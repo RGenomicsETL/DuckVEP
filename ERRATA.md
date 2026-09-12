@@ -7,9 +7,11 @@ this document is not a claim of complete conformance or clinical validation.
 
 Within its supported surface, DuckVEP must reproduce the pinned VEP 116 executable
 under the same reference, transcript model and settings, including absent HGVS values
-and input-representation-dependent results. The [upstream source registry](test/duckvep/upstream/sources.tsv),
+and input-representation-dependent results. The [compatibility contract](design/duckvep.md)
+pins the VEP, Ensembl core and variation revisions. The
+[upstream source registry](test/duckvep/upstream/sources.tsv),
 [dependency lock](test/duckvep/upstream/receipts/vep116_2026-07-22.conda-explicit.txt)
-and individual comparison receipts identify the exact authorities.
+and individual comparison receipts supply source anchors, dependencies and run identities.
 
 Every physical input record and source ALT remains a separate comparison unit, including
 duplicate POS/REF/ALT records. Equal reconstructed sequence does not permit replacing their
