@@ -247,8 +247,11 @@ is extended. The frameshift string has the reconstructed termination distance bu
 a different operation; the delins string asserts a stop absent from that translation.
 This does not establish prevalence, clinical impact or a general stop-loss defect.
 
-The complete four-record outputs and trace receipts remain local diagnostics, not a
-checked-in conformance pack. The shipped
+The complete four-record outputs and trace are in the untracked receipts
+`hgvs_anchor_contract_NTMkInFP/receipt.json` and
+`hgvs_anchor_trace_p2DHeEUD/mechanism_receipt.json`, both under
+`test/duckvep/conformance/results/`. These are local, build-unbound diagnostics,
+not a published conformance pack or release-build certificate. The shipped
 [terminal-anchor differential](test/duckvep/conformance/hgvs_anchor_differential.R)
 provides the broader executable comparison. DuckVEP's compatibility target remains
 each original record's VEP result; this inference does not replace it.
@@ -285,7 +288,8 @@ The [raw observations](test/duckvep/conformance/raw_indel_observations.R) and
 
 Haplosaurus groups lanes by final sequence but copies indel/frame flags from the first
 lane encountered. Later members do not combine those flags. The
-[grouped-flag experiment](test/duckvep/conformance/haplotype_grouped_flags.R) observes the
+[grouped-flag experiment](test/duckvep/conformance/haplotype_grouped_flags.R), recorded in
+its [results ledger](test/duckvep/conformance/data/haplotype_grouped_flags_history.csv), observes the
 same 180-base sequence group with `has_indel=0` for 11 hash seeds and `1` for 21,
 with identical memberships and agreement between repeats. This is order-dependent
 metadata, not a biological consensus rule. DuckVEP path flags and upstream group flags
