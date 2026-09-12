@@ -50,6 +50,10 @@ The compound path emits `p.(=)`; VEP's original MNV emits `p.Arg2=`.
 Whole-protein equality and equality at a named residue are different assertions.
 The 320 disagreements among 26,352 cis-SNV/MNV comparisons remain failures, not evidence
 that VEP is wrong or permission to merge source identities.
+These counts come from an unsigned, build-unbound local diagnostic outside release
+conformance history. Its untracked receipt is
+`test/duckvep/conformance/results/hgvs_cis_codon_3e62f43d481358/receipt.json`;
+the linked R file is the comparison driver, not a published result.
 
 The [retained indel comparison](test/duckvep/conformance/data/ambiguous_indel_translation/summary.csv)
 contains 168,000 original records and 1,344,000 HGVSp comparisons. Independent and
