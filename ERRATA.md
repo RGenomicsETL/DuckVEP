@@ -1,2487 +1,292 @@
-# DuckHTS errata
+# DuckVEP compatibility and errata
 
-Status: current compatibility and evidence ledger. Records pinned VEP-116 behavior,
-observed DuckVEP conformance gaps, and separately assessed upstream errata.
+Status: current compatibility guidance for pinned Ensembl VEP 116. DuckVEP is alpha;
+this document is not a claim of complete conformance or clinical validation.
 
-**An entry in this file is not, by itself, a claim that VEP is wrong.** Observed
-upstream behavior, DuckVEP compatibility failures and supported upstream-defect claims
-must be distinguished. Upstream acknowledgement is recorded separately from our evidence.
+## What the compatibility target means
 
-## Required target: pinned Ensembl VEP 116
+Within its supported surface, DuckVEP must reproduce the pinned VEP 116 executable
+under the same reference, transcript model and settings, including absent HGVS values
+and input-representation-dependent results. The [upstream source registry](test/duckvep/upstream/sources.tsv),
+[dependency lock](test/duckvep/upstream/receipts/vep116_2026-07-22.conda-explicit.txt)
+and individual comparison receipts identify the exact authorities.
 
-**DuckVEP must reproduce pinned Ensembl VEP 116, including its HGVS output and
-documented anomalies. This is the compatibility contract, not an HGVS spelling choice.**
-Within the declared supported surface, the acceptance contract is the pinned
-executable's output for each original record and source ALT, using the same reference,
-transcript model and settings. This includes HGVSc, HGVSp, input-representation-dependent
-results and absent HGVS values. It is a required target, not a claim that every DuckVEP
-path already conforms.
+Every physical input record and source ALT remains a separate comparison unit, including
+duplicate POS/REF/ALT records. Equal reconstructed sequence does not permit replacing their
+different VEP outputs with a canonical answer. A disagreement stays in the denominator.
 
-**Sequence equivalence does not waive a VEP-116 mismatch.** Equivalent inputs retain
-their separate source identities and per-record expectations. A different string must
-be classified by what it asserts: two spellings may describe the same change, whereas
-different asserted termination positions describe different protein outcomes. Neither
-a preferred canonical spelling nor another tool's output may replace the pinned
-expectations to make a compatibility test pass.
+Three verdicts must remain separate:
 
-**HGVS recommendations are a separate audit reference.** Matching VEP 116 does not
-establish HGVS nomenclature correctness. A disagreement does not establish a VEP defect.
-Suspected upstream errors require the evidence below; unresolved comparisons remain
-failures with every record retained in the denominator. The executable authorities are:
+- **Observed upstream convention:** reproducible VEP behavior that DuckVEP must follow.
+- **DuckVEP gap:** unsupported behavior or a retained compatibility disagreement.
+- **Potential upstream erratum:** a result contradicting an independently established
+  contract. Reproduction, interpretation and upstream acknowledgement are separate facts.
 
-- Ensembl VEP: `57ea5c52340acc1f156267f810ad162e26597082`;
-- Ensembl core: `c0cf13daa961d80584bad797b2eb0ff3a7500ef3`;
-- Ensembl variation: `2fb834b987ede3824e200197a838ce11e91aeb4b`;
-- dependency environment:
-  [`vep116_2026-07-22.conda-explicit.txt`](test/duckvep/upstream/receipts/vep116_2026-07-22.conda-explicit.txt).
+A potential upstream erratum requires a minimized input, pinned model and executable,
+complete outputs and diagnostics, an independent sequence or versioned-rule argument,
+and controls excluding our parser, projection and comparator. Agreement with another
+tool is insufficient. No upstream acknowledgement is recorded for the observations
+below. None authorizes silently changing compatibility output.
 
-**When VEP 116 and HGVS recommendations disagree, compatibility output follows VEP 116.**
-An independently supported nomenclature discrepancy belongs in this ledger; it does not
-authorize silently correcting the output. The exact executable revisions above are the
-target, not a floating VEP release or a generic HGVS renderer. Changing that target
-requires an explicit compatibility-contract decision, new pins and separate conformance
-evidence. HGVS-rule assessments name their recommendation version separately.
-An `ok` computation status does not certify that the returned string satisfies HGVS.
-`phase_policy := 'strict'` governs genotype phasing, not HGVS nomenclature. The internal
-`DUCKVEP_COMPAT_STRICT` control is not a certified HGVS implementation or a public SQL
-HGVS selection option. Phased composition still requires its own validation; matching
-independent-event VEP output does not certify compound HGVS.
+[HGVS 21.1.4 recommendations](https://hgvs-nomenclature.org/21.1.4/) are a separate
+nomenclature audit reference. Matching VEP does not certify HGVS correctness; an
+`ok` result is a computation status, not that certificate. The internal strict
+compatibility control is neither a second public consequence standard nor a certified
+HGVS implementation. Genotype `phase_policy := 'strict'` addresses a different question.
 
-VEP compatibility describes an observed result, not an endorsement of the underlying
-biology or API design. When VEP's predicate ordering produces an unusual combination of
-terms, DuckVEP must reproduce that state before offering a separately named alternative.
+## Remaining limitations
 
-## Haplosaurus does not define whole-haplotype SO, IMPACT or NMD
+Haplotype sequence replay is a foundation, not complete compound consequence prediction.
+Whole-haplotype SO, IMPACT and NMD require their own contract: Haplosaurus reports
+sequences, differences, carriers and flags, while the pinned NMD plugin evaluates one
+transcript-variation allele. Unioning independent labels or applying the plugin to a
+rebuilt stop position does not reproduce a whole-haplotype upstream method.
+See the [haplotype follow-up](https://github.com/RGenomicsETL/duckhts/issues/92).
 
-**Classification: upstream output scope, not an upstream defect or a waived mismatch.**
-Pinned Haplosaurus exposes CDS/protein sequences, differences, carriers, source variants
-and flags. Its CDS flags distinguish indels, open frameshifts and resolved frameshifts;
-its protein flags include stop changes and available SIFT/PolyPhen predictions. These
-are not a whole-haplotype Sequence Ontology consequence set, IMPACT category or NMD
-prediction. The per-source transcript-variation objects used to identify protein
-contributors do not classify the completed haplotype.
+Compound HGVS also has unresolved presentation comparisons. In the
+[internal-codon differential](test/duckvep/conformance/hgvs_cis_codon_differential.R),
+two cis SNVs changing `AGA` to `CGC` reconstruct the same protein as one MNV.
+The compound path emits `p.(=)`; VEP's original MNV emits `p.Arg2=`.
+Whole-protein equality and equality at a named residue are different assertions.
+The 320 disagreements among 26,352 cis-SNV/MNV comparisons remain failures, not evidence
+that VEP is wrong or permission to merge source identities.
 
-The pinned NMD plugin consumes one transcript-variation allele. Its eligibility comes
-from that allele's consequences, and its positional rules use the original feature's
-CDS/exon coordinates. It does not consume a completed alternate CDS or its first stop.
-Choosing a contributor, merging uploaded spans, or substituting the alternate stop
-position would define a different NMD policy, not reproduce that plugin.
+The [retained indel comparison](test/duckvep/conformance/data/ambiguous_indel_translation/summary.csv)
+contains 168,000 original records and 1,344,000 HGVSp comparisons. Independent and
+decoded-singleton routes agree, but raw-source routes retain 41,712 disagreements
+with independent-event VEP. Their distinct input semantics are explained below.
+All 336,000 independent SO comparisons agree in that finite matrix. These are recorded
+diagnostics, not current-build certificates, population error rates, or proof for
+compound events, reverse strands or phase-padded indels.
 
-Whole-haplotype SO/IMPACT/NMD remains a requested DuckVEP feature. It requires an explicit
-compound-prediction contract and independent validation; neither a union of independent
-labels nor a passing Haplosaurus sequence comparison establishes that contract. Existing
-VEP-116 comparisons, failures and denominators remain unchanged.
+The [conformance guide](test/duckvep/conformance/README.md) and
+[rendered report](benchmarks/duckvep_conformance.md) describe executable checks and their
+scope. The [evidence policy](design/duckvep_corpus_workflow.md) governs retained failures,
+comparison keys and controls; passing native properties cannot replace an executable
+differential.
 
-Sources: pinned [Haplosaurus output](https://github.com/Ensembl/ensembl-vep/blob/57ea5c52340acc1f156267f810ad162e26597082/modules/Bio/EnsEMBL/VEP/Haplo/Runner.pm#L235-L308),
-[CDS flags](https://github.com/Ensembl/ensembl-variation/blob/2fb834b987ede3824e200197a838ce11e91aeb4b/modules/Bio/EnsEMBL/Variation/CDSHaplotype.pm#L138-L189),
-[protein flags](https://github.com/Ensembl/ensembl-variation/blob/2fb834b987ede3824e200197a838ce11e91aeb4b/modules/Bio/EnsEMBL/Variation/ProteinHaplotype.pm#L387-L455),
-and [NMD plugin](https://github.com/Ensembl/VEP_plugins/blob/0082591268417af618e03850c5ffdc7c09998a5d/NMD.pm#L79-L118).
+<a id="n-containing-codons-in-independent-and-singleton-protein-annotation"></a>
 
-## Evidence required to call an upstream result wrong
+## Ambiguous bases: translation and allele validity are different
 
-**A DuckVEP/VEP disagreement is not evidence that VEP is wrong.** Its cause is initially
-unclassified: it may be a DuckVEP defect, a different input/model/configuration, a test
-harness error, or a deliberate upstream convention. Within the declared supported
-surface it remains a compatibility failure until resolved. Compatibility witnesses
-prove observed behaviour, not biological incorrectness. A proposed defect claim needs:
+**Classification: corrected DuckVEP compatibility defects, with scoped evidence.**
+An unambiguous source allele can lie in an N-containing codon whose amino acid is
+determinate. For table-1 CDS `ATGGCNTAA`, CDS position 4 `G>A` changes Ala to Thr:
+VEP reports `missense_variant` and `p.Ala2Thr`. Conversely, an N in the changed
+source allele can make its peptide unavailable. N is never a wildcard for REF validation.
 
-- a minimized input, runnable reproduction commands and exact executable, dependency,
-  reference and transcript-model identities, with input checksums, both complete raw
-  outputs, warnings and exit statuses retained and matching coordinate/allele conventions;
-- an independently checkable violated contract: for example a cited HGVS rule, or a
-  CDS reconstruction and translation derived from the pinned reference and transcript,
-  including strand, phase, codon table and model sequence edits;
-- controls that exclude our parser, projection, normalization and test comparator as
-  the cause, plus the affected scope and counterexamples to any proposed general rule;
-- a distinction between observed evidence, our inference and upstream acknowledgement,
-  with links to any upstream report or response. Another tool's agreement or a ClinVar
-  classification alone does not prove the claim.
+DuckVEP uses consensus translation while preserving separate checks for uploaded
+alleles, raw sequence ambiguity and curated reference proteins. Unknown local residues
+can coexist with missense or frame-change facts; they do not justify discarding all
+sequence predicates. The [SNV comparison](test/duckvep/conformance/data/ambiguous_codon_consensus/summary.csv)
+retains all 28,800 original SNVs over 125 ACGTN codons and 24 tables: 230,400 HGVSp
+and 57,600 SO comparisons agree. The
+[failing baseline](test/duckvep/conformance/data/ambiguous_codon_baseline) remains available.
+These forward, phase-zero internal-codon tests do not establish all transcript contexts.
 
-Even a supported erratum does not remove mismatches from a VEP-conformance denominator
-or silently change the selected compatibility profile. Any alternative needs explicit
-semantics and separate validation. Unresolved cases remain unresolved.
+For length-changing records, a literally matching N in an erased anchor or shared
+prefix/suffix differs from N in the changed payload. For CDS `ATGGCNGCCTAA`,
+position 6 `N>NGCC` yields independent-event `inframe_insertion` and `p.Ala2dup`.
+A removed N can still support a deletion while leaving the reference peptide unavailable.
+Raw predicate flags and emitted SO are also distinct: a length-decreasing event may
+have true raw missense and frameshift predicates but emit only `frameshift_variant`.
 
-Candidate witnesses: [fastVEP's divergence report at
-99b1275](https://github.com/Huang-lab/fastVEP/blob/99b1275fb114ecdff4b1b824a4284aa5058f8cef/docs/VEP_DIVERGENCE.md)
-describes VEP-115.1 observations. Establishing a VEP-116 defect or validating a
-DuckVEP alternative requires the evidence above for that exact version and contract.
+The [indel witnesses](test/duckvep/conformance/data/indel_translation_witnesses.jsonl.gz)
+and [predicate witnesses](test/duckvep/conformance/data/indel_predicate_witnesses)
+retain original records, actual CLI/direct-API observations and controls. The
+[diagnostic driver](test/duckvep/conformance/ambiguous_codon_differential.R) preserves
+source identities and absent outputs; direct-API evidence does not automatically
+certify VCF parser behavior.
 
-## HGVS authority and sequence equivalence
+## Record geometry and consequence terms
 
-VEP-116 compatibility and HGVS nomenclature correctness have separate verdicts.
-Compatibility compares each original input record with the pinned executable.
-A nomenclature claim names the HGVS recommendation version and the applicable rule;
-neither verdict substitutes for the other or changes its comparison denominator.
+**Classification: observed VEP-116 conventions.** The uploaded feature, minimized
+physical edit, displayed coordinates and altered sequence serve different purposes.
+DuckVEP keeps them distinct; normalizing an input before annotation can change the
+question VEP answers.
 
-Different representations are not automatically semantically equivalent. State which
-property is being compared:
-
-| Property | Required comparison |
+| Topic | Observed behavior and consequence for users |
 | --- | --- |
-| Source identity | Retain every physical input record and source ALT, including duplicate POS/REF/ALT records. |
-| Sequence equivalence | Reconstruct complete altered DNA and translated sequence under the same reference, transcript model and phased-edit interpretation. |
-| VEP-116 compatibility | Compare each original record's output, including absent HGVS values, with the pinned executable under matching inputs and settings. |
-| HGVS nomenclature correctness | Assess what each description asserts against an explicitly versioned HGVS rule and independent sequence evidence. |
-
-Equal altered DNA does not guarantee equal VEP-116 strings. Conversely, descriptions
-that assert different termination positions are not merely cosmetic spellings. The
-four-record witness below distinguishes those cases. Sequence-equivalent records stay
-separate in compatibility tests; their expected VEP output must not be replaced by one
-canonical string to make the comparison pass.
-
-[HGVS 21.1.4 extension rules](https://hgvs-nomenclature.org/21.1.4/recommendations/protein/extension/)
-give extension priority over frameshift or deletion-insertion when the complete
-reference protein is extended. Establish that sequence condition from the declared
-transcript, translation table and available downstream sequence. An unknown residue
-from an incomplete local codon does not establish a translated termination codon.
-
-Equal displayed proteins alone do not establish equivalent variants: the
-[HGVS deletion-insertion examples](https://hgvs-nomenclature.org/21.1.4/recommendations/protein/delins/)
-include different DNA variants with identical resulting proteins and different HGVS
-descriptions. A retained-anchor equivalence check must establish the same complete
-altered DNA under the same model and phased-edit interpretation. Source coordinates,
-record identity and contributor provenance remain separate from sequence equivalence.
-
-### Equivalent DNA anchors can produce contradictory VEP-116 protein descriptions
-
-**Classification: reproduced VEP-116 behavior; a sequence contradiction in the retained
-synthetic witness and an HGVS-rule inference, without upstream acknowledgement.**
-
-The witness uses standard translation table 1, a forward, single-exon transcript
-`ANCHOR1` on `chrA1:11-45`, and a phase-zero CDS at `chrA1:11-22`. Its complete transcript
-sequence is `ATGGGTCCTTAAAAAGAACAATAATAACTAGCTGA`; its CDS is `ATGGGTCCTTAA`, translating
-to `MGP*`. Coordinates below are one-based genomic positions. All four physical VCF
-records are retained, including the two with identical POS/REF/ALT and different IDs.
-
-| Source record ID | POS | REF | ALT | VEP HGVSc | VEP HGVSp suffix |
-| --- | --- | --- | --- | --- | --- |
-| `ANCHOR1_10_T_0` | 19 | T | TT | `ANCHOR1:c.10dup` | `p.Ter4LeufsTer9` |
-| `ANCHOR1_10_T_1` | 20 | T | TT | `ANCHOR1:c.10dup` | `p.Ter4delinsLeuTer` |
-| `ANCHOR1_11_T_0` | 20 | T | TT | `ANCHOR1:c.10dup` | `p.Ter4delinsLeuTer` |
-| `ANCHOR1_11_T_1` | 21 | A | TA | `ANCHOR1:c.10dup` | `p.Ter4delinsLeuTer` |
-
-**Observed sequence evidence.** Applying each REF/ALT to the same reference produces the
-same complete altered genome and transcript. The altered transcript is
-`ATGGGTCCTTTAAAAAGAACAATAATAACTAGCTGA`. Independent base-R translation and BioPerl agree
-on `MGPLKRTIITS*`, with the first stop at position 12. The delins string instead denotes
-Leu at position 4 followed immediately by a stop at position 5. These are not equivalent
-spellings of the same protein result.
-
-**Observed executable mechanism.** The allele-local peptide cache contains an incomplete
-codon rendered as `X`; the HGVS helper converts `Xaa` to `Ter`. The alternate anchor
-selects a different cached reference-peptide/frameshift state. Unmodified and
-observationally traced VEP runs produce identical complete record outputs, at both
-buffer sizes 1 and 5,000. Source authority:
-[`TranscriptVariationAllele::_get_hgvs_peptides`](https://github.com/Ensembl/ensembl-variation/blob/2fb834b987ede3824e200197a838ce11e91aeb4b/modules/Bio/EnsEMBL/Variation/TranscriptVariationAllele.pm#L2108)
-and the preceding `hgvs_protein` / `_get_hgvs_protein_type` call path.
-
-**HGVS-rule inference.** Under
-[HGVS 21.1.4](https://hgvs-nomenclature.org/21.1.4/recommendations/protein/extension/),
-the intact reference protein is extended, so extension takes priority over frameshift
-or delins. Our inferred predicted suffix is `p.(Ter4LeuextTer9)`. The observed frameshift
-string has the reconstructed termination distance but not the preferred operation;
-the observed delins string specifies a stop absent from the reconstructed sequence.
-This does not establish clinical impact, prevalence, behavior in other VEP versions,
-or a general defect affecting all stop-loss annotations.
-
-**DuckVEP policy.** VEP-116 compatibility requires the per-record observed presentation.
-Sequence equivalence and HGVS compatibility have separate assertions: equal altered DNA
-must preserve replayed sequence, while each original record's HGVS is compared with
-the pinned executable. A nomenclature disagreement remains visible; it is not removed
-from either comparison denominator or silently replaced with the inferred HGVS form.
-
-Retained local evidence lives under `test/duckvep/conformance/results/` in
-`hgvs_anchor_contract_NTMkInFP/receipt.json` and
-`hgvs_anchor_trace_p2DHeEUD/mechanism_receipt.json`. These receipts identify the reference,
-GFF, original records, complete oracle outputs, source trace and independent translation.
-Controls reject dropped records, duplicate identities, changed protein strings and
-synthetic stops. These are local diagnostic artifacts, not a published conformance pack
-or release-build certificate. No upstream acknowledgement is recorded.
-
-### Phased HGVS certification scope
-
-**Classification: diagnostic singleton conformance evidence, not complete phased-HGVS
-certification.** The four forward-transcript records above do not establish general compatibility.
-The [terminal-anchor differential](test/duckvep/conformance/README.md) crosses all three
-stop codons, following codons, both strands and both source-anchor forms. It compares
-every source independently under decoded and raw-genotype routes, with complete model
-sequence and exact CDS replay checks.
-
-The comparison retains every case, including absent HGVS values. A DuckVEP string
-where VEP emits none is a compatibility failure, not evidence that VEP is wrong.
-Such failures must not be excused by the four-record witness or removed from the
-denominator. Native composition properties and SQL/R tests do not replace this check.
-
-The retained diagnostic `hgvs_anchor_ca4e927159c40/receipt.json` under
-`test/duckvep/conformance/results/` covers 384 models and 12,288 physical records:
-zero independent-event HGVSp mismatches, zero phased HGVSp mismatches across 49,152
-comparisons (two routes and two thread counts), and zero CDS replay mismatches.
-Complete native outputs are thread-invariant. Five corruption controls exercise the
-same comparison routine. The failed baseline `hgvs_anchor_be6c231a9fb1c/receipt.json`
-retains its 21,376 phased disagreements over the same 49,152 comparisons. No case is
-waived. `baseline_comparison.json` verifies identical generated input hashes and zero
-changes to every non-HGVS output field across all 49,152 comparisons. These generated
-configurations establish neither a population error rate nor
-compound-event conformance; the diagnostic build is not release-certified.
-
-### Cis synonymous substitutions and a single MNV have different equality output
-
-**Classification: reproduced compound/single-record presentation disagreement;
-not a demonstrated VEP defect or a protein-sequence error.**
-
-The exhaustive [internal-codon diagnostic](test/duckvep/conformance/README.md) covers
-6,588 forward/reverse model cases with two or three changed bases in the second
-codon, standard translation table 1, complete phase-zero CDS and one exon. VEP 116
-annotates the original three-base MNV. DuckVEP receives that exact MNV separately
-from the equivalent two- or three-SNV source relation; it does not merge their
-source identities for compatibility scoring.
-
-For example, the forward `CIS01299` model has CDS `ATGAGAGCCTAA` at genomic positions
-11–22. Both of these inputs reconstruct CDS `ATGCGCGCCTAA` and protein `MRA*`:
-
-| Source representation | Genomic edits | Observed HGVSp suffix |
-| --- | --- | --- |
-| One MNV, pinned VEP and DuckVEP | 14: `AGA` → `CGC` | `p.Arg2=`; DuckVEP's phased singleton adds prediction parentheses |
-| Two cis SNVs, DuckVEP compound path | 14: `A` → `C`; 16: `A` → `C` | `p.(=)` |
-
-The same distinction occurs in 80 of the 6,588 cases, all involving synonymous
-Arg, Leu or Ser codons. Across one/four DuckDB threads, decoded strict haploid calls
-and raw `1|1` diploid calls, 39,528 exact-MNV HGVSp comparisons have zero mismatches.
-The separate cis-SNV/MNV comparison retains 320 mismatches across 26,352 comparisons
-(80 cases repeated in four configurations). All 52,704 haplotype CDS and protein
-comparisons agree, and complete native outputs agree across thread counts.
-
-[HGVS 21.1.4 substitution rules](https://hgvs-nomenclature.org/21.1.4/recommendations/protein/substitution/)
-distinguish equality at a named residue from equality of the entire protein coding
-region. The compound builder contrasts complete proteins and emits `p.(=)` when
-there are no changed protein operations; the single-source path preserves VEP's
-localized label. Equal reconstructed sequence does not turn these assertions into
-interchangeable compatibility strings. Conversely, VEP's output for a synthetic
-merged MNV does not establish its output for multiple original records.
-
-The diagnostic exits nonzero and waives no difference. Its exact-MNV result is
-single-record evidence, not compound-HGVS certification or an upstream-error claim.
-Retained local evidence is
-`test/duckvep/conformance/results/hgvs_cis_codon_3e62f43d481358/receipt.json`,
-including both complete oracle VCFs, source relations, nested native outputs,
-34 corruption controls, source hashes and the executed extension. This is an
-unsigned, build-unbound diagnostic; it does not enter release conformance history.
-
-### Independent HGVS and curated-reference protein differences are separate contracts
-
-Pinned `TranscriptVariationAllele` reports `p.Ala2=` or `p.Ala3=` for the retained
-synonymous SNV witnesses with a legitimate alternative start, selenocysteine,
-terminal readthrough, mitochondrial termination or lowercase model sequence.
-Haplosaurus's displayed alternate may nevertheless differ from its curated reference
-protein. Those differences remain in `protein_differences`; they do not replace the
-single-source VEP HGVS label with a whole-protein contrast such as `p.Met1Leu`.
-
-`reference_translation_oracle.pl` constructs real pinned core/variation objects and
-observes both outputs. `reference_translation_differential.R` retains all six emitted
-HGVS observations from five source cases, including the extra uppercase-reference
-allele admitted by the direct API for lowercase sequence. That direct-API observation
-is not a claim about VEP's VCF parser. Its reference/alternate translation matrix
-and separate corruption controls remain part of the receipt.
-The retained [reference-translation bundle](test/duckvep/conformance/data/reference_translation_consensus)
-covers 27,014 reference/alternate translation cases and these six HGVS observations.
-This observer supplies phase-zero models without a database adaptor. Translation
-attributes reach core reference curation, but it does not populate the variation
-model's `_seq_edits` cache as VEP's `prefetch_translation_data` does. Its independent
-HGVS observations therefore do not certify allele-local peptide-edit semantics.
-
-## Executable compatibility policy
-
-Executable-language leaks are named in
-`src/duckvep/kernel/src/duckvep_compat.h`. The adapter explicitly selects the public
-`DUCKVEP_COMPAT_VEP_116` kernel profile; the internal `DUCKVEP_COMPAT_STRICT` oracle
-disables only these gated leaks and is not a second consequence standard. A new
-Perl/BioPerl/runtime-dependent result must be classified here: either it receives a named
-flag, a strict counterexample, and an executable-VEP witness, or this ledger explains why
-it is part of the direct VEP state-machine contract rather than an alternative formatter
-policy. It must never remain an undocumented local special case. Algorithms must query
-the policy and must not test a VEP version or substitute a codon table locally.
-
-| Compatibility flag | VEP-116 result | Strict control | Detailed entry |
-|---|---|---|---|
-| `DUCKVEP_COMPAT_HGVS_INCOMPLETE_CODON_ASSIGNMENT` | Perl assignment retains an alternate CDS of at least three bases in the late protein-HGVS path | trim the alternate CDS to complete codons | [Protein HGVS local-peptide state machine](#protein-hgvs-preserves-veps-local-peptide-state-machine) |
-| `DUCKVEP_COMPAT_HGVS_LATE_STOP_STANDARD_TABLE` | BioPerl silently uses NCBI table 1 for the late stop search | retain the transcript codon table | [Late protein-stop search](#late-protein-stop-search-ignores-the-transcript-codon-table) |
-| `DUCKVEP_COMPAT_HGVS_TERMINAL_PARTIAL_INSERTION` | consequence and HGVSp inspect distinct peptide views | use the canonical coding-context peptide view | [Terminal partial-codon insertions](#terminal-partial-codon-insertions-use-distinct-consequence-and-hgvs-peptide-views) |
-| `DUCKVEP_COMPAT_HGVS_NEGATIVE_SUBSTR` | a negative Perl substring start can produce position-zero output | reject the invalid negative peptide slice | [Protein HGVS local-peptide state machine](#protein-hgvs-preserves-veps-local-peptide-state-machine) |
-| `DUCKVEP_COMPAT_HGVS_XAA_AS_TER` | the formatter conflates BioPerl `Xaa` and `Ter` | keep unknown residue `Xaa` distinct from termination `Ter` | [Protein HGVS local-peptide state machine](#protein-hgvs-preserves-veps-local-peptide-state-machine) |
-
-This is the complete current inventory of runtime-language leaks for which DuckVEP has a
-separate strict result. The table is not a second implementation. The terminal-partial
-insertion predicate has one C authority shared by consequence and HGVS; profile-gated
-consumers choose the required view.
-Codon-table selection for the late stop search goes through the named policy helper, and
-even the single-residue fast path requires its caller to supply a profile.
-
-The implementation and test authorities are deliberately small:
-
-- `duckvep_compat_policy()` is the only profile-to-flag mapping. The
-  `compatibility_policy_inventory_is_versioned` test asserts the complete VEP-116 mask,
-  the empty strict mask, and the profile-dependent late-stop codon table;
-  `compatibility_policy_rejects_unknown_profiles_everywhere` proves that an invalid
-  profile cannot silently acquire strict-like fact or rendering semantics.
-- `hgvs_protein_alt_cds_length()` owns the incomplete-codon assignment replay;
-  `hgvs_short_alternate_cds_reproduces_vep_trim_assignment` pins both the executable Perl
-  result and the strict complete-codon result.
-- `duckvep_compat_late_stop_codon_table()` owns the table-1 substitution;
-  `hgvs_late_stop_search_reproduces_vep_standard_table_and_precedence` exercises both
-  VEP-116 and strict table-2 results.
-- `duckvep_coding_context_is_terminal_partial_insertion()` is the sole predicate for the
-  terminal-partial insertion state. `coding_context_delta_cds_end_nf_known_scene` pins
-  codon-start versus internal insertion placement, the distinct VEP consequence/HGVS
-  views and strict Xaa rendering, while
-  `partial_terminal_insertion_covers_generated_vep_strata` explores both terminal-tail
-  lengths, all insertion-length residues modulo three, both strands, and standard and
-  mitochondrial translation tables.
-- the protein fact builder and renderer admit position-zero facts only through
-  `DUCKVEP_COMPAT_HGVS_NEGATIVE_SUBSTR`;
-  `hgvs_protein_facts_render_core_vep_shapes` builds both position-zero shapes from
-  complete peptide contexts, pins VEP's strings, and proves strict rejection at fact
-  construction. The minimized scenes cite the tracked extraction
-  `test/duckvep/conformance/data/hgvs_compatibility_witnesses.tsv` from the executable
-  differential, rather than inventing renderer-only facts.
-  `hgvs_protein_residue_name()` plus the sequence writer own Xaa/Ter presentation;
-  `strict_compatibility_keeps_xaa_distinct_from_termination` proves that disabling the
-  flag changes both substitution and delins output.
-
-Facts that borrow a coding context carry the same profile as that context. Fact building,
-late frameshift-termination replay, residue access, and rendering reject unknown or
-mismatched profiles; they cannot combine a strict fact with a VEP-116 peptide view. The
-self-contained single-residue fast path rejects an unknown profile as `INVALID_ARG`, not
-as a biologically inapplicable event.
-
-These C tests isolate mechanics; they do not certify VEP compatibility by themselves.
-Executable VEP differentials over fixed witnesses, complete real corpora, and generated
-rare-state campaigns remain the acceptance authority. Sanitizers establish memory and
-undefined-behaviour safety for the exercised states, not biological or VEP equivalence.
-The strict profile is never selected implicitly and is not exposed as a SQL option in the
-VEP-116 release surface.
-
-The SQL-only `duckvep_transcript_projection` reference is likewise specifically a
-VEP-116 presentation contract, not a strict-profile kernel entry point. Its alternate
-codon slice reproduces `TranscriptVariationAllele::_get_alternate_cds` calling
-`_trim_incomplete_codon`: the latter's assignment in the condition retains an alternate
-CDS of at least three bases, then the caller appends the post-CDS sequence. Trimming
-that sequence to a multiple of three would change frameshift and terminal-partial
-codon displays. The explicit SQL length test is the reference relation's expression
-of this same named incomplete-codon assignment behavior; it does not change the C
-profile inventory. `test/sql/duckvep_projection.test` pins variable-length displays
-and a partial-CDS endpoint; `projection_differential.R` compares every typed display
-field with the pinned executable on both strands and a partial-CDS model. GFF input
-does not carry the full Ensembl transcript-quality/translation-edit attribute set:
-positive `cds_*_NF` and peptide-edit tests are model-attribute properties, not a claim
-of GFF-based oracle coverage for those attributes.
-
-### Presentation phase is not CDS sequence padding
-
-VEP 116 `BaseTranscriptVariation::cds_start` uses
-`transcript->start_Exon->phase`, and the pinned core `TranscriptMapper` initializes
-its protein-coordinate shift from `get_all_Exons()->[0]->phase`. Both refer to
-the first **transcript** exon. Separately, `Transcript::translateable_seq` pads
-the sequence with the phase of `translation->start_Exon`, the first **coding**
-exon. These phases can differ when a partial CDS begins after a noncoding exon.
-The SQL VEP presentation relation must retain that distinction rather than use
-the kernel's biological CDS-padding offset for displayed CDS/protein positions.
-This is the direct pinned VEP mapper contract, not a new strict-profile policy.
-
-`projection_differential.R` includes later coding-exon phases 1 and 2, with an
-initial noncoding exon of phase -1. Every projected field is compared against
-the unchanged pinned VEP executable. Deliberately substituting the coding-exon
-phase must produce CDS-coordinate mismatches. `duckvep_projection.test` also
-pins a three-base CDS position whose protein position would change under that
-substitution.
-
-The distinction also governs sequence mutation, not just displayed positions.
-`TranscriptVariationAllele::_get_alternate_cds` edits the padded sequence at the
-feature-CDS offset. Start predicates instead edit UTR+CDS at the unpadded cDNA
-offset. `_overlaps_stop_codon` tests unpadded cDNA, whereas
-`_ins_del_stop_altered` edits CDS+UTR at the feature-CDS offset and inspects the
-last three stored CDS positions, even when they are not an in-frame codon.
-Validating REF at the feature offset, adding physical padding to the start
-predicate, or requiring a codon-aligned stored CDS endpoint changes VEP results.
-
-The kernel's physical edit array is not mutated when opening an independent
-feature-coordinate context. The context retains a separate unpadded edit start
-and the model's physical padding count. Known padding N bytes, including their
-shifted positions after an indel, participate in the same BioPerl consensus
-translation as genomic N. Changed-allele eligibility remains a separate check.
-Standalone scratch calls use the same
-annotation dispatcher. Physical materialization remains an explicitly named
-sequence-edit reference, not a second independent-consequence implementation.
-
-Pinned later-coding-start witnesses include `chrDuck:165 A>AATG` (stop-gained at
-phase 0, insertion plus stop-gained at phase 1, insertion at phase 2),
-`235 TGGT>T` (in-frame deletion at every phase), and `239 AAAC>A` (partial-codon
-plus coding-unknown at phase 0, stop-lost at phases 1/2, with 3-prime UTR overlap
-throughout). SQL and R retain complete SO/status sets; native tests additionally
-mirror the same feature with a reverse-genomic VCF anchor and check that wrong
-physical REF fails before feature-coordinate mutation.
-
-The remaining entries in this ledger describe VEP's declared coordinate, mapper,
-predicate-order, cache, or output semantics. They are implemented as typed facts and
-generated consequence rules, not hidden formatter switches. Examples include the
-configurable 5 kb transcript reach, the separately named fixed 5 kb BND admission cap,
-the named 1,000-base HGVS shift window, splice/NMD thresholds, and uploaded-feature versus
-minimized-edit geometry. Those values still require source anchors and differential
-witnesses, but toggling them in `STRICT` would define a different consequence engine
-rather than isolate a Perl/BioPerl leak.
-
-## Ensembl release VE is a release product, not the VEP executable oracle
-
-The official Ensembl variation release VCF contains both `VE` and `CSQ`. `VE` preserves
-one `Consequence|Index|Feature_type|Feature_id` item for every stored variation-effect
-row; its zero-based Index identifies the corresponding GVF `Variant_seq`. The release
-`CSQ` field is assembled later by `gvf2vcf.pl` in a hash keyed only by allele and feature.
-Assigning `Consequence` to that hash overwrites earlier terms for the same pair. A
-non-coding intronic allele can therefore retain both `non_coding_transcript_variant` and
-`intron_variant` in VE while CSQ contains only `intron_variant`.
-
-`VE` is lossless relative to those stored variation-effect rows, but those rows are not
-the output of the VEP command-line executable. The distinction is observable in release
-116 at both `X:276322 G>A` and `Y:276322 G>A`: the published `VE` value is
-`intergenic_variant`, while the pinned VEP 116 executable in cache mode with
-`--distance 0` emits three path-specific `5_prime_UTR_variant` transcript rows on each
-chromosome. DuckVEP emits the same three Y transcript rows as the executable. The
-executable/cache combination therefore remains the compatibility oracle; the official
-VCF is a separate release-product audit that can reveal differences between Ensembl's
-variation release pipeline and VEP.
-
-The release-product audit must aggregate `VE` by Index and feature, set transcript flank
-distances to zero to match the variation database's overlap-only dump, and keep the exact
-producer revision in its receipt. A difference from `VE` is retained and reported, but it
-does not override an exact executable-VEP result. `CSQ` remains useful for testing the
-typed VCF parser and its advertised presentation fields, not for reconstructing the
-complete stored consequence relation. For non-SNVs, do not infer ownership by comparing
-the GVF/CSQ allele text with a padded VCF ALT: the producer records `Variant_seq` and Index
-before
-`VariationFeature->to_VCF_record` constructs the VCF representation.
-
-Source anchor: Ensembl Variation release/116 commit
-`2fb834b987ede3824e200197a838ce11e91aeb4b`,
-`scripts/misc/release/gvf2vcf.pl::parse_consequence_info`, and
-`scripts/export/release/dump_gvf.pl`.
-
-## Assembly paths, PAR, patches, and alternate haplotypes are distinct model inputs
-
-VEP 116 does not reduce every assembly path to one primary chromosome before annotation.
-Its cache contains top-level alternate and patch paths, and an input already named on an
-available annotation path is evaluated on that path. `Parser.pm` transforms an input
-feature to another top-level sequence only when the stated sequence cannot be resolved by
-the configured annotation sources.
-
-Four upstream structures have different roles and must not be collapsed into one alias
-table:
-
-- core `assembly_exception` rows define coordinate projections for `PAR`, `HAP`,
-  `PATCH_FIX`, and `PATCH_NOVEL` regions;
-- `alt_allele` and `alt_allele_attrib` describe gene-equivalence groups, including
-  `IS_PAR` and representative-gene metadata; they do not authorize merging path-specific
-  transcript consequence rows;
-- VEP cache construction explicitly resolves duplicate human Y slices before dumping
-  transcript content;
-- the Ensembl variation FASTA adapter can fetch human Y-PAR reference sequence from the
-  corresponding X interval when the Y representation is unavailable or masked.
-
-This matters beyond contig spelling. X and Y PAR transcripts can share sequence and gene
-equivalence while retaining different transcript stable IDs and sequence-region
-coordinates. MHC alternate haplotypes such as `HSCHR6_MHC_COX_CTG1` are likewise distinct
-top-level annotation paths. A primary chromosome 6 event is not implicitly copied onto
-every MHC path, and an HLA allele name such as `HLA-A*02:01` is not a genomic
-sequence-region identifier.
-
-The current DuckVEP Ensembl preparation macros select exactly the sequence regions present
-in the supplied reference-chunk relation. A primary-assembly FASTA therefore builds a
-primary-path model; adding an alternate-path FASTA makes those exact paths eligible.
-`duckvep_model_load(...)` and `duckvep_annotate(...)` consume the resulting dense
-sequence-region ordinals and do not perform implicit synonym, PAR, patch, haplotype, or
-assembly-exception projection. Callers that accept external contig names must resolve them
-to an exact modeled path before constructing the event relation. Model receipts must state
-the reference path set, transcript-selection policy, and any assembly-exception
-preprocessing.
-
-This exact-path policy is compatible with VEP only for inputs whose path is directly
-available in the prepared model. General unavailable-path transformation and wrapped or
-projected assembly-exception execution remain separate work; returning an ordinary
-intergenic result for an absent path would be incorrect.
-
-The checked `par_path_witnesses.vcf` covers both path admission and sequence-dependent
-annotation. At `X/Y:276322 G>A`, VEP and DuckVEP emit the six path-specific
-`5_prime_UTR_variant` rows that differ from the published release `VE` product. At
-`X/Y:284188 A>G`, both engines emit path-specific PLCXD1 `start_lost` rows with
-`c.1A>G` and `p.Met1?`, including the corresponding NMD and non-coding transcript states.
-The four-event executable differential contains 44 transcript pairs; all 44 consequence
-pairs, all applicable HGVSc values, and all applicable HGVSp values agree exactly, with no
-unresolved, missing, or extra row.
-
-Source anchors: Ensembl release/116
-`modules/Bio/EnsEMBL/VEP/Parser.pm`, VEP cache pipeline
-`modules/Bio/EnsEMBL/VEP/Pipeline/DumpVEP/CreateDumpJobs.pm`, Ensembl Variation
-`modules/Bio/EnsEMBL/Variation/Utils/FastaSequence.pm`, and the core/otherfeatures schema
-fixtures containing `assembly_exception`, `alt_allele`, and `alt_allele_attrib`.
-
-## VEP removes EMAR rows before regulatory overlap evaluation
-
-The Ensembl funcgen `regulatory_feature` table contains
-`epigenetically_modified_region` rows whose feature-type name is EMAR. VEP 116 does not
-turn those rows into `RegulatoryFeatureVariation` objects. Both its database annotation
-source and the regulation-effect pipeline explicitly remove them before overlap
-consequences are computed; the source comment says this avoids their very long names.
-The indexed cache therefore cannot emit an EMAR stable ID even when an allele overlaps
-the corresponding funcgen interval.
-
-Loading every raw funcgen row produced a clean diagnostic signature: ordinary promoter,
-enhancer, CTCF, open-chromatin, and motif overlaps agreed, while every extra DuckVEP row
-was an EMAR `regulatory_region_variant`. The model compiler now removes EMAR rows before
-dense feature ordinals, the resident SoA, and the cgranges index are built. This is source
-selection, not a consequence suppression rule; keeping EMAR in the hot model and hiding
-its output would waste memory and traversal work on features VEP never admits.
-
-Source anchors: VEP 116 `AnnotationSource/Database/RegFeat.pm` and Ensembl Variation 116
-`Pipeline/RegulationEffect.pm`.
-
-## BND topology stays local while truncation observes both overlap alleles
-
-VEP 116 does not evaluate a BND as two ordinary point variants. `BaseVCF4::get_start`
-shifts the local VCF `POS` by one. `StructuralVariationFeature::_parse_breakends` keeps the
-mate coordinate verbatim, and `StructuralVariationOverlap` can build an overlap allele for
-each endpoint within its fixed 5 kb admission distance. Ordinary transcript predicates
-still inspect the shifted local feature. Only `feature_truncation` inspects the current
-overlap allele's endpoint.
-
-The consequences are deliberately odd. A local intronic endpoint plus an intragenic mate
-can produce `feature_truncation&intron_variant`. A transcript found only through an
-interchromosomal mate produces `feature_truncation` with no local region. A mate near but
-outside a transcript can create an internal overlap allele whose predicate list falls back
-to `intergenic_variant`. The four VCF bracket orientations do not alter these transcript
-consequence sets.
-
-The fixed overlap-allele admission and the caller's directional window are independent.
-The fixed 5 kb rule does not discover a transcript by itself. VEP's transcript annotation
-source must first fetch the transcript through an overlapping endpoint or the configured
-upstream/downstream window; only then can `StructuralVariationOverlap::_close_to_feature`
-attach another endpoint to that already-created transcript overlap object. An executable
-VEP 116 witness with both BND endpoints outside `ENST00000624595`, but no farther than
-5,000 bases from its transcript endpoints, emits no transcript row at `--distance 0` and
-does emit the downstream transcript row at `--distance 5000` and `--distance 10000`.
-Consequently DuckVEP limits BND transcript candidate discovery by the configured caller
-distance (and by exact overlap), while retaining 5,000 as the separate post-discovery
-overlap-allele admission test. Treating either number as an alias for the other changes
-the zero- and wider-distance results.
-
-Once a transcript has been discovered through the mate or another eligible locus, the
-fixed overlap-allele rule becomes observable.
-For example, with `--distance 0`, a shifted local point that is outside a transcript but
-within the fixed 5000-base admission range still creates a local overlap allele. Its
-disabled upstream/downstream predicate leaves an empty predicate set, so that allele
-defaults to `intergenic_variant`; an intragenic mate independently contributes
-`feature_truncation`. VEP therefore returns
-`feature_truncation&intergenic_variant`. At 5001 bases the local allele does not exist and
-the same mate contributes only `feature_truncation`. Testing only the shared 5000-base
-default hides this state.
-
-The default also applies to the mate allele. In the minimal two-exon model,
-raw `chrDuck:150 N[chrDuck:251[` shifts the local feature to the first intron
-base, where the structural consequence program has no ordinary term. The local
-allele truncates the transcript; the mate at 251 is just outside it and defaults
-to intergenic. The union is `feature_truncation&intergenic_variant` in all four
-orientations. A mate 5001 bases outside the transcript creates no allele, so it
-cannot contribute that default. Assigning defaults only after unioning endpoint
-predicates loses this state. The seed-31 minimal-model executable witness and
-native, SQL and R cases retain it.
-
-The converse is equally non-obvious. If the mate creates the overlap object, predicates
-on that mate allele still receive the local `StructuralVariationFeature`. A caller window
-wider than 5000 bases can therefore emit a local upstream/downstream term even when the
-local endpoint is too far away to create its own overlap allele. The fixed cap controls
-allele construction; it does not clip the coordinates seen by ordinary predicates on an
-allele constructed for the other endpoint.
-
-Raw VEP output may contain two allele rows for one BND/transcript. DuckVEP supplies both
-loci to one event, performs two cgranges candidate queries, evaluates ordinary topology
-once from the local feature, applies mate-aware truncation, and emits the union once per
-transcript. The rich SQL region is NULL when only the mate contributes; the compact region
-mask is zero. Raw ALT, orientation, event identity, and provenance remain ordinary
-relation columns for HGVS, fusion, and round-trip work.
-
-VEP's executable oracle has a separate batching hazard. `InputBuffer::interval_tree`
-inserts every mate position into the same coordinate tree as the local positions without
-a chromosome key. When several cross-chromosome BNDs share a buffer, neighboring records
-can therefore change another record's transcript set. This is not a per-event consequence
-rule. The differential runs BNDs with `buffer_size=1` in one VEP process, preserving cache
-reuse while isolating the event whose semantics are being compared. It also writes the VCF
-with chromosomes contiguous and positions increasing, using the FASTA index only as the
-deterministic chromosome order.
-
-The broader seeded GRCh38 differential covers chromosomes 1, 2, 7, 21, and X, all four
-bracket orientations, same- and cross-chromosome pairs, and transcript/exon/intron/CDS/flank
-endpoint states. Its 1,004 BND events produced 91,428 transcript pairs, all exact against
-isolated executable VEP 116 with no disagreement, extra row, or missing row. Source anchors
-are VEP 116 `InputBuffer::interval_tree` and `BaseVCF4::get_start`, plus Ensembl Variation
-116 `StructuralVariationFeature::_parse_breakends` and `StructuralVariationOverlap`.
-
-## BND regulatory and motif overlap observes both endpoint points
-
-The transcript asymmetry above does not mean regulation is local-only. VEP 116's
-`AnnotationSource` fetches RegulatoryFeature and MotifFeature candidates around the local
-and alternative breakend coordinates. `RegFeat::annotate_InputBuffer` then asks the input
-buffer for overlapping variation features; that helper tests the shifted local point and
-every mate point. Either point can therefore create a regulatory or motif overlap.
-
-A BND has neither VEP's ordinary deletion predicate nor its copy-number-gain predicate,
-but the result still depends on which endpoint found the feature. A shifted-local hit
-retains the ordinary `regulatory_region_variant` or `TF_binding_site_variant` term.
-`VariationEffect::feature_truncation` first checks `chromosome_breakpoint`; a mate-only
-overlap reaches that branch and becomes generic HIGH-impact `feature_truncation` without
-consulting deletion or copy loss.
-
-There is a second, less obvious state. Once either endpoint discovers a feature exactly,
-`StructuralVariationOverlap::_close_to_feature` admits the other endpoint when it is on
-the same contig and no farther than 5000 bases from that feature. If the mate is inside
-but the shifted local point is merely close, VEP emits two rows for the same stable
-feature: local `intergenic_variant` and mate `feature_truncation`. DuckVEP's public unit
-is their union, `feature_truncation&intergenic_variant`. This does not mean that a feature
-5000 bases away is independently discoverable; one endpoint must still overlap it
-exactly before the close endpoint is attached to that object.
-
-This fixed value is not VEP's caller-configurable `--distance`, even though both default
-to 5000. The former is compiled into
-`StructuralVariationOverlap::_close_to_feature`; the latter controls directional
-upstream/downstream transcript reach. DuckVEP therefore tests a 10,000-base caller window
-with structural endpoints exactly 5,000 and 5,001 bases from the object. The first may
-join the mate-discovered object; the second must not. Statistical sweep scenes also use
-4,999, 5,000, 5,001, 10,000, and 65,535-base windows so the implementation is not trained
-only on the shared default value.
-
-If local and mate points both lie inside the same feature, the local base term wins. VEP
-116 may emit several identical rows for that `(event, feature)` because
-`InputBuffer::get_overlapping_vfs` can return the same StructuralVariationFeature through
-both points. The executable witness at local raw `21:45553052`, shifted local
-`21:45553053`, and mate `21:45553063` emits repeated
-`regulatory_region_variant` for `ENSR21_5DP9TR`, but emits local
-`intergenic_variant` plus mate `feature_truncation` for the nested motif
-`ENSM00000587576`, whose exact interval starts at `21:45553055`. DuckVEP unions distinct
-allele rows and returns each object once. It also rechecks contig plus point overlap, so a
-matching numeric coordinate on the wrong contig is not an overlap.
-
-Source anchors: VEP 116 `AnnotationSource.pm::get_all_features_by_InputBuffer`,
-`AnnotationType/RegFeat.pm::annotate_InputBuffer`, and
-`InputBuffer.pm::get_overlapping_vfs`; Ensembl Variation 116
-`StructuralVariationOverlap::_close_to_feature` and
-`Utils/VariationEffect.pm::{feature_truncation,within_regulatory_feature,within_motif_feature}`.
-
-## Bounded tandem repeats change VEP object class; structural repeats mimic tandem duplication
-
-For `<CNV:TR>`, VEP's VCF parser reads `RN` with `RUS`/`RUC` or `RB` and expands the repeat
-to literal REF/ALT sequence when the resulting allele fits `max_sv_size`. The expanded
-record becomes an ordinary `VariationFeature`; its consequence follows small-variant
-normalization, sequence projection, and translation. An oversized or unexpanded record
-remains a `StructuralVariationFeature` with structural class `tandem_repeat`.
-
-The parser explicitly ignores `CIRUC` and `CIRB` when constructing the alternate allele.
-Its default `max_sv_size` is 5,000 bases, but that allocation guard is unrelated to both
-the configurable transcript-distance default and the separate fixed 5,000-base BND
-overlap-allele admission predicate. Equal numbers here represent three different controls.
-
-That structural identity is observable metadata but not a distinct set of VEP consequence
-predicates. `tandem_repeat` implies copy-number gain and insertion in
-`VariationEffect.pm`, while the `duplication` predicate explicitly excludes tandem
-repeats. The resulting transcript and interval-feature consequence terms are nevertheless
-the same as a tandem duplication for the registered VEP-116 terms. DuckVEP therefore keeps
-`STR` distinct in its event ABI but maps it to the same gain/insertion fact algebra; callers
-retain repeat units and counts for provenance and HGVS.
-
-Source anchors: VEP 116 `Parser/VCF.pm::_expand_tandem_repeat_allele_string` and Ensembl
-Variation 116 `VariationEffect.pm::tandem_repeat`, `copy_number_gain`, `insertion`, and
-`duplication`.
-
-## Symbolic VCF support is a finite parser vocabulary, not arbitrary ALT interpretation
-
-VEP 116 maps a declared set of symbolic forms to structural classes: insertion and
-mobile-element insertion/deletion subtypes, deletion, duplication, tandem duplication,
-copy-number alleles, inversion, tandem repeat, and breakend. `Parser::get_SO_term` looks
-the normalized abbreviation up in `%SO_TERMS`; an unrecognised kind such as CPX has no
-term, is reported as unsupported, and is skipped. VEP does not infer general compound
-geometry from an arbitrary angle-bracketed string.
-
-Consequently DuckVEP input preparation should map the finite VEP vocabulary plus explicit
-producer conventions into typed events and preserve the raw record beside them. The
-public `UNKNOWN` operation is a generic typed fallback for already-prepared geometry, not
-a compatibility claim that VEP accepts every symbolic ALT. Unsupported raw syntax must
-remain explicit rather than being silently coerced to a known operation.
-
-Source anchors: VEP 116 `Parser.pm::get_SO_term`, Ensembl Variation 116
-`Utils/Config.pm::%SO_TERMS`, and `Parser/VCF.pm::create_StructuralVariationFeatures`.
-
-## The gVCF catch-all `<*>` is not the spanning-deletion `*`
-
-VEP 116 skips `<NON_REF>` as an unsupported symbolic structural allele, omits a
-bare `*` from alternate-overlap output, and omits `.` unless non-variant output
-is explicitly requested. The distinct `<*>` allele remains attached to the
-ordinary uploaded REF span. In coding sequence it has no alternate bases to
-translate, so VEP emits `coding_sequence_variant`; a hit on the annotated start
-or stop codon instead emits `start_retained_variant` or
-`stop_retained_variant`. It does not emit transcript or protein HGVS for that
-allele.
-
-There is one important executable quirk. VEP 116 still passes the literal three
-characters in `<*>` through its ordinary allele-length deletion predicate. If a
-REF longer than three bases completely contains a transcript, regulatory
-feature, or motif feature, VEP can therefore emit the corresponding ablation
-term. That output does not mean the catch-all allele is a known three-base
-replacement. DuckVEP reproduces it for VEP-116 compatibility; callers who do
-not want consequences for the catch-all allele should exclude `<*>` rows after
-ALT expansion.
-
-DuckVEP accepts one already-expanded ALT per event. A mixed record is therefore
-split before annotation, and both `T,<*>` and `<*>,T` produce the same two
-allele-level results. A record-level gVCF `END` remains source provenance for a
-literal ALT or `<*>`; it does not turn either allele into a structural event.
-
-Source anchors: VEP 116 `Parser_VCF.t` non-variant cases, Ensembl Variation 116
-`VariationFeatureOverlap.pm` alternate-overlap filtering, and
-`VariationEffect.pm` deletion, feature-ablation, coding-unknown,
-start-retained, and stop-retained predicates.
-`test-duckvep-gvcf-differential` executes both engines on the fixed mixed-ALT
-fixture, including the complete-transcript long-REF case.
-
-## Structural confidence and inserted-sequence payloads do not alter VEP 116 consequence terms
-
-VEP's parser preserves `CIPOS`/`CIEND` as inner/outer structural coordinates, but its
-release-116 candidate searches and registered `VariationEffect` predicates consume the
-nominal start/end coordinates. Likewise, the structural branch of `inframe_insertion`
-contains an explicit upstream TODO and returns false because it does not inspect inserted
-sequence. These fields are still important evidence; they simply are not inputs to the
-41-term consequence state machine being reproduced.
-
-DuckVEP may therefore annotate nominal coordinates for strict VEP-116 consequence parity
-while the surrounding relation retains confidence intervals and inserted sequence. It
-must not promote the nominal span to exact experimental geometry, discard the payload, or
-reuse it as HGVS, fusion, or round-trip geometry. Adding ignored payload parameters to the
-hot consequence ABI would falsely imply semantics that VEP 116 does not have.
-
-Source anchors: VEP 116 `Parser/VCF.pm` structural INFO handling and Ensembl Variation 116
-`VariationEffect.pm::inframe_insertion` plus structural overlap predicates.
-
-## Terminal-stop fallbacks bypass Translation SeqEdits
-
-VEP applies supported Ensembl Translation SeqEdits to the reference peptide returned by
-`TranscriptVariationAllele::peptide`, so its ordinary stop predicates inspect edited
-local peptide text. The length-changing `X` or unavailable-peptide fallback is a separate
-authority: `_overlaps_stop_codon_cil` tests the genomic coding endpoint, and
-`_ins_del_stop_altered_cil` edits raw translateable DNA and translates the raw terminal
-codon. It does not reapply Translation SeqEdits. A terminal deletion can consequently be
-`stop_lost` through the CIL fallback even when a SeqEdit renders the corresponding local
-reference residue `X`.
-
-DuckVEP intentionally keeps the raw CDS terminal-stop gate for that fallback while using
-the sparse edit overlay in direct peptide comparisons. Replacing both with one cleaner
-peptide authority would change VEP 116 behavior. The focused C regression combines a
-terminal `TAA`, an `X` reference-peptide edit, and a one-base terminal deletion to pin the
-distinction.
-
-## The insertion-length stop check is strand-asymmetric
-
-VEP 116 has a second non-obvious state in the same fallback. For a minimized insertion,
-the uploaded genomic interval is reversed: `(P+1,P)`. `_overlaps_stop_codon_cil` changes
-the first coordinate by the inserted sequence length before testing the terminal codon.
-On a reverse-strand transcript this turns an insertion just before the stop into an
-ordinary interval that reaches the stop. On the forward strand the same arithmetic keeps
-the interval reversed, so it does not create the corresponding upstream reach. This is an
-observable strand asymmetry in the pinned implementation.
-
-The subsequent `_ins_del_stop_altered_cil` path applies the insertion to translateable
-CDS plus the 3-prime UTR, then retranslates the codon at the original CDS endpoint. The
-extended overlap alone therefore does **not** imply stop retention: nearby insertions can
-shift a non-stop codon into that position. The real GRCh38 witness
-`7:148807690 C>CATCAGCCT` on reverse-strand transcript `ENST00001066230` happens to retain
-the stop after that reconstruction. Its local peptides are `M/IG*X`, yet VEP emits
-`protein_altering_variant&stop_retained_variant`, not
-`frameshift_variant&stop_gained`. DuckVEP keeps transcript strand and uploaded-allele
-orientation in both materialized and borrowed coding contexts, reproduces the exact
-genomic coordinate calculation, and uses the shared CDS+tail endpoint reconstruction.
-The reduced C witness uses the same inserted bases and peptide state; a plus-strand
-“symmetry” rewrite or an overlap-implies-retention shortcut would be a compatibility
-regression.
-
-Source anchors: Ensembl Variation 116
-`VariationEffect.pm::_overlaps_stop_codon_cil`, `::_ins_del_stop_altered_cil`,
-`::stop_retained`, and `::frameshift`.
-
-## `coding_unknown` and `missense` can coexist
-
-VEP 116 does not treat an unknown peptide residue as a blanket failure. Its
-`synonymous_variant` predicate rejects peptide strings containing `X`, but
-`missense_variant` only asks whether the reference and alternate peptide strings have
-equal length and differ, after the start/stop guards. Separately, `coding_unknown`
-records that either local peptide contains `X`. Both predicates can therefore succeed
-for the same allele.
-
-The GRCh38 witness `17:75629084 GATGCCAGCAGA>TCTGCCTCTGGG` on
-`ENST00000581825` has an incomplete first CDS codon. Ensembl represents its leading
-bases as `NN`, giving local peptides `XLLAS/XPEAE`. VEP emits
-`coding_sequence_variant&missense_variant`: the first residue remains unknown while the
-later residues prove a missense change. DuckVEP permits `N` only in that declared
-`cds_start_NF` first codon; ambiguity elsewhere still fails closed. The two resulting
-facts remain independent rather than being cleaned into one biologically tidier label.
-
-Source anchors: Ensembl Variation 116
-`VariationEffect.pm::synonymous_variant`, `::missense_variant`, and `::coding_unknown`.
-
-The converse matters at an incomplete terminal codon. When an uploaded feature starts
-in a complete codon and reaches the trailing synthetic `X`, VEP may still prove a
-missense change in the complete prefix, but it may **not** call an unchanged prefix
-synonymous: `synonymous_variant` rejects the complete local peptide because it contains
-`X`. The GRCh37 witness `2:228564238 CC>GG` on `ENST00000419059` therefore emits only
-`coding_sequence_variant`, not `coding_sequence_variant&synonymous_variant`. Six
-independently sampled GRCh37 transcript pairs exposed the same state. DuckVEP classifies
-the complete-codon prefix, then applies the full-window `X` guard before retaining a
-synonymous fact.
-
-## A partial terminal codon is a sequence shape, not an attribute flag
-
-VEP's `partial_codon` predicate is selected by the first affected peptide coordinate.
-The durable model fact is the prepared CDS length modulo three, not merely Ensembl's
-`cds_end_NF` attribute. A transcript whose prepared CDS ends in one or two bases can
-therefore produce `incomplete_terminal_codon_variant` even when that attribute is absent;
-this occurs in real mitochondrial and nuclear models.
-
-Three nearby states must remain distinct:
-
-- an edit beginning inside the one- or two-base terminal codon is
-  `coding_sequence_variant&incomplete_terminal_codon_variant`, with stop-gained
-  independently possible when the alternate codon completes using 3-prime UTR;
-- an edit beginning in a complete codon and continuing into the partial tail classifies
-  the entire local peptide pair, not just the complete reference prefix. REF and ALT
-  requests are codon-rounded and clipped independently; the reference can end in `X`
-  while the alternate borrows UTR and ends in a known amino acid or stop;
-- an equal-length feature that continues beyond the transcript's 3-prime edge still
-  exposes its first mapped coding piece through `genomic2pep`, so the partial-codon term
-  survives the outer mapper gap.
-
-DuckVEP derives this from the prepared CDS byte length and the first mapped CDS position.
-It does not promote every edit touching the final rounded codon to partial, and it does
-not suppress the term just because one feature endpoint is a mapper gap. Fixed C cases
-cover both strands, with and without `cds_end_NF`, and both internal and outer 3-prime
-boundaries.
-
-The substitution and indel interpreters share that codon-window construction. VEP 116
-`VariationEffect::stop_lost` and `stop_retained` reject partial-codon starts, but
-`stop_gained` does not. `ref_eq_alt_sequence` also recognizes an unchanged complete
-reference peptide followed by a stop, even when the local reference allele includes
-an incomplete-codon `X` that is absent from the full peptide. The full-peptide splice
-must clamp the replaced reference span just as Perl `substr` does.
-
-Executable `projection_differential.R` witnesses at the fixed chrDuck reference:
-
-| Model / uploaded feature | Local peptides | Native SO terms |
-| --- | --- | --- |
-| `partial_cds_end`, `237 GT>TT` | `WX/C*` | coding-sequence + stop-gained |
-| `partial_cds_end`, `239 A>G` | `X/*` | coding-sequence + incomplete-terminal-codon + stop-gained |
-| `noncoding_first_exon`, `238 TA>AT` | `GX/G*` | stop-retained |
-| `noncoding_first_exon`, `239 A>T` | `X/*` | coding-sequence + incomplete-terminal-codon + stop-gained |
-
-`sequence_delta_terminal_substitution_borrows_utr` reduces these sequence shapes and
-checks both genomic strands, present versus empty UTR, physical REF rejection and
-the distinction between an uploaded feature and minimized edit-set mechanics. The
-SQL/R fixtures exercise the same four shapes through the bundled extension.
-`annotate_partial_codon_cds_to_utr3_mapping_gap_known_scene` retains a mitochondrial
-control with CDS `ATGAAACCCGG` and UTR `AAA`: CDS `8 CCG>AAA` is `PX/Q*`
-(coding-sequence + stop-gained), and `9 CG>TA` is `PX/P*` (stop-retained).
-The transcript-oriented `9 CG>TA` in its reverse standard-code control is `PX/PR`
-(coding-sequence + missense). These pinned executable results replace the former
-complete-reference-prefix-only expectations; generators and comparison oracles are
-unchanged. The native scalar protein-position slot is absent for a multi-residue
-window; rich presentation retains its separately projected start/end range.
-
-## A leading unknown codon does not suppress the frameshift predicate
-
-For `cds_start_NF` transcripts, Ensembl may prefix the translateable sequence with one or
-two synthetic `N` bases to preserve phase; the corresponding local peptide begins with
-`X`. VEP still classifies a length-changing edit in that leading codon as a frameshift
-from CDS edit geometry. Peptide-dependent start, missense, and stop facts remain absent,
-but ambiguity is not a reason to discard the coordinate-level frameshift fact.
-
-DuckVEP permits those synthetic `N` bases only in the declared incomplete first codon.
-Its shared length-changing context resolves both a one-base insertion and one-base
-deletion there to `frameshift_variant` on either strand, while ambiguity elsewhere still
-fails closed. This is separate from the equal-length `coding_unknown&missense` state:
-one concerns net frame displacement, the other compares equal-length peptide strings.
-
-Source anchors: Ensembl Variation 116 `TranscriptVariationAllele.pm::peptide`,
-`VariationEffect.pm::frameshift`, and the transcript `cds_start_NF` attribute path.
-
-## An empty annotated UTR can overlap a spanning deletion
-
-VEP 116 constructs its transcript-oriented before- and after-coding intervals as
-`[transcript_start, cds_start - 1]` and `[cds_end + 1, transcript_end]`. When a CDS shares
-the corresponding transcript endpoint, one of those intervals is inverted and contains
-no annotated base. The generic `overlap()` predicate does not reject that empty interval;
-a deletion spanning the endpoint can satisfy its four endpoint comparisons. The separate
-cDNA-mapping requirement is also true, so VEP emits a UTR term together with
-`coding_sequence_variant` even though the transcript has no UTR bases on that side.
-
-The indexed VEP-116 cache exposed both orientations in the deterministic ClinVar chr21
-sample. For example, `chr21:33602313 ATGTGCTAACTGAATAGCTATTG>A` on
-`ENST00000417979` emits `3_prime_UTR_variant&coding_sequence_variant`. DuckVEP reproduces
-the predicate geometry for a length-changing span; it does not manufacture a UTR sequence
-or move the CDS endpoint. Complete feature-overlap states remain separate because VEP
-routes them through feature ablation rather than these UTR predicates.
-
-Source anchors: Ensembl Variation 116 `VariationEffect.pm::_before_coding`,
-`::_after_coding`, and `::overlap`. Keep the pure-C empty-interval witness and the real
-cache differential together: either one alone is too easy to satisfy with an endpoint
-special case that breaks the opposite strand or complete-overlap state.
-
-Pure insertions have two additional explicit exceptions in those same predicates. VEP
-stores an insertion after genomic base `P` as the reversed interval `(P+1,P)`.
-`_before_coding` returns true when `P+1` is the CDS start, and `_after_coding` returns true
-when `P` is the CDS end. The transcript mapper may accept the coding-side flank even when
-the topology point used for the insertion is in the adjacent intron. The reverse-strand
-GRCh37 witness `5:70356757 T>TG` on `ENST00000425596` consequently emits
-`5_prime_UTR_variant&splice_region_variant`; treating the insertion as one ordinary point
-loses the UTR term.
-
-An equal-length feature can similarly cover the first CDS base and one base outside the
-transcript. Its outer mapper endpoint is a `Gap`, so no start peptide exists, but the
-inverted empty 5-prime UTR still overlaps and the mapped CDS base makes `within_cdna`
-true. VEP's final result is supported
-`5_prime_UTR_variant&coding_sequence_variant`, not a sequence failure. The full GRCh37
-sample contained 36 such pairs on both strands. This outer 5-prime state must not be
-generalized to the 3-prime edge: a partial terminal codon there remains classifiable as
-described above.
-
-## A mature miRNA term replaces the generic non-coding exon term
-
-VEP 116 does not infer a mature miRNA from the transcript biotype alone. Ensembl stores
-one or more `miRNA` transcript attributes whose values are inclusive cDNA ranges. VEP maps
-each range through the transcript mapper, then tests the uploaded genomic span against the
-resulting genomic segments. When the test succeeds, `mature_miRNA_variant` is selected at
-an earlier consequence tier than the generic non-coding transcript and exon predicates;
-those generic terms are therefore absent rather than added alongside it.
-
-The deterministic ClinVar chromosome-21 cache sample exposed the final two differences:
-`ENST00000290239` carries ranges `3-24` and `44-66`, while `ENST00000611994` carries
-`41-61` and `6-28`. DuckVEP projects these cDNA ranges once during model preparation,
-splits an interval at exon boundaries, and packs the resulting genomic segments as a
-per-transcript side relation. The hot kernel checks that numeric slice; it does not parse
-attributes or rebuild cDNA mappings per variant.
-
-The cross-assembly GRCh37 cache run exposed an insertion-only boundary detail. VEP tests
-the minimized `VariationFeature` coordinates, not the transcript mapper's chosen placement
-point. A pure insertion after genomic base `P` has the reversed interval `(P+1,P)`;
-therefore an insertion after the last mature-miRNA base does not overlap the mature range,
-even though its retained VCF anchor does. Using the placement point produced 3,667 false
-`mature_miRNA_variant` calls in the targeted GRCh37 corpus. The frozen boundary regression
-keeps this distinction explicit for both transcript strands.
-
-Source anchors: Ensembl Variation 116 `VariationEffect.pm::within_mature_miRNA`, the
-`miRNA` `attrib_type`, and the transcript mapper. Keep the rule-tier regression as well as
-the importer-to-resident-model test: emitting both mature and generic exon terms would
-find the right interval but still fail VEP compatibility.
-
-## An empty predicate set becomes a transcript-associated intergenic result
-
-VEP 116 does not drop a `TranscriptVariationAllele` merely because every consequence
-predicate returns false. After evaluating the complete consequence list,
-`BaseVariationFeatureOverlapAllele::get_all_OverlapConsequences` replaces an empty list
-with `$DEFAULT_OVERLAP_CONSEQUENCE`, whose term is `intergenic_variant`. The resulting
-row still carries the transcript identifier and may carry coding coordinates and peptide
-text. It is therefore not evidence that the uploaded variant lies between transcripts.
-
-Seed 71 exposed 18 such terminal coding delins for `DUCK1-201`; for example,
-`chrDuck:233 ACTGGTAA>AACCGGTTGACACTATTACTCATACCAATGGGTGC` has VEP codon and amino-acid
-fields but the sole consequence `intergenic_variant`. DuckVEP assigns the same default
-only after a real transcript candidate has exhausted its predicate set. This remains
-separate from the SQL adapter's no-candidate behavior: only a receipt-backed complete
-model may call a genuinely transcript-free input supported `intergenic_variant`; a
-partial model returns `no_feature_in_loaded_model`.
-
-Source anchors: Ensembl Variation 116
-`BaseVariationFeatureOverlapAllele.pm::get_all_OverlapConsequences` and
-`Utils/Constants.pm::$DEFAULT_OVERLAP_CONSEQUENCE`. Keep the transcript index in the
-fixed regression. Replacing the missing row with a transcript-free synthetic row would
-match the term while losing the upstream state.
-
-## A mapper Gap can manufacture a retained stop
-
-For a length-changing feature whose first or last transcript-mapper result is a `Gap`,
-VEP cannot define both `cds_start` and `cds_end`, so ordinary codon and peptide alleles
-do not exist. If any mapped part intersects CDS, the normal result is
-`coding_sequence_variant` plus the independent topology and splice terms.
-
-The terminal-stop path has a stranger outcome. `_overlaps_stop_codon_cil` ignores the
-failed transcript endpoint and tests the uploaded genomic span directly. When that span
-touches the terminal codon, `_ins_del_stop_altered_cil` then returns false because its
-cDNA/CDS endpoint is missing. `stop_retained` negates that false result and emits
-`stop_retained_variant` without ever editing or translating sequence. Held-out seed 71
-exposed 2,237 instances of this state; `chrDuck:202` with a 50-base REF deletion is the
-fixed witness. DuckVEP reproduces the predicate order rather than treating the missing
-endpoint as proof that the biological stop was examined.
-
-Source anchors: Ensembl Variation 116 `BaseTranscriptVariation::cds_start`,
-`VariationEffect.pm::coding_unknown`, `::_overlaps_stop_codon_cil`,
-`::_ins_del_stop_altered_cil`, and `::stop_retained`.
-
-## A retained stop can still be protein-altering
-
-VEP's consequence list is a set of independently evaluated predicates, not a clean
-single-label hierarchy. For a length-changing insertion just before the terminal codon,
-`_overlaps_stop_codon_cil` may reach the annotated endpoint and
-`_ins_del_stop_altered_cil` may prove that the stop remains there. `stop_retained` then
-suppresses `frameshift`, but it does not suppress `protein_altering_variant`. If the
-local peptide strings have different lengths and the alternate preserves neither edge
-of the reference peptide, VEP emits both `stop_retained_variant` and
-`protein_altering_variant`.
-
-The held-out randomized C run found reverse-strand examples with local peptide shapes
-such as `M/IX`: the original endpoint still retranslates to stop, while the local
-peptide shape satisfies the separate protein-altering predicate. DuckVEP keeps both
-facts. The property oracle derives them separately from the local peptide strings; it
-does not merely allow either result.
-
-Source anchors: Ensembl Variation 116 `VariationEffect.pm::stop_retained`,
-`::frameshift`, and `::protein_altering_variant`.
-
-## An uploaded span can suppress a simpler coding edit
-
-VEP 116 maps an equal-length uploaded `VariationFeature` to CDS as one span; it does not
-default-minimize the substitution. If that complete feature starts in CDS and ends in
-the transcript-oriented 3-prime UTR, one endpoint returned by
-`BaseTranscriptVariation::cds_coords` is a `Bio::EnsEMBL::Mapper::Gap`. Consequently,
-`TranscriptVariationAllele::codon` and `::peptide` are unavailable and
-`VariationEffect::coding_unknown` emits `coding_sequence_variant` instead of a more
-specific missense or stop consequence.
-
-This is representation-dependent VEP behaviour. Semantic prefix/suffix trimming may
-leave a single changed CDS base, but evaluating only that smaller edit produces a result
-for a feature VEP was not asked to annotate. DuckVEP therefore retains both geometries:
-the uploaded feature decides whether VEP can map peptide state, while the minimized edit
-is used only after that mapping state permits sequence evaluation.
-
-The paired VEP-116 witnesses isolate the distinction in the terminal `TAA` codon:
-
-| Uploaded feature | Mapping state | Exact VEP terms |
-| --- | --- | --- |
-| `chrDuck:239 AA>CA` | both endpoints in CDS | `stop_lost` |
-| `chrDuck:240 AA>TA` | final endpoint in 3-prime UTR | `3_prime_UTR_variant&coding_sequence_variant` |
-
-Do not generalize this suppression to a feature crossing the 5-prime UTR boundary.
-VEP has separate start-codon predicates that may still emit `start_lost` or
-`start_retained_variant` without the ordinary peptide path. The executable witnesses and
-held-out differentials are the authority for the precise boundary.
-
-## Ordinary literal deletions can ablate a complete transcript
-
-VEP's `feature_ablation` predicate is not restricted to
-`StructuralVariationFeatureOverlapAllele`. An ordinary VCF allele containing
-only literal A/C/G/T bases remains a `VariationFeature` even when it is tens of
-kilobases long. For length-changing alleles, the VCF parser removes the anchor
-and `Parser::post_process_vfs` minimizes common allele edges; the resulting
-ordinary deletion predicate is then combined with complete transcript overlap.
-If both are true, the tier-1 result is `transcript_ablation`.
-
-This state is common enough in graph/pangenome VCFs to matter. Treating all long
-alleles as structural would change parser identity and other predicates, while
-restricting ablation to the typed SV adapter loses the correct consequence.
-DuckVEP therefore derives one normalized deletion fact for ordinary alleles and
-sets the shared feature-ablation fact when that allele's VEP feature span
-contains the complete transcript. Symbolic DEL/CNV loss continues through the
-structural fact producer; the generated SO rule remains the single consumer.
-
-Source anchors: VEP 116 `Parser/VCF.pm::create_VariationFeatures`,
-`Parser.pm::post_process_vfs` / `::minimise`, and Ensembl Variation 116
-`VariationEffect.pm::deletion` / `::feature_ablation`. Fixed tests must include
-an ordinary shortened delins, not only a symbolic `<DEL>` record.
-
-## Complete equal-length spans can expose both empty UTR predicates
-
-VEP's `within_5_prime_utr` and `within_3_prime_utr` predicates call a generic
-four-comparison overlap helper after requiring a cDNA mapping. They do not first
-prove that the UTR interval contains a reference base. When a transcript and
-its CDS share an endpoint, the corresponding UTR interval is inverted; an
-equal-length uploaded feature containing the complete transcript can still
-satisfy the overlap comparisons on both sides.
-
-The HPRC long-literal witness at chromosome 22 position 22,919,681 has a
-3,060-base REF and ALT and contains the 46-base `ENST00000390330` transcript,
-whose transcript and CDS endpoints coincide. VEP 116 emits exactly
-`3_prime_UTR_variant&5_prime_UTR_variant`. It emits neither
-`coding_sequence_variant` nor a biological claim that UTR bases exist.
-`VariationEffect::coding_unknown` is unconditionally false for complete feature
-overlap, so an unknown-coding fact produced by the sequence view must not leak
-back into the consequence set.
-
-DuckVEP preserves this state in the shared span classifier on both transcript
-strands, then makes complete-overlap suppression authoritative during effect
-finalization. Do not replace the four comparisons with a non-empty-interval
-test, and do not let an independently computed peptide/X state reintroduce
-`coding_sequence_variant` afterward.
-
-Source anchors: Ensembl Variation 116 `VariationEffect.pm::within_5_prime_utr`,
-`::within_3_prime_utr`, `::coding_unknown`, and the shared `overlap` helper.
-
-## Retained feature bases participate in peptide predicates
-
-When an equal-length uploaded feature maps wholly into CDS, VEP 116 uses every codon
-covered by that feature as the local peptide window and applies the complete feature ALT
-at the feature CDS offset. The independently retained minimized edit does not replace
-either representation. Two records with the same changed genomic base can therefore
-receive different start, stop, synonymous, and missense consequences.
-
-Paired VEP-116 witnesses isolate three forms of this representation dependence:
-
-| Complete uploaded feature | One-base counterpart | Exact VEP distinction |
-| --- | --- | --- |
-| `chrDuck:122 GG>GA` | `chrDuck:123 G>A` | `start_lost&start_retained_variant` vs `missense_variant` |
-| `chrDuck:237 GT>TT` | `chrDuck:237 G>T` | `stop_retained_variant` vs `missense_variant` |
-| `chrDuck:237 GT>AT` | `chrDuck:237 G>A` | `missense_variant` vs `stop_gained` |
-
-The first pair is especially non-obvious: the complete local peptides differ, so
-`start_lost` is true, while the rebuilt first codon is still `ATG`, so the independently
-evaluated `start_retained_variant` predicate is also true. In the third pair, the complete
-window has a stop in both peptides at different local indexes, so none of VEP's
-stop-lost, stop-retained, or stop-gained predicates succeeds and `missense_variant`
-remains.
-
-Keep one substitution evaluator over an explicitly selected peptide window. The uploaded
-feature selects both that window and its replacement allele. Do not
-normalize the uploaded identity inside the consequence kernel or implement separate
-start/stop rule copies for MNV-shaped input.
-
-The complete feature is also the reference-validation contract. Every retained REF base
-must agree with the physical transcript CDS before feature-coordinate conversion or
-partial-codon admission. Synthetic phase padding in the selected VEP codon is not unknown
-genomic REF: its `X` peptide still reaches the independent start predicates. Once the
-uploaded window is authoritative, a sequence failure must not retry the smaller trimmed
-edit, which would annotate a different input representation.
-
-The later-coding-start models in `projection_fixtures.R` distinguish physical and feature
-positions for MNVs as well as SNVs. These pinned executable results include:
-
-| Uploaded MNV | Coding phase 0 | Coding phase 1 | Coding phase 2 |
-| --- | --- | --- | --- |
-| `chrDuck:158 CG>GC` | start-lost | start-lost | start-lost |
-| `chrDuck:165 AC>TG` | missense | synonymous | missense |
-| `chrDuck:235 TG>AC` | missense | stop-gained | synonymous |
-| `chrDuck:239 AA>CA` | partial-codon + coding-unknown | stop-lost | missense |
-
-At phase 2, `235 TG>AC` replaces feature-CDS bases that already contain `AC`; VEP's
-codons are `gtACtg/gtACtg` and peptides `VL/VL`. An unchanged consequence view must still
-reach synonymous/retained-stop predicates, even though the physical REF and ALT differ.
-At phase 1, `160 TA>AT` produces identical `XY/XY` peptides but is start-lost through
-the independent UTR+CDS offset test. Native tests mirror these scenes on both strands;
-SQL/R tests retain complete SO sets, and incorrect retained REF remains unresolved even
-for the partial terminal-codon case.
-
-Prepared CDS can prove that complete contract without genomic FASTA only when the complete
-uploaded REF is also the minimized differing REF. If prefix/suffix trimming retained an
-uploaded padding base or VCF anchor, validating only the differing CDS slice proves a
-different, smaller assertion. A no-reference model must report `missing_reference` for
-that HGVS row; it must not guess `reference_mismatch`, because the missing genomic base was
-never observed. The regression `POS=124 REF=AA ALT=AC` over a transcript whose true bases
-are `TA` is deliberately unresolved without FASTA and becomes an auditable mismatch only
-when a reference provider is present.
-
-Source anchors: Ensembl Variation 116 `TranscriptVariationAllele.pm::_get_alternate_cds`,
-`VariationEffect.pm::start_lost`, `::start_retained_variant`, `::stop_lost`,
-`::stop_retained`, `::stop_gained`, and `::missense_variant`.
-Fixed witnesses must remain paired with large held-out differentials so a
-special-case term substitution cannot satisfy conformance.
-
-## A five-prime boundary feature selects only the start codon
-
-VEP 116 treats the opposite CDS boundary asymmetrically. When an equal-length uploaded
-feature begins in the 5-prime UTR and continues into CDS, its start predicates edit
-UTR+translateable sequence at the unpadded cDNA offset. They do not need ordinary
-peptide alleles. Coding bases later in the same uploaded feature do not produce an
-additional missense or stop term through this path.
-
-Four real VEP-116 witnesses separate the states:
-
-| Uploaded feature | Coding change | Exact VEP terms |
-| --- | --- | --- |
-| `chrDuck:119 GA>AC` | start codon changes | `5_prime_UTR_variant&start_lost` |
-| `chrDuck:118 CGA>GAA` | only UTR bases change; retained `A` overlaps CDS | `5_prime_UTR_variant&start_retained_variant` |
-| `chrDuck:119 GATGGT>TATGAT` | `ATG` survives but the following coding bases change | `5_prime_UTR_variant&start_retained_variant` |
-| `chrDuck:119 GATG>GTAA` | start codon becomes `TAA` | `5_prime_UTR_variant&start_lost`, without `stop_gained` |
-
-The last two rows are the important guards: classifying the complete altered CDS would
-add a coding or stop consequence that VEP does not emit. Conversely, treating the feature
-like the 3-prime mapping gap would lose the start term. DuckVEP uses the same borrowed
-transcript-string evaluator as length-changing UTR/CDS edits, with substitution-specific
-start predicates. Physical REF validation uses the unpadded transcript; the predicate
-edits the stored phase-padded CDS after the UTR, matching VEP's string operations.
-Missing required UTR sequence is an explicit unresolved result, never permission to
-retry a clipped CDS-only edit.
-
-The `projection_fixtures.R` later-coding-start models pin this distinction for phase
-0, 1 and 2: `chrDuck:157 ACG>ATT` is start-lost, while `ACGT>AATG` is start-retained.
-All retain the 5-prime UTR term. Native tests mirror both strands and reject an incorrect
-retained UTR REF base even when the smaller semantic coding edit is unchanged.
-
-Source anchors: Ensembl Variation 116
-`BaseTranscriptVariation.pm::translation_coords`,
-`TranscriptVariationAllele.pm::codon` / `::peptide`, and
-`VariationEffect.pm::start_lost`, `::start_retained_variant`,
-`::_snp_start_altered`, `::_inv_start_altered`. The fixed cases are generated and adjudicated by the real VEP
-executable; randomized distributions remain the regression guard against overfitting.
-
-## A length-changing start edit can be both lost and retained
-
-For a feature crossing the 5-prime UTR/CDS boundary, VEP 116 evaluates two independent
-string predicates. `_ins_del_start_altered` compares the edited UTR-plus-translateable
-sequence with the original strings and feeds `start_retained_variant`. `start_lost` also
-calls `_inv_start_altered`, even for an ordinary small allele; that helper asks whether
-`ATG` remains at the original start offset. An edit can therefore preserve the translated
-suffix while moving `ATG` away from that offset, making retained and lost true together.
-
-The fixed VEP witness `chrDuck:117 ACGA>A` emits exactly
-`start_lost&start_retained_variant&5_prime_UTR_variant`. This is why the resident model
-keeps the complete spliced pre-CDS sequence and why the kernel evaluates the two predicates
-separately over one allocation-free edited-sequence view. Do not collapse them into one
-boolean or “correct” the combination. Models without complete transcript flanks return
-`missing_transcript_flank`.
-
-For an SNV, the unchanged UTR cancels out of the string comparison. The edit
-offset is the unpadded cDNA offset within the CDS, even when `translateable_seq`
-starts with synthetic phase-padding bases. This start test runs before the
-unknown-peptide guard: a nonempty UTR and a reconstructed non-ATG initial codon
-can yield `start_lost` with `X/X` peptide alleles. The retained later-CDS witness
-`chrDuck:158 C>A` and `sequence_delta_snv_start_test_precedes_unknown_peptide`
-pin this ordering. Physical genomic REF validation still uses the padding-adjusted
-position; the start-offset string view must not replace that reference check.
-
-For consequence codons, `BaseTranscriptVariation::cds_start` adds the first
-*transcript* exon phase, while core `Transcript::translateable_seq` pads with the
-first *coding* exon phase. `TranscriptVariationAllele::_get_alternate_cds` edits
-that padded string at the feature's CDS coordinate. For the later phase-1 model,
-`chrDuck:162 C>A` therefore displays `tAc/tAc`, yielding synonymous even though
-the genomic REF is C. The same allele in phase 2 displays `gTa/gAa` and is
-missense. At `chrDuck:240 A>C`, phase 2 uses the complete `gTa/gCa` codon rather
-than the final physical partial codon. The shared VEP feature projector owns
-this coordinate conversion; genomic REF checks and semantic edit sets retain
-the physical projection. Native fixed tests mirror these witnesses on both
-strands, and the full record-preserving executable differential retains indels
-and unresolved pairs as well as SNVs.
-
-The same independence applies to `inframe_insertion`. VEP suppresses that term for a
-start-retaining insertion only when the complete reference peptide is the *suffix* of the
-alternate peptide, meaning that new residues were added before translation began. When the
-reference peptide is the alternate *prefix*, the insertion follows the retained start and
-`inframe_insertion&start_retained_variant` remains valid. Held-out seed 71 exposed the
-minimal witness `chrDuck:121 T>TGTT`.
-
-Source anchors: Ensembl Variation 116 `VariationEffect.pm::_ins_del_start_altered`,
-`::_inv_start_altered`, `::start_lost`, `::start_retained_variant`, and
-`::inframe_insertion`. The reverse-strand kernel witness also pins VEP's genomic-left
-anchor removal, which is not transcript-left on the negative strand.
-
-## Length-changing predicates are independent
-
-VEP 116 does not first assign a length-changing coding edit to one clean biological
-class. `start_lost`, the three stop predicates, `frameshift`, `inframe_insertion`,
-`inframe_deletion`, and `protein_altering_variant` independently inspect one local
-codon/peptide state. DuckVEP therefore derives that state once and evaluates the same
-predicate set; selecting one term from allele length or net frame loses valid results.
-
-Four held-out VEP witnesses pin combinations that the older shape-specific paths left
-unresolved:
-
-| Uploaded feature | Exact VEP terms |
-| --- | --- |
-| `chrDuck:120 A>AAGTAAAATG` | `start_lost&stop_gained` |
-| `chrDuck:129 ACGTACGTACGTACG>ACATAG` | `protein_altering_variant&stop_gained` |
-| `chrDuck:202 CGTACGTACGTACGTACGTACGTACGTACGTACTGGTA>C` | `frameshift_variant&stop_lost` |
-| `chrDuck:221 ACGT>A` | `inframe_deletion&stop_gained` |
-
-The terminal shortening case follows another non-obvious guard in
-`_ins_del_stop_altered`: VEP edits translateable CDS plus the complete 3-prime UTR and,
-when that entire result is shorter than the original CDS, declares the original stop
-altered without trying to read a replacement codon at the old endpoint. A complete
-transcript flank proves this state; a model carrying only a short tail must fail closed.
-
-Source anchors: Ensembl Variation 116 `VariationEffect.pm::start_lost`, `::stop_gained`,
-`::stop_lost`, `::frameshift`, `::inframe_deletion`,
-`::protein_altering_variant`, and `::_ins_del_stop_altered`.
-
-## Terminal overlap does not prove the stored codon is a stop
-
-VEP's `_overlaps_stop_codon` is a coordinate predicate. For a complete annotated CDS it
-asks whether the feature reaches the final three coding bases; it does not first require
-the stored terminal codon or reference peptide residue to be `*`. The later
-`_ins_del_stop_altered` comparison can consequently make `stop_lost` true for an edit at
-an annotated coding endpoint whose prepared CDS actually ends in a non-stop codon.
-
-The GRCh37 transcript `ENST00000599428` has a 60-base prepared CDS ending in `CCC`.
-At `10:135341026`, the insertion `G>GT` is nevertheless
-`frameshift_variant&stop_lost` in VEP 116. DuckVEP therefore separates “complete terminal
-coordinate exists” from “reference terminal peptide is a stop.” Requiring `*` in the
-coordinate gate loses this state; calling every endpoint edit stop-lost without running
-the altered-endpoint comparison invents others.
-
-Source anchors: Ensembl Variation 116 `VariationEffect.pm::_overlaps_stop_codon`,
-`::_ins_del_stop_altered`, `::stop_lost`, and `::frameshift`.
-
-## ALT-only mismatch islands inherit an expanded intron cache
-
-VEP 116 can emit `intron_variant` for a lengthening replacement whose REF-shaped
-`VariationFeature` remains entirely exonic. The result comes from two stages that are
-easy to miss when reading one predicate in isolation:
-
-- parser post-processing fully prefix/suffix-minimizes a length-changing biallelic pair,
-  then defines the feature span from the remaining REF (which is empty for a pure
-  insertion);
-- with `Set::IntervalTree`, `_overlapped_introns` preselects and caches introns over a
-  three-base flank on both exon sides;
-- `_intron_effects` later compares REF and ALT bytewise, and an ALT-only mismatch island
-  may extend beyond the cached feature span into the intronic interior.
-
-The intronic predicate still excludes the essential first and last two intron bases.
-Consequently, an island can produce `intron_variant` together with coding, donor, and
-donor-fifth-base terms. Moving the REF-shaped feature one base beyond the three-base
-cache flank suppresses all intron-derived terms even when the ALT-only island reaches the
-same bases. This is cache-dependent VEP behaviour, not a general interval-overlap rule.
-Perl's zero-padded string XOR is classified here as a direct VEP predicate semantic,
-not as an HGVS presentation alternative: it defines the differing-region islands that
-the splice and intron state machine consumes. The strict HGVS profile therefore does not
-change it. Its implementation remains in the typed splice-fact producer and is tested
-against the VEP-shaped island oracle; it must not be reimplemented by a formatter or SQL
-adapter.
-
-The pinned VEP environment uses `Set::IntervalTree` 0.12. Its source expands the cached
-intron interval in `BaseTranscriptVariation.pm::_create_intron_trees`, then consumes the
-cached list in `BaseTranscriptVariationAllele.pm::_intron_effects`. Fixed witnesses at
-`chrDuck:146 CGT>CACTGAGGGC` and `chrDuck:145 ACG>ACCTTCTGTGTA` pin the two sides of the
-cache boundary. Large held-out differentials remain necessary because transcript 3-prime
-shifting can move the predicate geometry before this cache is consulted.
-
-## The 12-base exon stretch is only a candidate set
-
-`BaseTranscriptVariation::_overlapped_exons` stretches every exon by 12 bases when the
-transcript contains any intron whose endpoint difference is at most 12. This is a coarse
-lookup rule, not a replacement exon model. `non_coding_exon_variant` explicitly tests the
-uploaded feature against each candidate's original exon coordinates before returning
-true. A point inside the short intron is therefore neither a non-coding exon variant nor
-an ordinary intron variant: `_intron_effects` recognizes the frameshift intron first and
-skips its normal intron and splice predicates. The transcript-level non-coding fallback
-remains.
-
-The GRCh37 deletion `22:38616642 GG>G` minimizes to position `38616643`, inside a
-four-base intron of `ENST00000541788`. VEP emits only
-`non_coding_transcript_variant`. DuckVEP keeps the physical region intronic for reporting,
-but keeps exact exon overlap and `within_intron` as separate predicate facts. The same
-transcript-wide stretch still matters for consequence metadata whose `include` rule asks
-for coarse exon exclusion, such as the polypyrimidine-tract gate; a remote short intron
-can affect that candidate gate without turning every stretched base into an exon.
-
-Source anchors: Ensembl Variation 116
-`BaseTranscriptVariation.pm::_overlapped_exons`, `::_create_intron_trees`,
-`BaseTranscriptVariationAllele.pm::_intron_effects`, and
-`VariationEffect.pm::non_coding_exon_variant`.
-
-## Terminal-stop insertions are predicate states, not modulo-three classes
-
-VEP 116 can classify an insertion whose length is not divisible by three as
-`inframe_insertion`, and can combine it with `coding_sequence_variant`, `stop_lost`, or
-`stop_retained_variant`. The result follows the order and local state of
-`stop_retained`, `stop_lost`, `frameshift`, `inframe_insertion`, and `coding_unknown`; it
-cannot be reconstructed from insertion length alone.
-
-The important upstream details are:
-
-- `VariationEffect.pm::frameshift` returns false when the first affected reference
-  peptide begins with `*`.
-- `VariationEffect.pm::inframe_insertion` trims the alternate peptide after its first
-  stop, then accepts a preserved reference prefix or suffix.
-- `TranscriptVariationAllele.pm::peptide` appends `X` for a trailing partial codon,
-  except when the complete translated peptide is exactly `*`.
-- `VariationEffect.pm::coding_unknown` excludes frameshift and stop predicates, but not
-  `inframe_insertion`, so both terms can be true.
-
-Executable VEP-116 witnesses in the terminal `TAA` fixture include:
-
-| Insertion site and local alternate codon | Exact VEP terms |
-| --- | --- |
-| inside `TAA`: `tAGCaa` (`*Q`) | `inframe_insertion&stop_retained_variant` |
-| inside `TAA`: `tAGGTaa` (`*VX`) | `coding_sequence_variant&inframe_insertion` |
-| inside `TAA`: `tCGATGTTATGAaa` (`SML*X`) | `inframe_insertion&stop_lost` |
-| immediately before `TAA`: `TAAA` (`*`) | `inframe_insertion&stop_retained_variant` |
-
-Source authority: Ensembl VEP 116, commit
-`57ea5c52340acc1f156267f810ad162e26597082`. Preserve these cases as fixed witnesses and
-also measure them through deterministic random differentials with held-out seeds. A
-targeted witness alone is not evidence that the surrounding state space improved.
-
-The "consider insertion length" endpoint reconstruction is itself only a fallback.
-`VariationEffect.pm::stop_retained` first asks whether the codon-local alternate peptide
-is defined, non-empty, and contains no `X`. When it is, VEP calls
-`ref_eq_alt_sequence` and does not consult `_ins_del_stop_altered_cil`, even if the
-inserted length reaches the original CDS endpoint. A reverse-strand insertion can
-therefore leave a stop at that original endpoint but expose the concrete local peptide
-`*`; when the local reference peptide is `W`, VEP emits
-`frameshift_variant&stop_gained` rather than `stop_retained_variant`. The held-out
-statistical seed `20260719` found this distinction after 93,064 generated cases. Keep the
-fixed `ATGGCATGGAGT`, CDS-position-9 `AT` insertion scene and the randomized oracle:
-terminal-coordinate reconstruction applies only when the local alternate peptide is
-empty or contains `X`.
-
-Source anchors: Ensembl Variation 116
-`VariationEffect.pm::stop_retained`, `::ref_eq_alt_sequence`,
-`::_ins_del_stop_altered_cil`, `::stop_gained`, and `::frameshift`.
-
-## Lengthening edits use two different peptide views
-
-VEP 116 does not reduce every coding length increase to a single biological shape. Its
-`inframe_insertion` and `protein_altering_variant` predicates inspect the same
-codon-local edit through deliberately different peptide views:
-
-- `inframe_insertion` truncates the alternate peptide at its first new stop, then asks
-  whether the reference peptide is a prefix or suffix of that truncated value;
-- `protein_altering_variant` tests the untruncated alternate peptide and suppresses the
-  term when that complete value preserves the reference prefix or suffix.
-
-Consequently, the local change `Y` -> `*QCY` is `stop_gained` alone. The reference `Y`
-is absent from the stop-truncated alternate (`*`), so it is not an in-frame insertion;
-it is present as the suffix of the untruncated alternate, so it is not a protein-altering
-variant either. By contrast, `Y` -> `YRVALM*...` preserves `Y` before the stop and is
-both `inframe_insertion` and `stop_gained`.
-
-This is an upstream state-machine property, not a claim that the terms form a clean
-biological partition. DuckVEP must reproduce the two predicate inputs and their unusual
-combinations. Do not replace them with a single whole-protein diff, a net-length rule,
-or one shared "in-frame versus protein-altering" classifier.
-
-Source anchors: Ensembl Variation 116
-`VariationEffect.pm::inframe_insertion` and
-`VariationEffect.pm::protein_altering_variant`. The fixed VCF witness
-`chrDuck:233:A:AACAATGTTA` has local codons `tac/taACAATGTTAc`, local peptides
-`Y/*QCY`, and exact VEP consequence `stop_gained`. Keep a paired positive
-`inframe_insertion&stop_gained` witness so a blanket suppression cannot satisfy the
-test.
-
-## In-frame deletion is not the inverse of in-frame insertion
-
-VEP 116 tests `inframe_deletion` against the codon strings, not the peptide strings used
-by `inframe_insertion`. It accepts a shorter alternate codon string when that string is
-a reference prefix or suffix, or when common-edge trimming consumes the alternate and
-leaves a reference remainder divisible by three. A net CDS change of minus three bases
-is therefore insufficient.
-
-This distinction matters after semantic allele trimming. A raw deletion-like delins
-whose alternate is an exact nucleotide edge reduces to a pure deletion. A genuinely
-non-empty local replacement may instead be `protein_altering_variant`, even though the
-CDS becomes shorter by one codon. The fixed kernel scene replacing local peptide `PG`
-with `A` is such a case.
-
-Source anchors: Ensembl Variation 116
-`VariationEffect.pm::inframe_deletion`,
-`VariationEffect.pm::protein_altering_variant`, and
-`Sequence.pm::trim_sequences`. Keep the deletion and insertion predicates separate;
-making one the length-sign mirror of the other changes VEP results.
-
-## Start loss directly depends on in-frame deletion and 5-prime UTR state
-
-VEP 116 does not evaluate every coding predicate from an immutable biological fact set.
-`VariationEffect::start_lost` directly calls the `inframe_insertion` and
-`inframe_deletion` predicates before it falls back to its generic insertion/deletion start
-test. Its private
-`_inv_start_altered` test is also false unless the transcript has a 5-prime UTR.
-The dependency order inside `start_lost` and transcript UTR state are therefore observable
-parts of the VEP state machine; this is not a claim that the global consequence registry
-must already have cached an in-frame deletion.
-
-The GRCh38 ClinVar deletion
-`1:17053947:CCTGCAGGCAGGCTCCGCCAAGGGTTGTGGCCGGCAACCGGCGCCTCAAGGAGAGGGCGACCACCGCCGCCAT:C`
-deletes the complete first 24 codons from two transcripts that have no 5-prime UTR. VEP
-116 emits `inframe_deletion&splice_region_variant` for `ENST00000485515` and
-`NMD_transcript_variant&inframe_deletion` for `ENST00000714035`, with
-`c.1_72del` and `p.Met1_Gln24del`; it does not add `start_lost`.
-
-DuckVEP's staged classifier consequently resolves deletion shape before its start facts so
-that it can supply the same direct dependency, and gates the offset-based start alteration
-on the presence of a 5-prime UTR. Moving the staged start evaluation ahead of the deletion
-fact, or interpreting absence of `ATG` at the old CDS offset by itself, reintroduces the
-false `start_lost` term. A fixed C witness pins both the dependency and the no-UTR
-condition; the strict executable corpus differential remains the independent acceptance
-gate.
-
-Source anchors: Ensembl Variation 116 `VariationEffect.pm::start_lost`,
-`::_inv_start_altered`, and `::inframe_deletion`.
-
-## Terminal partial-codon insertions use distinct consequence and HGVS peptide views
-
-For a pure insertion at the start of an incomplete terminal codon, VEP 116 does not feed one
-peptide representation to consequence classification and protein HGVS. The consequence
-predicates can observe an empty reference codon allele and translate the inserted allele
-directly. The later HGVSp replay instead uses the codon-rounded edited CDS, including the
-pre-existing terminal partial base.
-
-The GRCh38 ClinVar event `1:45013701:C:CTAG` on `ENST00000650713` has a 281-base CDS with
-`CDS_END_NF`. Its consequence-local codon alleles are `-/TAG`, producing
-`incomplete_terminal_codon_variant&inframe_insertion&stop_gained` without
-`coding_sequence_variant`. After transcript 3-prime placement, HGVSc is
-`c.280_281insAGT`; the HGVS-specific codon-rounded replay compares the incomplete
-reference residue with a translated stop and VEP renders `p.Ter94=`.
-
-The unshifted event inserts before CDS base 280, the first base of the partial codon;
-only the later HGVS placement is between bases 280 and 281. This does **not** imply
-insertion-only consequence translation at every site in the partial codon. With a
-14-base `ATGAAACCCGGGTT` CDS and no UTR, pinned VEP 116 gives `-/TAG` before base 13,
-but `tt/tTAGt` and `X/LX` before base 14. The latter has insertion and coding-unknown
-terms without stop-gained. An internal `TAGA` instead gives `tt/tTAGAt`, `X/LD` and
-protein-altering; an internal `AGT` gives `tt/tAGTt`, `X/*` and stop-gained plus
-coding-unknown. Both strands have the same transcript-oriented results.
-
-The former handwritten insertion-only property generalized the ClinVar placement
-incorrectly. Its generator, seeds, trial count and all site strata are retained; its
-expected peptide now splices the oriented payload between the partial bases and uses
-VEP's independently rounded insertion endpoints. The executable projection differential
-remains unchanged. Codon rounding, not a terminal-insertion special case, owns the
-consequence peptide window.
-
-`TranscriptVariationAllele::codon` applies the rounded reference request and its
-length-adjusted alternate request independently; it does not shorten the ALT request
-when Perl `substr` clips the reference to the partial CDS tail. The alternate view
-includes the borrowed 3-prime UTR. For example, internal `A` in the same terminal `TT`
-gives `tt/tAt` without a UTR, but `tt/tAta` when its first UTR base is `A`. The latter
-retains `X/YX` and an insertion term. Physical CDS mutation and its byte/peptide accessors
-remain unchanged; only the consequence codon view reads beyond the edited CDS.
-
-DuckVEP therefore retains the codon-rounded edited-CDS cache for HGVS while exposing the
-empty-reference/insertion-only consequence window at the unshifted codon-start site. Treating the
-synthetic incomplete reference residue as consequence-level `X` invents
-`coding_sequence_variant`; reusing the consequence-only insertion peptide for HGVSp loses
-`p.Ter94=`. Fixed C, SQL, and R witnesses assert both views and the exact consequence,
-HGVSc, HGVSp, and shift; the strict executable corpus differential remains the independent
-acceptance gate.
-
-Compatibility policy: the HGVS state predicate is
-`duckvep_coding_context_is_terminal_partial_insertion()`.
-`DUCKVEP_COMPAT_HGVS_TERMINAL_PARTIAL_INSERTION` selects only VEP's later
-codon-rounded HGVSp view; disabling it leaves the canonical coding-context peptide view.
-There is no second terminal-partial predicate in the formatter.
-
-Source anchors: Ensembl core 116 `TranscriptMapper.pm::genomic2pep`, Ensembl Variation
-116 `TranscriptVariationAllele.pm::codon`, `VariationEffect.pm::partial_codon`,
-`::inframe_insertion`, `::stop_gained`, `::coding_unknown`, and
-`TranscriptVariationAllele.pm::hgvs_protein`.
-
-## The NMD plugin projects the full uploaded feature, not the minimized edit
-
-Variant-induced NMD prediction in VEP Plugins release/116 does not consume the same
-coordinates used to change CDS sequence. `NMD.pm` asks the parent
-`TranscriptVariation` for CDS coordinates derived from the complete uploaded
-`VariationFeature`, and reads the feature's genomic end for its exon-position rules.
-Common-prefix/suffix minimization can therefore preserve the sequence change while
-changing the NMD result.
-
-Pure insertions expose the most surprising state. The parent transcript variation keeps an
-empty feature as a reversed CDS interval such as `102,101`; it does not use the expanded
-`101..102` allele range rendered in VEP JSON. At an exon edge, mapping one genomic flank
-can be sufficient. Immediately before the first coding base, `1,0` is a valid result:
-`NMD.pm` checks whether both coordinates are defined, not whether the numeric values are
-nonzero, then treats the zero CDS end as an early-CDS escape.
-
-DuckVEP consequently retains two projections:
-
-- the minimized physical edit projection for REF validation and sequence application; and
-- the full uploaded-feature projection for the NMD plugin's early-CDS, last-exon, and
-  penultimate-exon-end rules.
-
-A cached early-CDS fact from consequence prediction is reusable only when the full feature
-and minimized edit cover identical genomic spans. Equal-length padded features and pure
-insertions must use the full-feature projector. Broadening that cache condition changes
-valid VEP results even when the underlying sequence edit is identical.
-
-The physical cache also needs the same phase as the feature mapper. When CDS begins
-in a later exon, DuckVEP uses the shared full-feature projector instead: physical
-CDS 103 can be VEP feature CDS 101, which changes the plugin's early-CDS escape.
-The cache-versus-projector test covers both strands and phases 0–2.
-
-Source authority: VEP Plugins release/116 `NMD.pm`, commit
-`0082591268417af618e03850c5ffdc7c09998a5d`, together with VEP 116
-`BaseTranscriptVariation::cds_coords` and `TranscriptVariation` insertion mapping. Fixed
-executable-plugin witnesses cover both strands, reversed insertion ranges, and the valid
-`1,0` coordinate. The checked-in ClinVar chromosome-21 differential matches all 68,554
-eligible transcript pairs, including 29,416 states both implementations leave unresolved.
-
-## Structural coding predicates do not share one projection rule
-
-VEP 116's structural consequence predicates reuse different pieces of mapper state. Five
-cases found by seeded executable-VEP exploration must remain distinct:
-
-- For an ordinary structural span, `_overlaps_start_codon` requires the first and last
-  genomic positions to map to cDNA. A deletion or inversion can cover the genomic start
-  codon but emit no start term when its other endpoint is intronic. When both endpoints are
-  exonic, a structural allele has no inserted sequence, so VEP can emit the apparently
-  contradictory pair `start_lost&start_retained_variant`.
-- A structural insertion is different. `Mapper::map_insert` exposes its cDNA location as
-  `start = end + 1` on both transcript strands. At an exon edge, its one mapped flank still
-  determines which side of that base owns the insertion. Sorting the two coordinates or
-  collapsing a one-flank result to a point invents start terms immediately before the CDS
-  and after the third start-codon base. The reversed coordinate can nevertheless overlap a
-  start codon split across exons, for example after its second base.
-- structural `frameshift` requires a deletion wholly inside one exon and a length not
-  divisible by three. It does not inspect `cds_coords`. Structural `inframe_deletion`
-  additionally requires exactly one CDS `Coordinate` and no mapper `Gap`. A deletion that
-  runs from CDS into 3-prime UTR can therefore be a frameshift when its length is not
-  divisible by three, but only `coding_sequence_variant` when the same geometry has a
-  length divisible by three.
-- structural `stop_lost` calls the shared `partial_codon` predicate first. That predicate
-  uses the event's transcript-oriented `translation_start`, not a transcript-wide
-  "incomplete CDS" flag. On a 160-base prepared CDS, a deletion beginning in CDS base 158
-  may still lose the stop because its first peptide coordinate names a complete codon;
-  one beginning at CDS base 160 is suppressed as partial. If the event begins with a
-  mapper `Gap`, `translation_start` is undefined and the partial-codon guard is false.
-- `coding_transcript_variant` is restricted to the literal `protein_coding` biotype. Some
-  Ensembl transcripts have a translation/CDS but another biotype; a neutral structural
-  event containing such a transcript can exhaust the registry predicates and receive the
-  transcript-associated default `intergenic_variant`.
-
-These are compatibility facts, not a proposed biological cleanup. Fixed C witnesses pin
-each state, while held-out generated structural events compare exact term sets against the
-indexed VEP 116 cache. Source anchors: Ensembl Variation 116
-`Mapper.pm::map_insert`, `BaseTranscriptVariation.pm::translation_start`,
-`VariationEffect.pm::_overlaps_start_codon`, `partial_codon`, `stop_lost`, `frameshift`,
-`inframe_deletion`, and the `coding_transcript_variant` registry entry in `Constants.pm`.
-
-## Ensembl transcript HGVS first shifts against genomic sequence
-
-VEP 116 does not normally discover the 3-prime `c.`/`n.` representation by walking the
-spliced transcript. `TranscriptVariationAllele::_return_3prime` first calls
-`_genomic_shift` in the transcript's strand direction. That routine fetches up to 1000
-forward-reference bases on both sides of the event and calls `perform_shift`; the
-resulting genomic offset and rotated allele are then used while the event is projected
-back to transcript coordinates. A negative-strand transcript therefore walks toward
-lower genomic coordinates, not toward the next byte in a stored CDS string.
-
-The `perform_shift` limit is also not simply `min(1000, available bases)`. When the fetched
-3-prime flank is at least as long as the inserted or deleted pattern, VEP compares at most
-`flank_length - pattern_length + 1` positions. This allele-length-dependent remainder is
-an executable compatibility detail. A byte-walk property covers both strands, rotated
-multi-base alleles, duplications, and stops caused by that exact loop limit.
-
-There is a separate sequence-region-end pathology. `_genomic_shift` expands the event to
-1,000 bases on each genomic side, constrains that slice to the sequence region, and then
-still defines `pre_seq` as the first 1,000 bytes and `post_seq` as the last 1,000 bytes of
-the clipped slice. When the complete clipped slice is shorter than 2,000 bases, those two
-substrings overlap. On a tiny contig, or close enough to either end of an ordinary contig,
-`post_seq` can therefore begin before the event instead of at its 3-prime genomic flank.
-The executable `chrDuck` fixture exposes shifted coordinates and rotated insertion payloads
-that a clean non-overlapping flank implementation does not produce. This is a pinned VEP
-implementation effect, not a general HGVS rule. DuckVEP must keep it as an explicit
-compatibility case and must not train the ordinary interior-locus shift path on tiny-contig
-output without modeling the clipped-slice construction itself.
-
-Only RefSeq transcripts carrying relevant RNA-edit attributes may require a second
-`perform_shift` against edited transcript sequence after VEP decides that a cached genomic
-shift cannot be reused. Genomic `g.`/`m.` rendering is a third path:
-`VariationFeature::get_all_hgvs_genomic` uses
-`Utils::Sequence::get_3prime_seq_offset`. These paths share allele/event facts but must not
-share one falsely generic sequence provider.
-
-Source anchors: Ensembl Variation 116
-`TranscriptVariationAllele::_return_3prime`, `_genomic_shift`, `perform_shift`, and
-`VariationFeature::get_all_hgvs_genomic`, together with
-`Utils::Sequence::get_3prime_seq_offset`.
-
-The similarly named VEP options are different operations. `--shift_hgvs` controls this
-HGVS-only 3-prime placement. `--shift_3prime` changes the internal transcript consequence
-feature before consequence evaluation, and `--shift_genomic` rewrites the uploaded genomic
-location toward the 3-prime representation. DuckVEP's independent-event HGVS surface
-implements only the first operation; it must not move the consequence event or the caller's
-variant identity as a side effect of printing HGVS.
-
-## VEP HGVSc has an exonic-SNP-only phase fast path
-
-VEP 116 does not use one coordinate routine for every transcript HGVS allele. Inside
-`TranscriptVariationAllele::hgvs_transcript`, a literal `VariationFeature` whose
-`var_class` is `SNP`, whose precomputed consequence state is exonic, and whose
-`TranscriptVariation` has defined CDS endpoints takes a special path: both HGVS endpoints
-are assigned directly from `TranscriptVariation::cds_start`. That value is already the
-phase-aware CDS projection. Every other representation—including an intronic SNP, an
-indel, an MNV, and an uploaded multi-base feature that trims to a one-base semantic
-substitution—uses `_get_cDNA_position` instead.
-
-The distinction is observable on `CDS_START_NF` transcripts whose first CDS exon has
-positive phase. An exonic one-base `VariationFeature` includes that phase in its `c.`
-coordinate, while an intronic SNP or a length-changing/multi-base feature at the same
-transcript does not acquire a general phase offset. Applying phase in the generic
-coordinate converter made a chromosome-21 ClinVar probe worse: the original 37 HGVSc
-mismatches became 467, including shifted intronic and indel coordinates. The executable
-state machine—not a uniform HGVS numbering rule—is therefore the compatibility authority.
-
-DuckVEP keeps generic `_get_cDNA_position` coordinates phase-neutral and applies the
-phase-aware coding projection only when the retained VEP feature is literally one
-reference base and one alternate base, both endpoints are the same exonic coding base,
-and coding projection succeeds. Fixed properties separately pin the literal-SNP and
-multi-base-uploaded-feature cases so later cleanup cannot merge the two paths.
-
-Source anchor: Ensembl Variation 116
-`TranscriptVariationAllele::hgvs_transcript`, specifically its `var_class eq 'SNP'` plus
-`pre_consequence_predicates->{exon}` branch and the following `_get_cDNA_position` branch.
-
-## VEP caches a clamped pre-shift transcript slice for endpoint-crossing alleles
-
-VEP 116 does not require every base of a deletion or delins to project inside a transcript
-before it emits HGVSc/HGVSn. `TranscriptVariationAllele::_var2transcript_slice_coords`
-first expresses the original `VariationFeature` relative to the transcript's genomic
-slice. It returns no coordinates only when the complete feature is before or after that
-slice. When a feature overlaps a transcript endpoint, it clamps the projected start and
-end into `[1, transcript_length]`. Consequently, a four-base deletion with only the first
-deleted base inside a transcript can be rendered as `n.1del`, and a longer deletion with
-only two transcript bases retained can be rendered from those two bases rather than being
-rejected as an invalid projection.
-
-This state interacts non-obviously with HGVS 3-prime shifting. `hgvs_transcript` invokes
-`_return_3prime` before lazily filling `_slice_start` and `_slice_end`, but
-`_var2transcript_slice_coords` explicitly reads `unshifted_start` and `unshifted_end` when
-the feature has been shifted. VEP then applies `_hgvs_offset` to the cached, clamped
-coordinates when it calls `hgvs_variant_notation`; it does not replace the cache with a
-fresh projection of the shifted feature. Executable VEP 116 therefore exposes the
-original slice and the later shift at once:
-
-- GRCh38 `21:45405086 CCCCGCCCCCTGCCCGGCCCCTGCCCGGCCCCTG>C` on
-  `ENST00000859059` initially clamps the deleted feature to transcript slice bases 1 and
-  2. VEP then reports an 18-base genomic HGVS shift, while the cached slice remains 1 and
-  2, and renders `c.-95_-94del`.
-- GRCh38 `21:31667246 TTTCA>T` on `ENST00000609934` leaves only one deleted base inside
-  the transcript. The cached slice is `1..1`, the genomic shift is zero for this
-  transcript, and VEP renders `n.1del`.
-- GRCh38 `21:36930415 GAGGTAGTTCTAA>AGTTTGCACTATGTTGGAGTTTGCACTAT` on
-  `ENST00000482273` clamps the feature to transcript slice `1..3` but retains the complete
-  alternate allele state, producing
-  `n.1_3delinsATAGTGCAAACTCCAACATAGTGCAAACT` on the negative strand.
-- A pure insertion retains reversed transcript-slice coordinates. GRCh38
-  `21:33262748 G>GT` is initially represented as `32781..32780` on
-  `ENST00000980233`; after a one-base genomic shift the cached pair is unchanged and VEP
-  renders `c.*860dup`.
-
-The compatibility representation must therefore keep three concepts distinct: the
-lossless uploaded feature, the semantic edit used by consequence and haplotype kernels,
-and the clamped/cached transcript-slice facts used by VEP's HGVS formatter. Globally
-clamping semantic edit endpoints, or accepting an event whose complete uploaded feature
-also misses the transcript, would change consequence, CDS, and phased-edit semantics.
-DuckVEP therefore leaves the semantic prepared event unchanged and retains a clamped
-terminal projection only when that lossless complete feature overlaps the transcript. The
-HGVS-facing edit carries the separate transcript-slice start/end facts and applies the
-HGVS shift offset during notation construction. Deterministic properties pin clipped
-deletion, delins, and reversed insertion-slice states; the strict chromosome-21 ClinVar
-differential exercises the same implementation without any HGVSc/HGVSp disagreement.
-
-Source anchors: Ensembl Variation 116
-`TranscriptVariationAllele::_var2transcript_slice_coords`, `look_for_slice_start`,
-`_return_3prime`, and `TranscriptVariationAllele::hgvs_transcript`.
-
-## Transcript-external consequence rows have no transcript HGVS
-
-VEP can admit a transcript because an allele lies inside the configured upstream or
-downstream distance while returning no `hgvsc` for that transcript allele. The absence is
-not an HGVS projection error: neither edited genomic coordinate lies inside the transcript
-span, so there is no transcript coordinate to print. A chromosome-19 GRCh38 GIAB probe
-contained 767 such transcript pairs—404 `upstream_gene_variant` and 363
-`downstream_gene_variant`—and executable VEP 116 returned no HGVSc for every pair.
-
-DuckVEP consequently maps `DUCKVEP_TRANSCRIPT_EDIT_OUTSIDE_TRANSCRIPT` to public HGVS
-status `not_applicable` only when the complete semantic edit span—or both flanks of a pure
-insertion—lies before or after the transcript. An event crossing a transcript endpoint is
-different: its HGVS-facing transcript edit carries the clamped, cached slice facts from the
-overlapping part of the original feature and may still render a supported string. A
-printable VEP slice that is absent by design remains `not_applicable`; invalid exon/cDNA
-projection, reference mismatch, missing reference sequence, and allocation-capacity
-failures remain `unresolved`. Those states must not be collapsed merely because executable
-VEP returned no string.
-
-Source anchors: VEP 116
-`TranscriptVariationAllele::hgvs_transcript` and the transcript-variation coordinate
-projection used before it formats `c.` or `n.` notation.
-
-## N-containing codons in independent and singleton protein annotation
-
-This entry records a **DuckVEP compatibility defect** and its scoped correction,
-not a claim that VEP is wrong. A source SNV with A/C/G/T alleles can sit inside a codon containing N at
-another position. VEP 116 checks the uploaded allele for unambiguous DNA and
-translates its surrounding codon using BioPerl's consensus rules. Those are
-different checks. Uncertainty in the nucleotide sequence does not necessarily
-make its translated amino acid unknown.
-
-For single-exon, forward-strand, phase-zero CDS `ATGGCNTAA`, table 1, the
-original SNV at CDS position 4 is `G>A`. VEP returns `missense_variant` and
-`p.Ala2Thr`; the rebuilt CDS is `ATGACNTAA`. DuckVEP production revision
-`84770198dd9e43ddd4aa936d2f5bf9c3deabe550` instead returns
-`coding_sequence_variant` and `p.Ter2=` from `duckvep_annotate`, and
-`p.(Ter2=)` from singleton `duckvep_haplotypes`. The latter's complete protein
-is correctly `MT*`, while its local coding block remains unsupported. Agreement
-of replayed sequence therefore does not establish annotation agreement.
-
-The failure also occurs with partially resolved peptides. In CDS `ATGAANTAA`, position
-5 `A>C` changes an unknown residue to threonine. VEP returns both
-`coding_sequence_variant` and `missense_variant`, with `p.Ter2Thr` under its
-unknown-residue presentation rule. DuckVEP returns only the generic coding term
-and `p.Ter2=`. In contrast, position 4 `N>A` in `ATGNCNTAA` has an ambiguous
-uploaded REF: VEP returns the generic coding term and no HGVSp. That absent
-result is a retained control, not permission to assign a consensus peptide to
-an unavailable uploaded-allele interpretation.
-
-The executable diagnostic
-[`ambiguous_codon_differential.R`](test/duckvep/conformance/ambiguous_codon_differential.R)
-retains all 28,800 original SNVs: 13,824 canonical-codon controls, 7,776 events
-with unambiguous uploaded alleles and N elsewhere in the codon, and 7,200 events
-with N at the uploaded REF position. It exhausts 125 internal ACGTN codons,
-three edited positions, every different A/C/G/T ALT, and all 24 supported tables.
-At revision `84770198dd9e43ddd4aa936d2f5bf9c3deabe550`, 1,624 distinct SNVs disagree in both independent
-SO and HGVSp: 656 require missense alone and 968 require missense together with
-the generic coding term. All are in the surrounding-N stratum. Canonical and
-uploaded-N controls match the compared terms/text. These counts are a finite
-synthetic matrix, not an estimated population error rate. Phased local SO,
-start/terminal codons, reverse strands, phase padding, indels and compound
-events are outside this diagnostic's comparison contract.
-
-The checked-in
-[`ambiguous_codon_baseline`](test/duckvep/conformance/data/ambiguous_codon_baseline)
-bundle contains every comparison pair as Parquet, compressed source cases and
-raw oracle observations, summaries, controls and hashes. Its 230,400 HGVSp
-comparisons span eight route/thread configurations, with 12,992 disagreements;
-57,600 independent SO comparisons contain 3,248 disagreements. No pair is
-missing or extra. The bundle includes 64 passing comparator/provenance
-corruption controls. It is unsigned diagnostic evidence, not an authenticated
-conformance certificate, and excludes native fields outside the comparison.
-The network-free audit independently reconstructs every expected case and
-substitution from the declared finite grid. Twenty matrix corruption controls
-include case and substitution replacements that preserve cardinalities and
-unique event ordinals, and repeated case/variant JSON properties. Retained JSON
-object keys must be unique before arrays become data frames. Each required source
-field must occur exactly once. Totals alone do not establish exhaustive coverage.
-
-The oracle uses the pinned environment and actual VEP-116
-`TranscriptVariationAllele::peptide`, `VariationFeatureOverlapAllele::seq_is_unambiguous_dna`
-and `Utils::VariationEffect::{missense_variant,coding_unknown}`; it does not
-replace these methods. Full outer comparisons, absent results, carrier/source
-identities and deliberate comparator corruptions are retained. The diagnostic
-fails on any disagreement and labels the supplied extension as build-unbound.
-The implementation uses one consensus translator while keeping uploaded-allele
-validity, raw nucleotide ambiguity, uncurated coding peptides and curated
-reference proteins separate.
-
-The [corrected-source bundle](test/duckvep/conformance/data/ambiguous_codon_consensus)
-retains the same 28,800 SNVs, oracle and comparison axes: all 230,400 HGVSp and
-57,600 independent SO comparisons agree. All 64 comparator/provenance corruption
-controls pass. The original failing bundle remains unchanged. Both complete pair
-relations and raw source/oracle observations are tracked; their receipts retain
-the source and binary identities without claiming release-build certification.
-The [reference-translation bundle](test/duckvep/conformance/data/reference_translation_consensus)
-separately retains zero failures
-over 27,014 curated-reference, uncurated-coding and alternate translation cases.
-The coding expectation is the pinned raw consensus output, without masking N-bearing
-codons to X; the independent raw-nucleotide ambiguity checks are unchanged.
-Network-free audits reconstruct both corrected bundles and the original failure
-bundle from their raw observations. Compressed JSON and Parquet preserve every
-compared field without committing the local build trees or duplicate native outputs.
-The audit code pins each reviewed receipt independently of its declared hashes,
-binding the recorded source map, binary identity and all retained payloads. It also
-checks diagnostic status, oracle revisions and the pinned package environment.
-Rehashed oracle/native substitutions are rejected. These checks preserve the
-identity of unsigned historical observations; they do not authenticate execution.
-
-SQL and R tests retain eleven exact source-SNV witnesses, including first and
-terminal codons, nonstandard tables and unavailable uploaded REF N. A single X
-alternate peptide suppresses VEP's `start_lost`; X in a longer peptide does not
-establish the same condition. These witnesses do not extend the exhaustive
-internal-codon comparison to phase padding, reverse strands, peptide-edit caches,
-indels or compound events. Length-changing contexts can still be unsupported.
-
-### Indel codon consensus and retained N anchors
-
-**Classification: DuckVEP compatibility corrections against pinned VEP 116.**
-For CDS `ATGGCNGCCTAA`, table 1, original CDS position 4 `G>GGCC`, VEP
-returns `protein_altering_variant` and `p.Ala2delinsGlyPro`. Consensus
-translation also applies to length-changing local peptide operands. A blanket
-rejection of genomic N loses these facts. Changed alleles still undergo their
-own eligibility check: an erased, literally matching VCF indel anchor N
-is distinct from N inside the changed payload. Position 6 `N>NGCC` in this
-CDS yields `inframe_insertion` and `p.Ala2dup`; N is not a wildcard when
-validating the uploaded REF against the model or genomic reference.
-
-Raw `source_records` replay is a different input contract. Haplosaurus's VCF
-parser preserves the complete `NGCC` allele, and
-`TranscriptHaplotypeContainer::_mutate_sequences` skips non-ACGT alleles before
-replacement. DuckVEP retains a checked skipped source as
-`source_allele_skipped`, with conditional evidence and zero physical edits.
-For this source alone, the raw sequence is unchanged `ATGGCNGCCTAA` / `MAA*`,
-with both `1|1` carriers. Other valid sources still replay. This does not mean
-inserting `GCC` after trimming N. The complete coding REF and model storage
-remain validated; mismatches still withhold sequence. Conditional paths have
-NULL HGVSp and `incomplete_input`, not an assertion of protein equivalence.
-Independent-VEP and decoded-singleton expectations therefore do not establish
-raw-source equivalence; cross-route diagnostics retain those contrasts.
-
-The raw mutation gate is case-sensitive: within DuckVEP's supported literal
-ACGTUN/acgtun alphabet, uppercase ACGT applies, while N, U and lowercase ALT
-bases skip. Unsupported IUPAC symbols and dashes remain explicit native
-limitations. Raw `GT=1` is not decoded haploidy: pinned Haplosaurus retains two
-file lanes, and its undefined second slot replaces the complete REF with an
-empty ALT. For the example above, that lane is `ATGGCGCCTAA` / `MAP`.
-
-Removed REF ambiguity has a separate eligibility rule. For the same CDS,
-original position 5 `CN>C` becomes VEP feature `N/-`: the literal deletion is
-valid and `frameshift_variant` is true, but the reference allele has no peptide
-and HGVSp is NULL. The canonical control `ATGGCTGCCTAA`, position 5 `CT>C`,
-has the same emitted SO and `p.Ala3ProfsTer?`. Its raw missense predicate is
-also true; the N-reference case's is false. Consensus translation of the CDS
-does not create an eligible reference-allele peptide. Actual Haplosaurus accepts
-the complete ALT `C` in both original records with GT `1|1`, rebuilding
-`ATGGCGCCTAA` / `MAP` with both carriers and the source contributor retained.
-Physical replay therefore accepts literal matching N in a length-changing REF,
-while independent peptide predicates preserve parsed-allele availability.
-This does not relax alternate-payload or equal-length-substitution validation.
-
-An N retained in both uploaded alleles is not a removed N. For CDS
-`ATGNAAGCCTAA`, genomic position 14 `NAAG>N`, VEP strips the matching anchor
-and annotates `AAG/-` at positions 15–17 as `inframe_deletion`, `p.Ala3del`.
-The same literal-anchor rule applies to deletion and replacement records as to
-insertions. Mismatched anchors and N in the changed payload remain distinct
-validation cases.
-
-Shared suffixes also disappear during minimization. For CDS `ATGACNGCCTAA`,
-genomic position 14 `ACN>ATCN` and position 15 `CN>TCN` both become `-/T`
-at 15–14 and yield `p.Thr2IlefsTer?`, `frameshift_variant`. Position 14
-`ACN>AGTN` instead becomes `C/GT` at 15 and yields `p.Thr2SerfsTer?`.
-The complete uploaded REF must match literally, including N outside the
-checked minimized REF interval on either side. This does not make an N inside
-that interval eligible or minimize equal-length uploaded alleles.
-
-For CDS `ATGNCNGCCTAA`, position 14 `NCN>NN` becomes `C/-` at position 15.
-Its local reference and alternate peptides are both X, but VEP still evaluates
-the frameshift and returns `p.Ala3ProfsTer?`, `frameshift_variant`.
-`hgvs_protein` skips clipping for equal local peptides; `_get_hgvs_protein_type`
-then gives the frameshift predicate precedence, and `_get_fs_peptides` compares
-the downstream translations. Local equality alone does not establish protein
-equality for a frame-changing edit.
-
-For CDS `ATGNNAGCCTAA`, genomic position 13 `G>GAC`, VEP's post-HGVS
-`_get_fs_peptides` produces reference A and alternate X at amino-acid position 3.
-Its formatter converts Xaa to Ter before deciding whether a frameshift starts
-with an immediate stop, yielding `p.Ala3Ter`, not `p.Ala3TerfsTer?`.
-This is a pinned notation policy, not evidence that an ambiguous codon is a
-biological stop; it does not change translation or consequence predicates.
-The internal strict profile retains Xaa frameshift notation.
-
-The [translation witnesses](test/duckvep/conformance/data/indel_translation_witnesses.jsonl.gz)
-retain these original inputs, actual VEP CLI and Haplosaurus outputs, direct TVA
-observations, diagnostics and reproduction scripts, together with the alternate
-translation-table controls below. Seven fixed predicate cases include an in-frame
-deletion, unavailable coding contrast, start loss, stop loss and terminal partial
-codon; native tests additionally check their reverse-complement orientations.
-The capsule has 290 byte-exact files and SHA256
-`7b0acf236647f50971e1920e9232152fc8df765c1aac72031d1f7f530e71a6a0`.
-Original receipt pins are
-`396a66d709a0248230a1f1d6e4a4aac45c32a67183efae50036aa8c6c4de05b5`
-for removed REF and
-`bdc81aa4e8a1a5783c76ff5e43d37035af5e2eb5f5872f29beee751744e3a560`
-for alternate-table observations; the seven-case predicate receipt is
-`12d56d937587f4cb9e348e011cf778a44384a2b28f4de7633d4e62b2c634e00c`.
-The retained-anchor and immediate-stop diagnostic receipt is
-`2e30edccd140181909cd529d374d4700a997dfcb93adbd6dee2387491f6c8dd5`;
-it retains all 168,000 independent comparison rows from its input checkpoint,
-112 repeated oracle observations, and two direct TVA observations.
-The erased-padding receipt is
-`7c8dea7611c850908ba46800b0f14032f5de54415f3edae1b16575287d7f3202`;
-its 14 original VCF records cover suffix, prefix, both-sided padding, unequal
-replacement, deletion, equal-length and changed-N controls in three models.
-Their actual parser geometry agrees with the native prepared event. The
-geometry probe's source and output are retained, not its compiled executable.
-The equal-local-peptide receipt is
-`df54971ee09344132d2526a17349875a0606a4c4b1bc15113d2fd87eeddd6931`;
-three fresh TVA call orders agree for original records 4, 10 and 14. The
-native fact probe retains its source and output, not its compiled executable.
-The `canonical_hgvs` and `xaa_duplication` origins retain twelve original-record
-observations for internal-stop shifting, delins formatting and duplication.
-Their receipt pins are
-`93d5cee946ba03b11acfd78fa26e77ee1ace7e40ddd19873a26b87786d90bb2f` and
-`38d8d2fdef7fce4e5bfc8fad8f11496201de7dd7462ba9ab697ecc74a455e796`.
-Raw-source observations retain five exact indels with `GT=1|1`, their `GT=1`
-companions, five additional configurations including a skipped-plus-valid pair,
-and nine literal ALT spellings. Original Runner output and observed output are
-byte-identical within each campaign; per-lane observations retain applied source
-IDs and raw flags. Their receipt pins are
-`96fef08540301180ea41b70e4c0342889286563cbc3f6ed46648f7cab0368944`,
-`e3efba82cbb9d53623753b37f8747be580e48180e0700c558c60aec5f6a2f51a`,
-`0eb53b96f6fab741bed65faf42fcaebed6eb4a27125e17fa136ff16d84cc58e2` and
-`286298b57d32972e0c9094ddfcdf98c7f0aa4e8d726830e51fcbb6ad9521a175`.
-The first pin identifies the final receipt over closed output/log files; its
-earlier receipt is also retained, including its explicitly superseded log hash.
-These are unsigned diagnostic witnesses,
-not general conformance or claims of an upstream biological defect.
-
-Raw predicates and emitted SO terms are different observations. The
-[retained predicate witnesses](test/duckvep/conformance/data/indel_predicate_witnesses)
-include CDS `ATGAAACCCGGGTTTTAA`, position 10 `GG>C`, and CDS
-`ATGACGTATGTAGTAGATCCTTCCGAATAT`, position 19 `CCT>A`. Their local peptides
-are respectively `G/X` and `P/X`. Both raw `frameshift` and `missense_variant`
-predicates are true, but emitted SO contains only `frameshift_variant`:
-`Constants.pm` excludes missense for a length-decreasing feature. The observed
-HGVSp values are `p.Gly4ArgfsTer?` and `p.Pro7IlefsTer?`. Native tests check
-both layers rather than treating a raw missense flag as an emitted consequence.
-
-The canonical replay benchmark's CDS67 `GC>G` supplies an exact additional
-witness: local `GCT/GT` gives `A/X`, raw frameshift and missense are true,
-and independent VEP emits only `frameshift_variant` with
-`p.Ala23ValfsTer?`. A physical block does not inherit the uploaded-feature
-class gate, so its local mask includes both raw predicates. The
-[checkpoint report](benchmarks/duckvep_haplotypes_indel.md) retains the paired
-four-row native outputs, exact upstream observation and all 51 measurements.
-A complete typed comparison of 90,112 keyed singleton row pairs finds exactly
-22,528 deletion-mask changes and no other field changes or missing keys. The
-retained captures match the original timed-output fingerprints, and seven
-corruption controls check the comparator. The singleton full-output fingerprints
-remain unequal; the report describes same-input, different-output measurements,
-not identical-output performance or a general conformance result.
-
-The indel predicate bundle retains six later-coding-exon models, both strands and phases
-0, 1 and 2, with N outside the validated `T>AC` or reverse-strand `A>GT`
-source allele. Pinned TVA and CLI observations agree on
-`frameshift_variant&start_lost`; the local peptides are `X/XX`. HGVSp is
-`p.Thr2_?1` at phase 0 and `p.Met1?` at phases 1 and 2. These exact models
-justify their native regression expectations; they do not certify every
-phase-padded indel. The bundle preserves source models, original VCF, FASTA,
-GFF, observation scripts, complete TVA/CLI output, warnings and original
-receipts. Its network-free audit reconstructs all eight witnesses and rejects
-semantic corruptions and rewritten receipt identities. It is unsigned diagnostic
-evidence, not an authenticated execution certificate.
-
-Source anchors: pinned `Parser::VCF`, `TranscriptVariationAllele::peptide`,
-`Utils::VariationEffect::{missense_variant,inframe_insertion,coding_unknown}`
-and the feature-class gates in `Utils::Constants`. VEP's parser also minimizes
-some complex indels without `--minimal`; diagnostic source records remain
-unchanged, and comparisons retain their original event/ALT identities.
-
-The complete forward, single-exon indel matrix retains 168,000 source records
-across 125 ACGTN codons, 24 tables and 56 insertion/deletion/replacement
-geometries per model. Both native and oracle transcripts have explicitly empty
-UTRs and separate A10 genomic flanks. All eight route/thread configurations
-remain in 1,344,000 HGVSp comparisons; the independent routes additionally
-compare 336,000 SO sets. These finite synthetic counts are not population
-error rates or certification of compound, reverse-strand or phase-padded indels.
-
-The [baseline](test/duckvep/conformance/data/ambiguous_indel_baseline) contains
-260,088 HGVSp and 70,532 SO disagreements. The
-[codon-consensus checkpoint](test/duckvep/conformance/data/ambiguous_indel_consensus)
-contains 164,454 HGVSp and 39,024 SO disagreements. The
-[translation/REF-eligibility checkpoint](test/duckvep/conformance/data/ambiguous_indel_translation)
-contains 41,712 HGVSp and zero SO disagreements: 122,742 HGVSp and all 39,024 SO
-failures from the preceding checkpoint are resolved. The source events, oracle
-expectations and comparison keys are unchanged, with no newly failing comparison.
-Independent and decoded singleton routes match all 168,000 events each, including
-the 86,016 canonical-codon controls. **Indel conformance still fails:** each raw
-route retains 20,856 HGVSp disagreements under the input-contract distinction above.
-Zero SO disagreements
-in this finite matrix do not certify other transcript structures or compound SO.
-
-The bundles preserve every pair, raw source/oracle observations, warnings,
-controls and separately identified source/binary hashes. The network-free audit
-pins their reviewed receipts outside those receipts and reconstructs the entire
-matrix and its nonzero verdicts. Its default check compares each adjacent
-checkpoint, requires identical source and oracle expectations at each key, and
-rejects newly failing HGVSp or
-SO comparisons, including count-preserving exchanges. They remain unsigned
-diagnostic evidence.
-The 28,800-SNV regression matrix retains zero disagreements in its 230,400
-HGVSp and 57,600 SO comparisons after this correction.
-
-## Protein HGVS preserves VEP's local-peptide state machine
-
-VEP 116 protein HGVS is not a generic diff followed by a canonical formatter. Its helper
-order makes several observable states that DuckVEP must retain even when a cleaner global
-peptide comparison would choose another representation:
-
-- HGVSp is attempted only when the pre-consequence `coding` predicate is true and both
-  the first and last `TranscriptMapper::genomic2pep` items are coordinates. A feature may
-  overlap CDS yet begin or end with a mapper Gap—for example at an intronic endpoint. VEP
-  returns no HGVSp for that ordinary state; it is not a peptide-reconstruction failure.
-- Equal local reference and alternate peptides return before shared-prefix/suffix clipping.
-  The original translation start therefore remains the reported protein position.
-- VEP converts a literal stop `*` to its internal `X`, BioPerl expands that symbol as
-  `Xaa`, and the final formatter maps `Xaa` to `Ter`. A synthetic unknown residue and a
-  translated stop can consequently share the rendered token even though their upstream
-  facts differ.
-- `_get_alternate_cds` calls `_trim_incomplete_codon` before appending the
-  transcript-oriented 3-prime UTR used for continued translation, but that helper contains
-  `if ($full_length = $keep_length)`. In executable Perl this assignment means edited CDS
-  strings of one or two bases are trimmed to empty, while every length of at least three is
-  returned wholly untrimmed—even when its length is not divisible by three. Replacing this
-  with the biologically cleaner equality test changes frameshift/extension output.
-- The first changed frameshift amino acid can occur after the first codon touched by the
-  nucleotide edit. Its termination distance is measured from that first differing peptide
-  residue to the new stop, not from the edit's first CDS coordinate.
-- An insertion before the first translated residue, after the last translated residue, or
-  immediately before the canonical terminal stop can have no protein HGVS. VEP's insertion
-  representation requires two flanking residues, while its ordinary peptide string omits
-  the terminal stop.
-- `_shift_3prime` rotates a peptide insertion or deletion only when the complete changed
-  peptide fits inside the remaining reference peptide. Its loop limit is
-  `length(post_seq) - length(changed_peptide)`. A matching first residue is therefore not
-  sufficient when the changed peptide is longer than the suffix; a cyclic-prefix search
-  moves valid indels too far.
-- `_get_surrounding_peptides` returns no post-variant sequence when its one-based
-  `post_pos` equals the peptide length, even though that position names the final
-  translated residue. The subsequent 3-prime shift is skipped. A coding insertion that
-  copies that last residue can therefore remain `p.Tyr22_Trp23insTrp` instead of becoming
-  `p.Trp23dup`, even when its transcript DNA form is a duplication. The held-out
-  seed-161803399 campaign exposed this state with `chrDuck:234 C>CTGG`; the minimized C
-  test uses a `YW` peptide and pins the same endpoint comparison.
-- Perl substring semantics leak into two start-of-peptide outputs. When clipping leaves an
-  insertion at `start=1,end=0`, `substr(_peptide, -1, 2)` supplies the final reference
-  residue and executable VEP can print strings such as
-  `p.Trp0_Trp1insIle`. A cached start-loss override over the same reversed
-  interval can print `p.Trp1_?0`. These are VEP-116 compatibility strings, not valid HGVS
-  positions, and the typed fact layer records them separately from semantic edit replay.
-  Two fixed builder scenes are minimized from committed executable differentials on
-  `DUCK1-201`: `chrDuck:119:G:GATA` produces `p.Trp0_Trp1insIle`, while
-  `chrDuck:120:A:ACCA` produces `p.Trp1_?0`. Their complete VEP and DuckVEP rows are in
-  the tracked extraction
-  `test/duckvep/conformance/data/hgvs_compatibility_witnesses.tsv`; it records the source
-  differential revision, seed-named corpus, and pinned VEP/core/variation authorities.
-- The terminal stop becomes an insertion flank only for a pure insertion whose mapper
-  coordinate lies inside the terminal codon. VEP may then print
-  `p.Trp23_Ter24ins...`. An earlier coding insertion can clip to the same peptide-level
-  insertion after the final non-stop residue, but VEP returns no HGVSp; globally appending
-  a synthetic stop creates false protein strings.
-- Independent-event duplication detection translates raw reference CDS with BioPerl's
-  default table 1,
-  independently of the declared-table peptide used for clipping and insertion flanks.
-  On table-5 CDS `ATGAGAGCCTAA`, original CDS position 4 `A>AGCC` gives
-  `p.Arg2dup`, even though the declared reference residue is Ser. On table-26 CDS
-  `ATGCTGGCCTAA`, position 6 `G>GGCC` gives `p.Ala2_Ala3insAla`, not a duplication.
-  The duplication formatter returns before ordinary Xaa-to-Ter replacement: table-1
-  `ATGNNAGCCTAA`, position 4 `N>NGCC`, gives `p.Xaa2dup`. For an ordinary insertion,
-  `ATGNCNGCCTAA` with the same original allele gives `p.Ter2_Ala3insPro`.
-  Compound protein contrast against an explicitly supplied curated reference is a
-  different contract: its duplication must replay against that supplied sequence.
-- The delins/insertion formatter tests its already converted reference text for a
-  trailing literal `X` before appending an extension. Three-letter `Ter` does not
-  satisfy that condition. Table-1 `ATGTAAGCCTAA`, position 4 `T>TGCC`, therefore
-  gives `p.Ter2delinsCysGln` despite a true `stop_lost` predicate. The separate
-  substitution/deletion extension branch still applies.
-
-The internal protein-HGVS facts keep equality, substitution, deletion, insertion, delins,
-duplication, frameshift, start loss, and extension distinct before rendering. Randomized
-properties replay the described peptide edit and publish counters for each observed shape,
-strand, immediate-stop state, and unsupported terminal insertion. Executable-VEP strings
-remain the final compatibility oracle.
-
-Named policy flags isolate the executable-language behaviour in this state machine:
-
-- `DUCKVEP_COMPAT_HGVS_INCOMPLETE_CODON_ASSIGNMENT` owns the assignment in
-  `_trim_incomplete_codon`;
-- `DUCKVEP_COMPAT_HGVS_NEGATIVE_SUBSTR` owns only the negative-`substr` position-zero
-  result;
-- `DUCKVEP_COMPAT_HGVS_XAA_AS_TER` owns both Xaa/Ter equality and rendered residue-name
-  substitution outside duplication, including truncation of alternate peptide text at
-  the first VEP-style `Ter`; and
-- `DUCKVEP_COMPAT_HGVS_THREE_LETTER_DELINS_NO_EXTENSION` preserves the delins/insertion
-  formatter's post-conversion reference test.
-
-The shared fact builder and writer consume those flags. Callers cannot recreate these
-states by passing a formatter hint, and the strict control disables these policies.
-
-VEP's ordinary `--hgvs` output renders the default protein suffix without parentheses,
-for example `p.Ter394CysextTer9`. Parentheses are a presentation option enabled by
-`--hgvsp_use_prediction`; they are not evidence of a different protein edit. The public
-DuckVEP renderer follows the default unparenthesized form, while the internal renderer can
-exercise both modes without changing the typed protein facts.
-
-Source anchors: Ensembl Variation 116
-`TranscriptVariationAllele::hgvs_protein`,
-`BaseTranscriptVariation::translation_start`/`translation_coords`,
-`TranscriptVariationAllele::_get_hgvs_protein_format`,
-`_get_hgvs_protein_type`, `_get_hgvs_peptides`, `_clip_alleles`, `_get_fs_peptides`,
-`_get_surrounding_peptides`, `_get_alternate_cds`, `_check_for_peptide_duplication`,
-`_stop_loss_extra_AA`, and `_shift_3prime`.
-
-## Consequence predicate sidecars preserve cached start- and stop-loss false states
-
-The finalized SO set is not a closed-world serialization of every sequence predicate VEP
-evaluated. Generalized edits that overlap splice logic can emit a splice/coding consequence
-set without `frameshift_variant`, while the later shifted-CDS replay used by HGVSp still
-proves a frameshift. Conversely, a consequence-side positive frameshift/start/stop
-predicate remains useful when HGVS rebuilds the same edit.
-
-DuckVEP therefore carries a compact predicate sidecar beside the consequence mask.
-Frameshift and stop-retained bits are positive evidence: HGVS may OR them into its
-independent CDS replay, but an absent bit must not clear a fact that the replay proved.
-Deriving those HGVSp states only from the SO mask loses valid VEP combinations.
-
-Original peptide operands supply a separate, explicit exclusion. VEP's
-`_get_peptide_alleles` caches the pair before HGVS shifting; `frameshift` rejects
-a partial codon, a retained stop, or an available reference peptide beginning
-with `*`. Those guards survive the display shift even if the shifted local
-reference no longer begins with a stop. On table-1 CDS `ATGTAAGCCTAA`, original
-CDS position 5 `AAG>A` therefore gives `p.Ala3Ter`; `A>AAC` gives
-`p.Ter2_Ala3insTer`, and `A>AACGT` gives `p.Ter2_Ala3insArgTer`.
-The shared peptide-window guard captures these concrete exclusions before
-worker scratch is reused. Missing operands do not establish an exclusion,
-and an absent frameshift flag alone remains insufficient.
-
-`start_lost` and `stop_lost` are the narrow exceptions. VEP evaluates and caches those
-predicates while it constructs consequences, before `hgvs_protein()` performs its private
-3-prime placement. The HGVSp call then reuses the cached values. The executable witness
-`chrDuck:119 G>GAACT` is initially a `5_prime_UTR_variant`, shifts to
-`c.1_2insACTA`, and renders `p.Met1AsnfsTer?`. Replaying the shifted CDS alone would infer
-start loss and incorrectly render `p.Met1?`; VEP's cached `start_lost = false` prevents
-that. The same cached complete-feature `coding` predicate also controls failure status. If
-only that witness's uploaded anchor is replaced with a wrong base, genomic validation makes
-HGVSc unresolved; HGVSp must be unresolved too because the feature was coding-admissible
-even though its original region label was 5-prime UTR. Treating that region label as the
-protein authority incorrectly returns not applicable.
-
-The late frameshift stop search is a third, separate reconstruction. Before
-`_stop_loss_extra_AA()` asks for an alternate CDS, `hgvs_protein()` deletes its private
-shift hash. That restores both the original CDS coordinate and the original, unrotated
-feature allele; it does not reuse the shifted HGVSc display allele. The formatter passes
-`protein_start - 1` into `_stop_loss_extra_AA()`, which rejects zero before rebuilding an
-alternate CDS. Position-1 frameshifts therefore retain `fsTer?`, including the short
-witness above, even when a direct translated edit would contain a later stop. This is not
-a blanket rule. The rare generated witness
-`chrDuck:119 G>GACGGTGATCCTGGGTGGCAGGTGATCTAGATAGGGGGGTGACTGGA`
-first renders shifted `c.3_4insGTGATCCTGGGTGGCAGGTGATCTAGATAGGGGGGTGACTGGAACG`,
-then the restored original allele at the original CDS coordinate finds a positive late
-stop and renders `p.Arg3IlefsTer6`. Replaying the rotated display allele instead produces
-the wrong `Ter5`; suppressing every non-CDS shifted termination produces the wrong
-`Ter?`. A deletion that removes the terminal peptide can likewise reconstruct stop loss
-while the cached original predicate remains false, yielding an ordinary terminal
-`p.Trp23_Ter24del` rather than an extension. Once the sidecar says sequence predicates are
-valid, its start-loss and stop-loss bits are therefore closed-world even though its
-frameshift and stop-retained bits are not.
-
-The start-loss cache has a separate mapper trap. `Mapper::map_insert` maps the two genomic
-flanks, drops an intronic `Gap`, and moves the surviving cDNA coordinate inward to retain
-`start=end+1`. An insertion beside a start codon split across exons can consequently have
-unshifted cDNA coordinates `3,2` and satisfy `_overlaps_start_codon` even though only one
-genomic flank is exonic. Requiring two exonic endpoints clears a valid cached start-loss
-fact. Fixed forward- and reverse-strand scenes cover both possible exon edges.
-
-The protein formatter adds another insertion-only state after genomic 3-prime placement.
-For a shifted in-frame pure insertion with cached `start_lost`, peptide clipping can leave
-an empty reference allele. Before the final start-loss override, VEP still treats this as
-a peptide insertion: `_check_peptides_post_var()` and `_shift_3prime()` rotate the changed
-peptide across matching following reference residues and advance the mapper positions.
-Only then does it read the two flanking reference residues. The generated
-`chrDuck:120 A>AAGGTCTACCCGCCACTCGCATTATCTGACAACCCCTGAGTGCGCA`
-therefore renders `p.ValArg3_?2`, not `p.MetVal2_?1`; the analogous position-121 witness
-renders `p.ArgThr4_?3`, not `p.ValArg3_?2`. This is sequence-dependent: the equally shifted
-`chrDuck:120 A>AAGA` has changed peptide `K`, which does not match the following reference
-`V`, so VEP retains `p.MetVal2_?1`. Advancing every shifted start-loss insertion is wrong.
-The shared protein fact now performs the same bounded peptide rotation before replacing
-the insertion shape with VEP's start-loss syntax.
-
-The pure-C regression deliberately restores a frameshift fact from a sidecar whose SO mask
-contains only `coding_sequence_variant&splice_acceptor_variant`, then proves that an empty
-sidecar cannot erase a separately reconstructed frameshift but does clear start and stop
-loss. The public SQL regression pins the shifted 5-prime-UTR insertion and its exact
-HGVSc/HGVSp.
-
-This distinction is also a performance invariant. It is safe to synthesize the HGVS delta
-from a valid sidecar when CDS length is unchanged, or when the sidecar positively records
-frameshift. It is not safe to treat an absent frameshift bit as complete negative evidence
-for a length-changing splice overlap. A strict chromosome-21 ClinVar differential exposed
-three such rows: `21:44288343 AGG>A` on `ENST00000291582` and `ENST00000966178` must render
-`p.Gly180AspfsTer36`, and `21:46117558 GCAGCCCAGCAGCCC>G` on `ENST00000984854` must render
-`p.Ala359PhefsTer8`. Skipping the complete delta misrendered them as `p.Gly180Ter` and
-`p.Ala359_His363delinsTer`. The centralized completeness predicate now admits the shortcut
-only for an unchanged CDS length or positive frameshift evidence.
-
-Source anchors: the separate VEP 116 consequence and `hgvs_protein` call paths,
-`VariationEffect::frameshift`, `::_get_peptide_alleles`, `::start_lost`,
-`::stop_lost`, their `_predicate_cache`,
-`Mapper::map_insert`, and DuckVEP
-`duckvep_sequence_delta_consequence_flags` /
-`duckvep_sequence_delta_apply_consequence_flags` /
-`duckvep_sequence_delta_consequence_flags_complete_for_hgvs`.
-
-## Frameshift alternate translation and late stop search use standard table 1
-
-VEP 116 does not use one translation authority throughout protein HGVS. Its ordinary
-transcript consequence and peptide paths honor the transcript's codon table, including
-vertebrate mitochondrial table 2. `_get_fs_peptides()` and the late termination search
-used to append `fsTerN` or `extTerN` do not: both translate rebuilt alternate CDS
-without a codon-table argument, so BioPerl uses standard table 1. The frameshift
-reference peptide still comes from the transcript's table-specific `_peptide`.
-On mitochondrial transcripts, an alternate `TGA` is consequently a
-stop for the late HGVS search even though it is Trp in the peptide that established the
-frameshift consequence. The formatter searches that complete table-1 translation from
-its beginning. When the first such TGA lies before the affected residue, its computed
-distance is non-positive and VEP prints `Ter?`; the search must not reuse a first-stop
-shortcut proved under table 2. DuckVEP applies this policy to frameshift alternate
-residues and the late stop search; ordinary mitochondrial coding consequences remain
-table-2 translations. `DUCKVEP_COMPAT_HGVS_CDS_STANDARD_TABLE` and
-`duckvep_compat_hgvs_codon_table()` define the shared policy for these alternate
-translations and the raw-reference duplication lookup. The internal
-strict control retains the transcript table.
-
-Original-VCF controls on CDS `ATGAAAGCCTAA` distinguish these authorities:
-
-| Table | CDS position and original allele | Pinned HGVSp |
-| --- | --- | --- |
-| 2 | 4 `A>AG` | `p.Lys2ArgfsTer?` |
-| 2 | 4 `A>AT` | `p.Lys2IlefsTer?` |
-| 6 | 3 `G>GT` | `p.Lys2Ter` |
-| 9 | 4 `A>AG` | `p.Asn2ArgfsTer?` |
-
-Table 9's reference is `MNA`, while its rebuilt alternate translates to `MRSL`
-under table 1, not table-9 `MSSL`. Table-2 `A>AG` still emits both
-`frameshift_variant` and `stop_gained`; HGVSp's alternate-table policy must not
-change those consequences. The translation-witness capsule above retains ten
-direct TVA/native comparisons, six unchanged controls and complete observations
-for all 224 original alleles across these four models.
-
-The same formatter exposes a precedence state that consequence names alone do not make
-obvious. `_get_hgvs_protein_format()` tests cached `stop_lost` combined with peptide type
-`del` or `>` before it reaches its `fs` branch. A frame-changing terminal edit may
-therefore retain both `frameshift_variant` and `stop_lost` as consequences while its
-protein string is a deletion-extension such as `p.Ter227delextTer?`, not a frameshift or
-plain deletion.
-
-The complete 2026-07-06 ClinVar mitochondrial shard supplies 67,828 transcript pairs.
-Before this rule was isolated, all consequences and HGVSc strings were exact but 25
-HGVSp strings differed: 24 late stop distances followed the transcript mitochondrial
-table instead of VEP's implicit standard table, and one combined frameshift/stop-loss
-deletion missed the formatter precedence. Fixed C witnesses distinguish TGA under tables
-1 and 2 and pin the combined deletion-extension state. The fail-closed rerun is exact for
-all 67,828 transcript pairs, including every one of the 3,294 present HGVSc and 2,354
-present HGVSp values; the executable full-shard differential remains the acceptance
-authority.
-
-Source anchors: Ensembl Variation 116
-`TranscriptVariationAllele::_get_hgvs_protein_format`,
-`TranscriptVariationAllele::_get_fs_peptides`,
-`TranscriptVariationAllele::_stop_loss_extra_AA`, and their argument-free
-`Bio::PrimarySeq::translate()` calls.
-
-## DNA duplication projects the copied source before requiring insertion flanks
-
-VEP decides whether an inserted sequence is a tandem duplication before it formats an
-ordinary insertion. For a duplication it prints the transcript coordinates of the copied
-reference source. Only the fallback `ins` form requires both insertion flanks to project.
-Reversing that order rejects a valid `dup` merely because the ordinary insertion notation
-would lack one projected flank.
-
-The low-level DuckVEP fact property pins this typed state with a copied final transcript
-base rendering as `c.12dup`; it is a fact-layer reachability test, not a claim that the
-current candidate sweep admits an insertion after a transcript endpoint. The executable
-GRCh38 witness `21:33262748 G>GT` is end-adjacent rather than transcript-external: both
-insertion flanks are in `ENST00000980233`, its copied source is projected after VEP's shift,
-and the result is `c.*860dup`. Keep those two claims distinct when extending candidate
-geometry.
-
-Three genomic reference views must also remain distinct. `_genomic_shift` consumes the
-exact sequence-region-constrained +/-1000 slice and takes its first and last 1000 bases as
-the two shift strings. Complete uploaded VCF REF validation may require retained padding
-outside that slice. Later, `hgvs_variant_notation` checks the transcript feature sequence
-for an adjacent copied source whose length is the inserted allele length and is not capped
-at 1000. DuckVEP performs one bounded faidx fetch but exposes the exact shift slice and the
-wider assertion/duplication lookup as separate borrowed views. Widening the shift view for
-retained REF changes VEP placement; limiting duplication lookup to it turns a valid
-greater-than-1000-base `dup` into `ins`.
-
-The randomized shift oracle exposed a second ownership lesson. Rare terminal duplications
-can keep a printable copied-source DNA fact after the shifted insertion point has left a
-synthetic transcript-sized reference view. Low-level CDS composition then depends on which
-genomic VCF anchor that deliberately truncated view still contains, and forward/reverse
-cases need not return the same low-level status. The public adapter first applies VEP's
-shifted genomic-to-peptide endpoint precondition and does not compose that transcript-external
-insertion into HGVSp. The statistical property therefore records the DNA-only state instead
-of asserting an unreachable composition status; deterministic public tests own HGVSp
-applicability.
-
-Complete-feature clamping can also make a duplication reachable after minimization moved
-the semantic differing base outside the transcript. On the positive-strand minimal
-fixture, uploaded terminal `chrDuck:250 CG>CC` minimizes to `G>C` at position 251, but
-`_var2transcript_slice_coords` first clamps the complete two-base feature to the terminal
-transcript base. `hgvs_variant_notation` recognizes the two-copy `dup` before
-`hgvs_transcript` skips allele clipping for that type, retaining `c.*10dup`.
-The same geometry with a non-copy (`CG>CA`) remains
-absent. The complete feature must clamp to exactly that one terminal base: uploaded
-`chrDuck:249 ACG>ACC` retains two in-transcript bases before clipping and VEP leaves its
-resulting out-of-range insertion absent, even though the remaining `C` is a terminal copy.
-Rejecting the minimized event before retaining the overlapping complete feature loses the
-positive VEP state; admitting every outside minimized event or every terminal-copy suffix
-creates false terminal annotations.
-
-Only type `dup` skips `_clip_alleles`, not the other multiplication types from
-`hgvs_variant_notation`. The unchanged seed-27182818 campaign exposed terminal
-`chrDuck:250 CGT>CCC`: clamping gives `C>CCC`, but the intermediate `[3]` type is
-then clipped to an insertion with one coordinate past the transcript. VEP returns
-no HGVSc. Treating every multiplication as printable repeat syntax incorrectly
-emitted `c.*10[3]`. The fixed VCF `test/data/duckvep/hgvs_terminal_multiplication.vcf`
-retains this counterexample, two-copy duplication and larger-copy controls.
-
-Source anchors: Ensembl Variation 116 `TranscriptVariationAllele::hgvs_transcript`,
-`TranscriptVariationAllele::_genomic_shift`, `hgvs_variant_notation`, and its duplication
-check before insertion formatting.
-
-## Haplosaurus reference and alternate proteins use different stop rules
-
-Ensembl-116 core `Transcript::translate` drops a stop at the last complete codon,
-forces a legitimate start to methionine (any expansion for an ambiguous start),
-and applies translation SeqEdits without truncating internal stops. Haplosaurus
-then appends `*` only when the original CDS ends with the exact uppercase bytes
-`TAA`, `TAG` or `TGA`. That last check ignores codon table, reading frame and case
-normalization. Alternate translation has no reference SeqEdits or start override
-and is displayed only through its first stop. These conventions can produce a
-protein difference without a causal edit at the differing amino acid.
-
-| CDS / table | Reference protein | No-edit alternate translation |
-| --- | --- | --- |
-| `CTGGCCTAA` / 1 | `MA*` | `LA*` |
-| `ATGTGAGCCTAA`, peptide position 2 = U / 1 | `MUA*` | `M*` |
-| `ATGGCCTAA`, peptide position 3 = W / 1 | `MAW*` | `MA*` |
-| `ATGGCCTGA` / 2 | `MAW*` | `MAW` |
-| `ATGGCCAGA` / 2 | `MA` | `MA*` |
-| `ATGGCCTAAA` or `atggcctaa` / 1 | `MA` | `MA*` |
-
-The terminal SeqEdit restores a residue removed by core translation; the
-container can append an additional stop after it. Reference scratch must allow
-`floor(CDS_length/3) + 1` residues plus NUL. A model reference is immutable;
-uppercase CDS alignment and the exact reference-protein spelling rule are
-separate views. `reference_translation_oracle.pl` observes the real pinned core
-and container methods over these witnesses and the complete ACGTN/table matrix.
-SQL/R haplotype tests retain contributor geometry rather than attributing a
-reference-curation difference to a new genomic position.
-
-Source anchors: core `Transcript::translate`, `Translation::modify_translation`,
-`SeqEdit::apply_edit`, and Ensembl Variation 116
-`TranscriptHaplotypeContainer::_init` / `_mutate_sequences`. The reference
-translation receipt hashes the core modules from the pinned VEP distribution.
-
-## Haplosaurus sequence-group flags depend on sample traversal order
-
-**Classification: reproduced VEP-116 order-dependent metadata; not a claim of
-biological incorrectness. Full grouped-metadata conformance remains unresolved.**
-
-The pinned `TranscriptHaplotypeContainer::_init` traverses a sample hash and groups
-mutation lanes by sequence. A new group copies the first lane's `indel`, `frameshift`
-and `length_diff` flags. Later lanes add counts and contributing variants without
-combining those flags. Equal final sequences can therefore retain different group
-flags depending on sample traversal order.
-
-The [fixed seven-exon witness](test/duckvep/conformance/haplotype_grouped_flags.R)
-retains both original same-position records and the mixed missing call. Its
-[receipted experiment](test/duckvep/conformance/data/haplotype_grouped_flags_history.csv)
-runs 32 Perl hash seeds twice with `PERL_PERTURB_KEYS=0`: 64 original Runner runs
-and 64 observed runs. Observation preserves the complete original JSON within each
-seed and repeat. Per-lane sequences and flags remain identical across seeds. For
-the 180-base CDS group, `has_indel` is zero in 11 seeds and one in 21; both repeats
-agree, and every group retains the same three sample memberships.
-
-These observations identify the source of unstable group metadata, not a consensus
-biological flag rule. DuckVEP's path flags and VEP's sequence-group flags are distinct
-observations. The four retained full-output disagreements in the
+| Retained REF bases | Equal-length uploaded spans determine local peptide windows. They can change start/stop terms even when the differing base is identical. Complete uploaded REF still requires validation. |
+| CDS phase | Displayed CDS/protein coordinates use the first transcript exon phase; stored CDS padding uses the first coding exon phase. These may differ when CDS begins in a later exon. |
+| UTR and mapper gaps | A feature crossing the 3′ CDS end may lose peptide annotation, while one crossing the 5′ CDS start can retain start predicates. Empty annotated UTR intervals can still produce UTR terms for spanning features. |
+| Partial codons and stops | Partial-codon status depends on sequence length and first affected peptide position, not only an attribute. Terminal coordinate tests, local peptides and raw-CDS fallback translation can disagree, including after reference peptide edits. |
+| Predicate combinations | Start-lost/start-retained and stop-retained/protein-altering can coexist. In-frame insertion is not determined by length modulo three; deletion and insertion use different predicates. |
+| Splice and noncoding features | ALT-only differing runs can reach an intron selected by VEP's expanded cache. Short-intron exon stretching is candidate selection, not exon membership. Mature-miRNA overlap replaces generic noncoding exon terms. |
+| Empty consequence sets | A real transcript overlap with no successful predicate receives transcript-associated `intergenic_variant`. It must not be confused with absence of a transcript from an incomplete model. |
+| NMD | The plugin projects the full uploaded feature, including reversed insertion intervals, rather than the minimized edit. It is distinct from a transcript's curated `NMD_transcript_variant` biotype term. |
+
+Executable witnesses are in the [projection differential](test/duckvep/conformance/projection_differential.R)
+and [corpus differential](test/duckvep/conformance/corpus_differential.R).
+The [annotation](test/duckvep/property/duckvep_prop_annotation.c),
+[coding](test/duckvep/property/duckvep_prop_coding.c) and
+[classification](test/duckvep/property/duckvep_prop_classify.c) properties retain the
+specific strand, phase, start/stop, UTR, splice and NMD counterexamples. Pinned
+[VariationEffect](https://github.com/Ensembl/ensembl-variation/blob/2fb834b987ede3824e200197a838ce11e91aeb4b/modules/Bio/EnsEMBL/Variation/Utils/VariationEffect.pm)
+and [NMD](https://github.com/Ensembl/VEP_plugins/blob/0082591268417af618e03850c5ffdc7c09998a5d/NMD.pm)
+remain the source authorities, not biological simplifications of their term names.
+
+## Model inputs and structural events
+
+**Classification: upstream conventions and explicit DuckVEP scope.**
+
+- **Assembly paths:** X/Y PAR, patches and alternate haplotypes retain path-specific
+  coordinates and transcript identities. DuckVEP models the exact paths supplied by
+  the reference relation; it does not implicitly project absent paths or merge
+  equivalent genes. The [PAR fixture](test/duckvep/conformance/data/par_path_witnesses.vcf)
+  tests sequence-dependent annotation on both X and Y.
+- **Release annotations:** Ensembl release `VE` contains stored variation-effect rows;
+  release `CSQ` can overwrite terms for the same allele/feature. Neither replaces
+  executable VEP as the oracle. The [release audit](test/duckvep/conformance/release_vcf_differential.R)
+  preserves this distinction. Regulatory model preparation excludes EMAR because
+  VEP excludes those source rows before overlap evaluation.
+- **Breakends:** VEP adds one to local POS but retains the mate coordinate. Ordinary
+  transcript terms use the local feature; truncation and regulatory/motif overlap
+  can observe the mate. Candidate discovery and the fixed 5,000-base attachment
+  distance are separate rules. DuckVEP emits each event/feature once, unioning endpoint
+  terms; raw VEP may emit multiple rows. It does not infer fusion sequence. The
+  [BND fixture](test/duckvep/conformance/data/breakend_default_witnesses.vcf)
+  retains endpoint/default-term controls.
+- **BND batching:** VEP's
+  [input-buffer interval tree](https://github.com/Ensembl/ensembl-vep/blob/57ea5c52340acc1f156267f810ad162e26597082/modules/Bio/EnsEMBL/VEP/InputBuffer.pm#L345)
+  can mix mate coordinates without
+  a chromosome key, making a record's transcript set depend on other buffered records.
+  BND differentials use `buffer_size=1` to state an isolated-event oracle contract;
+  this is not conformance to arbitrary batched output. The
+  [multichromosome BND report](benchmarks/duckvep_conformance.md#paired-breakend-differential)
+  records that scope.
+- **Symbolic and repeat alleles:** VEP accepts a finite symbolic vocabulary, not arbitrary
+  `<...>` geometry. A bounded tandem repeat expanded to literal sequence is a small
+  variant; an unexpanded repeat uses structural gain/insertion predicates. Nominal SV
+  coordinates drive consequences; confidence intervals and inserted sequence remain
+  provenance, not inferred exact geometry or compound HGVS. The
+  [confidence fixture](test/duckvep/conformance/data/structural_confidence_grch38.vcf)
+  and [nominal-coordinate comparison](benchmarks/duckvep_conformance.md#declared-conformance-closure)
+  test uncertainty metadata; VEP's
+  [structural insertion predicate](https://github.com/Ensembl/ensembl-variation/blob/2fb834b987ede3824e200197a838ce11e91aeb4b/modules/Bio/EnsEMBL/Variation/Utils/VariationEffect.pm#L1100)
+  does not inspect inserted sequence.
+- **gVCF alleles:** `<*>`, `*`, `<NON_REF>` and `.` are different. The catch-all
+  `<*>` has no known alternate coding sequence or HGVS, yet VEP's length predicate can
+  produce ablation when a long REF contains a complete feature. The
+  [gVCF fixture](test/duckvep/conformance/data/gvcf_semantics.vcf) preserves mixed ALT
+  order and long-REF controls. Literal deletions can also ablate transcripts without
+  becoming symbolic structural records.
+
+These rules do not establish a general structural-variant or pangenome annotation
+engine. The [structural kernel](src/duckvep/kernel/src/duckvep_sv.c) and
+[classification tests](test/duckvep/property/duckvep_prop_classify.c) define the typed
+subset; original ALT, confidence, orientation and source identity remain necessary.
+
+## HGVS follows VEP's state machine
+
+**Classification: observed executable conventions, not a certified HGVS standard.**
+Protein HGVS is not simply a difference between two complete proteins, and transcript
+HGVS is not simply a walk along spliced CDS.
+
+- Transcript HGVS shifts against a genomic reference window in transcript direction.
+  VEP's clipped 1,000-base flank construction, allele-length limits and cached pre-shift
+  transcript slice affect endpoint cases. Duplication tests the copied source before
+  ordinary insertion flanks. These operations must not rewrite source coordinates or
+  consequence events; `shift_hgvs` is not `shift_3prime` or `shift_genomic`.
+- Literal exonic SNPs have a phase-aware HGVS coordinate path that MNVs and indels do
+  not share. A transcript-flank consequence can legitimately have no transcript HGVS;
+  missing reference or failed REF validation is instead unresolved.
+- Protein notation uses cached unshifted start/stop predicates and independently
+  reconstructed frameshift state. Shared peptide clipping, terminal insertion flanks
+  and stop-loss precedence affect both strings and applicability.
+- Some HGVS paths translate with BioPerl's default table 1: frameshift alternate CDS,
+  late stop search and raw-reference duplication checks. Ordinary consequences still
+  use the transcript's declared table. Mitochondrial HGVSp can therefore use a stop
+  incompatible with its consequence peptide's translation table.
+- Other executable details include incomplete-codon assignment behavior, distinct
+  terminal-partial insertion views, negative substring positions, Xaa-to-Ter conversion
+  and a delins extension guard after three-letter conversion. A rendered `Ter` is
+  therefore not independent proof that the reconstructed sequence contains a stop.
+- Default independent-event VEP protein strings omit prediction parentheses.
+  Parentheses alone do not change the asserted protein edit.
+
+The [compatibility policy](src/duckvep/kernel/src/duckvep_compat.h) is the single inventory
+of explicitly gated runtime behavior. The
+[HGVS properties](test/duckvep/property/duckvep_prop_projection_hgvs.c),
+[original-record witnesses](test/duckvep/conformance/data/hgvs_compatibility_witnesses.tsv)
+and [SQL tests](test/sql/duckvep_hgvs.test) pin the strings and absent-output cases.
+Position-zero output is preserved as a VEP convention, not endorsed as valid HGVS.
+
+<a id="equivalent-dna-anchors-can-produce-contradictory-vep-116-protein-descriptions"></a>
+
+### A stop-loss witness with a sequence contradiction
+
+**Classification: reproduced synthetic sequence contradiction and HGVS-rule inference;
+unpublished complete evidence, no upstream acknowledgement.**
+
+The forward single-exon transcript `ANCHOR1` spans `chrA1:11–45`, with phase-zero
+CDS `11–22`, standard table 1 and complete transcript sequence
+`ATGGGTCCTTAAAAAGAACAATAATAACTAGCTGA`. Its CDS `ATGGGTCCTTAA` translates to
+`MGP*`. These four physical records are separate inputs, including the duplicate allele:
+
+| Record ID | POS | REF → ALT | VEP HGVSc | VEP HGVSp suffix |
+| --- | --- | --- | --- | --- |
+| `ANCHOR1_10_T_0` | 19 | T → TT | `c.10dup` | `p.Ter4LeufsTer9` |
+| `ANCHOR1_10_T_1` | 20 | T → TT | `c.10dup` | `p.Ter4delinsLeuTer` |
+| `ANCHOR1_11_T_0` | 20 | T → TT | `c.10dup` | `p.Ter4delinsLeuTer` |
+| `ANCHOR1_11_T_1` | 21 | A → TA | `c.10dup` | `p.Ter4delinsLeuTer` |
+
+Every record reconstructs `ATGGGTCCTTTAAAAAGAACAATAATAACTAGCTGA`.
+Independent base-R and BioPerl translation agree on `MGPLKRTIITS*`, first stop at
+position 12. The delins description instead asserts a stop at position 5.
+The traced mechanism is an incomplete local codon rendered as Xaa and then Ter;
+unmodified and observed VEP output agreed at buffer sizes 1 and 5,000.
+
+Our [HGVS 21.1.4 extension-rule](https://hgvs-nomenclature.org/21.1.4/recommendations/protein/extension/)
+inference is `p.(Ter4LeuextTer9)`: extension has priority when the reference protein
+is extended. The frameshift string has the reconstructed termination distance but
+a different operation; the delins string asserts a stop absent from that translation.
+This does not establish prevalence, clinical impact or a general stop-loss defect.
+
+The complete four-record outputs and trace receipts remain local diagnostics, not a
+checked-in conformance pack. The shipped
+[terminal-anchor differential](test/duckvep/conformance/hgvs_anchor_differential.R)
+provides the broader executable comparison. DuckVEP's compatibility target remains
+each original record's VEP result; this inference does not replace it.
+
+<a id="haplosaurus-reference-and-alternate-proteins-use-different-stop-rules"></a>
+
+## Haplotype sequences, reference curation and flags
+
+**Classification: observed Haplosaurus conventions and unresolved grouped metadata.**
+Core reference translation removes the last complete translated stop, applies legitimate
+start methionine and reference peptide edits, and retains internal stops. Haplosaurus
+then appends `*` only for an exact uppercase raw-CDS suffix `TAA`, `TAG` or `TGA`,
+regardless of table or frame. Alternate translation has no reference edits or start
+override and displays only the first-stop prefix.
+
+For example, table-1 `CTGGCCTAA` has reference `MA*` but no-edit alternate `LA*`;
+table-2 `ATGGCCTGA` has reference `MAW*` but alternate `MAW`.
+Such protein differences do not prove a causal genomic edit at the differing residue.
+The [reference-translation evidence](test/duckvep/conformance/data/reference_translation_consensus)
+covers these conventions; single-source HGVS remains separate from curated-reference
+protein differences.
+
+Raw `source_records` replay follows literal parser alleles, not decoded singleton
+normalization. Haplosaurus skips non-ACGT mutation alleles, so the retained `N>NGCC`
+example does not insert GCC on that route. DuckVEP preserves the skipped contributor
+and conditional evidence with zero physical edits; HGVSp is NULL and input incomplete.
+A validated REF slot is not a skipped alternate. Within the supported raw alphabet,
+N, U and lowercase alternate bases skip; unsupported symbols remain explicit limitations.
+Raw `GT=1` is not decoded haploidy: Haplosaurus retains two file lanes, and its
+undefined second slot replaces the complete REF with an empty ALT. DuckVEP keeps
+this input-route distinction explicit rather than inferring a second called allele.
+The [raw observations](test/duckvep/conformance/raw_indel_observations.R) and
+[SQL haplotype tests](test/sql/duckvep_haplotypes.test) retain these distinctions.
+
+Haplosaurus groups lanes by final sequence but copies indel/frame flags from the first
+lane encountered. Later members do not combine those flags. The
+[grouped-flag experiment](test/duckvep/conformance/haplotype_grouped_flags.R) observes the
+same 180-base sequence group with `has_indel=0` for 11 hash seeds and `1` for 21,
+with identical memberships and agreement between repeats. This is order-dependent
+metadata, not a biological consensus rule. DuckVEP path flags and upstream group flags
+remain distinct; the four full-output disagreements in the
 [publication audit](benchmarks/duckvep_conformance.md#repeated-model-publication-audit)
-remain failures; matching sequence, counts and provenance does not waive flag differences.
-No upstream acknowledgement is recorded.
-
-Source authority: Ensembl Variation 116
-[`TranscriptHaplotypeContainer::_init`](https://github.com/Ensembl/ensembl-variation/blob/2fb834b987ede3824e200197a838ce11e91aeb4b/modules/Bio/EnsEMBL/Variation/TranscriptHaplotypeContainer.pm#L768).
+are not waived by matching sequences and counts. The
+[pinned container implementation](https://github.com/Ensembl/ensembl-variation/blob/2fb834b987ede3824e200197a838ce11e91aeb4b/modules/Bio/EnsEMBL/Variation/TranscriptHaplotypeContainer.pm)
+is the upstream authority; full grouped-metadata conformance remains unresolved.
