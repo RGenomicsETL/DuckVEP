@@ -192,7 +192,10 @@ main <- function() {
     option("--resume", action = "store_true", default = FALSE)
   )))
   root <- normalizePath(system2("git", c("rev-parse", "--show-toplevel"), stdout = TRUE))
+  Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
   source(file.path(root, "scripts/duckvep_evidence.R"))
+  source(file.path(root, "r/duckhtsbench/R/registry.R"))
+  source(file.path(root, "r/duckhtsbench/R/stage.R"))
   source(file.path(root, "r/duckhtsbench/R/duckvep.R"))
   source(file.path(root, "r/duckhtsbench/R/fastvep.R"))
   stopifnot(!is.null(opt$evidence), nzchar(opt$output), !is.null(opt$extension_receipt), !is.null(opt$fastvep_build_receipt),
@@ -210,6 +213,8 @@ main <- function() {
   duckvep_evidence_command("git", c("-C", root, "ls-files", "--error-unmatch", self), "replay driver must be committed")
   duckvep_evidence_assert_checkout(root, revision, allowed_outputs = opt$output)
   ext <- duckvep_evidence_read_extension_receipt(paths[[2L]], root, extension, revision)
+  # Cold staging precedes fork; workers only validate and reuse these files.
+  duckhts_bench_stage_repository_fixtures(root, "duckvep-projection")
   pins <- c(vep = "57ea5c52340acc1f156267f810ad162e26597082",
     variation = "2fb834b987ede3824e200197a838ce11e91aeb4b",
     fastvep = "18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6")

@@ -89,10 +89,12 @@ main <- function() {
     stop("publishable evidence requires --fastvep-build-receipt for the selected executable artifact")
   }
   root <- normalizePath(system2("git", c("rev-parse", "--show-toplevel"), stdout = TRUE))
+  Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
   imports <- c(
     "scripts/duckvep_evidence.R", "test/duckvep/conformance/projection_fixtures.R",
     "benchmarks/benchmark_duckvep_fastvep_fields.R", "benchmarks/benchmark_duckvep_fastvep_extract.R",
     "benchmarks/benchmark_duckvep_fastvep_compare.R",
+    "r/duckhtsbench/R/registry.R", "r/duckhtsbench/R/stage.R",
     "r/duckhtsbench/R/duckvep.R", "r/duckhtsbench/R/fastvep.R"
   )
   for (script in imports) source(file.path(root, script), local = TRUE)
@@ -101,7 +103,8 @@ main <- function() {
   if (replay) opt$replay_input <- normalizePath(opt$replay_input, mustWork = TRUE)
   sources <- file.path(root, c(
     imports, "benchmarks/benchmark_duckvep_fastvep_field_conformance.R",
-    "benchmarks/benchmark_duckvep_fastvep_worker.R", "test/duckvep/conformance/generate_witnesses.R",
+    "benchmarks/benchmark_duckvep_fastvep_worker.R", "r/duckhtsbench/inst/benchmark_registry.tsv",
+    "test/duckvep/conformance/generate_witnesses.R",
     "test/duckvep/conformance/minimal_model.sql"
   ))
   source_hashes <- vapply(sources, duckvep_evidence_sha256, character(1L))
@@ -163,7 +166,7 @@ main <- function() {
       stop("could not retain FastVEP build provenance")
     }
   }
-  inputs <- duckhtsbench::duckhts_bench_stage_repository_fixtures(root, "duckvep-projection")
+  inputs <- duckhts_bench_stage_repository_fixtures(root, "duckvep-projection")
   if (replay) inputs <- c(inputs, replay_input = opt$replay_input)
   snapshot_inputs <- function() {
     states <- t(vapply(
