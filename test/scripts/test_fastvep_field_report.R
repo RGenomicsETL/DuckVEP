@@ -85,6 +85,7 @@ main <- function() {
       supplementary_providers = "none", distance = "5000", output_filesystem = "synthetic"
     )
     write_fields(metadata, file.path(path, "metadata.csv"))
+    coverage <- list()
     for (i in seq_len(nrow(matrix))) {
       configuration <- matrix$configuration[[i]]
       group <- match(configuration, configurations)
@@ -94,13 +95,19 @@ main <- function() {
         tool = sub("_.*$", "", configuration),
         output_contract = sub("^[^_]+_", "", configuration),
         threads = matrix$threads[[i]], run = matrix$run[[i]],
-        row_count = 100L + group, bytes = 1000L + group,
+        row_count = 4095611L + group, bytes = (4095611L + group) * 100,
+        sha256 = strrep(as.character(group), 64L),
         xor_hash = as.character(group), low32_sum = as.character(20L + group),
         high32_sum = as.character(40L + group), timing_file = timing,
         multiset_checked = TRUE, fingerprint_scope = "full_row"
       )
       write_csv(observation, file.path(path, paste0(labels[[i]], ".csv")))
+      coverage[[i]] <- data.frame(observation[c("tool", "output_contract", "threads", "run")],
+        scope = "final_output", input_sha256 = hashes[["input"]],
+        output_sha256 = observation$sha256, source_alleles = "4095611", covered_alleles = "4095611",
+        missing_alleles = "0", unknown_alleles = "0", ambiguous_alleles = "0")
     }
+    write_csv(do.call(rbind, coverage), file.path(path, "allele_coverage.csv"))
     write_csv(data.frame(
       source_revision = revision, completed = TRUE,
       binding = "source_bound", observations = 30L, repetitions = 3L,
@@ -260,6 +267,27 @@ main <- function() {
   check("missing_source_coverage", function(path) {
     edit_csv(path, "completion.csv", function(x) {
       x$allele_coverage <- NULL
+      x
+    })
+  })
+  check("verified_flag_without_evidence", function(path) {
+    unlink(file.path(path, "allele_coverage.csv"))
+  })
+  for (field in c("input_sha256", "output_sha256", "source_alleles", "covered_alleles",
+      "missing_alleles", "unknown_alleles", "ambiguous_alleles", "scope")) {
+    check(paste0("coverage_", field), function(path) {
+      edit_csv(path, "allele_coverage.csv", function(x) {
+        x[[field]][[1L]] <- if (field == "scope") "before_projection" else "1"
+        x
+      })
+    })
+  }
+  check("duplicate_coverage_observation", function(path) {
+    edit_csv(path, "allele_coverage.csv", function(x) rbind(x, x[1L, ]))
+  })
+  check("fewer_output_rows_than_covered_alleles", function(path) {
+    edit_csv(path, paste0(labels[[1L]], ".csv"), function(x) {
+      x$row_count <- "1"
       x
     })
   })

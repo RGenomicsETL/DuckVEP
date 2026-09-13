@@ -1651,7 +1651,7 @@ if (!file.exists(completion_path)) {
   manifest <- read.csv(manifest_path, colClasses = "character")
   stopifnot(!anyDuplicated(manifest$file), all(basename(manifest$file) == manifest$file),
     identical(unname(vapply(file.path(complete_dir, manifest$file), sha256, character(1L))), manifest$sha256))
-  required <- c("metadata.csv", "inputs.csv", "fastvep_cache_receipt.tsv")
+  required <- c("metadata.csv", "inputs.csv", "fastvep_cache_receipt.tsv", "allele_coverage.csv")
   stopifnot(all(required %in% manifest$file))
   metadata <- read.csv(file.path(complete_dir, "metadata.csv"), colClasses = "character")
   inputs <- read.csv(file.path(complete_dir, "inputs.csv"), colClasses = "character")
@@ -1701,6 +1701,22 @@ if (!file.exists(completion_path)) {
     all(complete_rows$timing_file %in% manifest$file), all(complete_rows$multiset_checked == "TRUE"),
     all(complete_rows$timing_file == paste0(actual_keys, ".time")),
     all(complete_rows$fingerprint_scope == "full_row"))
+  coverage <- read.csv(file.path(complete_dir, "allele_coverage.csv"), colClasses = "character")
+  coverage_fields <- c("tool", "output_contract", "threads", "run", "scope", "input_sha256",
+    "output_sha256", "source_alleles", "covered_alleles", "missing_alleles", "unknown_alleles", "ambiguous_alleles")
+  stopifnot(all(coverage_fields %in% names(coverage)))
+  coverage_keys <- paste(coverage$tool, coverage$output_contract, coverage$threads, coverage$run, sep = "_")
+  stopifnot(!anyDuplicated(coverage_keys), setequal(coverage_keys, actual_keys))
+  coverage <- coverage[match(actual_keys, coverage_keys), ]
+  stopifnot(all(coverage$scope == "final_output"),
+    all(coverage$input_sha256 == input_hashes[["input"]]),
+    all(coverage$output_sha256 == complete_rows$sha256),
+    all(grepl("^[0-9a-f]{64}$", coverage$output_sha256)),
+    all(coverage$source_alleles == metadata[["eligible_literal_alleles"]]),
+    all(coverage$covered_alleles == coverage$source_alleles),
+    all(as.numeric(complete_rows$row_count) >= as.numeric(coverage$covered_alleles)),
+    all(coverage$missing_alleles == "0"), all(coverage$unknown_alleles == "0"),
+    all(coverage$ambiguous_alleles == "0"))
   for (group in split(complete_rows, paste(complete_rows$tool, complete_rows$output_contract))) {
     stopifnot(nrow(unique(group[c("row_count", "xor_hash", "low32_sum", "high32_sum")])) == 1L)
   }
