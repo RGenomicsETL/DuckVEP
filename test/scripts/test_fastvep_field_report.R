@@ -68,8 +68,8 @@ main <- function() {
   fixture <- function(path) {
     dir.create(path, recursive = TRUE)
     hashes <- setNames(
-      vapply(seq_len(7L), function(i) strrep(as.character(i), 64L), character(1L)),
-      c("input", "model", "fasta", "gff3", "cache", "fastvep", "fasta_index")
+      vapply(seq_len(8L), function(i) strrep(as.character(i), 64L), character(1L)),
+      c("input", "model", "fasta", "gff3", "cache", "fastvep", "fasta_index", "source_map")
     )
     cache <- c(
       source_commit = identity[["source_commit"]],
@@ -83,6 +83,15 @@ main <- function() {
     cache_path <- file.path(path, "fastvep_cache_receipt.tsv")
     write_fields(cache, cache_path, tab = TRUE)
     hashes <- c(hashes, cache_receipt = sha256(cache_path))
+    writeLines("synthetic successful fresh Cargo build", file.path(path, "build.log"))
+    build <- c(binding = "cargo_fresh_release_locked_offline", source_commit = identity[["source_commit"]],
+      cargo_lock_sha256 = strrep("b", 64L), toolchain = "1.98.1", rustc = "fixture rustc",
+      cargo = "fixture cargo", rustflags = "-C target-cpu=native", command = "fixture cargo build",
+      executable_sha256 = hashes[["fastvep"]], log = "build.log",
+      log_sha256 = sha256(file.path(path, "build.log")), exit_status = "0")
+    write_fields(build, file.path(path, "fastvep_build.tsv"), tab = TRUE)
+    hashes <- c(hashes, fastvep_build = sha256(file.path(path, "fastvep_build.tsv")),
+      fastvep_build_log = build[["log_sha256"]])
     write_csv(data.frame(
       artifact = names(hashes), path = paste0("synthetic/", names(hashes)),
       sha256 = unname(hashes)
@@ -93,7 +102,7 @@ main <- function() {
       input_alt_alleles = "4096123", eligible_literal_alleles = "4095611",
       fastvep_source_revision = identity[["source_commit"]],
       fastvep_version = paste("fastvep", identity[["version"]]),
-      fastvep_binding = "expected_binary_sha256", fastvep_expected_sha256 = hashes[["fastvep"]],
+      fastvep_binding = "cargo_fresh_release_locked_offline",
       supplementary_providers = "none", distance = "5000", output_filesystem = "synthetic"
     )
     write_fields(metadata, file.path(path, "metadata.csv"))
@@ -120,7 +129,8 @@ main <- function() {
       write_csv(observation, file.path(path, paste0(labels[[i]], ".csv")))
       coverage[[i]] <- data.frame(observation[c("tool", "output_contract", "threads", "run")],
         scope = "final_output", input_sha256 = hashes[["input"]],
-        output_sha256 = observation$sha256, source_alleles = "4095611", covered_alleles = "4095611",
+        output_sha256 = observation$sha256, source_map_sha256 = hashes[["source_map"]],
+        source_alleles = "4095611", covered_alleles = "4095611",
         missing_alleles = "0", unknown_alleles = "0", ambiguous_alleles = "0")
     }
     write_csv(do.call(rbind, coverage), file.path(path, "allele_coverage.csv"))
@@ -234,14 +244,13 @@ main <- function() {
   for (field in c(
     "binding", "input_id", "input_records", "input_alt_alleles",
     "eligible_literal_alleles", "fastvep_source_revision", "fastvep_version",
-    "fastvep_binding", "fastvep_expected_sha256"
+    "fastvep_binding"
   )) {
     values <- c(
       binding = "diagnostic_unbound", input_id = "fastvep_cache_probe",
       input_records = "3", input_alt_alleles = "3", eligible_literal_alleles = "3",
       fastvep_source_revision = "7038e7c17708e7d2226149e78e0bb297bcc6d1d6",
-      fastvep_version = "fastvep 0.2.0", fastvep_binding = "diagnostic_binary_unbound",
-      fastvep_expected_sha256 = strrep("0", 64L)
+      fastvep_version = "fastvep 0.2.0", fastvep_binding = "diagnostic_binary_unbound"
     )
     check(paste0("metadata_", field), function(path) edit_metadata(path, field, values[[field]]))
   }
@@ -260,6 +269,17 @@ main <- function() {
     )
     check(paste0("cache_", field), function(path) edit_cache(path, field, values[[field]]))
   }
+  for (field in c("binding", "source_commit", "executable_sha256", "log_sha256", "exit_status")) {
+    check(paste0("build_", field), function(path) {
+      target <- file.path(path, "fastvep_build.tsv")
+      build <- utils::read.delim(target, colClasses = "character")
+      build$value[build$field == field] <- "invalid"
+      utils::write.table(build, target, sep = "\t", quote = FALSE, row.names = FALSE)
+    })
+  }
+  check("missing_build_receipt", function(path) unlink(file.path(path, "fastvep_build.tsv")))
+  check("missing_build_log", function(path) unlink(file.path(path, "build.log")))
+  check("changed_build_log", function(path) writeLines("stale build", file.path(path, "build.log")))
   check("missing_observation", function(path) {
     unlink(file.path(path, paste0(labels[[1L]], ".csv")))
   })
@@ -287,7 +307,7 @@ main <- function() {
   check("verified_flag_without_evidence", function(path) {
     unlink(file.path(path, "allele_coverage.csv"))
   })
-  for (field in c("input_sha256", "output_sha256", "source_alleles", "covered_alleles",
+  for (field in c("input_sha256", "output_sha256", "source_map_sha256", "source_alleles", "covered_alleles",
       "missing_alleles", "unknown_alleles", "ambiguous_alleles", "scope")) {
     check(paste0("coverage_", field), function(path) {
       edit_csv(path, "allele_coverage.csv", function(x) {
@@ -387,13 +407,13 @@ main <- function() {
     stopifnot(!is.null(attr(result, "status")), attr(result, "status") != 0L,
       any(grepl(message, result, fixed = TRUE)), !file.exists(output))
   }
-  check_cli("missing-digest", character(), "published observations require --fastvep-sha256")
-  check_cli("invalid-digest", c("--fastvep-sha256", "invalid"),
-    "--fastvep-sha256 must be a lowercase SHA256 value")
-  check_cli("mismatched-digest", c("--diagnostic", "--fastvep-sha256", strrep("0", 64L),
-    "--fastvep", file.path(valid_path, "metadata.csv")), "FastVEP executable does not match --fastvep-sha256")
+  check_cli("missing-build", character(), "published observations require --fastvep-build-receipt")
+  check_cli("invalid-build", c("--diagnostic", "--fastvep-build-receipt", file.path(valid_path, "metadata.csv")),
+    "invalid FastVEP build receipt schema")
+  check_cli("mismatched-binary", c("--diagnostic", "--fastvep-build-receipt", file.path(valid_path, "fastvep_build.tsv"),
+    "--fastvep", file.path(valid_path, "metadata.csv")), "FastVEP executable differs from its build receipt")
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
-  cat("Timing runner: missing, malformed and mismatched expected executable digests rejected\n")
+  cat("Timing runner: missing/malformed build receipts and mismatched executables rejected\n")
 }
 
 main()

@@ -76,26 +76,24 @@ main <- function() {
     optparse::make_option("--extension-receipt", dest = "extension_receipt", default = NULL),
     optparse::make_option("--vep-prefix", dest = "vep_prefix", default = Sys.getenv("VEP_PREFIX")),
     optparse::make_option("--fastvep", default = ".sync/fastVEP/target/release/fastvep"),
-    optparse::make_option("--fastvep-sha256",
-      dest = "fastvep_sha256", default = NULL,
-      help = "expected hash of the selected executable artifact; required for publishable evidence"
+    optparse::make_option("--fastvep-build-receipt",
+      dest = "fastvep_build_receipt", default = NULL,
+      help = "fresh pinned-source build receipt; required for publishable evidence"
     )
   )))
   stopifnot(!is.na(opt$seed), !is.na(opt$random_cases), opt$random_cases >= 0L)
   replay <- nzchar(opt$replay_input)
   if (replay != nzchar(opt$case)) stop("--replay-input and --case must be supplied together")
   if (!nzchar(opt$vep_prefix)) stop("set VEP_PREFIX or provide --vep-prefix")
-  if (!is.null(opt$fastvep_sha256) && !grepl("^[0-9a-f]{64}$", opt$fastvep_sha256)) {
-    stop("--fastvep-sha256 must be a lowercase SHA256 value")
-  }
-  if (!is.null(opt$extension_receipt) && is.null(opt$fastvep_sha256)) {
-    stop("publishable evidence requires --fastvep-sha256 for the selected executable artifact")
+  if (!is.null(opt$extension_receipt) && is.null(opt$fastvep_build_receipt)) {
+    stop("publishable evidence requires --fastvep-build-receipt for the selected executable artifact")
   }
   root <- normalizePath(system2("git", c("rev-parse", "--show-toplevel"), stdout = TRUE))
   imports <- c(
     "scripts/duckvep_evidence.R", "test/duckvep/conformance/projection_fixtures.R",
     "benchmarks/benchmark_duckvep_fastvep_fields.R", "benchmarks/benchmark_duckvep_fastvep_extract.R",
-    "benchmarks/benchmark_duckvep_fastvep_compare.R"
+    "benchmarks/benchmark_duckvep_fastvep_compare.R",
+    "r/duckhtsbench/R/duckvep.R", "r/duckhtsbench/R/fastvep.R"
   )
   for (script in imports) source(file.path(root, script), local = TRUE)
   if (replay && !opt$case %in% duckvep_projection_cases) stop("unknown replay fixture case: ", opt$case)
@@ -156,9 +154,14 @@ main <- function() {
   extension_hash <- duckvep_evidence_sha256(extension)
   fastvep_hash <- duckvep_evidence_sha256(fastvep)
   fastvep_binding <- "diagnostic_binary_unbound"
-  if (!is.null(opt$fastvep_sha256)) {
-    stopifnot(identical(fastvep_hash, opt$fastvep_sha256))
-    fastvep_binding <- "expected_binary_sha256"
+  if (!is.null(opt$fastvep_build_receipt)) {
+    build <- duckhts_bench_read_fastvep_build(opt$fastvep_build_receipt, pins[["fastvep"]], fastvep)
+    fastvep_binding <- build[["binding"]]
+    build_files <- c(opt$fastvep_build_receipt,
+      file.path(dirname(opt$fastvep_build_receipt), build[["log"]]))
+    if (!all(file.copy(build_files, file.path(directory, c("fastvep_build.tsv", build[["log"]]))))) {
+      stop("could not retain FastVEP build provenance")
+    }
   }
   inputs <- duckhtsbench::duckhts_bench_stage_repository_fixtures(root, "duckvep-projection")
   if (replay) inputs <- c(inputs, replay_input = opt$replay_input)

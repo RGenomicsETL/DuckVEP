@@ -56,6 +56,42 @@ main <- function() {
   helpers$duckvep_fastvep_read_field_tab(con, tab, "local_tab", c("Feature", "Codons", "HGVSp"))
   stopifnot(identical(DBI::dbGetQuery(con, "SELECT * FROM local_tab"),
     data.frame(Feature = "tx1", Codons = "", HGVSp = "-")))
+
+  # Physical geometry and the upstream native allele identify both ALTs even
+  # when IDs are missing. Full ALT lists and known star output remain intact.
+  source_map <- file.path(directory, "source.parquet")
+  source <- data.frame(record_index = c(1L, 1L, 2L, 2L), alt_index = c(1L, 2L, 1L, 2L),
+    chrom = "1", position = c(10L, 10L, 20L, 20L), variant_id = NA_character_,
+    reference = "TAA", raw_alternates = c("TA,T", "TA,T", "T,*", "T,*"),
+    native_allele = c("A", "-", "-", "*"))
+  DBI::dbWriteTable(con, "source_map", source)
+  DBI::dbExecute(con, paste0("COPY source_map TO ", DBI::dbQuoteString(con, source_map), " (FORMAT PARQUET)"))
+  identity_input <- file.path(directory, "identity.vcf")
+  identity_records <- c(
+    "1\t20\t.\tTAA\tT,*\t.\tPASS\tCSQ=-|-||,*|-||",
+    "1\t10\t.\tTAA\tTA,T\t.\tPASS\tCSQ=A|tx1||p.%3D,-|tx1||,A|tx2||")
+  writeLines(c(header, identity_records), identity_input)
+  duckvep_fastvep_extract_csq(con, identity_input, "plain", fields)
+  duckvep_fastvep_extract_csq(con, identity_input, "identified", fields, source_map)
+  observed <- DBI::dbGetQuery(con, "SELECT * FROM identified ORDER BY record_index, alt_index, Feature")
+  stopifnot(identical(names(observed), c(duckvep_fastvep_identity_fields, fields)),
+    identical(as.integer(observed$record_index), c(1L, 1L, 1L, 2L, 2L)),
+    identical(as.integer(observed$alt_index), c(1L, 1L, 2L, 1L, 2L)),
+    identical(observed$Allele, c("A", "A", "-", "-", "*")),
+    all(observed$Uploaded_variation == "."), all(observed$Feature[4:5] == "-"))
+  payload <- paste(DBI::dbQuoteIdentifier(con, fields), collapse = ", ")
+  differences <- DBI::dbGetQuery(con, paste0("SELECT count(*) n FROM (
+    (SELECT ", payload, " FROM identified EXCEPT ALL SELECT * FROM plain)
+    UNION ALL (SELECT * FROM plain EXCEPT ALL SELECT ", payload, " FROM identified))"))$n
+  stopifnot(differences == 0)
+  writeLines(c(header, sub("\t20\t", "\t21\t", identity_records)), identity_input)
+  expect_error(duckvep_fastvep_extract_csq(con, identity_input, "unknown_identity", fields, source_map))
+  writeLines(c(header, identity_records), identity_input)
+  duplicate_source <- rbind(source, transform(source[1L, ], record_index = 3L))
+  DBI::dbWriteTable(con, "duplicate_source", duplicate_source)
+  duplicate_map <- file.path(directory, "duplicate_source.parquet")
+  DBI::dbExecute(con, paste0("COPY duplicate_source TO ", DBI::dbQuoteString(con, duplicate_map), " (FORMAT PARQUET)"))
+  expect_error(duckvep_fastvep_extract_csq(con, identity_input, "ambiguous_identity", fields, duplicate_map))
   cat("CSQ extraction: transport spelling, missing fields and width controls passed\n")
 }
 

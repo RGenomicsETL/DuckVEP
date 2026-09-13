@@ -1882,6 +1882,16 @@ local({
   expect_identical(projected$interbase, c(FALSE, FALSE, TRUE, FALSE))
   expect_true(all(!projected$cds_start_nf & !projected$cds_end_nf))
   dbExecute(con, paste(
+    "CREATE TABLE duckvep_r_projection_unused AS SELECT * FROM duckvep_r_projection_model",
+    "UNION ALL SELECT * REPLACE(1::UINTEGER AS transcript_index,",
+    "from_hex('FF') AS cds_sequence, from_hex('FF') AS post_cds_sequence)",
+    "FROM duckvep_r_projection_model"
+  ))
+  expect_equal(dbGetQuery(con, paste(
+    "SELECT * FROM duckvep_transcript_projection('duckvep_r_projection_events',",
+    "'duckvep_r_projection_annotations', 'duckvep_r_projection_unused') ORDER BY event_index"
+  )), projected)
+  dbExecute(con, paste(
     "CREATE TABLE duckvep_r_projection_missing AS SELECT * FROM",
     "duckvep_r_projection_events WHERE event_index != 1"
   ))
@@ -3361,4 +3371,44 @@ local({
       "SELECT duckvep_model_drop('r-ensembl-grch37') AS dropped"
     )$dropped
   )
+})
+
+local({
+  con <- rduckhts_connect(config = list(
+    threads = "1", memory_limit = "96MB", max_temp_directory_size = "0B"
+  ))
+  on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
+  dbExecute(con, paste(
+    "CREATE TABLE projection_resource_transcript AS SELECT",
+    "0::UINTEGER transcript_index, 1::UINTEGER seq_region,",
+    "1::UBIGINT transcript_start, 12000::UBIGINT transcript_end,",
+    "1::TINYINT strand, 3::UBIGINT transcript_flags,",
+    "1::UBIGINT cds_start, 12000::UBIGINT cds_end,",
+    "('ATG'||repeat('AAA',3998)||'TAA')::BLOB cds_sequence,",
+    "'ACGT'::BLOB post_cds_sequence, 1::UTINYINT codon_table,",
+    "[struct_pack(exon_start:=1::UBIGINT, exon_end:=12000::UBIGINT,",
+    "exon_cdna_start:=1::UBIGINT, exon_cdna_end:=12000::UBIGINT,",
+    "phase:=0::TINYINT, end_phase:=0::TINYINT)] exons,",
+    "[]::STRUCT(protein_position UINTEGER, alternate_amino_acid VARCHAR, edit_code VARCHAR)[] peptide_edits"
+  ))
+  dbExecute(con, paste(
+    "CREATE TABLE projection_resource_events AS SELECT (i+1)::UBIGINT event_index,",
+    "1::UINTEGER seq_region, 4::UBIGINT AS position, 'A' reference, 'G' alternate",
+    "FROM range(32768) r(i)"
+  ))
+  dbExecute(con, paste(
+    "CREATE TABLE projection_resource_annotations AS SELECT event_index,",
+    "0::UINTEGER transcript_index, 0::UBIGINT consequence_mask FROM projection_resource_events"
+  ))
+  observed <- dbGetQuery(con, paste(
+    "SELECT count(*) AS output_rows, count(DISTINCT event_index) AS identities,",
+    "min(event_index) AS first_id, max(event_index) AS last_id,",
+    "count(*) FILTER (WHERE cds_start=4 AND cds_end=4 AND protein_start=2 AND protein_end=2",
+    "AND reference_codons='Aaa' AND alternate_codons='Gaa'",
+    "AND reference_amino_acids='K' AND alternate_amino_acids='E') AS exact_rows",
+    "FROM duckvep_transcript_projection('projection_resource_events',",
+    "'projection_resource_annotations', 'projection_resource_transcript')"
+  ))
+  expect_equal(observed, data.frame(output_rows = 32768, identities = 32768,
+    first_id = 1, last_id = 32768, exact_rows = 32768))
 })

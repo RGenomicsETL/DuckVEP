@@ -35,7 +35,7 @@ duckvep_fastvep_vcf_relation <- function(con, path, header) {
     "], columns = {", schema, "}, auto_detect = false)")
 }
 
-duckvep_fastvep_extract_csq <- function(con, input, table, fields) {
+duckvep_fastvep_extract_csq <- function(con, input, table, fields, source_map = "") {
   header <- duckvep_fastvep_vcf_header(input)
   payload <- setdiff(fields, "Uploaded_variation")
   absent <- setdiff(payload, header$fields)
@@ -46,16 +46,40 @@ duckvep_fastvep_extract_csq <- function(con, input, table, fields) {
   expressions <- c(Uploaded_variation = "ID")
   for (field in payload) expressions[[field]] <- paste0("values[", match(field, header$fields), "]")
   values <- paste(paste0(expressions[fields], " AS ", qi(fields)), collapse = ", ")
+  identity <- ""
+  source_join <- ""
+  if (nzchar(source_map)) {
+    if (!"Allele" %in% fields) stop("identity extraction requires the CSQ Allele field")
+    q <- function(x) as.character(DBI::dbQuoteString(con, x))
+    DBI::dbExecute(con, paste0("CREATE TEMP VIEW fastvep_extract_source AS
+      SELECT chrom, position, coalesce(variant_id, '.') AS variant_id,
+        reference, raw_alternates, native_allele, count(*) AS source_matches,
+        min(record_index) AS record_index, min(alt_index) AS alt_index
+      FROM read_parquet(", q(source_map), ") GROUP BY ALL"))
+    on.exit(DBI::dbExecute(con, "DROP VIEW fastvep_extract_source"), add = TRUE)
+    identity <- "s.record_index, s.alt_index, coalesce(s.source_matches, 0) AS _source_matches, "
+    source_join <- paste0(" LEFT JOIN fastvep_extract_source s
+      ON a.CHROM = s.chrom AND try_cast(a.POS AS UBIGINT) = s.position
+        AND a.ID = s.variant_id AND a.REF = s.reference AND a.ALT = s.raw_alternates
+        AND a.values[", match("Allele", header$fields), "] = s.native_allele")
+  }
   DBI::dbExecute(con, paste0("CREATE TEMP TABLE ", qi(table), " AS WITH records AS (
     SELECT *, regexp_extract(INFO, '(?:^|;)CSQ=([^;]*)', 1) AS csq,
       length(regexp_extract_all(INFO, '(?:^|;)CSQ=')) AS csq_keys FROM ", raw,
     "), annotations AS (
-      SELECT ID, csq_keys, string_split(annotation, '|') AS values FROM records,
+      SELECT CHROM, POS, ID, REF, ALT, csq_keys, string_split(annotation, '|') AS values FROM records,
         UNNEST(string_split(csq, ',')) a(annotation)
-    ) SELECT ", values, ", length(values) AS _csq_width, csq_keys AS _csq_keys FROM annotations"))
+    ) SELECT ", identity, values, ", length(values) AS _csq_width, csq_keys AS _csq_keys
+      FROM annotations a", source_join))
   width <- DBI::dbGetQuery(con, paste0("SELECT count(*) n FROM ", qi(table),
     " WHERE _csq_keys != 1 OR _csq_width != ", length(header$fields)))$n
   if (width != 0) stop("missing/duplicate CSQ or field count differs from its header: ", width, " rows")
+  if (nzchar(source_map)) {
+    invalid <- DBI::dbGetQuery(con, paste0("SELECT count(*) n FROM ", qi(table),
+      " WHERE _source_matches != 1"))$n
+    if (invalid != 0) stop("CSQ output has unknown or ambiguous physical ALT identity: ", invalid, " rows")
+    DBI::dbExecute(con, paste0("ALTER TABLE ", qi(table), " DROP COLUMN _source_matches"))
+  }
   DBI::dbExecute(con, paste0("ALTER TABLE ", qi(table), " DROP COLUMN _csq_width"))
   DBI::dbExecute(con, paste0("ALTER TABLE ", qi(table), " DROP COLUMN _csq_keys"))
   invisible(table)
@@ -64,6 +88,7 @@ duckvep_fastvep_extract_csq <- function(con, input, table, fields) {
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--input"), optparse::make_option("--output"),
+    optparse::make_option("--source-map", dest = "source_map", default = ""),
     optparse::make_option("--memory-limit", dest = "memory_limit", default = "4GB"),
     optparse::make_option("--max-spill", dest = "max_spill", default = "8GB"),
     optparse::make_option("--threads", type = "integer", default = 1L))))
@@ -76,7 +101,7 @@ main <- function() {
   DBI::dbExecute(con, paste("SET memory_limit =", DBI::dbQuoteString(con, opt$memory_limit)))
   DBI::dbExecute(con, paste("SET max_temp_directory_size =", DBI::dbQuoteString(con, opt$max_spill)))
   DBI::dbExecute(con, paste("SET temp_directory =", DBI::dbQuoteString(con, file.path(tempdir(), "duckdb"))))
-  duckvep_fastvep_extract_csq(con, opt$input, "csq", duckvep_fastvep_fields("vep_csq"))
+  duckvep_fastvep_extract_csq(con, opt$input, "csq", duckvep_fastvep_fields("vep_csq"), opt$source_map)
   DBI::dbExecute(con, paste0("COPY csq TO ", DBI::dbQuoteString(con, opt$output),
     " (FORMAT CSV, DELIMITER '\t', HEADER TRUE, QUOTE '', ESCAPE '')"))
 }

@@ -1660,7 +1660,8 @@ if (!file.exists(completion_path)) {
   manifest <- read_receipt(manifest_path, c("file", "sha256"))
   stopifnot(!anyDuplicated(manifest$file), all(basename(manifest$file) == manifest$file),
     identical(unname(vapply(file.path(complete_dir, manifest$file), sha256, character(1L))), manifest$sha256))
-  required <- c("metadata.csv", "inputs.csv", "fastvep_cache_receipt.tsv", "allele_coverage.csv")
+  required <- c("metadata.csv", "inputs.csv", "fastvep_cache_receipt.tsv", "fastvep_build.tsv",
+    "allele_coverage.csv")
   stopifnot(all(required %in% manifest$file))
   metadata <- read_receipt(file.path(complete_dir, "metadata.csv"), c("field", "value"))
   inputs <- read_receipt(file.path(complete_dir, "inputs.csv"), c("artifact", "sha256"))
@@ -1670,17 +1671,23 @@ if (!file.exists(completion_path)) {
   cache <- setNames(cache$value, cache$field)
   input_hashes <- setNames(inputs$sha256, inputs$artifact)
   source(file.path(root, "r/duckhtsbench/R/stage.R"))
+  source(file.path(root, "r/duckhtsbench/R/duckvep.R"))
+  source(file.path(root, "r/duckhtsbench/R/fastvep.R"))
   registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"), check.names = FALSE)
   identity <- duckhts_bench_identity_fields(registry$supplier_identity[
     registry$id == "fastvep_ensembl116_cache"])
+  build <- duckhts_bench_read_fastvep_build(file.path(complete_dir, "fastvep_build.tsv"),
+    identity[["source_commit"]])
+  stopifnot(build[["log"]] %in% manifest$file,
+    sha256(file.path(complete_dir, "fastvep_build.tsv")) == input_hashes[["fastvep_build"]],
+    build[["log_sha256"]] == input_hashes[["fastvep_build_log"]],
+    build[["executable_sha256"]] == input_hashes[["fastvep"]])
   stopifnot(metadata[["source_revision"]] == completion$source_revision,
     metadata[["binding"]] == "source_bound", metadata[["input_id"]] == "variantkey_giab_hg002_v421",
     metadata[["input_records"]] == as.character(source_records),
     metadata[["input_alt_alleles"]] == as.character(source_alt_alleles),
     metadata[["eligible_literal_alleles"]] == "4095611",
-    metadata[["fastvep_binding"]] == "expected_binary_sha256",
-    grepl("^[0-9a-f]{64}$", metadata[["fastvep_expected_sha256"]]),
-    metadata[["fastvep_expected_sha256"]] == input_hashes[["fastvep"]],
+    metadata[["fastvep_binding"]] == build[["binding"]],
     metadata[["fastvep_source_revision"]] == identity[["source_commit"]],
     metadata[["fastvep_version"]] == paste("fastvep", identity[["version"]]),
     metadata[["supplementary_providers"]] == "none", metadata[["distance"]] == "5000",
@@ -1716,13 +1723,15 @@ if (!file.exists(completion_path)) {
     all(complete_rows$timing_file == paste0(actual_keys, ".time")),
     all(complete_rows$fingerprint_scope == "full_row"))
   coverage_fields <- c("tool", "output_contract", "threads", "run", "scope", "input_sha256",
-    "output_sha256", "source_alleles", "covered_alleles", "missing_alleles", "unknown_alleles", "ambiguous_alleles")
+    "output_sha256", "source_map_sha256", "source_alleles", "covered_alleles", "missing_alleles",
+    "unknown_alleles", "ambiguous_alleles")
   coverage <- read_receipt(file.path(complete_dir, "allele_coverage.csv"), coverage_fields)
   coverage_keys <- paste(coverage$tool, coverage$output_contract, coverage$threads, coverage$run, sep = "_")
   stopifnot(!anyDuplicated(coverage_keys), setequal(coverage_keys, actual_keys))
   coverage <- coverage[match(actual_keys, coverage_keys), ]
   stopifnot(all(coverage$scope == "final_output"),
     all(coverage$input_sha256 == input_hashes[["input"]]),
+    all(coverage$source_map_sha256 == input_hashes[["source_map"]]),
     all(coverage$output_sha256 == complete_rows$sha256),
     all(grepl("^[0-9a-f]{64}$", coverage$output_sha256)),
     all(coverage$source_alleles == metadata[["eligible_literal_alleles"]]),
@@ -1750,10 +1759,13 @@ if (!file.exists(completion_path)) {
 }
 ```
 
-Whole-GIAB timings remain diagnostic until the final CSQ rows retain physical
-record/ALT identity. Different deletion ALTs can share the same displayed
-`Allele`, and FastVEP's flattened CSQ omits raw record coordinates. Stable
-row fingerprints alone do not establish complete source-allele coverage.
+Final CSQ files carry `record_index` and `alt_index` followed by the 32 common
+fields. Both engines write this 34-column transport; the native and operational
+contracts remain 17 columns. An independent source map retains every physical
+record/ALT ordinal, including explicitly excluded nonliteral alleles. Final-file
+coverage checks reject missing eligible ALTs, unknown output keys and ambiguous
+identity. Different deletion ALTs can share a displayed `Allele`, so row
+fingerprints alone do not establish source-allele coverage.
 The [retained incomplete run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb)
 stopped when the native projection exhausted the
 available spill disk; it has no completion receipt or published timing median.
@@ -1767,31 +1779,32 @@ cache preparation is outside timing, and scans must leave it unchanged. Neither
 run loads supplementary annotation providers.
 `--memory-limit` and `--max-spill` set per-process DuckDB memory and spill caps;
 their defaults are 4 GB and 8 GB. Spill files use a private temporary directory.
-Published runs require `--fastvep-sha256` from an independently recorded build
-of the pinned FastVEP source. The expected digest is retained and checked against
-the timed executable and cache receipt; a matching version string is insufficient.
+Published runs require `--fastvep-build-receipt` from a fresh build of the pinned
+FastVEP source in an empty Cargo target directory. The retained build log and
+receipt bind the source commit, Cargo lockfile, toolchain, flags and executable
+digest. The runner checks the executable and cache against that receipt.
 Source/model/reference identities, input record and ALT counts, elapsed/user/
 system time, CPU utilization, peak RSS, bytes and complete output fingerprints
 are retained beside a completion manifest. Partial or failed runs cannot
 populate the table above.
 
 ```{bash, eval=FALSE, echo=TRUE}
-test "$(git -C .sync/fastVEP rev-parse HEAD)" = 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
-env RUSTFLAGS='-C target-cpu=native' cargo +1.98.1 build \
-  --manifest-path .sync/fastVEP/Cargo.toml --release --locked --offline -p fastvep-cli
+Rscript r/duckhtsbench/scripts/build_fastvep.R \
+  --checkout .sync/fastVEP --output build/fastvep-pinned
 Rscript r/duckhtsbench/scripts/stage_fastvep.R \
-  --checkout .sync/fastVEP --executable .sync/fastVEP/target/release/fastvep
+  --checkout .sync/fastVEP --executable build/fastvep-pinned/fastvep
 Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
   --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
-  --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256" \
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv \
   --output benchmarks/data/duckvep_fastvep/field_contracts
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
-  --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv
 # Replay a retained unique-ID record without generation or relabelling.
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --case noncoding_first_exon_phase1 --replay-input "$REPLAY_VCF" \
-  --vep-prefix "$VEP_PREFIX" --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
+  --vep-prefix "$VEP_PREFIX" --fastvep build/fastvep-pinned/fastvep \
+  --fastvep-build-receipt build/fastvep-pinned/build.tsv
 ```
 
 ## Compact-output revisions and input receipts

@@ -17,6 +17,11 @@ duckvep_fastvep_fields <- function(contract) {
 
 duckvep_fastvep_identity_fields <- c("record_index", "alt_index")
 
+duckvep_fastvep_transport_fields <- function(contract) {
+  fields <- duckvep_fastvep_fields(contract)
+  if (contract == "vep_csq") c(duckvep_fastvep_identity_fields, fields) else fields
+}
+
 duckvep_fastvep_tab_header <- function(path, fields) {
   connection <- file(path, "rt")
   on.exit(close(connection), add = TRUE)
@@ -32,16 +37,18 @@ duckvep_fastvep_tab_header <- function(path, fields) {
   skip
 }
 
-duckvep_fastvep_read_field_tab <- function(con, path, table, fields) {
+duckvep_fastvep_tab_relation <- function(con, path, fields) {
   skip <- duckvep_fastvep_tab_header(path, fields)
   q <- function(x) as.character(DBI::dbQuoteString(con, x))
   schema <- paste(paste0(q(fields), ": 'VARCHAR'"), collapse = ", ")
-  DBI::dbExecute(con, paste0(
-    "CREATE TEMP TABLE ", DBI::dbQuoteIdentifier(con, table),
-    " AS SELECT * FROM read_csv(", q(path), ", delim = '\t', header = true, skip = ", skip,
+  paste0("read_csv(", q(path), ", delim = '\t', header = true, skip = ", skip,
     ", quote = '', escape = '', force_not_null = [", paste(q(fields), collapse = ", "),
-    "], columns = {", schema, "}, auto_detect = false)"
-  ))
+    "], columns = {", schema, "}, auto_detect = false)")
+}
+
+duckvep_fastvep_read_field_tab <- function(con, path, table, fields) {
+  DBI::dbExecute(con, paste0("CREATE TEMP TABLE ", DBI::dbQuoteIdentifier(con, table),
+    " AS SELECT * FROM ", duckvep_fastvep_tab_relation(con, path, fields)))
   invisible(table)
 }
 
@@ -74,12 +81,12 @@ duckvep_fastvep_csq_sql <- function(field, value) {
     ", ''), ',', '&'), ';', '%3B'), '\\s+', '_', 'g'), '|', '&')")
 }
 
-duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 = "") {
-  stopifnot(contract %in% c("native_tab17", "vep_csq"), length(distance) == 1L,
-    is.numeric(distance), is.finite(distance), distance == floor(distance),
-    distance >= 0, distance <= 2^32 - 1)
+duckvep_fastvep_prepare_source <- function(con, input) {
   q <- function(x) as.character(DBI::dbQuoteString(con, x))
   execute <- function(sql) invisible(DBI::dbExecute(con, sql))
+  original_order <- DBI::dbGetQuery(con,
+    "SELECT current_setting('preserve_insertion_order') AS preserve_order")$preserve_order
+  on.exit(execute(paste("SET preserve_insertion_order =", if (original_order) "true" else "false")), add = TRUE)
   execute("SET preserve_insertion_order = true")
   execute(paste0("CREATE TEMP TABLE fastvep_source AS SELECT
     row_number() OVER ()::UBIGINT AS record_index, CHROM AS chrom,
@@ -91,6 +98,7 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
   execute("CREATE TEMP TABLE fastvep_source_spelling AS
     WITH anchored AS (
       SELECT *, len(list_filter(alternates, x -> len(x) != len(reference))) > 0
+        AND NOT (len(alternates) = 1 AND alternates[1] IN ('<NON_REF>', '<*>'))
         AND len(list_filter(alternates, x -> starts_with(x, '<') AND ends_with(x, '>')
           AND x NOT IN ('<NON_REF>', '<*>'))) = 0
         AND len(list_filter(alternates, x -> NOT contains(x, '*'))) > 0
@@ -108,6 +116,127 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
     ) SELECT *, chrom || ':' || native_start::VARCHAR || CASE
       WHEN native_start = native_end THEN '' ELSE '-' || native_end::VARCHAR END AS native_location
     FROM alleles")
+  invisible("fastvep_source_spelling")
+}
+
+duckvep_fastvep_write_source_map <- function(con, input, output) {
+  if (file.exists(output)) stop("source map output already exists")
+  duckvep_fastvep_prepare_source(con, input)
+  on.exit({
+    DBI::dbRemoveTable(con, "fastvep_source_spelling")
+    DBI::dbRemoveTable(con, "fastvep_source")
+  }, add = TRUE)
+  # Every physical ALT remains in this map, including unsupported alleles.
+  # Eligibility determines the required denominator, not what output is retained.
+  query <- "WITH alleles AS (
+    SELECT s.record_index, a.alt_index::UBIGINT AS alt_index, s.chrom, s.position,
+      s.variant_id, s.reference, array_to_string(s.alternates, ',') AS raw_alternates,
+      a.alternate, s.native_location,
+      coalesce(s.variant_id, s.native_location || '_' || s.native_reference ||
+        CASE WHEN s.raw_alternates IN ('<NON_REF>', '<*>') THEN ''
+          ELSE '/' || array_to_string(s.native_alternates, '/') END) AS native_uploaded,
+      CASE WHEN s.raw_alternates IN ('<NON_REF>', '<*>') THEN '*'
+        ELSE s.native_alternates[a.alt_index] END AS native_allele,
+      s.chrom || ':' || s.position::VARCHAR AS operational_location,
+      coalesce(s.variant_id, concat(s.chrom, ':', s.position, ':',
+        upper(s.reference), ':', upper(a.alternate))) AS operational_uploaded,
+      upper(a.alternate) AS operational_allele,
+      CASE WHEN NOT regexp_full_match(s.reference, '[ACGTNacgtn]+') THEN 'nonliteral_reference'
+        WHEN a.alternate = '*' THEN 'spanning_deletion'
+        WHEN NOT regexp_full_match(a.alternate, '[ACGTNacgtn]+') THEN 'nonliteral_alternate'
+        WHEN upper(s.reference) = upper(a.alternate) THEN 'reference_equal'
+        ELSE 'eligible' END AS eligibility
+    FROM (SELECT *, array_to_string(alternates, ',') AS raw_alternates
+      FROM fastvep_source_spelling) s
+    CROSS JOIN UNNEST(s.alternates) WITH ORDINALITY a(alternate, alt_index)
+  ) SELECT *, eligibility = 'eligible' AS eligible FROM alleles"
+  DBI::dbExecute(con, paste0("COPY (", query, ") TO ", DBI::dbQuoteString(con, output), " (FORMAT PARQUET)"))
+  invisible(output)
+}
+
+duckvep_fastvep_source_coverage <- function(con, output_table, source_map, contract, failures) {
+  stopifnot(contract %in% c("operational17", "native_tab17", "vep_csq"))
+  q <- function(x) as.character(DBI::dbQuoteString(con, x))
+  qi <- function(x) as.character(DBI::dbQuoteIdentifier(con, x))
+  execute <- function(sql) invisible(DBI::dbExecute(con, sql))
+  execute(paste0("CREATE TEMP VIEW fastvep_coverage_source AS SELECT * FROM read_parquet(", q(source_map), ")"))
+  on.exit(execute("DROP VIEW fastvep_coverage_source"), add = TRUE)
+  invalid <- DBI::dbGetQuery(con, "SELECT count(*) n FROM (
+    SELECT record_index, alt_index FROM fastvep_coverage_source
+    GROUP BY record_index, alt_index
+    HAVING count(*) != 1 OR record_index IS NULL OR alt_index IS NULL
+      OR NOT regexp_full_match(record_index::VARCHAR, '[1-9][0-9]*')
+      OR NOT regexp_full_match(alt_index::VARCHAR, '[1-9][0-9]*')
+      OR try_cast(record_index AS UBIGINT) IS NULL OR try_cast(alt_index AS UBIGINT) IS NULL)")$n
+  if (invalid != 0) stop("source map has duplicate or invalid physical ALT ordinals")
+  invalid <- DBI::dbGetQuery(con, "SELECT count(*) n FROM fastvep_coverage_source
+    WHERE eligible IS NULL OR eligible IS DISTINCT FROM coalesce(
+      regexp_full_match(reference, '[ACGTNacgtn]+')
+      AND regexp_full_match(alternate, '[ACGTNacgtn]+')
+      AND upper(reference) <> upper(alternate), false)")$n
+  if (invalid != 0) stop("source map eligibility differs from its raw allele geometry")
+
+  if (contract == "vep_csq") {
+    keys <- c("record_index", "alt_index")
+    predicate <- paste(vapply(keys, function(key) paste0("regexp_full_match(o.", key,
+      ", '[1-9][0-9]*') AND try_cast(o.", key, " AS UBIGINT) = s.", key), character(1L)),
+      collapse = " AND ")
+  } else {
+    keys <- c("Uploaded_variation", "Location", "Allele")
+    source_keys <- paste0(if (contract == "native_tab17") "native_" else "operational_",
+      c("uploaded", "location", "allele"))
+    predicate <- paste(paste0("o.", qi(keys), " = s.", qi(source_keys)), collapse = " AND ")
+  }
+  key_columns <- paste(qi(keys), collapse = ", ")
+  named_key <- paste(paste0(qi(keys), " := o.", qi(keys)), collapse = ", ")
+  execute(paste0("CREATE TEMP TABLE fastvep_coverage_emitted AS WITH output_keys AS (
+    SELECT ", key_columns, ", count(*) AS output_rows FROM ", qi(output_table),
+    " GROUP BY ALL
+    ) SELECT to_json(struct_pack(", named_key, "))::VARCHAR AS output_key, o.output_rows,
+      count(s.record_index) AS source_matches,
+      min(s.record_index) AS record_index, min(s.alt_index) AS alt_index,
+      bool_or(s.eligible) AS eligible
+    FROM output_keys o LEFT JOIN fastvep_coverage_source s ON ", predicate,
+    " GROUP BY ALL"))
+  on.exit(execute("DROP TABLE fastvep_coverage_emitted"), add = TRUE)
+  matched <- "SELECT record_index, alt_index, sum(output_rows) AS output_rows
+    FROM fastvep_coverage_emitted WHERE source_matches = 1 GROUP BY ALL"
+  execute(paste0("CREATE TEMP TABLE fastvep_coverage_alleles AS
+    SELECT s.record_index, s.alt_index, s.eligible, coalesce(o.output_rows, 0) AS output_rows
+    FROM fastvep_coverage_source s LEFT JOIN (", matched,
+    ") o USING(record_index, alt_index)"))
+  on.exit(execute("DROP TABLE fastvep_coverage_alleles"), add = TRUE)
+  failure_query <- "SELECT CASE WHEN source_matches = 0 THEN 'unknown_output'
+      ELSE 'ambiguous_output' END AS failure, output_key, record_index, alt_index,
+      output_rows, source_matches FROM fastvep_coverage_emitted WHERE source_matches != 1
+    UNION ALL SELECT 'missing_source', NULL, record_index, alt_index, output_rows, 1
+      FROM fastvep_coverage_alleles WHERE eligible AND output_rows = 0"
+  execute(paste0("COPY (", failure_query, ") TO ", q(failures), " (FORMAT PARQUET)"))
+  summary <- DBI::dbGetQuery(con, "SELECT
+    count(*) FILTER (WHERE eligible) AS source_alleles,
+    count(*) FILTER (WHERE eligible AND output_rows > 0) AS covered_alleles,
+    count(*) FILTER (WHERE eligible AND output_rows = 0) AS missing_alleles,
+    count(*) FILTER (WHERE NOT eligible) AS excluded_source_alleles,
+    count(*) FILTER (WHERE NOT eligible AND output_rows > 0) AS emitted_excluded_alleles,
+    coalesce(sum(output_rows) FILTER (WHERE NOT eligible), 0) AS excluded_output_rows
+    FROM fastvep_coverage_alleles")
+  errors <- DBI::dbGetQuery(con, "SELECT
+    count(*) FILTER (WHERE source_matches = 0) AS unknown_alleles,
+    count(*) FILTER (WHERE source_matches > 1) AS ambiguous_alleles,
+    coalesce(sum(output_rows), 0) AS output_rows FROM fastvep_coverage_emitted")
+  summary <- cbind(summary, errors)
+  summary$passed <- all(unlist(summary[c("missing_alleles", "unknown_alleles", "ambiguous_alleles")]) == 0)
+  summary
+}
+
+duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 = "") {
+  stopifnot(contract %in% c("native_tab17", "vep_csq"), length(distance) == 1L,
+    is.numeric(distance), is.finite(distance), distance == floor(distance),
+    distance >= 0, distance <= 2^32 - 1)
+  q <- function(x) as.character(DBI::dbQuoteString(con, x))
+  execute <- function(sql) invisible(DBI::dbExecute(con, sql))
+  duckvep_fastvep_prepare_source(con, input)
+  execute("SET preserve_insertion_order = false")
   execute("CREATE TEMP TABLE fastvep_events AS
     SELECT row_number() OVER (ORDER BY s.record_index, a.alt_index)::UBIGINT AS event_index,
       s.record_index, a.alt_index, r.seq_region, s.chrom, s.position, s.variant_id,

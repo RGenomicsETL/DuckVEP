@@ -838,11 +838,14 @@ denominator.
 
     #> Whole-GIAB complete-field measurements are not published yet.
 
-Whole-GIAB timings remain diagnostic until the final CSQ rows retain
-physical record/ALT identity. Different deletion ALTs can share the same
-displayed `Allele`, and FastVEP’s flattened CSQ omits raw record
-coordinates. Stable row fingerprints alone do not establish complete
-source-allele coverage. The [retained incomplete
+Final CSQ files carry `record_index` and `alt_index` followed by the 32
+common fields. Both engines write this 34-column transport; the native
+and operational contracts remain 17 columns. An independent source map
+retains every physical record/ALT ordinal, including explicitly excluded
+nonliteral alleles. Final-file coverage checks reject missing eligible
+ALTs, unknown output keys and ambiguous identity. Different deletion
+ALTs can share a displayed `Allele`, so row fingerprints alone do not
+establish source-allele coverage. The [retained incomplete
 run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb) stopped
 when the native projection exhausted the available spill disk; it has no
 completion receipt or published timing median.
@@ -857,31 +860,32 @@ timing, and scans must leave it unchanged. Neither run loads
 supplementary annotation providers. `--memory-limit` and `--max-spill`
 set per-process DuckDB memory and spill caps; their defaults are 4 GB
 and 8 GB. Spill files use a private temporary directory. Published runs
-require `--fastvep-sha256` from an independently recorded build of the
-pinned FastVEP source. The expected digest is retained and checked
-against the timed executable and cache receipt; a matching version
-string is insufficient. Source/model/reference identities, input record
+require `--fastvep-build-receipt` from a fresh build of the pinned
+FastVEP source in an empty Cargo target directory. The retained build
+log and receipt bind the source commit, Cargo lockfile, toolchain, flags
+and executable digest. The runner checks the executable and cache
+against that receipt. Source/model/reference identities, input record
 and ALT counts, elapsed/user/ system time, CPU utilization, peak RSS,
 bytes and complete output fingerprints are retained beside a completion
 manifest. Partial or failed runs cannot populate the table above.
 
 ``` bash
-test "$(git -C .sync/fastVEP rev-parse HEAD)" = 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
-env RUSTFLAGS='-C target-cpu=native' cargo +1.98.1 build \
-  --manifest-path .sync/fastVEP/Cargo.toml --release --locked --offline -p fastvep-cli
+Rscript r/duckhtsbench/scripts/build_fastvep.R \
+  --checkout .sync/fastVEP --output build/fastvep-pinned
 Rscript r/duckhtsbench/scripts/stage_fastvep.R \
-  --checkout .sync/fastVEP --executable .sync/fastVEP/target/release/fastvep
+  --checkout .sync/fastVEP --executable build/fastvep-pinned/fastvep
 Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
   --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
-  --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256" \
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv \
   --output benchmarks/data/duckvep_fastvep/field_contracts
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
-  --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv
 # Replay a retained unique-ID record without generation or relabelling.
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --case noncoding_first_exon_phase1 --replay-input "$REPLAY_VCF" \
-  --vep-prefix "$VEP_PREFIX" --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
+  --vep-prefix "$VEP_PREFIX" --fastvep build/fastvep-pinned/fastvep \
+  --fastvep-build-receipt build/fastvep-pinned/build.tsv
 ```
 
 ## Compact-output revisions and input receipts
