@@ -1656,6 +1656,8 @@ field/key failures are retained in the [field data](data/duckvep_fastvep/fields_
 A [singleton replay](data/duckvep_fastvep/replay_phase1_589)
 of `chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus VEP's
 `c.1C>A`; that diagnostic does not replace the full campaign denominator.
+Independent-event HGVS corrections are tracked separately in
+https://github.com/RGenomicsETL/duckhts/issues/223.
 
 ```{r complete-field-singletons}
 validate_replay_bundle <- function(directory, evidence, expected = c(records = 10671L, tasks = 10100L, cells = 41942L)) {
@@ -1898,6 +1900,10 @@ An [incomplete verification run](data/duckvep_fastvep/field_contracts_incomplete
 retains three successful output timings. Its CSQ source-coverage check was
 terminated after its query plan exposed an all-pairs join. It does not supply
 the repeated timing matrix; coverage now joins validated numeric identities by hash.
+The [CSQ conversion capacity failure](data/duckvep_fastvep/field_contracts_incomplete_e63d0a1)
+retains four verified observations and the fifth observation's failed timing.
+FastVEP annotation completed, but VCF-to-table conversion exhausted the 8 GB
+spill cap at 16 GB query memory. This run has no completion receipt or median.
 
 ```{r native-capacity-diagnostic, include=FALSE}
 capacity_dir <- file.path(data_dir, "native_capacity_c183")
@@ -1945,7 +1951,8 @@ run loads supplementary annotation providers.
 `--memory-limit` and `--max-spill` set per-process DuckDB memory and spill caps;
 their defaults are 4 GB and 8 GB. Spill files use a private temporary directory.
 Published runs require `--fastvep-build-receipt` from a fresh build of the pinned
-FastVEP source in an empty Cargo target directory. The retained build log and
+FastVEP Git tree in an empty Cargo target directory. The builder exports tracked
+source files, excluding local untracked or ignored inputs. The retained build log and
 receipt bind the source commit, Cargo lockfile, toolchain, flags and executable
 digest. The runner checks the executable and cache against that receipt.
 Source/model/reference identities, input record and ALT counts, elapsed/user/
@@ -1979,6 +1986,17 @@ directory and `FIELD_PACK` to a new directory under `benchmarks/data/duckvep_fas
 ```{bash, eval=FALSE, echo=TRUE}
 Rscript benchmarks/benchmark_duckvep_fastvep_publish.R \
   --source "$FIELD_CAMPAIGN" --output "$FIELD_PACK"
+```
+
+Replay every discrepancy-bearing physical record independently, preserving its
+alleles and model, with one CPU ID per worker:
+
+```{bash, eval=FALSE, echo=TRUE}
+Rscript benchmarks/benchmark_duckvep_fastvep_replay.R \
+  --evidence "$FIELD_PACK" --output "$REPLAY_PACK" \
+  --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" --vep-prefix "$VEP_PREFIX" \
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv \
+  --jobs 4 --cpus 2,4,6,8
 ```
 
 The pack retains source VCFs, model GFFs, comparison Parquets, logs, receipts and

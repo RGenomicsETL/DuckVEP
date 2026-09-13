@@ -21,6 +21,21 @@ main <- function() {
     Feature = c("tx1", "tx2", "tx1"), Codons = c("-", "", "A/B"),
     HGVSp = c("p.%3D", "", "p.(a&b)"))
   stopifnot(identical(actual, expected))
+  correlated_query <- function(connection, path, fields) {
+    declared <- duckvep_fastvep_vcf_header(path)
+    raw <- duckvep_fastvep_vcf_relation(connection, path, declared)
+    payload <- setdiff(fields, "Uploaded_variation")
+    columns <- paste0("values[", match(payload, declared$fields), "] AS ",
+      DBI::dbQuoteIdentifier(connection, payload), collapse = ", ")
+    paste0("WITH records AS (SELECT ID, regexp_extract(INFO, '(?:^|;)CSQ=([^;]*)', 1) AS csq FROM ", raw,
+      "), annotations AS (SELECT ID, string_split(annotation, '|') AS values
+        FROM records, UNNEST(string_split(csq, ',')) a(annotation))
+      SELECT ID AS Uploaded_variation, ", columns, " FROM annotations")
+  }
+  DBI::dbExecute(con, paste("CREATE TEMP TABLE correlated AS", correlated_query(con, input, fields)))
+  stopifnot(DBI::dbGetQuery(con, "SELECT count(*) n FROM (
+    (SELECT * FROM actual EXCEPT ALL SELECT * FROM correlated)
+    UNION ALL (SELECT * FROM correlated EXCEPT ALL SELECT * FROM actual))")$n == 0L)
   expect_error <- function(expression) stopifnot(inherits(tryCatch({
     force(expression)
     NULL
@@ -92,7 +107,105 @@ main <- function() {
   duplicate_map <- file.path(directory, "duplicate_source.parquet")
   DBI::dbExecute(con, paste0("COPY duplicate_source TO ", DBI::dbQuoteString(con, duplicate_map), " (FORMAT PARQUET)"))
   expect_error(duckvep_fastvep_extract_csq(con, identity_input, "ambiguous_identity", fields, duplicate_map))
+  # A correlated CSQ split retains the full CSQ value as a delimiter-join key.
+  # Both queries face the same memory cap and cannot spill. Duplicate annotations
+  # are intentional: each physical record must retain all 1,024 copies.
+  bounded_input <- file.path(directory, "multiplicity.vcf")
+  wide_fields <- duckvep_fastvep_fields("vep_csq")
+  payload <- setdiff(wide_fields, "Uploaded_variation")
+  bounded_header <- c(header[[1L]], paste0('##INFO=<ID=CSQ,Number=.,Type=String,Description="Format: ',
+    paste(payload, collapse = "|"), '">'), header[[3L]])
+  records <- vapply(seq_len(128L), function(i) {
+    values <- setNames(rep("", length(payload)), payload)
+    values[c("Allele", "Feature", "Codons", "HGVSp")] <- c("C", paste0("tx", i), "-", "p.%3D")
+    paste("1", i, paste0("e", i), "A", "C", ".", "PASS",
+      paste0("CSQ=", paste(rep(paste(values, collapse = "|"), 1024L), collapse = ",")), sep = "\t")
+  }, character(1L))
+  writeLines(c(bounded_header, records), bounded_input)
+  limited <- function() DBI::dbConnect(duckdb::duckdb(config = list(
+    threads = "1", memory_limit = "64MB", max_temp_directory_size = "0B")))
+  check_correlated <- function() {
+    connection <- limited()
+    on.exit(DBI::dbDisconnect(connection, shutdown = TRUE), add = TRUE)
+    query <- correlated_query(connection, bounded_input, wide_fields)
+    error <- tryCatch({
+      DBI::dbExecute(connection, paste("CREATE TEMP TABLE correlated AS", query))
+      NULL
+    }, error = identity)
+    stopifnot(inherits(error, "error"), grepl("Out of Memory", conditionMessage(error), fixed = TRUE))
+  }
+  check_projected <- function() {
+    connection <- limited()
+    on.exit(DBI::dbDisconnect(connection, shutdown = TRUE), add = TRUE)
+    duckvep_fastvep_extract_csq(connection, bounded_input, "bounded", wide_fields)
+    empty_fields <- setdiff(payload, c("Allele", "Feature", "Codons", "HGVSp"))
+    empty <- paste0(DBI::dbQuoteIdentifier(connection, empty_fields), " = ''", collapse = " AND ")
+    counts <- DBI::dbGetQuery(connection, paste0("SELECT count(*) AS records, sum(copies) AS annotations,
+      count(*) FILTER (WHERE copies != 1024 OR NOT exact_fields) AS invalid FROM (
+      SELECT Uploaded_variation, count(*) AS copies,
+        bool_and(Feature = 'tx' || substr(Uploaded_variation, 2) AND Allele = 'C'
+          AND Codons = '-' AND HGVSp = 'p.%3D' AND ", empty, ") AS exact_fields
+      FROM bounded GROUP BY Uploaded_variation)"))
+    stopifnot(counts$records == 128L, counts$annotations == 131072L, counts$invalid == 0L)
+  }
+  check_correlated()
+  check_projected()
+  # Exercise the file-writing process, not only its materializing R helper.
+  # Malformed rows follow valid rows so a filtering implementation cannot pass.
+  check_cli <- function(label, path, map = "", expected_rows = NULL, expected_error = NULL) {
+    api_table <- paste0("api_", label)
+    api_error <- tryCatch({
+      duckvep_fastvep_extract_csq(con, path, api_table, wide_fields, map)
+      NULL
+    }, error = identity)
+    output <- file.path(directory, paste0(label, ".tsv"))
+    log <- file.path(directory, paste0(label, ".log"))
+    args <- c("benchmarks/benchmark_duckvep_fastvep_extract.R", "--input", path,
+      "--output", output, "--memory-limit", "64MB", "--max-spill", "0B", "--threads", "1")
+    if (nzchar(map)) args <- c(args, "--source-map", map)
+    status <- suppressWarnings(system2("Rscript", shQuote(args), stdout = log, stderr = log))
+    if (!is.null(expected_error)) {
+      stopifnot(inherits(api_error, "error"), grepl(expected_error, conditionMessage(api_error), fixed = TRUE),
+        status != 0L, any(grepl(expected_error, readLines(log), fixed = TRUE)))
+      return(invisible(NULL))
+    }
+    stopifnot(is.null(api_error), status == 0L)
+    cli_table <- paste0("cli_", label)
+    columns <- c(if (nzchar(map)) duckvep_fastvep_identity_fields, wide_fields)
+    duckvep_fastvep_read_field_tab(con, output, cli_table, columns)
+    differences <- DBI::dbGetQuery(con, paste0("SELECT count(*) n FROM (
+      (SELECT * FROM ", api_table, " EXCEPT ALL SELECT * FROM ", cli_table, ")
+      UNION ALL (SELECT * FROM ", cli_table, " EXCEPT ALL SELECT * FROM ", api_table, "))"))$n
+    stopifnot(differences == 0L, DBI::dbGetQuery(con, paste("SELECT count(*) n FROM", cli_table))$n == expected_rows)
+  }
+  check_cli("bounded", bounded_input, expected_rows = 131072L)
+  annotation <- function(allele, feature, codons = "", hgvsp = "") {
+    values <- setNames(rep("", length(payload)), payload)
+    values[c("Allele", "Feature", "Codons", "HGVSp")] <- c(allele, feature, codons, hgvsp)
+    paste(values, collapse = "|")
+  }
+  a <- annotation("A", "tx1", "-", "p.%3D")
+  full_records <- c(
+    paste0("1\t20\t.\tTAA\tT,*\t.\tPASS\tCSQ=", annotation("-", "-"), ",", annotation("*", "-")),
+    paste0("1\t10\t.\tTAA\tTA,T\t.\tPASS\tCSQ=", a, ",", annotation("-", "tx1"), ",", a))
+  cli_input <- file.path(directory, "cli.vcf")
+  writeLines(c(bounded_header, full_records), cli_input)
+  check_cli("identity", cli_input, source_map, expected_rows = 5L)
+  check_cli("ambiguous", cli_input, duplicate_map,
+    expected_error = "CSQ output has unknown or ambiguous physical ALT identity")
+  writeLines(c(bounded_header, sub("\t20\t", "\t21\t", full_records)), cli_input)
+  check_cli("unknown", cli_input, source_map,
+    expected_error = "CSQ output has unknown or ambiguous physical ALT identity")
+  invalid_info <- c(missing_key = "X=1", duplicate_key = paste0("CSQ=", a, ";CSQ=", a),
+    short_width = paste0("CSQ=", substr(a, 1L, nchar(a) - 1L)), long_width = paste0("CSQ=", a, "|"))
+  for (label in names(invalid_info)) {
+    invalid <- paste0("1\t10\t.\tTAA\tTA,T\t.\tPASS\t", invalid_info[[label]])
+    writeLines(c(bounded_header, full_records[[1L]], invalid), cli_input)
+    check_cli(label, cli_input, expected_error = "missing/duplicate CSQ or field count differs from its header")
+  }
   cat("CSQ extraction: transport spelling, missing fields and width controls passed\n")
+  cat("CSQ extraction: exact lateral/projection multiset; 131,072 rows at 64MB with zero spill; correlated negative control failed OOM\n")
+  cat("CSQ extraction: direct CLI COPY matches materialized rows; API and CLI reject all malformed/identity controls\n")
 }
 
 main()

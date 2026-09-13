@@ -835,7 +835,8 @@ the [field data](data/duckvep_fastvep/fields_seed173_9bf888e). A
 [singleton replay](data/duckvep_fastvep/replay_phase1_589) of
 `chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus
 VEP’s `c.1C>A`; that diagnostic does not replace the full campaign
-denominator.
+denominator. Independent-event HGVS corrections are tracked separately
+in <https://github.com/RGenomicsETL/duckhts/issues/223>.
 
     #> Complete singleton replay evidence is not published yet.
 
@@ -860,7 +861,12 @@ run](data/duckvep_fastvep/field_contracts_incomplete_9bf888e) retains
 three successful output timings. Its CSQ source-coverage check was
 terminated after its query plan exposed an all-pairs join. It does not
 supply the repeated timing matrix; coverage now joins validated numeric
-identities by hash.
+identities by hash. The [CSQ conversion capacity
+failure](data/duckvep_fastvep/field_contracts_incomplete_e63d0a1)
+retains four verified observations and the fifth observation’s failed
+timing. FastVEP annotation completed, but VCF-to-table conversion
+exhausted the 8 GB spill cap at 16 GB query memory. This run has no
+completion receipt or median.
 
 A separate [capacity
 diagnostic](data/duckvep_fastvep/native_capacity_c183) completed the
@@ -882,13 +888,15 @@ supplementary annotation providers. `--memory-limit` and `--max-spill`
 set per-process DuckDB memory and spill caps; their defaults are 4 GB
 and 8 GB. Spill files use a private temporary directory. Published runs
 require `--fastvep-build-receipt` from a fresh build of the pinned
-FastVEP source in an empty Cargo target directory. The retained build
-log and receipt bind the source commit, Cargo lockfile, toolchain, flags
-and executable digest. The runner checks the executable and cache
-against that receipt. Source/model/reference identities, input record
-and ALT counts, elapsed/user/ system time, CPU utilization, peak RSS,
-bytes and complete output fingerprints are retained beside a completion
-manifest. Partial or failed runs cannot populate the table above.
+FastVEP Git tree in an empty Cargo target directory. The builder exports
+tracked source files, excluding local untracked or ignored inputs. The
+retained build log and receipt bind the source commit, Cargo lockfile,
+toolchain, flags and executable digest. The runner checks the executable
+and cache against that receipt. Source/model/reference identities, input
+record and ALT counts, elapsed/user/ system time, CPU utilization, peak
+RSS, bytes and complete output fingerprints are retained beside a
+completion manifest. Partial or failed runs cannot populate the table
+above.
 
 ``` bash
 Rscript r/duckhtsbench/scripts/build_fastvep.R \
@@ -917,6 +925,17 @@ execution directory and `FIELD_PACK` to a new directory under
 ``` bash
 Rscript benchmarks/benchmark_duckvep_fastvep_publish.R \
   --source "$FIELD_CAMPAIGN" --output "$FIELD_PACK"
+```
+
+Replay every discrepancy-bearing physical record independently,
+preserving its alleles and model, with one CPU ID per worker:
+
+``` bash
+Rscript benchmarks/benchmark_duckvep_fastvep_replay.R \
+  --evidence "$FIELD_PACK" --output "$REPLAY_PACK" \
+  --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" --vep-prefix "$VEP_PREFIX" \
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv \
+  --jobs 4 --cpus 2,4,6,8
 ```
 
 The pack retains source VCFs, model GFFs, comparison Parquets, logs,
