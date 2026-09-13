@@ -9,6 +9,17 @@ main <- function() {
   stopifnot(length(begin) == 1L)
   end <- which(seq_along(rmd) > begin & rmd == "```")[[1L]]
   gate <- parse(text = rmd[seq.int(begin + 1L, end - 1L)])
+  setup_begin <- which(rmd == "```{r setup, include=FALSE}")
+  stopifnot(length(setup_begin) == 1L)
+  setup_end <- which(seq_along(rmd) > setup_begin & rmd == "```")[[1L]]
+  setup <- parse(text = rmd[seq.int(setup_begin + 1L, setup_end - 1L)])
+  timing_helpers <- new.env(parent = globalenv())
+  for (name in c("time_value", "elapsed_seconds", "read_gnu_time")) {
+    definition <- Filter(function(expr) is.call(expr) && identical(expr[[1L]], quote(`<-`)) &&
+      identical(expr[[2L]], as.name(name)), setup)
+    stopifnot(length(definition) == 1L)
+    eval(definition[[1L]], envir = timing_helpers)
+  }
   registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"),
     check.names = FALSE, colClasses = "character"
   )
@@ -90,7 +101,11 @@ main <- function() {
       configuration <- matrix$configuration[[i]]
       group <- match(configuration, configurations)
       timing <- paste0(labels[[i]], ".time")
-      writeLines("synthetic timing fixture", file.path(path, timing))
+      writeLines(c(
+        "User time (seconds): 0.8", "System time (seconds): 0.2",
+        "Percent of CPU this job got: 100%", "Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.00",
+        "Maximum resident set size (kbytes): 1024", "File system outputs: 0", "Exit status: 0"
+      ), file.path(path, timing))
       observation <- data.frame(
         tool = sub("_.*$", "", configuration),
         output_contract = sub("^[^_]+_", "", configuration),
@@ -161,11 +176,7 @@ main <- function() {
     timing_reads <- 0L
     env$read_gnu_time <- function(path, engine, threads, run) {
       timing_reads <<- timing_reads + 1L
-      stopifnot(file.exists(path))
-      data.frame(engine, threads, run,
-        elapsed_seconds = 1, user_seconds = 0.8,
-        system_seconds = 0.2, cpu_percent = 100, maximum_rss_kib = 1024
-      )
+      timing_helpers$read_gnu_time(path, engine, threads, run)
     }
     output <- tryCatch(capture.output(result <- eval(gate, envir = env)),
       error = function(error) {
@@ -175,7 +186,7 @@ main <- function() {
     list(value = result, output = output, env = env, timing_reads = timing_reads)
   }
   rejected <- character()
-  check <- function(label, mutate, reseal = TRUE) {
+  check <- function(label, mutate, reseal = TRUE, expected_timing_reads = 0L) {
     path <- fixture(file.path(directory, label, "field_contracts"))
     seal(path)
     mutate(path)
@@ -188,8 +199,8 @@ main <- function() {
       error = function(error) error
     )
     if (!inherits(error, "error")) stop("publication accepted mutation: ", label)
-    if (!identical(attr(error, "timing_reads"), 0L)) {
-      stop("publication read timing data before rejecting mutation: ", label)
+    if (!identical(attr(error, "timing_reads"), expected_timing_reads)) {
+      stop("publication rejected mutation after an unexpected number of timing reads: ", label)
     }
     rejected <<- c(rejected, label)
   }
@@ -347,6 +358,24 @@ main <- function() {
       }, reseal = file != "completion.csv")
     }
   }
+  for (status in c("1", "137", "missing", "signal")) {
+    check(paste0("failed_command_", status), function(path) {
+      timing <- file.path(path, paste0(sort(labels)[[1L]], ".time"))
+      lines <- readLines(timing)
+      if (status == "signal") {
+        lines <- c("Command terminated by signal 9", lines)
+      } else {
+        lines <- lines[!grepl("^Exit status:", lines)]
+        if (status != "missing") lines <- c(lines, paste("Exit status:", status))
+      }
+      writeLines(lines, timing)
+    }, expected_timing_reads = 1L)
+  }
+  check("retained_failed_command", function(path) {
+    failed <- file.path(root, "benchmarks/data/duckvep_fastvep",
+      "field_contracts_incomplete_0d2bdcb/duckvep_native_tab17_1_1.time")
+    stopifnot(file.copy(failed, file.path(path, paste0(sort(labels)[[1L]], ".time")), overwrite = TRUE))
+  }, expected_timing_reads = 1L)
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
 }
 

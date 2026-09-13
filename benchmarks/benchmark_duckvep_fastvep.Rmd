@@ -38,6 +38,8 @@ elapsed_seconds <- function(value) {
 
 read_gnu_time <- function(path, engine, threads, run) {
   lines <- readLines(path, warn = FALSE)
+  stopifnot(time_value(lines, "Exit status") == "0",
+    !any(grepl("^Command terminated by signal ", trimws(lines))))
   elapsed <- elapsed_seconds(time_value(
     lines,
     "Elapsed \\(wall clock\\) time \\(h:mm:ss or m:ss\\)"
