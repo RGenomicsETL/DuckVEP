@@ -225,7 +225,7 @@ main <- function() {
   manifest <- utils::read.delim(file.path(evidence, "artifacts.tsv"), colClasses = "character")
   stopifnot(!anyDuplicated(manifest$path), !any(grepl("(^/|(^|/)\\.\\.(/|$))", manifest$path)))
   inputs <- c(file.path(evidence, manifest$path), file.path(evidence, "artifacts.tsv"), self,
-    extension, paths[2:4], file.path(dirname(paths[[3L]]), build[["log"]]))
+    extension, paths[2:4], file.path(dirname(paths[[3L]]), c(build[["log"]], build[["source_tree"]])))
   hashes <- vapply(inputs, duckvep_evidence_sha256, "")
   stopifnot(identical(unname(hashes[seq_len(nrow(manifest))]), manifest$sha256))
   con <- DBI::dbConnect(duckdb::duckdb(config = list(threads = "1")))
@@ -251,8 +251,10 @@ main <- function() {
     utils::write.table(data.frame(field = names(binding), value = unname(binding)), receipt,
       sep = "\t", quote = FALSE, row.names = FALSE)
   }
-  build_sources <- c(paths[[2L]], paths[[3L]], file.path(dirname(paths[[3L]]), build[["log"]]))
-  build_targets <- file.path(output, c("extension_build.tsv", "fastvep_build.tsv", build[["log"]]))
+  build_sources <- c(paths[[2L]], paths[[3L]],
+    file.path(dirname(paths[[3L]]), c(build[["log"]], build[["source_tree"]])))
+  build_targets <- file.path(output,
+    c("extension_build.tsv", "fastvep_build.tsv", build[["log"]], build[["source_tree"]]))
   stopifnot(endsWith(build[["log"]], ".log"), !anyDuplicated(basename(build_targets)),
     !any(basename(build_targets) %in% c("run.tsv", "completion.csv")))
   if (!opt$resume) stopifnot(all(file.copy(build_sources, build_targets)))
