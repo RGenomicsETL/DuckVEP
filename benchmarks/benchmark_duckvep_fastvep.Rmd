@@ -1638,9 +1638,16 @@ completion_path <- file.path(complete_dir, "completion.csv")
 if (!file.exists(completion_path)) {
   cat("Whole-GIAB complete-field measurements are not published yet.\n")
 } else {
-  completion <- read.csv(completion_path, colClasses = "character")
-  if (!"allele_coverage" %in% names(completion) ||
-      !identical(completion$allele_coverage, "verified")) {
+  read_receipt <- function(path, required, sep = ",") {
+    receipt <- read.csv(path, sep = sep, colClasses = "character", check.names = FALSE)
+    stopifnot(nrow(receipt) > 0L, !anyDuplicated(names(receipt)),
+      all(required %in% names(receipt)), !anyNA(receipt[required]),
+      all(vapply(receipt[required], function(column) all(nzchar(column)), logical(1L))))
+    receipt
+  }
+  completion <- read_receipt(completion_path, c("source_revision", "completed", "binding",
+    "observations", "repetitions", "allele_coverage", "artifacts_sha256"))
+  if (!identical(completion$allele_coverage, "verified")) {
     stop("Complete-field timing publication requires verified final source-allele coverage")
   }
   stopifnot(nrow(completion) == 1L, completion$completed == "TRUE",
@@ -1648,14 +1655,14 @@ if (!file.exists(completion_path)) {
   sha256 <- function(path) strsplit(system2("sha256sum", shQuote(path), stdout = TRUE), " +")[[1L]][[1L]]
   manifest_path <- file.path(complete_dir, "artifacts.csv")
   stopifnot(sha256(manifest_path) == completion$artifacts_sha256)
-  manifest <- read.csv(manifest_path, colClasses = "character")
+  manifest <- read_receipt(manifest_path, c("file", "sha256"))
   stopifnot(!anyDuplicated(manifest$file), all(basename(manifest$file) == manifest$file),
     identical(unname(vapply(file.path(complete_dir, manifest$file), sha256, character(1L))), manifest$sha256))
   required <- c("metadata.csv", "inputs.csv", "fastvep_cache_receipt.tsv", "allele_coverage.csv")
   stopifnot(all(required %in% manifest$file))
-  metadata <- read.csv(file.path(complete_dir, "metadata.csv"), colClasses = "character")
-  inputs <- read.csv(file.path(complete_dir, "inputs.csv"), colClasses = "character")
-  cache <- read.delim(file.path(complete_dir, "fastvep_cache_receipt.tsv"), colClasses = "character")
+  metadata <- read_receipt(file.path(complete_dir, "metadata.csv"), c("field", "value"))
+  inputs <- read_receipt(file.path(complete_dir, "inputs.csv"), c("artifact", "sha256"))
+  cache <- read_receipt(file.path(complete_dir, "fastvep_cache_receipt.tsv"), c("field", "value"), sep = "\t")
   stopifnot(!anyDuplicated(metadata$field), !anyDuplicated(inputs$artifact), !anyDuplicated(cache$field))
   metadata <- setNames(metadata$value, metadata$field)
   cache <- setNames(cache$value, cache$field)
@@ -1684,8 +1691,10 @@ if (!file.exists(completion_path)) {
     cache[["fasta_index_sha256"]] == input_hashes[["fasta_index"]],
     sha256(file.path(complete_dir, "fastvep_cache_receipt.tsv")) == input_hashes[["cache_receipt"]])
   observations <- manifest$file[grepl("^(duckvep|fastvep)_.*_[14]_[0-9]+[.]csv$", manifest$file)]
+  observation_fields <- c("tool", "output_contract", "threads", "run", "row_count", "bytes",
+    "sha256", "xor_hash", "low32_sum", "high32_sum", "timing_file", "multiset_checked", "fingerprint_scope")
   complete_rows <- do.call(rbind, lapply(file.path(complete_dir, observations), function(path) {
-    observation <- read.csv(path, colClasses = "character")
+    observation <- read_receipt(path, observation_fields)
     stopifnot(nrow(observation) == 1L)
     observation
   }))
@@ -1701,10 +1710,9 @@ if (!file.exists(completion_path)) {
     all(complete_rows$timing_file %in% manifest$file), all(complete_rows$multiset_checked == "TRUE"),
     all(complete_rows$timing_file == paste0(actual_keys, ".time")),
     all(complete_rows$fingerprint_scope == "full_row"))
-  coverage <- read.csv(file.path(complete_dir, "allele_coverage.csv"), colClasses = "character")
   coverage_fields <- c("tool", "output_contract", "threads", "run", "scope", "input_sha256",
     "output_sha256", "source_alleles", "covered_alleles", "missing_alleles", "unknown_alleles", "ambiguous_alleles")
-  stopifnot(all(coverage_fields %in% names(coverage)))
+  coverage <- read_receipt(file.path(complete_dir, "allele_coverage.csv"), coverage_fields)
   coverage_keys <- paste(coverage$tool, coverage$output_contract, coverage$threads, coverage$run, sep = "_")
   stopifnot(!anyDuplicated(coverage_keys), setequal(coverage_keys, actual_keys))
   coverage <- coverage[match(actual_keys, coverage_keys), ]

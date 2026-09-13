@@ -309,6 +309,44 @@ main <- function() {
   check("duplicate_input_key", function(path) {
     edit_csv(path, "inputs.csv", function(x) rbind(x, x[1L, ]))
   })
+  for (field in names(read_csv(file.path(valid_path, paste0(labels[[1L]], ".csv"))))) {
+    check(paste0("missing_observation_column_", field), function(path) {
+      for (label in labels) {
+        edit_csv(path, paste0(label, ".csv"), function(x) {
+          x[[field]] <- NULL
+          x
+        })
+      }
+    })
+  }
+  for (value in list("", NA_character_)) {
+    label <- if (is.na(value)) "missing" else "empty"
+    check(paste0(label, "_observation_hash"), function(path) {
+      edit_csv(path, paste0(labels[[1L]], ".csv"), function(x) {
+        x$sha256 <- value
+        x
+      })
+    })
+  }
+  check("duplicate_observation_hash_column", function(path) {
+    edit_csv(path, paste0(labels[[1L]], ".csv"), function(x) {
+      x$extra <- x$sha256
+      names(x)[names(x) == "extra"] <- "sha256"
+      x
+    })
+  })
+  for (file in c("completion.csv", "metadata.csv", "inputs.csv", "allele_coverage.csv")) {
+    fields <- names(read_csv(file.path(valid_path, file)))
+    if (file == "inputs.csv") fields <- setdiff(fields, "path")
+    for (field in fields) {
+      check(paste0("missing_", file, "_", field), function(path) {
+        edit_csv(path, file, function(x) {
+          x[[field]] <- NULL
+          x
+        })
+      }, reseal = file != "completion.csv")
+    }
+  }
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
 }
 
