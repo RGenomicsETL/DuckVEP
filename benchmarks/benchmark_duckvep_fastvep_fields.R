@@ -367,8 +367,8 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE)
     # REF_ALLELE from that feature, not the individual transcript allele.
     REF_ALLELE = "CASE WHEN length(e.alternates) > 1 THEN e.native_reference
       WHEN length(e.reference) = length(e.alternate) THEN e.reference
-      ELSE coalesce(nullif(substring(e.reference, geometry.reference_difference_offset + 1,
-        geometry.reference_difference_length), ''), '-') END",
+      ELSE coalesce(nullif(substring(e.reference, e.geometry.reference_difference_offset + 1,
+        e.geometry.reference_difference_length), ''), '-') END",
     UPLOADED_ALLELE = "e.uploaded_reference || '/' || array_to_string(e.alternates, ',')",
     # VEP OutputFactory multiplies the transcript-oriented shift by strand.
     HGVS_OFFSET = "CASE WHEN a.transcript_hgvs IS NOT NULL OR a.protein_hgvs IS NOT NULL
@@ -390,11 +390,11 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE)
   if (include_identity) values <- c("e.record_index", "e.alt_index", values)
   paste0("SELECT ", paste(values, collapse = ",\n"), "
     FROM fastvep_annotations a
-    JOIN fastvep_events e USING(event_index)
+    JOIN (SELECT *, duckvep_allele_geometry(position, reference, alternate) AS geometry
+      FROM fastvep_events) e USING(event_index)
     JOIN duckvep_transcript_projection('fastvep_events', 'fastvep_annotations',
       'duckvep_bench_model.model_transcripts') p
       ON p.event_index = a.event_index AND p.transcript_index IS NOT DISTINCT FROM a.transcript_index
     LEFT JOIN duckvep_bench_model.model_transcripts t ON t.transcript_index = a.transcript_index
-    LEFT JOIN fastvep_metadata m ON m.transcript_index = a.transcript_index
-    CROSS JOIN LATERAL (SELECT duckvep_allele_geometry(e.position, e.reference, e.alternate) AS geometry)")
+    LEFT JOIN fastvep_metadata m ON m.transcript_index = a.transcript_index")
 }

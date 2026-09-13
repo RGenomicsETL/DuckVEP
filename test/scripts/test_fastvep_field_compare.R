@@ -112,12 +112,13 @@ main <- function() {
   stopifnot(status != 0L,
     any(grepl("all five options are required", readLines(file.path(directory, "cli_missing_source.stderr")), fixed = TRUE)))
   source("benchmarks/benchmark_duckvep_fastvep_field_conformance.R", local = TRUE)
+  source("benchmarks/benchmark_duckvep_fastvep_fields.R", local = TRUE)
   source_rows <- data.frame(CHROM = "chrDuck", POS = c("158", "159"),
     ID = c("original_156", "original_157"), REF = c("C", "G"), ALT = c("A", "T"))
   prepare <- function(rows, expected_records = NULL) {
     if (DBI::dbExistsTable(con, "field_input")) DBI::dbRemoveTable(con, "field_input")
     DBI::dbWriteTable(con, "replay_source", rows, overwrite = TRUE)
-    duckvep_fastvep_prepare_source(con, "replay_source", expected_records)
+    duckvep_fastvep_prepare_comparison_source(con, "replay_source", expected_records)
   }
   stopifnot(prepare(source_rows, 2L) == 2L,
     identical(DBI::dbGetQuery(con, "SELECT Uploaded_variation FROM field_input ORDER BY record_index")[[1L]],

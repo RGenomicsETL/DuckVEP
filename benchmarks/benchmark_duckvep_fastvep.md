@@ -845,10 +845,22 @@ retains every physical record/ALT ordinal, including explicitly excluded
 nonliteral alleles. Final-file coverage checks reject missing eligible
 ALTs, unknown output keys and ambiguous identity. Different deletion
 ALTs can share a displayed `Allele`, so row fingerprints alone do not
-establish source-allele coverage. The [retained incomplete
-run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb) stopped
-when the native projection exhausted the available spill disk; it has no
-completion receipt or published timing median.
+establish source-allele coverage. The exact GIAB map remains in the
+registered artifact cache; its provenance and digest accompany the
+measurements. Rendering verifies that retained object and the empty
+failure-witness files without rebuilding either. The [retained
+incomplete run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb)
+stopped when the native projection exhausted the available spill disk;
+it has no completion receipt or published timing median.
+
+A separate [capacity
+diagnostic](data/duckvep_fastvep/native_capacity_c183) completed the
+whole-GIAB native-tab projection at 16 GB query memory and an 8 GB spill
+cap: 47629345 rows, 6336737466 output bytes, and all 4095611 eligible
+source ALTs covered. The same spill cap was exhausted at 4 GB and 8 GB
+query memory. This untimed, unbound diagnostic does not supply a
+performance observation, CSQ validation or the required repeated
+one-/four-core matrix.
 
 The paired runner uses one and four assigned cores, three fresh-process
 observations per configuration, the same registered whole-GIAB input and
@@ -877,6 +889,7 @@ Rscript r/duckhtsbench/scripts/stage_fastvep.R \
 Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
   --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
   --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv \
+  --memory-limit 16GB --max-spill 8GB \
   --output benchmarks/data/duckvep_fastvep/field_contracts
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \

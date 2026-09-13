@@ -24,6 +24,11 @@ main <- function() {
     check.names = FALSE, colClasses = "character"
   )
   cache_row <- registry[registry$id == "fastvep_ensembl116_cache", ]
+  map_row <- registry[registry$id == "fastvep_giab_hg002_v421_source_map", ]
+  stopifnot(nrow(map_row) == 1L)
+  map_pairs <- strsplit(strsplit(map_row$supplier_identity, ";", fixed = TRUE)[[1L]], "=", fixed = TRUE)
+  map_identity <- setNames(vapply(map_pairs, `[[`, character(1L), 2L),
+    vapply(map_pairs, `[[`, character(1L), 1L))
   stopifnot(nrow(cache_row) == 1L)
   pairs <- strsplit(strsplit(cache_row$supplier_identity, ";", fixed = TRUE)[[1L]],
     "=",
@@ -43,6 +48,14 @@ main <- function() {
   dir.create(directory)
   on.exit(unlink(directory, recursive = TRUE), add = TRUE)
   sha256 <- function(path) digest::digest(file = path, algo = "sha256")
+  failure_template <- file.path(directory, "empty_failures.parquet")
+  failure_con <- DBI::dbConnect(duckdb::duckdb())
+  on.exit(DBI::dbDisconnect(failure_con, shutdown = TRUE), add = TRUE)
+  failure_columns <- "NULL::VARCHAR failure, NULL::VARCHAR output_key,
+    NULL::UBIGINT record_index, NULL::UBIGINT alt_index,
+    NULL::BIGINT output_rows, NULL::BIGINT source_matches"
+  DBI::dbExecute(failure_con, paste0("COPY (SELECT ", failure_columns,
+    " WHERE false) TO ", DBI::dbQuoteString(failure_con, failure_template), " (FORMAT PARQUET)"))
   write_csv <- function(value, path) utils::write.csv(value, path, row.names = FALSE)
   read_csv <- function(path) utils::read.csv(path, colClasses = "character")
   write_fields <- function(values, path, tab = FALSE) {
@@ -71,6 +84,22 @@ main <- function() {
       vapply(seq_len(8L), function(i) strrep(as.character(i), 64L), character(1L)),
       c("input", "model", "fasta", "gff3", "cache", "fastvep", "fasta_index", "source_map")
     )
+    hashes[["input"]] <- map_identity[["input_sha256"]]
+    map_directory <- file.path(paste0(path, "-cache"), map_row$cache_relpath)
+    dir.create(map_directory, recursive = TRUE)
+    map_path <- file.path(map_directory, "source_alleles.parquet")
+    DBI::dbExecute(failure_con, paste0("COPY (SELECT 1::UBIGINT record_index, 1::UBIGINT alt_index)
+      TO ", DBI::dbQuoteString(failure_con, map_path), " (FORMAT PARQUET)"))
+    hashes[["source_map"]] <- sha256(map_path)
+    map_receipt <- c(artifact_id = map_row$id, transform = map_row$transform,
+      supplier_identity = map_row$supplier_identity, source_id = "variantkey_giab_hg002_v421",
+      input_sha256 = hashes[["input"]], generator_sha256 = strrep("a", 64L),
+      generator_source_sha256 = strrep("b", 64L), extension_sha256 = strrep("c", 64L),
+      duckdb_version = "synthetic", source_map_sha256 = hashes[["source_map"]],
+      map_identity[c("records", "alleles", "eligible_alleles")])
+    write_fields(map_receipt, paste0(map_path, ".provenance.tsv"), tab = TRUE)
+    stopifnot(file.copy(paste0(map_path, ".provenance.tsv"), file.path(path, "source_map_receipt.tsv")))
+    hashes <- c(hashes, source_map_receipt = sha256(file.path(path, "source_map_receipt.tsv")))
     cache <- c(
       source_commit = identity[["source_commit"]],
       executable_version = paste("fastvep", identity[["version"]]),
@@ -127,11 +156,14 @@ main <- function() {
         multiset_checked = TRUE, fingerprint_scope = "full_row"
       )
       write_csv(observation, file.path(path, paste0(labels[[i]], ".csv")))
+      failures_file <- paste0(labels[[i]], ".coverage.failures.parquet")
+      stopifnot(file.copy(failure_template, file.path(path, failures_file)))
       coverage[[i]] <- data.frame(observation[c("tool", "output_contract", "threads", "run")],
         scope = "final_output", input_sha256 = hashes[["input"]],
         output_sha256 = observation$sha256, source_map_sha256 = hashes[["source_map"]],
         source_alleles = "4095611", covered_alleles = "4095611",
-        missing_alleles = "0", unknown_alleles = "0", ambiguous_alleles = "0")
+        missing_alleles = "0", unknown_alleles = "0", ambiguous_alleles = "0",
+        failures_file = failures_file, failures_sha256 = sha256(failure_template))
     }
     write_csv(do.call(rbind, coverage), file.path(path, "allele_coverage.csv"))
     write_csv(data.frame(
@@ -178,6 +210,11 @@ main <- function() {
     })
   }
   evaluate <- function(path) {
+    previous <- Sys.getenv(c("DUCKHTS_CACHE_DIR", "DUCKHTSBENCH_REGISTRY"), unset = NA_character_)
+    on.exit(for (name in names(previous)) {
+      if (is.na(previous[[name]])) Sys.unsetenv(name) else do.call(Sys.setenv, as.list(previous[name]))
+    }, add = TRUE)
+    Sys.setenv(DUCKHTS_CACHE_DIR = paste0(path, "-cache"))
     env <- new.env(parent = globalenv())
     env$root <- root
     env$data_dir <- dirname(path)
@@ -280,6 +317,13 @@ main <- function() {
   check("missing_build_receipt", function(path) unlink(file.path(path, "fastvep_build.tsv")))
   check("missing_build_log", function(path) unlink(file.path(path, "build.log")))
   check("changed_build_log", function(path) writeLines("stale build", file.path(path, "build.log")))
+  check("missing_source_map_receipt", function(path) unlink(file.path(path, "source_map_receipt.tsv")))
+  check("missing_registered_source_map", function(path) {
+    unlink(file.path(paste0(path, "-cache"), map_row$cache_relpath, "source_alleles.parquet"))
+  })
+  check("changed_registered_source_map", function(path) {
+    writeLines("changed keys", file.path(paste0(path, "-cache"), map_row$cache_relpath, "source_alleles.parquet"))
+  })
   check("missing_observation", function(path) {
     unlink(file.path(path, paste0(labels[[1L]], ".csv")))
   })
@@ -318,6 +362,30 @@ main <- function() {
   }
   check("duplicate_coverage_observation", function(path) {
     edit_csv(path, "allele_coverage.csv", function(x) rbind(x, x[1L, ]))
+  })
+  check("missing_failure_artifact", function(path) {
+    unlink(file.path(path, paste0(labels[[1L]], ".coverage.failures.parquet")))
+  })
+  check("wrong_failure_artifact", function(path) {
+    edit_csv(path, "allele_coverage.csv", function(x) {
+      x$failures_file[1L] <- x$failures_file[2L]
+      x
+    })
+  })
+  check("failure_digest_mismatch", function(path) {
+    edit_csv(path, "allele_coverage.csv", function(x) {
+      x$failures_sha256[1L] <- strrep("0", 64L)
+      x
+    })
+  })
+  check("nonempty_failure_artifact_with_zero_summary", function(path) {
+    file <- file.path(path, paste0(labels[[1L]], ".coverage.failures.parquet"))
+    DBI::dbExecute(failure_con, paste0("COPY (SELECT ", failure_columns, ") TO ",
+      DBI::dbQuoteString(failure_con, file), " (FORMAT PARQUET)"))
+    edit_csv(path, "allele_coverage.csv", function(x) {
+      x$failures_sha256[x$failures_file == basename(file)] <- sha256(file)
+      x
+    })
   })
   check("fewer_output_rows_than_covered_alleles", function(path) {
     edit_csv(path, paste0(labels[[1L]], ".csv"), function(x) {
@@ -412,8 +480,42 @@ main <- function() {
     "invalid FastVEP build receipt schema")
   check_cli("mismatched-binary", c("--diagnostic", "--fastvep-build-receipt", file.path(valid_path, "fastvep_build.tsv"),
     "--fastvep", file.path(valid_path, "metadata.csv")), "FastVEP executable differs from its build receipt")
+  capacity_begin <- which(rmd == "```{r native-capacity-diagnostic, include=FALSE}")
+  stopifnot(length(capacity_begin) == 1L)
+  capacity_end <- which(seq_along(rmd) > capacity_begin & rmd == "```")[[1L]]
+  capacity_gate <- parse(text = rmd[seq.int(capacity_begin + 1L, capacity_end - 1L)])
+  capacity_source <- file.path(root, "benchmarks/data/duckvep_fastvep/native_capacity_c183")
+  for (mutation in c("none", "missing_failure", "wrong_digest", "nonempty_failure")) {
+    path <- file.path(directory, paste0("capacity_", mutation), "native_capacity_c183")
+    dir.create(path, recursive = TRUE)
+    stopifnot(all(file.copy(list.files(capacity_source, full.names = TRUE), path)))
+    failure_path <- file.path(path, "native16gb.coverage.failures.parquet")
+    if (mutation == "missing_failure") unlink(failure_path)
+    if (mutation == "nonempty_failure") {
+      DBI::dbExecute(failure_con, paste0("COPY (SELECT ", failure_columns, ") TO ",
+        DBI::dbQuoteString(failure_con, failure_path), " (FORMAT PARQUET)"))
+    }
+    if (mutation %in% c("wrong_digest", "nonempty_failure")) {
+      edit_csv(path, "native16gb.coverage.csv", function(x) {
+        x$failures_sha256 <- if (mutation == "wrong_digest") strrep("0", 64L) else sha256(failure_path)
+        x
+      })
+    }
+    files <- list.files(path, full.names = TRUE)
+    files <- files[basename(files) != "artifacts.tsv"]
+    utils::write.table(data.frame(path = basename(files), sha256 = vapply(files, sha256, character(1L))),
+      file.path(path, "artifacts.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
+    env <- new.env(parent = globalenv())
+    env$data_dir <- dirname(path)
+    outcome <- tryCatch({
+      eval(capacity_gate, envir = env)
+      TRUE
+    }, error = function(error) FALSE)
+    stopifnot(identical(outcome, mutation == "none"))
+  }
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
   cat("Timing runner: missing/malformed build receipts and mismatched executables rejected\n")
+  cat("Capacity diagnostic: valid evidence rendered; three failure-artifact corruptions rejected\n")
 }
 
 main()

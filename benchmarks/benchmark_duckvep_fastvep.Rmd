@@ -1661,7 +1661,7 @@ if (!file.exists(completion_path)) {
   stopifnot(!anyDuplicated(manifest$file), all(basename(manifest$file) == manifest$file),
     identical(unname(vapply(file.path(complete_dir, manifest$file), sha256, character(1L))), manifest$sha256))
   required <- c("metadata.csv", "inputs.csv", "fastvep_cache_receipt.tsv", "fastvep_build.tsv",
-    "allele_coverage.csv")
+    "source_map_receipt.tsv", "allele_coverage.csv")
   stopifnot(all(required %in% manifest$file))
   metadata <- read_receipt(file.path(complete_dir, "metadata.csv"), c("field", "value"))
   inputs <- read_receipt(file.path(complete_dir, "inputs.csv"), c("artifact", "sha256"))
@@ -1670,14 +1670,20 @@ if (!file.exists(completion_path)) {
   metadata <- setNames(metadata$value, metadata$field)
   cache <- setNames(cache$value, cache$field)
   input_hashes <- setNames(inputs$sha256, inputs$artifact)
+  source(file.path(root, "r/duckhtsbench/R/registry.R"))
   source(file.path(root, "r/duckhtsbench/R/stage.R"))
   source(file.path(root, "r/duckhtsbench/R/duckvep.R"))
   source(file.path(root, "r/duckhtsbench/R/fastvep.R"))
+  source(file.path(root, "r/duckhtsbench/R/fastvep_source.R"))
+  Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
   registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"), check.names = FALSE)
   identity <- duckhts_bench_identity_fields(registry$supplier_identity[
     registry$id == "fastvep_ensembl116_cache"])
   build <- duckhts_bench_read_fastvep_build(file.path(complete_dir, "fastvep_build.tsv"),
     identity[["source_commit"]])
+  source_map <- duckhts_bench_read_fastvep_source_map(input_hashes[["source_map"]], input_hashes[["input"]])
+  stopifnot(sha256(source_map[["receipt"]]) == input_hashes[["source_map_receipt"]],
+    sha256(file.path(complete_dir, "source_map_receipt.tsv")) == input_hashes[["source_map_receipt"]])
   stopifnot(build[["log"]] %in% manifest$file,
     sha256(file.path(complete_dir, "fastvep_build.tsv")) == input_hashes[["fastvep_build"]],
     build[["log_sha256"]] == input_hashes[["fastvep_build_log"]],
@@ -1724,7 +1730,7 @@ if (!file.exists(completion_path)) {
     all(complete_rows$fingerprint_scope == "full_row"))
   coverage_fields <- c("tool", "output_contract", "threads", "run", "scope", "input_sha256",
     "output_sha256", "source_map_sha256", "source_alleles", "covered_alleles", "missing_alleles",
-    "unknown_alleles", "ambiguous_alleles")
+    "unknown_alleles", "ambiguous_alleles", "failures_file", "failures_sha256")
   coverage <- read_receipt(file.path(complete_dir, "allele_coverage.csv"), coverage_fields)
   coverage_keys <- paste(coverage$tool, coverage$output_contract, coverage$threads, coverage$run, sep = "_")
   stopifnot(!anyDuplicated(coverage_keys), setequal(coverage_keys, actual_keys))
@@ -1739,6 +1745,20 @@ if (!file.exists(completion_path)) {
     all(as.numeric(complete_rows$row_count) >= as.numeric(coverage$covered_alleles)),
     all(coverage$missing_alleles == "0"), all(coverage$unknown_alleles == "0"),
     all(coverage$ambiguous_alleles == "0"))
+  stopifnot(!anyDuplicated(coverage$failures_file),
+    all(coverage$failures_file == paste0(actual_keys, ".coverage.failures.parquet")),
+    all(coverage$failures_file %in% manifest$file),
+    identical(coverage$failures_sha256, manifest$sha256[match(coverage$failures_file, manifest$file)]))
+  failure_con <- DBI::dbConnect(duckdb::duckdb())
+  tryCatch({
+    files <- paste(DBI::dbQuoteString(failure_con, file.path(complete_dir, coverage$failures_file)),
+      collapse = ",")
+    failures <- paste0("read_parquet([", files, "])")
+    DBI::dbExecute(failure_con, paste0("CREATE TEMP VIEW retained_failures AS SELECT * FROM ", failures))
+    stopifnot(identical(DBI::dbListFields(failure_con, "retained_failures"),
+      c("failure", "output_key", "record_index", "alt_index", "output_rows", "source_matches")),
+      DBI::dbGetQuery(failure_con, "SELECT count(*) n FROM retained_failures")$n == 0)
+  }, finally = DBI::dbDisconnect(failure_con, shutdown = TRUE))
   for (group in split(complete_rows, paste(complete_rows$tool, complete_rows$output_contract))) {
     stopifnot(nrow(unique(group[c("row_count", "xor_hash", "low32_sum", "high32_sum")])) == 1L)
   }
@@ -1766,9 +1786,48 @@ record/ALT ordinal, including explicitly excluded nonliteral alleles. Final-file
 coverage checks reject missing eligible ALTs, unknown output keys and ambiguous
 identity. Different deletion ALTs can share a displayed `Allele`, so row
 fingerprints alone do not establish source-allele coverage.
+The exact GIAB map remains in the registered artifact cache; its provenance and
+digest accompany the measurements. Rendering verifies that retained object and
+the empty failure-witness files without rebuilding either.
 The [retained incomplete run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb)
 stopped when the native projection exhausted the
 available spill disk; it has no completion receipt or published timing median.
+
+```{r native-capacity-diagnostic, include=FALSE}
+capacity_dir <- file.path(data_dir, "native_capacity_c183")
+capacity_manifest <- read.delim(file.path(capacity_dir, "artifacts.tsv"), colClasses = "character")
+stopifnot(!anyDuplicated(capacity_manifest$path),
+  all(basename(capacity_manifest$path) == capacity_manifest$path),
+  identical(unname(vapply(file.path(capacity_dir, capacity_manifest$path),
+    function(path) digest::digest(file = path, algo = "sha256"), character(1L))), capacity_manifest$sha256))
+capacity <- read.csv(file.path(capacity_dir, "native16gb.csv"), colClasses = "character")
+capacity_coverage <- read.csv(file.path(capacity_dir, "native16gb.coverage.csv"), colClasses = "character")
+stopifnot(nrow(capacity) == 1L, nrow(capacity_coverage) == 1L,
+  capacity$row_count == "47629345", capacity$timing_file == "",
+  capacity_coverage$passed == "TRUE", capacity_coverage$covered_alleles == "4095611",
+  capacity_coverage$missing_alleles == "0", capacity_coverage$unknown_alleles == "0",
+  capacity_coverage$ambiguous_alleles == "0", capacity_coverage$output_sha256 == capacity$sha256,
+  capacity_coverage$failures_file == "native16gb.coverage.failures.parquet",
+  capacity_coverage$failures_file %in% capacity_manifest$path,
+  capacity_coverage$failures_sha256 == capacity_manifest$sha256[
+    match(capacity_coverage$failures_file, capacity_manifest$path)])
+capacity_con <- DBI::dbConnect(duckdb::duckdb())
+tryCatch({
+  path <- DBI::dbQuoteString(capacity_con, file.path(capacity_dir, capacity_coverage$failures_file))
+  DBI::dbExecute(capacity_con, paste0("CREATE TEMP VIEW retained_failures AS SELECT * FROM read_parquet(", path, ")"))
+  stopifnot(identical(DBI::dbListFields(capacity_con, "retained_failures"),
+    c("failure", "output_key", "record_index", "alt_index", "output_rows", "source_matches")),
+    DBI::dbGetQuery(capacity_con, "SELECT count(*) n FROM retained_failures")$n == 0)
+}, finally = DBI::dbDisconnect(capacity_con, shutdown = TRUE))
+```
+
+A separate [capacity diagnostic](data/duckvep_fastvep/native_capacity_c183)
+completed the whole-GIAB native-tab projection at 16 GB query memory and an
+8 GB spill cap: `r capacity$row_count` rows, `r capacity$bytes` output bytes,
+and all `r capacity_coverage$covered_alleles` eligible source ALTs covered.
+The same spill cap was exhausted at 4 GB and 8 GB query memory. This untimed,
+unbound diagnostic does not supply a performance observation, CSQ validation
+or the required repeated one-/four-core matrix.
 
 The paired runner uses one and four assigned cores, three fresh-process
 observations per configuration, the same registered whole-GIAB input and local
@@ -1796,6 +1855,7 @@ Rscript r/duckhtsbench/scripts/stage_fastvep.R \
 Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
   --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
   --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv \
+  --memory-limit 16GB --max-spill 8GB \
   --output benchmarks/data/duckvep_fastvep/field_contracts
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \

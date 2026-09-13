@@ -181,5 +181,56 @@ local({
     )
     stopifnot(nrow(observed) == 2L, all(observed$SYMBOL == "DUCK1"))
   }
+
+  # Exercise the complete final projection, including every output field, with
+  # a fixed source/transcript multiplicity and an explicit no-spill budget.
+  con <- dbConnect(duckdb(config = list(allow_unsigned_extensions = "true",
+    threads = "1", memory_limit = "192MB", max_temp_directory_size = "0B")))
+  on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
+  dbExecute(con, paste("LOAD", dbQuoteString(con, extension)))
+  dbExecute(con, "ATTACH ':memory:' AS duckvep_bench_model")
+  dbExecute(con, "CREATE TABLE duckvep_bench_model.model_transcripts AS SELECT
+    i::UINTEGER transcript_index, 1::UINTEGER seq_region, 1::UBIGINT transcript_start,
+    12000::UBIGINT transcript_end, 1::TINYINT strand, 3::UBIGINT transcript_flags,
+    1::UBIGINT cds_start, 12000::UBIGINT cds_end,
+    ('ATG'||repeat('AAA',3998)||'TAA')::BLOB cds_sequence,
+    'ACGT'::BLOB post_cds_sequence, 1::UTINYINT codon_table,
+    [struct_pack(exon_start:=1::UBIGINT, exon_end:=12000::UBIGINT,
+      exon_cdna_start:=1::UBIGINT, exon_cdna_end:=12000::UBIGINT,
+      phase:=0::TINYINT, end_phase:=0::TINYINT)] exons,
+    []::STRUCT(protein_position UINTEGER, alternate_amino_acid VARCHAR, edit_code VARCHAR)[] peptide_edits,
+    'GENE' AS gene_stable_id, 'TX'||i::VARCHAR AS transcript_stable_id,
+    1::BIGINT AS transcript_version, 'protein_coding' AS transcript_biotype,
+    'P'||i::VARCHAR AS translation_stable_id, 1::BIGINT AS translation_version,
+    NULL::VARCHAR AS mane_select_refseq, NULL::VARCHAR AS mane_plus_clinical_refseq
+    FROM range(64) r(i)")
+  dbExecute(con, "CREATE TEMP TABLE fastvep_events AS SELECT
+    (i+1)::UBIGINT AS event_index, (i+1)::UBIGINT AS record_index, 1::BIGINT AS alt_index,
+    1::UINTEGER AS seq_region, 'chr1' AS chrom, 4::UBIGINT AS position,
+    'site_'||i::VARCHAR AS variant_id, 'A' AS reference, 'G' AS alternate, ['G'] AS alternates,
+    'A' AS uploaded_reference, 'A' AS native_reference, ['G'] AS native_alternates,
+    'chr1:4' AS native_location FROM range(4096) r(i)")
+  dbExecute(con, "CREATE TEMP TABLE fastvep_annotations AS SELECT event_index, transcript_index,
+    'missense_variant' AS consequence, (SELECT consequence_mask FROM duckvep_so_terms()
+      WHERE consequence='missense_variant') AS consequence_mask, 'MODERATE' AS impact,
+    'c.4A>G' AS transcript_hgvs, 'p.Lys2Glu' AS protein_hgvs, 0::BIGINT AS hgvs_shift
+    FROM fastvep_events, duckvep_bench_model.model_transcripts")
+  dbExecute(con, "CREATE TEMP TABLE fastvep_metadata AS SELECT transcript_index, 'GENE' AS symbol,
+    TRUE AS canonical, NULL::VARCHAR AS tsl, NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds
+    FROM duckvep_bench_model.model_transcripts")
+  for (contract in c("native_tab17", "vep_csq")) {
+    query <- duckvep_fastvep_field_query(con, contract, include_identity = contract == "vep_csq")
+    fields <- duckvep_fastvep_transport_fields(contract)
+    full_hash <- paste0("hash(", paste(dbQuoteIdentifier(con, fields), collapse = ","), ")")
+    result <- dbGetQuery(con, paste0("SELECT count(*) AS output_rows,",
+      "count(DISTINCT Uploaded_variation) AS source_records, count(DISTINCT Feature) AS transcripts,",
+      "count(DISTINCT (Uploaded_variation, Feature)) AS source_transcript_pairs,",
+      "count(*) FILTER (WHERE Codons='Aaa/Gaa' AND Amino_acids='K/E'",
+      " AND CDS_position='4' AND Protein_position='2') AS exact_rows,",
+      "bit_xor(", full_hash, ")::VARCHAR AS fingerprint FROM (", query, ")"))
+    stopifnot(result$output_rows == 262144, result$source_records == 4096,
+      result$transcripts == 64, result$source_transcript_pairs == 262144,
+      result$exact_rows == 262144, !is.na(result$fingerprint))
+  }
   cat("FastVEP field projection smoke: OK\n")
 })

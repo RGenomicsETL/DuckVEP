@@ -68,7 +68,7 @@ main <- function() {
   }
   source(file.path(root, "scripts/duckvep_evidence.R"))
   source(file.path(root, "benchmarks/benchmark_duckvep_fastvep_fields.R"))
-  for (name in c("registry", "stage", "duckvep", "fastvep")) {
+  for (name in c("registry", "stage", "duckvep", "fastvep", "fastvep_source")) {
     source(file.path(root, "r/duckhtsbench/R", paste0(name, ".R")))
   }
   Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
@@ -101,13 +101,17 @@ main <- function() {
   work <- tempfile("duckvep-fastvep-", tmpdir = normalizePath(opt$work_dir, mustWork = TRUE))
   dir.create(work)
   message("Working files: ", work)
-  source_map <- file.path(work, "source_alleles.parquet")
+  source_bundle <- if (opt$input_id == "variantkey_giab_hg002_v421") {
+    duckhts_bench_stage_fastvep_source_map(root, extension, opt$memory_limit, opt$max_spill)
+  } else NULL
+  source_map <- if (is.null(source_bundle)) file.path(opt$output, "source_alleles.parquet")
+    else source_bundle[["map"]]
   con <- DBI::dbConnect(duckdb::duckdb(config = list(allow_unsigned_extensions = "true")))
   DBI::dbExecute(con, paste("LOAD", DBI::dbQuoteString(con, extension)))
   DBI::dbExecute(con, paste("SET memory_limit =", DBI::dbQuoteString(con, opt$memory_limit)))
   DBI::dbExecute(con, paste("SET max_temp_directory_size =", DBI::dbQuoteString(con, opt$max_spill)))
   DBI::dbExecute(con, paste("SET temp_directory =", DBI::dbQuoteString(con, file.path(work, "source_spill"))))
-  duckvep_fastvep_write_source_map(con, paths[["input"]], source_map)
+  if (is.null(source_bundle)) duckvep_fastvep_write_source_map(con, paths[["input"]], source_map)
   mapped <- DBI::dbGetQuery(con, paste0("SELECT count(DISTINCT record_index)::VARCHAR records,
     count(*)::VARCHAR alt_alleles, count(*) FILTER (WHERE eligible)::VARCHAR
       eligible_literal_alleles FROM read_parquet(", DBI::dbQuoteString(con, source_map), ")"))
@@ -130,6 +134,12 @@ main <- function() {
     extension = extension, fastvep = normalizePath(opt$fastvep),
     cache = staged[["cache"]], cache_receipt = staged[["receipt"]], source_map = source_map,
     stats::setNames(source_files, basename(source_files)))
+  if (!is.null(source_bundle)) {
+    if (!file.copy(source_bundle[["receipt"]], file.path(opt$output, "source_map_receipt.tsv"))) {
+      stop("could not retain registered source-map provenance")
+    }
+    bound_files <- c(bound_files, source_map_receipt = source_bundle[["receipt"]])
+  }
   if (!is.null(fastvep_build)) {
     build_files <- c(fastvep_build = opt$fastvep_build_receipt,
       fastvep_build_log = file.path(dirname(opt$fastvep_build_receipt), fastvep_build[["log"]]))

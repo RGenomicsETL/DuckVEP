@@ -46,7 +46,7 @@ duckvep_fastvep_fixture_model <- function(con, gff, reference, output) {
   invisible(output)
 }
 
-duckvep_fastvep_prepare_source <- function(con, raw, expected_records = NULL) {
+duckvep_fastvep_prepare_comparison_source <- function(con, raw, expected_records = NULL) {
   DBI::dbExecute(con, paste0("CREATE TEMP TABLE field_input AS
     SELECT row_number() OVER ()::UBIGINT AS record_index, 1::UBIGINT AS alt_index,
       ID AS Uploaded_variation, CHROM, POS, REF, ALT FROM ", raw))
@@ -235,7 +235,7 @@ main <- function() {
         input_count <- duckvep_projection_label_records(generated, vcf)
       }
       raw <- duckvep_fastvep_vcf_relation(con, vcf, duckvep_fastvep_vcf_header(vcf))
-      input_count <- duckvep_fastvep_prepare_source(con, raw, input_count)
+      input_count <- duckvep_fastvep_prepare_comparison_source(con, raw, input_count)
       execute(paste0("COPY field_input TO ", q(file.path(case_directory, "source_keys.parquet")), " (FORMAT PARQUET)"))
       stopifnot(system2("bgzip", c("-c", shQuote(gff)), stdout = paste0(gff, ".gz")) == 0L)
       run(case, "index_gff", "tabix", c("-p", "gff", paste0(gff, ".gz")))
