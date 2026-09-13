@@ -26,6 +26,10 @@ op <- add_option(
 op <- add_option(op, "--model", default = "")
 op <- add_option(op, "--input", default = "")
 op <- add_option(op, "--output", default = "")
+op <- add_option(op, "--output-contract", dest = "output_contract", default = "operational17")
+op <- add_option(op, "--fasta", default = "")
+op <- add_option(op, "--gff3", default = "")
+op <- add_option(op, "--include-identity", dest = "include_identity", action = "store_true", default = FALSE)
 op <- add_option(op, "--threads", type = "integer", default = 1L)
 op <- add_option(op, "--distance", type = "integer", default = 5000L)
 op <- add_option(op, "--memory-limit", dest = "memory_limit", default = "4GB")
@@ -40,8 +44,18 @@ opt <- parse_args(op)
 
 die <- function(...) stop(glue(..., .envir = parent.frame()), call. = FALSE)
 root <- normalizePath(root[[1L]], mustWork = TRUE)
+source(file.path(root, "benchmarks/benchmark_duckvep_fastvep_fields.R"), local = TRUE)
+invisible(duckvep_fastvep_fields(opt$output_contract))
+if (opt$output_contract == "operational17" &&
+    (nzchar(opt$fasta) || nzchar(opt$gff3) || opt$include_identity)) {
+  die("--fasta, --gff3 and --include-identity require a field-complete output contract")
+}
+if (opt$output_contract == "vep_csq" && (!nzchar(opt$fasta) || !nzchar(opt$gff3))) {
+  die("vep_csq requires --fasta and --gff3 for HGVS and source-labelled symbols")
+}
 
-required <- c(opt$extension, opt$model, opt$input)
+required <- c(opt$extension, opt$model, opt$input,
+  c(opt$fasta, opt$gff3)[nzchar(c(opt$fasta, opt$gff3))])
 missing <- required[!nzchar(required) | !file.exists(required)]
 if (length(missing) != 0L) {
   die("missing input(s):\n{paste(missing, collapse = '\n')}")
@@ -103,7 +117,8 @@ invisible(dbExecute(
 ))
 
 region_query <- paste(
-  "SELECT seq_region, sequence_length",
+  if (nzchar(opt$fasta)) "SELECT seq_region, sequence_length, name AS seq_region_name"
+  else "SELECT seq_region, sequence_length",
   "FROM", model_relations[["duckvep_sequence_regions"]],
   "ORDER BY seq_region"
 )
@@ -139,13 +154,22 @@ loaded <- dbGetQuery(
        {sql_q(region_query)}, {sql_q(transcript_query)}, {sql_q(exon_query)},
        mature_mirna_query := {sql_q(mature_mirna_query)},
        peptide_edit_query := {sql_q(peptide_edit_query)},
+       {if (nzchar(opt$fasta)) paste0('reference_fasta := ', sql_q(normalizePath(opt$fasta)), ',') else ''}
        transcript_coverage_complete := TRUE)"
   )
 )$loaded
 if (length(loaded) != 1L || !isTRUE(loaded[[1L]])) {
   die("DuckVEP model load failed")
 }
-invisible(dbExecute(con, "DETACH duckvep_bench_model"))
+if (opt$output_contract == "operational17") {
+  invisible(dbExecute(con, "DETACH duckvep_bench_model"))
+} else {
+  duckvep_fastvep_prepare_fields(con, input, opt$output_contract, opt$distance, opt$gff3)
+  query <- duckvep_fastvep_field_query(con, opt$output_contract, opt$include_identity)
+  invisible(dbExecute(con, glue("COPY ({query}) TO {sql_q(output)}
+    (FORMAT CSV, DELIMITER E'\\t', HEADER TRUE, QUOTE '', ESCAPE '')")))
+  quit(status = 0L)
+}
 
 # FastVEP's native tab writer has a fixed 17-column contract. DuckVEP emits the
 # same columns here so real-file costs are comparable. Fields not owned by the

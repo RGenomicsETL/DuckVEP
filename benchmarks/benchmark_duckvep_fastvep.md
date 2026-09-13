@@ -4,26 +4,33 @@ West?
 
 <!-- benchmark_duckvep_fastvep.md is generated from benchmark_duckvep_fastvep.Rmd. Do not edit the .md by hand. -->
 
-Status: current measured comparison of DuckVEP and FastVEP on the
-complete GIAB HG002 GRCh38 small-variant benchmark VCF. It includes VCF
-decoding and real uncompressed tabular output. DuckVEP additionally pays
-for an explicit global coordinate sort. The consequence speed comparison
-excludes HGVS, regulatory/motif features, and supplementary annotation
-for both engines.
+Status: revision-labelled measured comparison of DuckVEP and FastVEP on
+the complete GIAB HG002 GRCh38 small-variant benchmark VCF. It includes
+VCF decoding and real uncompressed tabular output. DuckVEP additionally
+pays for an explicit global coordinate sort. The consequence speed
+comparison excludes HGVS, regulatory/motif features, and supplementary
+annotation for both engines.
 
 ## The short answer
 
 **On this declared test, yes.** DuckVEP is the fastest
 Ensembl-VEP-compatible consequence predictor measured here: it finishes
 the complete GIAB HG002 input **2.55 times faster on one physical core**
-and **2.12 times faster on four physical cores** than the current native
-FastVEP checkout.
+and **2.12 times faster on four physical cores** than FastVEP revision
+`7038e7c` (July 13, 2026).
 
 The question mark matters. This is not a census of every consequence
 predictor or every machine. FastVEP is the measured speed competitor;
 Ensembl VEP 116 is the behavioral oracle. The useful result is that
 DuckVEP combines the faster same-core pipeline with exact consequence
 and HGVS suffix agreement on the held-out VEP comparison below.
+
+These are compact-output measurements, not a speed claim against current
+FastVEP or proof of complete field parity. The complete-field comparison
+uses FastVEP `18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6` (September 10,
+2026), with a separately rebuilt cache. Its timings require the
+completion checks below; HGVS disagreements remain failures in the field
+differential.
 
 ## What was compared
 
@@ -72,11 +79,10 @@ The four placeholders have different status:
 Thus the comparison credits FastVEP for computing these native values.
 It also shows where DuckVEP can obtain named-variant and transcript
 metadata through ordinary joins without enlarging the consequence model.
-`Codons` is a missing public consequence field, not a supplementary
-join: rebuilding it independently from transcript sequence in SQL would
-create a second coding authority. The shared pair-fact path should
-expose the triplets it already uses, and that additional projection
-remains unmeasured here.
+`Codons` comes from `duckvep_transcript_projection`, which exposes
+native coding facts; it is not reconstructed independently in SQL. The
+complete-field comparison below includes that projection. The compact
+timings above do not measure it.
 
 ## Algorithm design: make the repeated biology small
 
@@ -414,9 +420,9 @@ shape with seed 113. The exact 113 KB sample is retained as
 `benchmarks/data/duckvep_fastvep/clinvar_chr21_seed113.vcf`;
 reproduction does not depend on regenerating it from an unrecorded
 mutable source. VEP ran from its indexed cache with HGVS enabled.
-FastVEP ran its current native binary with `--hgvs --output-format vcf`.
-DuckVEP’s oracle Parquet came from the same VEP run and the same
-resident model.
+FastVEP ran its recorded native binary with
+`--hgvs --output-format vcf`. DuckVEP’s oracle Parquet came from the
+same VEP run and the same resident model.
 
 Here a transcript key means the exact
 `(input variant ID, transcript accession)` pair emitted by a tool.
@@ -499,11 +505,11 @@ the real VEP 116 executable.
 
 <img src="benchmark_duckvep_fastvep_files/figure-gfm/plot-fuzz-1.png" alt="Checked randomized property trials and generated VEP differential pairs, both with zero observed failures or differences." width="1120" />
 
-At tested ancestor 15417633, 55 randomized properties completed
-5,500,000 trials with zero failures. They compare optimized sweeps,
+At tested ancestor b38f6179, 63 randomized properties completed
+6,300,000 trials with zero failures. They compare optimized sweeps,
 projection, sequence editing, translation, HGVS, regulation/BND, and
 multi-edit mechanics with independent or deliberately slower oracles. At
-tested ancestor 15417633, generated state-exploration seed 31415927
+tested ancestor 6ce2ddd8, generated state-exploration seed 31415927
 produced 100,268 variant/transcript comparisons against executable VEP
 116: all exact, with no unresolved, missing, or extra rows.
 
@@ -539,7 +545,7 @@ silently charged to only one tool.
     explicit sort and real output.
 2.  **The speed result survives a compatibility check.** DuckVEP is
     exact on all 56,998 held-out VEP transcript pairs, consequence sets,
-    HGVSc suffixes, and HGVSp suffixes, then adds 5,500,000 randomized
+    HGVSc suffixes, and HGVSp suffixes, then adds 6,300,000 randomized
     property trials and 100,268 generated VEP pair comparisons with no
     observed failure. FastVEP’s speed result does not imply the same
     HGVS contract.
@@ -767,14 +773,86 @@ throughput/memory measurements. This independent-event run does not
 measure phase preparation, carrier sharing or combined haplotype
 consequences.
 
-## Revisions and input receipts
+## Complete field contracts
+
+The compact operational timings above do not measure complete VEP
+presentation. Two additional projections have separate contracts:
+FastVEP’s native 17-column tab format, and 31 common CSQ fields plus the
+uploaded record ID. Native tab `FLAGS` means canonical status; CSQ
+`FLAGS` means CDS quality. Provider-backed `Existing_variation` is
+deliberately absent from both comparisons.
+
+| Contract      | Authority                            | Fields                                                                                                                    |
+|:--------------|:-------------------------------------|:--------------------------------------------------------------------------------------------------------------------------|
+| native_tab17  | cold source canonical status         | FLAGS                                                                                                                     |
+| native_tab17  | cold source metadata                 | Gene, Feature, Feature_type, STRAND                                                                                       |
+| operational17 | cold source metadata                 | Gene, Feature, Feature_type, STRAND                                                                                       |
+| vep_csq       | cold source metadata                 | SYMBOL, Gene, Feature_type, Feature, BIOTYPE, STRAND, CANONICAL, MANE_SELECT, MANE_PLUS_CLINICAL, TSL, APPRIS, CCDS, ENSP |
+| operational17 | compact scalar display               | cDNA_position, CDS_position, Protein_position, Amino_acids                                                                |
+| native_tab17  | native annotation and SQL formatting | Consequence, IMPACT                                                                                                       |
+| operational17 | native annotation and SQL formatting | Consequence, IMPACT                                                                                                       |
+| vep_csq       | native annotation and SQL formatting | Consequence, IMPACT, HGVSc, HGVSp, HGVS_OFFSET                                                                            |
+| native_tab17  | physical input record                | Uploaded_variation, Location, Allele                                                                                      |
+| operational17 | physical input record                | Uploaded_variation, Location                                                                                              |
+| vep_csq       | physical input record                | Uploaded_variation, REF_ALLELE, UPLOADED_ALLELE                                                                           |
+| operational17 | placeholder                          | Codons, DISTANCE, FLAGS                                                                                                   |
+| native_tab17  | provider excluded                    | Existing_variation                                                                                                        |
+| operational17 | provider excluded                    | Existing_variation                                                                                                        |
+| vep_csq       | provider excluded                    | Existing_variation                                                                                                        |
+| operational17 | raw input ALT                        | Allele                                                                                                                    |
+| native_tab17  | typed SQL projection                 | cDNA_position, CDS_position, Protein_position, Amino_acids, Codons, DISTANCE                                              |
+| vep_csq       | typed SQL projection                 | Allele, EXON, INTRON, cDNA_position, CDS_position, Protein_position, Amino_acids, Codons, DISTANCE, FLAGS                 |
+
+`GENCODE_PRIMARY` is absent from the pinned FastVEP CLI schema.
+`SYMBOL_SOURCE`, `HGNC_ID` and `SOURCE` are not included without a
+common source contract. CSQ extraction retains escaping, ordered values,
+empty strings and dashes exactly; it rejects missing or duplicate CSQ
+keys and inconsistent field counts.
+
+The field differential uses the eight existing projection models and the
+unchanged witness generator. Physical record/ALT ordinals distinguish
+repeated source events. Comparisons retain the full key union, duplicate
+rows, missing or extra pairs, and every differing field in Parquet. A
+disagreement makes the command fail; FastVEP is a comparator and Ensembl
+VEP 116 is the authority.
+
+    #> Whole-GIAB complete-field measurements are not published yet.
+
+The paired runner uses one and four assigned cores, three fresh-process
+observations per configuration, the same registered whole-GIAB input and
+local file output. DuckVEP includes input sorting and cold metadata
+joins. FastVEP’s CSQ measurement includes its native VCF output and
+extraction into the common flat field relation. Its cache includes
+coding and noncoding spliced sequences; cache preparation is outside
+timing, and scans must leave it unchanged. Neither run loads
+supplementary annotation providers. Source/model/reference identities,
+input record and ALT counts, elapsed/user/ system time, CPU utilization,
+peak RSS, bytes and complete output fingerprints are retained beside a
+completion manifest. Partial or failed runs cannot populate the table
+above.
+
+``` bash
+test "$(git -C .sync/fastVEP rev-parse HEAD)" = 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
+env RUSTFLAGS='-C target-cpu=native' cargo +1.98.1 build \
+  --manifest-path .sync/fastVEP/Cargo.toml --release --locked --offline -p fastvep-cli
+Rscript r/duckhtsbench/scripts/stage_fastvep.R \
+  --checkout .sync/fastVEP --executable .sync/fastVEP/target/release/fastvep
+Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
+  --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
+  --output benchmarks/data/duckvep_fastvep/field_contracts
+Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
+  --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
+  --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
+```
+
+## Compact-output revisions and input receipts
 
 | item                                | receipt                                                          |
 |:------------------------------------|:-----------------------------------------------------------------|
 | DuckHTS measured checkout           | 2a1c37cf2938e8226a078f19ca429ffeff84de73                         |
 | DuckHTS extension binary            | 53af1444f11bd22092001fe361e36f89bd397f7fcb52af927fefb69378c5281b |
 | DuckVEP measured worker revision    | 44f3e3533c957a798939bda6106c828f0bbea75c                         |
-| DuckVEP current reproduction worker | 9f32e4c045219da4ca89bb1e066b91f4e7ff99e6172d58237f72f839e9fbc472 |
+| DuckVEP current reproduction worker | 99ed7dc834ba994961bc9f4ba473434136589892b36499f3e87377e92e7f9c07 |
 | FastVEP checkout                    | 7038e7c17708e7d2226149e78e0bb297bcc6d1d6                         |
 | FastVEP native binary               | b4cb538537646a4eaa494e0ab29978e8ead73009f643e369b4f8ee447e392d5a |
 | FastVEP rebuilt transcript cache    | 00a3357ea30325c9d93f53ce0dabc81cb6542a0fd6d8741e895331935f89f962 |
@@ -804,15 +882,19 @@ time, CPU use, and process-level maximum RSS. All measurements used a
 warm local filesystem page cache and do not claim cold-storage or
 `fsync` latency.
 
-## Reproduction
+## Reproducing the compact-output measurements
 
 The exact measured command lines are retained verbatim in the checked-in
 GNU time files. The DuckVEP worker is
 `benchmarks/benchmark_duckvep_fastvep_worker.R`; it owns the SQL and
 exposes `--threads`, `--distance`, `--memory-limit`, and optional
-`--profile-json`. FastVEP was built with:
+`--profile-json`. These commands require FastVEP revision
+`7038e7c17708e7d2226149e78e0bb297bcc6d1d6` and its matching cache. They
+do not apply to the complete-field revision or cache. Verify the
+checkout before building:
 
 ``` bash
+test "$(git -C .sync/fastVEP rev-parse HEAD)" = 7038e7c17708e7d2226149e78e0bb297bcc6d1d6
 env RUSTFLAGS='-C target-cpu=native' cargo build \
   --manifest-path .sync/fastVEP/Cargo.toml --release --locked
 ```
