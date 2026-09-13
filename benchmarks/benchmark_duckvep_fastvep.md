@@ -817,8 +817,8 @@ union, duplicate rows, missing or extra pairs, source-coverage failures
 and every differing field in Parquet. A disagreement makes the command
 fail; FastVEP is a comparator and Ensembl VEP 116 is the authority.
 
-    #> DuckHTS source checkout: 0d2bdcb5f4cbea7a19a58e4c1a603fbbba35a392
-    #> FastVEP executable provenance: binary-unbound (expected_binary_sha256). Source checkout and executable digest do not establish build provenance.
+    #> DuckHTS source checkout: 9bf888e3188c0854ce653a0aa14aa6d95f0629b9
+    #> FastVEP executable provenance: source-bound (fresh Cargo build).
 
 | comparison      | input_alleles | compared_keys | field_failures | missing_keys | extra_keys | actual_missing_source_alleles | expected_missing_source_alleles |
 |:----------------|--------------:|--------------:|---------------:|-------------:|-----------:|------------------------------:|--------------------------------:|
@@ -831,11 +831,13 @@ DuckVEP/VEP differences comprise 168 HGVSc fields, 3,522 HGVSp fields
 and two HGVS shifts. The fixtures lack protein accessions; the HGVSp
 result therefore does not establish peptide-suffix agreement. Source
 VCFs, model GFFs, raw outputs and all field/key failures are retained in
-the [field data](data/duckvep_fastvep/fields_seed173_0d2bdcb). A
+the [field data](data/duckvep_fastvep/fields_seed173_9bf888e). A
 [singleton replay](data/duckvep_fastvep/replay_phase1_589) of
 `chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus
 VEP’s `c.1C>A`; that diagnostic does not replace the full campaign
 denominator.
+
+    #> Complete singleton replay evidence is not published yet.
 
     #> Whole-GIAB complete-field measurements are not published yet.
 
@@ -852,7 +854,13 @@ measurements. Rendering verifies that retained object and the empty
 failure-witness files without rebuilding either. The [retained
 incomplete run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb)
 stopped when the native projection exhausted the available spill disk;
-it has no completion receipt or published timing median.
+it has no completion receipt or published timing median. An [incomplete
+verification
+run](data/duckvep_fastvep/field_contracts_incomplete_9bf888e) retains
+three successful output timings. Its CSQ source-coverage check was
+terminated after its query plan exposed an all-pairs join. It does not
+supply the repeated timing matrix; coverage now joins validated numeric
+identities by hash.
 
 A separate [capacity
 diagnostic](data/duckvep_fastvep/native_capacity_c183) completed the
@@ -901,6 +909,24 @@ Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --fastvep build/fastvep-pinned/fastvep \
   --fastvep-build-receipt build/fastvep-pinned/build.tsv
 ```
+
+To package a completed field campaign, set `FIELD_CAMPAIGN` to its
+execution directory and `FIELD_PACK` to a new directory under
+`benchmarks/data/duckvep_fastvep`:
+
+``` bash
+Rscript benchmarks/benchmark_duckvep_fastvep_publish.R \
+  --source "$FIELD_CAMPAIGN" --output "$FIELD_PACK"
+```
+
+The pack retains source VCFs, model GFFs, comparison Parquets, logs,
+receipts and the three hash-checked registry fixture inputs. Raw
+annotation TSV/VCF outputs use deterministic gzip with decompressed-byte
+verification. It preserves the execution manifest and adds a relative
+artifact manifest. Regenerable models, FastVEP caches and private VEP
+directories are excluded; a duplicate generated VCF is omitted only when
+its bytes match a recorded retained counterpart. Packaging preserves
+disagreements and does not certify conformance.
 
 ## Compact-output revisions and input receipts
 

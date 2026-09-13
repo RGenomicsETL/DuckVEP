@@ -1606,7 +1606,7 @@ Parquet. A disagreement makes the command fail; FastVEP is a comparator and
 Ensembl VEP 116 is the authority.
 
 ```{r complete-field-conformance}
-field_dir <- file.path(data_dir, "fields_seed173_0d2bdcb")
+field_dir <- file.path(data_dir, "fields_seed173_9bf888e")
 field_manifest <- read.delim(file.path(field_dir, "artifacts.tsv"), colClasses = "character")
 stopifnot(!anyDuplicated(field_manifest$path),
   !any(grepl("^/|(^|/)\\.\\.(/|$)", field_manifest$path)),
@@ -1652,10 +1652,87 @@ These are failing comparisons, not a conformance certificate. DuckVEP/VEP
 differences comprise 168 HGVSc fields, 3,522 HGVSp fields and two HGVS shifts.
 The fixtures lack protein accessions; the HGVSp result therefore does not
 establish peptide-suffix agreement. Source VCFs, model GFFs, raw outputs and all
-field/key failures are retained in the [field data](data/duckvep_fastvep/fields_seed173_0d2bdcb).
+field/key failures are retained in the [field data](data/duckvep_fastvep/fields_seed173_9bf888e).
 A [singleton replay](data/duckvep_fastvep/replay_phase1_589)
 of `chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus VEP's
 `c.1C>A`; that diagnostic does not replace the full campaign denominator.
+
+```{r complete-field-singletons}
+validate_replay_bundle <- function(directory, evidence, expected = c(records = 10671L, tasks = 10100L, cells = 41942L)) {
+  source(file.path(root, "benchmarks/benchmark_duckvep_fastvep_replay.R"), local = TRUE)
+  source(file.path(root, "scripts/duckvep_evidence.R"), local = TRUE)
+  source(file.path(root, "r/duckhtsbench/R/duckvep.R"), local = TRUE)
+  source(file.path(root, "r/duckhtsbench/R/fastvep.R"), local = TRUE)
+  sha <- function(path) digest::digest(file = path, algo = "sha256")
+  fields <- function(path) {
+    x <- read.delim(path, colClasses = "character", quote = "", comment.char = "")
+    stopifnot(identical(names(x), c("field", "value")), !anyDuplicated(x$field), !anyNA(x))
+    setNames(x$value, x$field)
+  }
+  run <- fields(file.path(directory, "run.tsv"))
+  completion <- read.csv(file.path(directory, "completion.csv"))
+  stopifnot(run[["shard"]] == "1", run[["shards"]] == "1", nrow(completion) == 1L,
+    completion$shard == 1L, completion$shards == 1L,
+    isTRUE(completion$all_records_minimized), isTRUE(completion$assigned_records_minimized),
+    identical(completion$allele_or_model_minimized, FALSE),
+    all(unlist(completion[c("required_singletons", "assigned_singletons", "completed_singletons", "passed_singletons")]) == expected[["tasks"]]),
+    run[["original_records"]] == expected[["records"]], run[["original_failure_cells"]] == expected[["cells"]],
+    run[["required_singletons"]] == expected[["tasks"]], run[["assigned_singletons"]] == expected[["tasks"]],
+    grepl("^[0-9a-f]{40}$", run[["revision"]]), run[["source_revision"]] == run[["revision"]],
+    run[["build_binding"]] == "htslib_distclean_make_release",
+    run[["fastvep_binding"]] == "cargo_fresh_release_locked_offline",
+    run[["vep"]] == "57ea5c52340acc1f156267f810ad162e26597082",
+    run[["variation"]] == "2fb834b987ede3824e200197a838ce11e91aeb4b",
+    run[["fastvep"]] == "18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6",
+    all(grepl("^[0-9a-f]{64}$", run[c("extension_sha256", "fastvep_sha256", "driver_sha256", "input_identity")])))
+  extension <- fields(file.path(directory, "extension_build.tsv"))
+  stopifnot(identical(names(extension), c("source_revision", "path", "binding", "sha256")),
+    extension[["source_revision"]] == run[["revision"]], extension[["binding"]] == run[["build_binding"]],
+    extension[["sha256"]] == run[["extension_sha256"]])
+  build <- duckhts_bench_read_fastvep_build(file.path(directory, "fastvep_build.tsv"), run[["fastvep"]])
+  stopifnot(build[["executable_sha256"]] == run[["fastvep_sha256"]])
+  manifest_path <- file.path(evidence, "artifacts.tsv")
+  manifest <- read.delim(manifest_path, colClasses = "character")
+  stopifnot(run[["original_manifest_sha256"]] == sha(manifest_path), !anyDuplicated(manifest$path),
+    !any(grepl("^/|(^|/)\\.\\.(/|$)", manifest$path)),
+    setequal(manifest$path, setdiff(list.files(evidence, recursive = TRUE), "artifacts.tsv")),
+    identical(unname(vapply(file.path(evidence, manifest$path), sha, "")), manifest$sha256))
+  con <- DBI::dbConnect(duckdb::duckdb(config = list(threads = "1")))
+  on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
+  parquet <- function(path) DBI::dbGetQuery(con, paste("SELECT * FROM read_parquet(", DBI::dbQuoteString(con, path), ")"))
+  inventory <- duckvep_replay_inventory(con, evidence)
+  tasks <- inventory$tasks
+  stopifnot(sum(inventory$cases$input_records) == expected[["records"]],
+    sum(inventory$summary$field_failures) == expected[["cells"]], length(tasks) == expected[["tasks"]])
+  jobs <- duckvep_replay_indices(run[["jobs"]], 64L)
+  files <- sprintf("worker-%02d.parquet", seq_len(jobs))
+  stopifnot(setequal(files, list.files(directory, pattern = "^worker-[0-9]+[.]parquet$")))
+  completed <- integer()
+  cells <- 0L
+  for (worker in seq_len(jobs)) {
+    path <- file.path(directory, files[[worker]])
+    stopifnot(identical(readLines(paste0(path, ".sha256")), sha(path)))
+    rows <- parquet(path)
+    assigned <- which((seq_along(tasks) - 1L) %% jobs == worker - 1L)
+    found <- duckvep_replay_resume(rows, tasks, assigned, sha(file.path(directory, "run.tsv")))
+    stopifnot(all(rows$passed), setequal(found, assigned))
+    completed <- c(completed, found)
+    cells <- cells + nrow(rows)
+  }
+  stopifnot(!anyDuplicated(completed), setequal(completed, seq_along(tasks)), cells == expected[["cells"]])
+  data.frame(original_records = expected[["records"]], replayed_records = length(completed),
+    comparison_lanes = 3L * length(completed), retained_failure_cells = cells, changed_or_missing_cells = 0L)
+}
+replay_directory <- file.path(data_dir, "fields_replay_9bf888e")
+if (!file.exists(file.path(replay_directory, "completion.csv"))) {
+  cat("Complete singleton replay evidence is not published yet.\n")
+} else {
+  replay_counts <- validate_replay_bundle(replay_directory, field_dir)
+  knitr::kable(replay_counts)
+  cat("Each replay contains one physical record with unchanged alleles and model.\n",
+    "Every original failure cell is reproduced in isolation; this does not establish allele/model minimization or resolve the disagreements.\n")
+}
+```
 
 ```{r complete-field-observations}
 complete_dir <- file.path(data_dir, "field_contracts")
@@ -1817,6 +1894,10 @@ the empty failure-witness files without rebuilding either.
 The [retained incomplete run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb)
 stopped when the native projection exhausted the
 available spill disk; it has no completion receipt or published timing median.
+An [incomplete verification run](data/duckvep_fastvep/field_contracts_incomplete_9bf888e)
+retains three successful output timings. Its CSQ source-coverage check was
+terminated after its query plan exposed an all-pairs join. It does not supply
+the repeated timing matrix; coverage now joins validated numeric identities by hash.
 
 ```{r native-capacity-diagnostic, include=FALSE}
 capacity_dir <- file.path(data_dir, "native_capacity_c183")
@@ -1891,6 +1972,22 @@ Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --fastvep build/fastvep-pinned/fastvep \
   --fastvep-build-receipt build/fastvep-pinned/build.tsv
 ```
+
+To package a completed field campaign, set `FIELD_CAMPAIGN` to its execution
+directory and `FIELD_PACK` to a new directory under `benchmarks/data/duckvep_fastvep`:
+
+```{bash, eval=FALSE, echo=TRUE}
+Rscript benchmarks/benchmark_duckvep_fastvep_publish.R \
+  --source "$FIELD_CAMPAIGN" --output "$FIELD_PACK"
+```
+
+The pack retains source VCFs, model GFFs, comparison Parquets, logs, receipts and
+the three hash-checked registry fixture inputs. Raw annotation TSV/VCF outputs
+use deterministic gzip with decompressed-byte verification. It preserves the
+execution manifest and adds a relative artifact manifest. Regenerable models,
+FastVEP caches and private VEP directories are excluded; a duplicate generated
+VCF is omitted only when its bytes match a recorded retained counterpart.
+Packaging preserves disagreements and does not certify conformance.
 
 ## Compact-output revisions and input receipts
 

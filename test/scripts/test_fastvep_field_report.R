@@ -533,9 +533,10 @@ main <- function() {
   field_source <- file.path(root, "benchmarks/data/duckvep_fastvep/fields_seed173_0d2bdcb")
   original_summary <- read.csv(file.path(field_source, "summary.csv"))
   field_cases <- c("historical_unbound", "unbound_with_build", "bound", "missing_build",
-    "missing_log", "wrong_binary", "unlisted_build", "unlisted_log")
+    "missing_log", "wrong_binary", "unlisted_build", "unlisted_log",
+    "missing_fastvep", "missing_fastvep_sha256")
   for (mutation in field_cases) {
-    path <- file.path(directory, paste0("field_", mutation), "fields_seed173_0d2bdcb")
+    path <- file.path(directory, paste0("field_", mutation), "fields_seed173_9bf888e")
     dir.create(path, recursive = TRUE)
     stopifnot(all(file.copy(list.files(field_source, full.names = TRUE), path, recursive = TRUE)))
     receipt_path <- file.path(path, "receipt.tsv")
@@ -551,6 +552,11 @@ main <- function() {
         sep = "\t", quote = FALSE, row.names = FALSE)
       if (mutation != "missing_log") stopifnot(file.copy(file.path(valid_path, "build.log"), path))
     }
+    if (mutation %in% c("missing_fastvep", "missing_fastvep_sha256")) {
+      field <- sub("^missing_", "", mutation)
+      receipt <- receipt[receipt$field != field, ]
+      utils::write.table(receipt, receipt_path, sep = "\t", quote = FALSE, row.names = FALSE)
+    }
     files <- setdiff(list.files(path, recursive = TRUE), "artifacts.tsv")
     if (mutation == "unlisted_build") files <- setdiff(files, "fastvep_build.tsv")
     if (mutation == "unlisted_log") files <- setdiff(files, "build.log")
@@ -563,6 +569,9 @@ main <- function() {
     rendered <- tryCatch(capture.output(eval(field_gate, envir = env)), error = function(error) error)
     accepted <- mutation %in% c("historical_unbound", "unbound_with_build", "bound")
     stopifnot(identical(!inherits(rendered, "error"), accepted))
+    if (mutation %in% c("missing_fastvep", "missing_fastvep_sha256")) {
+      stopifnot(identical(conditionMessage(rendered), "subscript out of bounds"))
+    }
     if (accepted) {
       stopifnot(identical(env$field_summary, original_summary),
         any(grepl("FastVEP executable provenance: binary-unbound", rendered, fixed = TRUE)) == unbound,
@@ -572,7 +581,7 @@ main <- function() {
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
   cat("Timing runner: missing/malformed build receipts and mismatched executables rejected\n")
   cat("Capacity diagnostic: valid evidence rendered; three failure-artifact corruptions rejected\n")
-  cat("Field campaign provenance: historical evidence stays binary-unbound; verified build accepted; five mutations rejected\n")
+  cat("Field campaign provenance: historical evidence stays binary-unbound; verified build accepted; seven mutations rejected\n")
 }
 
 main()

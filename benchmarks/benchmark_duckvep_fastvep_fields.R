@@ -154,6 +154,14 @@ duckvep_fastvep_write_source_map <- function(con, input, output) {
   invisible(output)
 }
 
+duckvep_fastvep_ordinal_predicate <- function(keys) {
+  # Invalid spellings remain unmatched output keys. Keep the join itself an
+  # equality so DuckDB can hash physical ordinals instead of comparing all pairs.
+  paste(vapply(keys, function(key) paste0("CASE WHEN regexp_full_match(o.", key,
+    ", '[1-9][0-9]*') THEN try_cast(o.", key, " AS UBIGINT) END = s.", key),
+    character(1L)), collapse = " AND ")
+}
+
 duckvep_fastvep_source_coverage <- function(con, output_table, source_map, contract, failures) {
   stopifnot(contract %in% c("operational17", "native_tab17", "vep_csq"))
   q <- function(x) as.character(DBI::dbQuoteString(con, x))
@@ -178,9 +186,7 @@ duckvep_fastvep_source_coverage <- function(con, output_table, source_map, contr
 
   if (contract == "vep_csq") {
     keys <- c("record_index", "alt_index")
-    predicate <- paste(vapply(keys, function(key) paste0("regexp_full_match(o.", key,
-      ", '[1-9][0-9]*') AND try_cast(o.", key, " AS UBIGINT) = s.", key), character(1L)),
-      collapse = " AND ")
+    predicate <- duckvep_fastvep_ordinal_predicate(keys)
   } else {
     keys <- c("Uploaded_variation", "Location", "Allele")
     source_keys <- paste0(if (contract == "native_tab17") "native_" else "operational_",

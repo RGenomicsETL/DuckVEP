@@ -78,11 +78,18 @@ local({
     stopifnot(check(changed, contract, FALSE)$unknown_alleles == 1)
   }
   rows <- payload("vep_csq")
-  for (invalid in c("0", "-1", "1.0", "01", "", "18446744073709551616")) {
+  for (key in c("record_index", "alt_index")) for (invalid in
+      c("0", "-1", "1.0", "01", "1e0", " 1", "", NA, "18446744073709551616")) {
     changed <- rows
-    changed$alt_index[1L] <- invalid
+    changed[[key]][1L] <- invalid
     stopifnot(check(changed, "vep_csq", FALSE)$unknown_alleles == 1)
   }
+  DBI::dbWriteTable(con, "output", rows, overwrite = TRUE)
+  plan <- DBI::dbGetQuery(con, paste0("EXPLAIN SELECT * FROM output o LEFT JOIN read_parquet(",
+    DBI::dbQuoteString(con, source_map), ") s ON ",
+    duckvep_fastvep_ordinal_predicate(c("record_index", "alt_index"))))$explain_value
+  stopifnot(any(grepl("HASH_JOIN", plan, fixed = TRUE)),
+    !any(grepl("BLOCKWISE_NL_JOIN", plan, fixed = TRUE)))
   # A display-key collision cannot be resolved by choosing one source record.
   duplicate_map <- rbind(map, transform(map[1L, ], record_index = "6"))
   DBI::dbWriteTable(con, "duplicate_source", duplicate_map)
