@@ -1610,16 +1610,39 @@ field_dir <- file.path(data_dir, "fields_seed173_0d2bdcb")
 field_manifest <- read.delim(file.path(field_dir, "artifacts.tsv"), colClasses = "character")
 stopifnot(!anyDuplicated(field_manifest$path),
   !any(grepl("^/|(^|/)\\.\\.(/|$)", field_manifest$path)),
+  all(c("receipt.tsv", "summary.csv") %in% field_manifest$path),
   identical(unname(vapply(file.path(field_dir, field_manifest$path),
     function(path) digest::digest(file = path, algo = "sha256"), character(1L))), field_manifest$sha256))
 field_receipt <- read.delim(file.path(field_dir, "receipt.tsv"), colClasses = "character")
+stopifnot(identical(names(field_receipt), c("field", "value")), !anyDuplicated(field_receipt$field))
 field_receipt <- setNames(field_receipt$value, field_receipt$field)
 field_summary <- read.csv(file.path(field_dir, "summary.csv"))
 stopifnot(field_receipt[["build_binding"]] == "htslib_distclean_make_release",
   field_receipt[["completed_cases"]] == "8", field_receipt[["completed_comparisons"]] == "24",
   field_receipt[["input_records"]] == "10671", field_receipt[["errors"]] == "0",
   field_receipt[["shared_inputs_unchanged"]] == "TRUE", nrow(field_summary) == 24L)
-cat("Measured source:", field_receipt[["source_revision"]], "\n\n")
+cat("DuckHTS source checkout:", field_receipt[["source_revision"]], "\n\n")
+if (identical(field_receipt[["fastvep_binding"]], "cargo_fresh_release_locked_offline")) {
+  stopifnot("fastvep_build.tsv" %in% field_manifest$path)
+  for (name in c("stage", "duckvep", "fastvep")) {
+    source(file.path(root, "r/duckhtsbench/R", paste0(name, ".R")))
+  }
+  field_registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
+  field_pin <- field_registry[field_registry$id == "fastvep_ensembl116_cache", ]
+  stopifnot(nrow(field_pin) == 1L)
+  field_identity <- duckhts_bench_identity_fields(field_pin$supplier_identity)
+  stopifnot(field_receipt[["fastvep"]] == field_identity[["source_commit"]])
+  field_build <- duckhts_bench_read_fastvep_build(file.path(field_dir, "fastvep_build.tsv"),
+    field_identity[["source_commit"]])
+  stopifnot(field_build[["log"]] %in% field_manifest$path,
+    field_build[["executable_sha256"]] == field_receipt[["fastvep_sha256"]])
+  cat("FastVEP executable provenance: source-bound (fresh Cargo build).\n\n")
+} else {
+  stopifnot(field_receipt[["fastvep_binding"]] %in%
+    c("expected_binary_sha256", "diagnostic_binary_unbound"))
+  cat("FastVEP executable provenance: binary-unbound (", field_receipt[["fastvep_binding"]],
+    "). Source checkout and executable digest do not establish build provenance.\n\n", sep = "")
+}
 knitr::kable(aggregate(cbind(input_alleles, compared_keys, field_failures,
   missing_keys, extra_keys, actual_missing_source_alleles, expected_missing_source_alleles) ~
   comparison, field_summary, sum))

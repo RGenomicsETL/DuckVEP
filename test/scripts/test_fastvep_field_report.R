@@ -526,9 +526,53 @@ main <- function() {
     }, error = function(error) FALSE)
     stopifnot(identical(outcome, mutation == "none"))
   }
+  field_begin <- which(rmd == "```{r complete-field-conformance}")
+  stopifnot(length(field_begin) == 1L)
+  field_end <- which(seq_along(rmd) > field_begin & rmd == "```")[[1L]]
+  field_gate <- parse(text = rmd[seq.int(field_begin + 1L, field_end - 1L)])
+  field_source <- file.path(root, "benchmarks/data/duckvep_fastvep/fields_seed173_0d2bdcb")
+  original_summary <- read.csv(file.path(field_source, "summary.csv"))
+  field_cases <- c("historical_unbound", "unbound_with_build", "bound", "missing_build",
+    "missing_log", "wrong_binary", "unlisted_build", "unlisted_log")
+  for (mutation in field_cases) {
+    path <- file.path(directory, paste0("field_", mutation), "fields_seed173_0d2bdcb")
+    dir.create(path, recursive = TRUE)
+    stopifnot(all(file.copy(list.files(field_source, full.names = TRUE), path, recursive = TRUE)))
+    receipt_path <- file.path(path, "receipt.tsv")
+    receipt <- read.delim(receipt_path, colClasses = "character")
+    unbound <- mutation %in% c("historical_unbound", "unbound_with_build")
+    if (!unbound) receipt$value[receipt$field == "fastvep_binding"] <- "cargo_fresh_release_locked_offline"
+    utils::write.table(receipt, receipt_path, sep = "\t", quote = FALSE, row.names = FALSE)
+    if (!mutation %in% c("historical_unbound", "missing_build")) {
+      build <- read.delim(file.path(valid_path, "fastvep_build.tsv"), colClasses = "character")
+      build$value[build$field == "executable_sha256"] <-
+        if (mutation == "wrong_binary") strrep("0", 64L) else receipt$value[receipt$field == "fastvep_sha256"]
+      utils::write.table(build, file.path(path, "fastvep_build.tsv"),
+        sep = "\t", quote = FALSE, row.names = FALSE)
+      if (mutation != "missing_log") stopifnot(file.copy(file.path(valid_path, "build.log"), path))
+    }
+    files <- setdiff(list.files(path, recursive = TRUE), "artifacts.tsv")
+    if (mutation == "unlisted_build") files <- setdiff(files, "fastvep_build.tsv")
+    if (mutation == "unlisted_log") files <- setdiff(files, "build.log")
+    utils::write.table(data.frame(path = files,
+      sha256 = unname(vapply(file.path(path, files), sha256, character(1L)))),
+      file.path(path, "artifacts.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
+    env <- new.env(parent = globalenv())
+    env$root <- root
+    env$data_dir <- dirname(path)
+    rendered <- tryCatch(capture.output(eval(field_gate, envir = env)), error = function(error) error)
+    accepted <- mutation %in% c("historical_unbound", "unbound_with_build", "bound")
+    stopifnot(identical(!inherits(rendered, "error"), accepted))
+    if (accepted) {
+      stopifnot(identical(env$field_summary, original_summary),
+        any(grepl("FastVEP executable provenance: binary-unbound", rendered, fixed = TRUE)) == unbound,
+        any(grepl("FastVEP executable provenance: source-bound", rendered, fixed = TRUE)) == !unbound)
+    }
+  }
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
   cat("Timing runner: missing/malformed build receipts and mismatched executables rejected\n")
   cat("Capacity diagnostic: valid evidence rendered; three failure-artifact corruptions rejected\n")
+  cat("Field campaign provenance: historical evidence stays binary-unbound; verified build accepted; five mutations rejected\n")
 }
 
 main()

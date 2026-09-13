@@ -817,7 +817,8 @@ union, duplicate rows, missing or extra pairs, source-coverage failures
 and every differing field in Parquet. A disagreement makes the command
 fail; FastVEP is a comparator and Ensembl VEP 116 is the authority.
 
-    #> Measured source: 0d2bdcb5f4cbea7a19a58e4c1a603fbbba35a392
+    #> DuckHTS source checkout: 0d2bdcb5f4cbea7a19a58e4c1a603fbbba35a392
+    #> FastVEP executable provenance: binary-unbound (expected_binary_sha256). Source checkout and executable digest do not establish build provenance.
 
 | comparison      | input_alleles | compared_keys | field_failures | missing_keys | extra_keys | actual_missing_source_alleles | expected_missing_source_alleles |
 |:----------------|--------------:|--------------:|---------------:|-------------:|-----------:|------------------------------:|--------------------------------:|
