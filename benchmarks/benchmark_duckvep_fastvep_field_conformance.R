@@ -46,19 +46,6 @@ duckvep_fastvep_fixture_model <- function(con, gff, reference, output) {
   invisible(output)
 }
 
-duckvep_fastvep_read_field_tab <- function(con, path, table, fields) {
-  skip <- duckvep_fastvep_tab_header(path, fields)
-  q <- function(x) as.character(DBI::dbQuoteString(con, x))
-  schema <- paste(paste0(q(fields), ": 'VARCHAR'"), collapse = ", ")
-  DBI::dbExecute(con, paste0(
-    "CREATE TEMP TABLE ", DBI::dbQuoteIdentifier(con, table),
-    " AS SELECT * FROM read_csv(", q(path), ", delim = '\t', header = true, skip = ", skip,
-    ", quote = '', escape = '', force_not_null = [", paste(q(fields), collapse = ", "),
-    "], columns = {", schema, "}, auto_detect = false)"
-  ))
-  invisible(table)
-}
-
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--output", default = ""),
@@ -209,6 +196,7 @@ main <- function() {
         "--out", generated, "--random-cases", opt$random_cases, "--seed", opt$seed
       ))
       input_count <- duckvep_projection_label_records(generated, vcf)
+      stopifnot(input_count > 0L)
       raw <- duckvep_fastvep_vcf_relation(con, vcf, duckvep_fastvep_vcf_header(vcf))
       execute(paste0("CREATE TEMP TABLE field_input AS SELECT row_number() OVER ()::UBIGINT AS record_index,
         1::UBIGINT AS alt_index, ID AS Uploaded_variation, CHROM, POS, REF, ALT FROM ", raw))
@@ -297,7 +285,7 @@ main <- function() {
         if (!all(ready)) stop("comparison input unavailable: ", paste(tables[!ready], collapse = ", "))
         contract <- if (name == "native_tab17") name else "vep_csq"
         result <- duckvep_fastvep_compare(
-          con, tables[[1L]], tables[[2L]],
+          con, tables[[1L]], tables[[2L]], "field_input",
           duckvep_fastvep_fields(contract), file.path(case_directory, paste0("comparison_", name))
         )
         summaries[[length(summaries) + 1L]] <- cbind(case,

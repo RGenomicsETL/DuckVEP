@@ -122,6 +122,8 @@ main <- function() {
     input_id = opt$input_id, input_records = counts$records, input_alt_alleles = counts$alt_alleles,
     eligible_literal_alleles = counts$eligible_literal_alleles,
     r_version = R.version.string, duckdb_version = as.character(utils::packageVersion("duckdb")),
+    output_filesystem = duckvep_evidence_command("stat", c("-f", "-c", "%T", work),
+      "cannot identify output filesystem"),
     distance = "5000", memory_limit = "4GB", supplementary_providers = "none",
     affinity_one = opt$affinity_one, affinity_four = opt$affinity_four)
   utils::write.csv(data.frame(field = names(metadata), value = unname(metadata)),

@@ -811,10 +811,11 @@ keys and inconsistent field counts.
 
 The field differential uses the eight existing projection models and the
 unchanged witness generator. Physical record/ALT ordinals distinguish
-repeated source events. Comparisons retain the full key union, duplicate
-rows, missing or extra pairs, and every differing field in Parquet. A
-disagreement makes the command fail; FastVEP is a comparator and Ensembl
-VEP 116 is the authority.
+repeated source events. Each output must cover every declared source
+allele, including intergenic results. Comparisons retain the full key
+union, duplicate rows, missing or extra pairs, source-coverage failures
+and every differing field in Parquet. A disagreement makes the command
+fail; FastVEP is a comparator and Ensembl VEP 116 is the authority.
 
     #> Whole-GIAB complete-field measurements are not published yet.
 

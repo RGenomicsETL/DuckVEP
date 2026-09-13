@@ -82,7 +82,7 @@ main <- function() {
       input_alt_alleles = "4096123", eligible_literal_alleles = "4095611",
       fastvep_source_revision = identity[["source_commit"]],
       fastvep_version = paste("fastvep", identity[["version"]]),
-      supplementary_providers = "none", distance = "5000"
+      supplementary_providers = "none", distance = "5000", output_filesystem = "synthetic"
     )
     write_fields(metadata, file.path(path, "metadata.csv"))
     for (i in seq_len(nrow(matrix))) {
@@ -243,6 +243,12 @@ main <- function() {
   })
   check("missing_timing", function(path) {
     unlink(file.path(path, paste0(labels[[1L]], ".time")))
+  })
+  check("wrong_timing_observation", function(path) {
+    edit_csv(path, paste0(labels[[1L]], ".csv"), function(x) {
+      x$timing_file <- paste0(labels[[2L]], ".time")
+      x
+    })
   })
   check("changed_repeat_fingerprint", function(path) {
     edit_csv(path, paste0(labels[[1L]], ".csv"), function(x) {

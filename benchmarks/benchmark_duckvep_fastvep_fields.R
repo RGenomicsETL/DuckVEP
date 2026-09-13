@@ -32,6 +32,19 @@ duckvep_fastvep_tab_header <- function(path, fields) {
   skip
 }
 
+duckvep_fastvep_read_field_tab <- function(con, path, table, fields) {
+  skip <- duckvep_fastvep_tab_header(path, fields)
+  q <- function(x) as.character(DBI::dbQuoteString(con, x))
+  schema <- paste(paste0(q(fields), ": 'VARCHAR'"), collapse = ", ")
+  DBI::dbExecute(con, paste0(
+    "CREATE TEMP TABLE ", DBI::dbQuoteIdentifier(con, table),
+    " AS SELECT * FROM read_csv(", q(path), ", delim = '\t', header = true, skip = ", skip,
+    ", quote = '', escape = '', force_not_null = [", paste(q(fields), collapse = ", "),
+    "], columns = {", schema, "}, auto_detect = false)"
+  ))
+  invisible(table)
+}
+
 duckvep_fastvep_field_sources <- function(contract) {
   fields <- duckvep_fastvep_fields(contract)
   source <- stats::setNames(rep("typed SQL projection", length(fields)), fields)

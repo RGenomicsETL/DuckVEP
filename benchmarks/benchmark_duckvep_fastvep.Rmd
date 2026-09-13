@@ -1597,9 +1597,11 @@ it rejects missing or duplicate CSQ keys and inconsistent field counts.
 
 The field differential uses the eight existing projection models and the
 unchanged witness generator. Physical record/ALT ordinals distinguish repeated
-source events. Comparisons retain the full key union, duplicate rows, missing
-or extra pairs, and every differing field in Parquet. A disagreement makes the
-command fail; FastVEP is a comparator and Ensembl VEP 116 is the authority.
+source events. Each output must cover every declared source allele, including
+intergenic results. Comparisons retain the full key union, duplicate rows,
+missing or extra pairs, source-coverage failures and every differing field in
+Parquet. A disagreement makes the command fail; FastVEP is a comparator and
+Ensembl VEP 116 is the authority.
 
 ```{r complete-field-observations}
 complete_dir <- file.path(data_dir, "field_contracts")
@@ -1649,7 +1651,11 @@ if (!file.exists(completion_path)) {
     cache[["fasta_index_sha256"]] == input_hashes[["fasta_index"]],
     sha256(file.path(complete_dir, "fastvep_cache_receipt.tsv")) == input_hashes[["cache_receipt"]])
   observations <- manifest$file[grepl("^(duckvep|fastvep)_.*_[14]_[0-9]+[.]csv$", manifest$file)]
-  complete_rows <- do.call(rbind, lapply(file.path(complete_dir, observations), read.csv, colClasses = "character"))
+  complete_rows <- do.call(rbind, lapply(file.path(complete_dir, observations), function(path) {
+    observation <- read.csv(path, colClasses = "character")
+    stopifnot(nrow(observation) == 1L)
+    observation
+  }))
   expected <- expand.grid(configuration = c("duckvep_operational17", "duckvep_native_tab17",
     "duckvep_vep_csq", "fastvep_native_tab17", "fastvep_vep_csq"),
     threads = c(1L, 4L), run = seq_len(as.integer(completion$repetitions)))
@@ -1657,8 +1663,10 @@ if (!file.exists(completion_path)) {
     complete_rows$threads, complete_rows$run, sep = "_")
   expected_keys <- paste(expected$configuration, expected$threads, expected$run, sep = "_")
   stopifnot(!anyDuplicated(actual_keys), setequal(actual_keys, expected_keys),
+    identical(paste0(actual_keys, ".csv"), observations),
     length(actual_keys) == as.integer(completion$observations), all(as.numeric(complete_rows$row_count) > 0),
     all(complete_rows$timing_file %in% manifest$file), all(complete_rows$multiset_checked == "TRUE"),
+    all(complete_rows$timing_file == paste0(actual_keys, ".time")),
     all(complete_rows$fingerprint_scope == "full_row"))
   for (group in split(complete_rows, paste(complete_rows$tool, complete_rows$output_contract))) {
     stopifnot(nrow(unique(group[c("row_count", "xor_hash", "low32_sum", "high32_sum")])) == 1L)
@@ -1675,6 +1683,7 @@ if (!file.exists(completion_path)) {
     tool + output_contract + threads, complete_rows, median)
   cat("Measured source:", completion$source_revision, "\n\n")
   cat("FastVEP source:", metadata[["fastvep_source_revision"]], "\n\n")
+  cat("Output filesystem:", metadata[["output_filesystem"]], "\n\n")
   knitr::kable(medians, digits = 2)
 }
 ```

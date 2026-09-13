@@ -48,6 +48,14 @@ main <- function() {
   }
   writeLines(character(), tab)
   expect_error(duckvep_fastvep_tab_header(tab, native))
+  # The conformance driver imports helpers inside main, not into the global
+  # environment. Its reader must resolve the same locally imported header check.
+  helpers <- new.env(parent = baseenv())
+  source("benchmarks/benchmark_duckvep_fastvep_fields.R", local = helpers)
+  writeLines(c("Feature\tCodons\tHGVSp", "tx1\t\t-"), tab)
+  helpers$duckvep_fastvep_read_field_tab(con, tab, "local_tab", c("Feature", "Codons", "HGVSp"))
+  stopifnot(identical(DBI::dbGetQuery(con, "SELECT * FROM local_tab"),
+    data.frame(Feature = "tx1", Codons = "", HGVSp = "-")))
   cat("CSQ extraction: transport spelling, missing fields and width controls passed\n")
 }
 
