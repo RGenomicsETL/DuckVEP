@@ -817,7 +817,35 @@ union, duplicate rows, missing or extra pairs, source-coverage failures
 and every differing field in Parquet. A disagreement makes the command
 fail; FastVEP is a comparator and Ensembl VEP 116 is the authority.
 
+    #> Measured source: 0d2bdcb5f4cbea7a19a58e4c1a603fbbba35a392
+
+| comparison      | input_alleles | compared_keys | field_failures | missing_keys | extra_keys | actual_missing_source_alleles | expected_missing_source_alleles |
+|:----------------|--------------:|--------------:|---------------:|-------------:|-----------:|------------------------------:|--------------------------------:|
+| duckvep_vep_csq |         10671 |         10671 |           3692 |            0 |          0 |                             0 |                               0 |
+| fastvep_vep_csq |         10671 |         10671 |          30270 |            0 |          0 |                             0 |                               0 |
+| native_tab17    |         10671 |         10671 |           7980 |            0 |          0 |                             0 |                               0 |
+
+These are failing comparisons, not a conformance certificate.
+DuckVEP/VEP differences comprise 168 HGVSc fields, 3,522 HGVSp fields
+and two HGVS shifts. The fixtures lack protein accessions; the HGVSp
+result therefore does not establish peptide-suffix agreement. Source
+VCFs, model GFFs, raw outputs and all field/key failures are retained in
+the [field data](data/duckvep_fastvep/fields_seed173_0d2bdcb). A
+[singleton replay](data/duckvep_fastvep/replay_phase1_589) of
+`chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus
+VEP’s `c.1C>A`; that diagnostic does not replace the full campaign
+denominator.
+
     #> Whole-GIAB complete-field measurements are not published yet.
+
+Whole-GIAB timings remain diagnostic until the final CSQ rows retain
+physical record/ALT identity. Different deletion ALTs can share the same
+displayed `Allele`, and FastVEP’s flattened CSQ omits raw record
+coordinates. Stable row fingerprints alone do not establish complete
+source-allele coverage. The [retained incomplete
+run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb) stopped
+when the native projection exhausted the available spill disk; it has no
+completion receipt or published timing median.
 
 The paired runner uses one and four assigned cores, three fresh-process
 observations per configuration, the same registered whole-GIAB input and
@@ -826,11 +854,13 @@ joins. FastVEP’s CSQ measurement includes its native VCF output and
 extraction into the common flat field relation. Its cache includes
 coding and noncoding spliced sequences; cache preparation is outside
 timing, and scans must leave it unchanged. Neither run loads
-supplementary annotation providers. Source/model/reference identities,
-input record and ALT counts, elapsed/user/ system time, CPU utilization,
-peak RSS, bytes and complete output fingerprints are retained beside a
-completion manifest. Partial or failed runs cannot populate the table
-above.
+supplementary annotation providers. `--memory-limit` and `--max-spill`
+set per-process DuckDB memory and spill caps; their defaults are 4 GB
+and 8 GB. Spill files use a private temporary directory.
+Source/model/reference identities, input record and ALT counts,
+elapsed/user/ system time, CPU utilization, peak RSS, bytes and complete
+output fingerprints are retained beside a completion manifest. Partial
+or failed runs cannot populate the table above.
 
 ``` bash
 test "$(git -C .sync/fastVEP rev-parse HEAD)" = 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
@@ -844,6 +874,10 @@ Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
   --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
+# Replay a retained unique-ID record without generation or relabelling.
+Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
+  --case noncoding_first_exon_phase1 --replay-input "$REPLAY_VCF" \
+  --vep-prefix "$VEP_PREFIX" --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
 ```
 
 ## Compact-output revisions and input receipts
@@ -853,7 +887,7 @@ Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
 | DuckHTS measured checkout           | 2a1c37cf2938e8226a078f19ca429ffeff84de73                         |
 | DuckHTS extension binary            | 53af1444f11bd22092001fe361e36f89bd397f7fcb52af927fefb69378c5281b |
 | DuckVEP measured worker revision    | 44f3e3533c957a798939bda6106c828f0bbea75c                         |
-| DuckVEP current reproduction worker | 99ed7dc834ba994961bc9f4ba473434136589892b36499f3e87377e92e7f9c07 |
+| DuckVEP current reproduction worker | d4a025b64bb54a9693412171795c6074a87fb2ea9d7b0011ba3782f334ac371b |
 | FastVEP checkout                    | 7038e7c17708e7d2226149e78e0bb297bcc6d1d6                         |
 | FastVEP native binary               | b4cb538537646a4eaa494e0ab29978e8ead73009f643e369b4f8ee447e392d5a |
 | FastVEP rebuilt transcript cache    | 00a3357ea30325c9d93f53ce0dabc81cb6542a0fd6d8741e895331935f89f962 |

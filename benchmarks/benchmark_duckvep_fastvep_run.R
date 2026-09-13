@@ -11,7 +11,8 @@ duckvep_fastvep_run_job <- function(job, root) {
     args <- c(file.path(root, "benchmarks/benchmark_duckvep_fastvep_worker.R"),
       "--extension", job$extension, "--model", job$model, "--input", job$input,
       "--output", job$output, "--output-contract", job$contract,
-      "--threads", job$threads, "--distance", job$distance, "--memory-limit", job$memory_limit)
+      "--threads", job$threads, "--distance", job$distance, "--memory-limit", job$memory_limit,
+      "--max-spill", job$max_spill)
     if (job$contract != "operational17") args <- c(args, "--gff3", job$gff3)
     if (job$contract == "vep_csq") args <- c(args, "--fasta", job$fasta)
     run("Rscript", args)
@@ -25,7 +26,7 @@ duckvep_fastvep_run_job <- function(job, root) {
     if (job$contract == "vep_csq") {
       run("Rscript", c(file.path(root, "benchmarks/benchmark_duckvep_fastvep_extract.R"),
         "--input", output, "--output", job$output, "--threads", job$threads,
-        "--memory-limit", job$memory_limit))
+        "--memory-limit", job$memory_limit, "--max-spill", job$max_spill))
       unlink(output)
     }
   }
@@ -44,6 +45,8 @@ main <- function() {
     optparse::make_option("--checkout", default = ".sync/fastVEP"),
     optparse::make_option("--affinity-one", dest = "affinity_one", default = "2"),
     optparse::make_option("--affinity-four", dest = "affinity_four", default = "2,4,6,8"),
+    optparse::make_option("--memory-limit", dest = "memory_limit", default = "4GB"),
+    optparse::make_option("--max-spill", dest = "max_spill", default = "8GB"),
     optparse::make_option("--repetitions", type = "integer", default = 3L),
     optparse::make_option("--diagnostic", action = "store_true", default = FALSE)))
   opt <- optparse::parse_args(parser)
@@ -124,7 +127,8 @@ main <- function() {
     r_version = R.version.string, duckdb_version = as.character(utils::packageVersion("duckdb")),
     output_filesystem = duckvep_evidence_command("stat", c("-f", "-c", "%T", work),
       "cannot identify output filesystem"),
-    distance = "5000", memory_limit = "4GB", supplementary_providers = "none",
+    distance = "5000", memory_limit = opt$memory_limit, max_spill = opt$max_spill,
+    supplementary_providers = "none",
     affinity_one = opt$affinity_one, affinity_four = opt$affinity_four)
   utils::write.csv(data.frame(field = names(metadata), value = unname(metadata)),
     file.path(opt$output, "metadata.csv"), row.names = FALSE)
@@ -137,7 +141,8 @@ main <- function() {
     for (i in order) {
       job <- c(as.list(configurations[i, ]), as.list(paths), list(extension = extension,
         fastvep = normalizePath(opt$fastvep), cache = staged[["cache"]], threads = threads,
-        distance = 5000L, memory_limit = "4GB", output = file.path(work, "output.tsv")))
+        distance = 5000L, memory_limit = opt$memory_limit, max_spill = opt$max_spill,
+        output = file.path(work, "output.tsv")))
       label <- paste(job$engine, job$contract, threads, run, sep = "_")
       message("Running ", label)
       job_path <- file.path(work, "job.rds")
@@ -184,10 +189,11 @@ main <- function() {
     file.path(opt$output, "artifacts.csv"), row.names = FALSE)
   utils::write.csv(data.frame(source_revision = revision, completed = TRUE,
     binding = metadata[["binding"]], observations = length(completed), repetitions = opt$repetitions,
+    allele_coverage = "unverified",
     artifacts_sha256 = duckvep_evidence_sha256(file.path(opt$output, "artifacts.csv"))),
     file.path(opt$output, "completion.csv"), row.names = FALSE)
   unlink(work, recursive = TRUE)
-  message("Paired observations complete: ", opt$output)
+  message("Paired observations retained; final source-allele coverage is unverified: ", opt$output)
 }
 
 if (sys.nframe() == 0L) main()

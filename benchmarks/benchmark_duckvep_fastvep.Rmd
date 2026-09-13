@@ -1603,6 +1603,35 @@ missing or extra pairs, source-coverage failures and every differing field in
 Parquet. A disagreement makes the command fail; FastVEP is a comparator and
 Ensembl VEP 116 is the authority.
 
+```{r complete-field-conformance}
+field_dir <- file.path(data_dir, "fields_seed173_0d2bdcb")
+field_manifest <- read.delim(file.path(field_dir, "artifacts.tsv"), colClasses = "character")
+stopifnot(!anyDuplicated(field_manifest$path),
+  !any(grepl("^/|(^|/)\\.\\.(/|$)", field_manifest$path)),
+  identical(unname(vapply(file.path(field_dir, field_manifest$path),
+    function(path) digest::digest(file = path, algo = "sha256"), character(1L))), field_manifest$sha256))
+field_receipt <- read.delim(file.path(field_dir, "receipt.tsv"), colClasses = "character")
+field_receipt <- setNames(field_receipt$value, field_receipt$field)
+field_summary <- read.csv(file.path(field_dir, "summary.csv"))
+stopifnot(field_receipt[["build_binding"]] == "htslib_distclean_make_release",
+  field_receipt[["completed_cases"]] == "8", field_receipt[["completed_comparisons"]] == "24",
+  field_receipt[["input_records"]] == "10671", field_receipt[["errors"]] == "0",
+  field_receipt[["shared_inputs_unchanged"]] == "TRUE", nrow(field_summary) == 24L)
+cat("Measured source:", field_receipt[["source_revision"]], "\n\n")
+knitr::kable(aggregate(cbind(input_alleles, compared_keys, field_failures,
+  missing_keys, extra_keys, actual_missing_source_alleles, expected_missing_source_alleles) ~
+  comparison, field_summary, sum))
+```
+
+These are failing comparisons, not a conformance certificate. DuckVEP/VEP
+differences comprise 168 HGVSc fields, 3,522 HGVSp fields and two HGVS shifts.
+The fixtures lack protein accessions; the HGVSp result therefore does not
+establish peptide-suffix agreement. Source VCFs, model GFFs, raw outputs and all
+field/key failures are retained in the [field data](data/duckvep_fastvep/fields_seed173_0d2bdcb).
+A [singleton replay](data/duckvep_fastvep/replay_phase1_589)
+of `chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus VEP's
+`c.1C>A`; that diagnostic does not replace the full campaign denominator.
+
 ```{r complete-field-observations}
 complete_dir <- file.path(data_dir, "field_contracts")
 completion_path <- file.path(complete_dir, "completion.csv")
@@ -1610,6 +1639,10 @@ if (!file.exists(completion_path)) {
   cat("Whole-GIAB complete-field measurements are not published yet.\n")
 } else {
   completion <- read.csv(completion_path, colClasses = "character")
+  if (!"allele_coverage" %in% names(completion) ||
+      !identical(completion$allele_coverage, "verified")) {
+    stop("Complete-field timing publication requires verified final source-allele coverage")
+  }
   stopifnot(nrow(completion) == 1L, completion$completed == "TRUE",
     completion$binding == "source_bound", as.integer(completion$repetitions) >= 3L)
   sha256 <- function(path) strsplit(system2("sha256sum", shQuote(path), stdout = TRUE), " +")[[1L]][[1L]]
@@ -1688,6 +1721,14 @@ if (!file.exists(completion_path)) {
 }
 ```
 
+Whole-GIAB timings remain diagnostic until the final CSQ rows retain physical
+record/ALT identity. Different deletion ALTs can share the same displayed
+`Allele`, and FastVEP's flattened CSQ omits raw record coordinates. Stable
+row fingerprints alone do not establish complete source-allele coverage.
+The [retained incomplete run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb)
+stopped when the native projection exhausted the
+available spill disk; it has no completion receipt or published timing median.
+
 The paired runner uses one and four assigned cores, three fresh-process
 observations per configuration, the same registered whole-GIAB input and local
 file output. DuckVEP includes input sorting and cold metadata joins. FastVEP's
@@ -1695,6 +1736,8 @@ CSQ measurement includes its native VCF output and extraction into the common
 flat field relation. Its cache includes coding and noncoding spliced sequences;
 cache preparation is outside timing, and scans must leave it unchanged. Neither
 run loads supplementary annotation providers.
+`--memory-limit` and `--max-spill` set per-process DuckDB memory and spill caps;
+their defaults are 4 GB and 8 GB. Spill files use a private temporary directory.
 Source/model/reference identities, input record and ALT counts, elapsed/user/
 system time, CPU utilization, peak RSS, bytes and complete output fingerprints
 are retained beside a completion manifest. Partial or failed runs cannot
@@ -1712,6 +1755,10 @@ Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
   --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
+# Replay a retained unique-ID record without generation or relabelling.
+Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
+  --case noncoding_first_exon_phase1 --replay-input "$REPLAY_VCF" \
+  --vep-prefix "$VEP_PREFIX" --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256"
 ```
 
 ## Compact-output revisions and input receipts

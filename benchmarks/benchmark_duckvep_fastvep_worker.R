@@ -33,6 +33,7 @@ op <- add_option(op, "--include-identity", dest = "include_identity", action = "
 op <- add_option(op, "--threads", type = "integer", default = 1L)
 op <- add_option(op, "--distance", type = "integer", default = 5000L)
 op <- add_option(op, "--memory-limit", dest = "memory_limit", default = "4GB")
+op <- add_option(op, "--max-spill", dest = "max_spill", default = "8GB")
 op <- add_option(
   op,
   "--profile-json",
@@ -87,6 +88,8 @@ sql_q <- function(x) as.character(dbQuoteString(con, x))
 invisible(dbExecute(con, glue("LOAD {sql_q(extension)}")))
 invisible(dbExecute(con, glue("PRAGMA threads={opt$threads}")))
 invisible(dbExecute(con, glue("SET memory_limit = {sql_q(opt$memory_limit)}")))
+invisible(dbExecute(con, glue("SET max_temp_directory_size = {sql_q(opt$max_spill)}")))
+invisible(dbExecute(con, glue("SET temp_directory = {sql_q(file.path(tempdir(), 'duckdb'))}")))
 invisible(dbExecute(con, "SET preserve_insertion_order = false"))
 if (nzchar(opt$profile_json)) {
   profile_json <- normalizePath(opt$profile_json, mustWork = FALSE)

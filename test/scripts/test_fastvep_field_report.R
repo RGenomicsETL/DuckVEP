@@ -104,6 +104,7 @@ main <- function() {
     write_csv(data.frame(
       source_revision = revision, completed = TRUE,
       binding = "source_bound", observations = 30L, repetitions = 3L,
+      allele_coverage = "verified",
       artifacts_sha256 = ""
     ), file.path(path, "completion.csv"))
     invisible(path)
@@ -247,6 +248,18 @@ main <- function() {
   check("wrong_timing_observation", function(path) {
     edit_csv(path, paste0(labels[[1L]], ".csv"), function(x) {
       x$timing_file <- paste0(labels[[2L]], ".time")
+      x
+    })
+  })
+  check("unverified_source_coverage", function(path) {
+    edit_csv(path, "completion.csv", function(x) {
+      x$allele_coverage <- "unverified"
+      x
+    })
+  })
+  check("missing_source_coverage", function(path) {
+    edit_csv(path, "completion.csv", function(x) {
+      x$allele_coverage <- NULL
       x
     })
   })

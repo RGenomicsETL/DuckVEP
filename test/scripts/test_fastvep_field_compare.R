@@ -111,6 +111,38 @@ main <- function() {
     stdout = file.path(directory, "cli_missing_source.log"), stderr = file.path(directory, "cli_missing_source.stderr"))
   stopifnot(status != 0L,
     any(grepl("all five options are required", readLines(file.path(directory, "cli_missing_source.stderr")), fixed = TRUE)))
+  source("benchmarks/benchmark_duckvep_fastvep_field_conformance.R", local = TRUE)
+  source_rows <- data.frame(CHROM = "chrDuck", POS = c("158", "159"),
+    ID = c("original_156", "original_157"), REF = c("C", "G"), ALT = c("A", "T"))
+  prepare <- function(rows, expected_records = NULL) {
+    if (DBI::dbExistsTable(con, "field_input")) DBI::dbRemoveTable(con, "field_input")
+    DBI::dbWriteTable(con, "replay_source", rows, overwrite = TRUE)
+    duckvep_fastvep_prepare_source(con, "replay_source", expected_records)
+  }
+  stopifnot(prepare(source_rows, 2L) == 2L,
+    identical(DBI::dbGetQuery(con, "SELECT Uploaded_variation FROM field_input ORDER BY record_index")[[1L]],
+      source_rows$ID), prepare(source_rows[1L, ]) == 1L)
+  rejects_source <- function(rows, expected_records = NULL) {
+    inherits(tryCatch(prepare(rows, expected_records), error = function(error) error), "error")
+  }
+  duplicate_source <- rbind(source_rows, source_rows[1L, ])
+  multiallelic_source <- missing_id <- source_rows
+  multiallelic_source$ALT[[1L]] <- "A,T"
+  missing_id$ID[[1L]] <- "."
+  stopifnot(rejects_source(duplicate_source), rejects_source(multiallelic_source),
+    rejects_source(missing_id), rejects_source(source_rows[FALSE, ]), rejects_source(source_rows, 3L))
+  for (allele in c(NA_character_, "", ".")) {
+    absent_alt <- source_rows
+    absent_alt$ALT[[1L]] <- allele
+    stopifnot(rejects_source(absent_alt))
+  }
+  for (argument in c("--case", "--replay-input")) {
+    status <- system2("Rscript", shQuote(c("benchmarks/benchmark_duckvep_fastvep_field_conformance.R",
+      argument, if (argument == "--case") "forward" else output_path)),
+      stdout = file.path(directory, "replay_options.log"), stderr = file.path(directory, "replay_options.stderr"))
+    stopifnot(status != 0L, any(grepl("--replay-input and --case must be supplied together",
+      readLines(file.path(directory, "replay_options.stderr")), fixed = TRUE)))
+  }
   cat("Exact field comparator: all corruption controls passed\n")
 }
 

@@ -65,6 +65,7 @@ main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--input"), optparse::make_option("--output"),
     optparse::make_option("--memory-limit", dest = "memory_limit", default = "4GB"),
+    optparse::make_option("--max-spill", dest = "max_spill", default = "8GB"),
     optparse::make_option("--threads", type = "integer", default = 1L))))
   if (is.null(opt$input) || is.null(opt$output) || opt$threads < 1L) stop("input, output and positive threads required")
   root <- system2("git", c("rev-parse", "--show-toplevel"), stdout = TRUE)
@@ -73,6 +74,8 @@ main <- function() {
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
   DBI::dbExecute(con, paste0("SET threads=", opt$threads))
   DBI::dbExecute(con, paste("SET memory_limit =", DBI::dbQuoteString(con, opt$memory_limit)))
+  DBI::dbExecute(con, paste("SET max_temp_directory_size =", DBI::dbQuoteString(con, opt$max_spill)))
+  DBI::dbExecute(con, paste("SET temp_directory =", DBI::dbQuoteString(con, file.path(tempdir(), "duckdb"))))
   duckvep_fastvep_extract_csq(con, opt$input, "csq", duckvep_fastvep_fields("vep_csq"))
   DBI::dbExecute(con, paste0("COPY csq TO ", DBI::dbQuoteString(con, opt$output),
     " (FORMAT CSV, DELIMITER '\t', HEADER TRUE, QUOTE '', ESCAPE '')"))

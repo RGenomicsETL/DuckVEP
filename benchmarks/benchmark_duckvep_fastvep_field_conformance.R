@@ -46,11 +46,32 @@ duckvep_fastvep_fixture_model <- function(con, gff, reference, output) {
   invisible(output)
 }
 
+duckvep_fastvep_prepare_source <- function(con, raw, expected_records = NULL) {
+  DBI::dbExecute(con, paste0("CREATE TEMP TABLE field_input AS
+    SELECT row_number() OVER ()::UBIGINT AS record_index, 1::UBIGINT AS alt_index,
+      ID AS Uploaded_variation, CHROM, POS, REF, ALT FROM ", raw))
+  counts <- DBI::dbGetQuery(con, "SELECT count(*) AS records,
+    count(*) FILTER (WHERE Uploaded_variation IS NULL OR Uploaded_variation IN ('', '.')
+      OR ALT IS NULL OR ALT IN ('', '.') OR contains(ALT, ',')) AS invalid FROM field_input")
+  duplicates <- DBI::dbGetQuery(con, "SELECT count(*) n FROM
+    (SELECT Uploaded_variation FROM field_input GROUP BY ALL HAVING count(*) != 1)")$n
+  if (counts$records == 0 || counts$invalid != 0 || duplicates != 0) {
+    stop("source VCF requires nonempty biallelic records with unique nonmissing IDs")
+  }
+  if (!is.null(expected_records) && counts$records != expected_records) {
+    stop("source VCF record count differs from the generated physical-record count")
+  }
+  counts$records
+}
+
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--output", default = ""),
     optparse::make_option("--seed", type = "integer", default = 173L),
     optparse::make_option("--random-cases", dest = "random_cases", type = "integer", default = 1000L),
+    optparse::make_option("--replay-input", dest = "replay_input", default = "",
+      help = "retained unique-ID biallelic VCF; requires --case and bypasses generation and relabelling"),
+    optparse::make_option("--case", default = "", help = "existing fixture case for --replay-input"),
     optparse::make_option("--extension", default = "build/release/duckhts.duckdb_extension"),
     optparse::make_option("--extension-receipt", dest = "extension_receipt", default = NULL),
     optparse::make_option("--vep-prefix", dest = "vep_prefix", default = Sys.getenv("VEP_PREFIX")),
@@ -61,6 +82,8 @@ main <- function() {
     )
   )))
   stopifnot(!is.na(opt$seed), !is.na(opt$random_cases), opt$random_cases >= 0L)
+  replay <- nzchar(opt$replay_input)
+  if (replay != nzchar(opt$case)) stop("--replay-input and --case must be supplied together")
   if (!nzchar(opt$vep_prefix)) stop("set VEP_PREFIX or provide --vep-prefix")
   if (!is.null(opt$fastvep_sha256) && !grepl("^[0-9a-f]{64}$", opt$fastvep_sha256)) {
     stop("--fastvep-sha256 must be a lowercase SHA256 value")
@@ -75,6 +98,9 @@ main <- function() {
     "benchmarks/benchmark_duckvep_fastvep_compare.R"
   )
   for (script in imports) source(file.path(root, script), local = TRUE)
+  if (replay && !opt$case %in% duckvep_projection_cases) stop("unknown replay fixture case: ", opt$case)
+  cases <- if (replay) opt$case else duckvep_projection_cases
+  if (replay) opt$replay_input <- normalizePath(opt$replay_input, mustWork = TRUE)
   sources <- file.path(root, c(
     imports, "benchmarks/benchmark_duckvep_fastvep_field_conformance.R",
     "benchmarks/benchmark_duckvep_fastvep_worker.R", "test/duckvep/conformance/generate_witnesses.R",
@@ -95,7 +121,8 @@ main <- function() {
     binding <- duckvep_evidence_read_extension_receipt(opt$extension_receipt, root, extension, revision)$binding
   }
   if (!nzchar(opt$output)) {
-    opt$output <- tempfile(paste0("fastvep_fields_seed", opt$seed, "_"),
+    label <- if (replay) paste0("fastvep_fields_replay_", opt$case, "_") else paste0("fastvep_fields_seed", opt$seed, "_")
+    opt$output <- tempfile(label,
       tmpdir = file.path(root, "test/duckvep/conformance/results")
     )
   }
@@ -134,6 +161,7 @@ main <- function() {
     fastvep_binding <- "expected_binary_sha256"
   }
   inputs <- duckhtsbench::duckhts_bench_stage_repository_fixtures(root, "duckvep-projection")
+  if (replay) inputs <- c(inputs, replay_input = opt$replay_input)
   snapshot_inputs <- function() {
     states <- t(vapply(
       inputs, duckvep_evidence_file_state,
@@ -155,7 +183,7 @@ main <- function() {
   ), collapse = .Platform$path.sep)
   summaries <- errors <- commands <- list()
   denominators <- data.frame(
-    case = duckvep_projection_cases,
+    case = cases,
     input_records = NA_real_, input_alleles = NA_real_, prepared = FALSE
   )
   run <- function(case, stage, exe, args) {
@@ -176,7 +204,7 @@ main <- function() {
   }
   csq_fields <- duckvep_fastvep_fields("vep_csq")
   tab_fields <- duckvep_fastvep_fields("native_tab17")
-  for (case in duckvep_projection_cases) {
+  for (case in cases) {
     case_directory <- file.path(directory, case)
     dir.create(case_directory)
     con <- DBI::dbConnect(duckdb::duckdb(config = list(allow_unsigned_extensions = "true")))
@@ -189,25 +217,22 @@ main <- function() {
       model <- file.path(case_directory, "model.duckdb")
       duckvep_fastvep_fixture_model(con, gff, inputs[["projection_reference"]], model)
       generated <- file.path(case_directory, "generated.vcf")
-      vcf <- file.path(case_directory, "input.vcf")
-      run(case, "generate", "Rscript", c(
-        file.path(root, "test/duckvep/conformance/generate_witnesses.R"),
-        "--gff", gff, "--fasta", inputs[["projection_reference"]], "--ext", extension,
-        "--out", generated, "--random-cases", opt$random_cases, "--seed", opt$seed
-      ))
-      input_count <- duckvep_projection_label_records(generated, vcf)
-      stopifnot(input_count > 0L)
+      compressed <- replay && grepl("\\.(gz|bgz)$", opt$replay_input)
+      vcf <- file.path(case_directory, if (compressed) "input.vcf.gz" else "input.vcf")
+      input_count <- NULL
+      if (replay) {
+        if (!file.copy(opt$replay_input, vcf)) stop("could not retain replay input")
+        stopifnot(identical(duckvep_evidence_sha256(vcf), duckvep_evidence_sha256(opt$replay_input)))
+      } else {
+        run(case, "generate", "Rscript", c(
+          file.path(root, "test/duckvep/conformance/generate_witnesses.R"),
+          "--gff", gff, "--fasta", inputs[["projection_reference"]], "--ext", extension,
+          "--out", generated, "--random-cases", opt$random_cases, "--seed", opt$seed
+        ))
+        input_count <- duckvep_projection_label_records(generated, vcf)
+      }
       raw <- duckvep_fastvep_vcf_relation(con, vcf, duckvep_fastvep_vcf_header(vcf))
-      execute(paste0("CREATE TEMP TABLE field_input AS SELECT row_number() OVER ()::UBIGINT AS record_index,
-        1::UBIGINT AS alt_index, ID AS Uploaded_variation, CHROM, POS, REF, ALT FROM ", raw))
-      invalid <- DBI::dbGetQuery(con, "SELECT count(*) n FROM field_input WHERE
-        Uploaded_variation IS NULL OR Uploaded_variation IN ('', '.') OR contains(ALT, ',')")$n
-      duplicates <- DBI::dbGetQuery(con, "SELECT count(*) n FROM
-        (SELECT Uploaded_variation FROM field_input GROUP BY ALL HAVING count(*) != 1)")$n
-      stopifnot(
-        invalid == 0, duplicates == 0,
-        DBI::dbGetQuery(con, "SELECT count(*) n FROM field_input")$n == input_count
-      )
+      input_count <- duckvep_fastvep_prepare_source(con, raw, input_count)
       execute(paste0("COPY field_input TO ", q(file.path(case_directory, "source_keys.parquet")), " (FORMAT PARQUET)"))
       stopifnot(system2("bgzip", c("-c", shQuote(gff)), stdout = paste0(gff, ".gz")) == 0L)
       run(case, "index_gff", "tabix", c("-p", "gff", paste0(gff, ".gz")))
@@ -322,8 +347,9 @@ main <- function() {
   receipt <- c(
     source_revision = revision, build_binding = binding, extension_sha256 = extension_hash,
     fastvep_sha256 = fastvep_hash, fastvep_binding = fastvep_binding,
-    pins, seed = opt$seed, random_cases = opt$random_cases,
-    requested_cases = length(duckvep_projection_cases), completed_cases = sum(denominators$prepared),
+    pins, mode = if (replay) "replay" else "generated",
+    seed = if (replay) NA_integer_ else opt$seed, random_cases = if (replay) NA_integer_ else opt$random_cases,
+    requested_cases = length(cases), completed_cases = sum(denominators$prepared),
     input_records = sum(denominators$input_records), input_alleles = sum(denominators$input_alleles),
     completed_comparisons = nrow(summary), shared_inputs_unchanged = isTRUE(inputs_unchanged),
     errors = nrow(errors)
@@ -346,7 +372,7 @@ main <- function() {
     identical(fastvep_hash, duckvep_evidence_sha256(fastvep))
   )
   if (!is.null(opt$extension_receipt)) duckvep_evidence_assert_checkout(root, revision, allowed_outputs = opt$output)
-  if (nrow(errors) || nrow(summary) != length(duckvep_projection_cases) * 3L || !all(summary$passed)) quit(status = 1L)
+  if (nrow(errors) || nrow(summary) != length(cases) * 3L || !all(summary$passed)) quit(status = 1L)
 }
 
 if (sys.nframe() == 0L) main()
