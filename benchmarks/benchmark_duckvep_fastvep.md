@@ -856,11 +856,14 @@ coding and noncoding spliced sequences; cache preparation is outside
 timing, and scans must leave it unchanged. Neither run loads
 supplementary annotation providers. `--memory-limit` and `--max-spill`
 set per-process DuckDB memory and spill caps; their defaults are 4 GB
-and 8 GB. Spill files use a private temporary directory.
-Source/model/reference identities, input record and ALT counts,
-elapsed/user/ system time, CPU utilization, peak RSS, bytes and complete
-output fingerprints are retained beside a completion manifest. Partial
-or failed runs cannot populate the table above.
+and 8 GB. Spill files use a private temporary directory. Published runs
+require `--fastvep-sha256` from an independently recorded build of the
+pinned FastVEP source. The expected digest is retained and checked
+against the timed executable and cache receipt; a matching version
+string is insufficient. Source/model/reference identities, input record
+and ALT counts, elapsed/user/ system time, CPU utilization, peak RSS,
+bytes and complete output fingerprints are retained beside a completion
+manifest. Partial or failed runs cannot populate the table above.
 
 ``` bash
 test "$(git -C .sync/fastVEP rev-parse HEAD)" = 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
@@ -870,6 +873,7 @@ Rscript r/duckhtsbench/scripts/stage_fastvep.R \
   --checkout .sync/fastVEP --executable .sync/fastVEP/target/release/fastvep
 Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
   --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
+  --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256" \
   --output benchmarks/data/duckvep_fastvep/field_contracts
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \

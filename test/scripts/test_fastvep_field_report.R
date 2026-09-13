@@ -93,6 +93,7 @@ main <- function() {
       input_alt_alleles = "4096123", eligible_literal_alleles = "4095611",
       fastvep_source_revision = identity[["source_commit"]],
       fastvep_version = paste("fastvep", identity[["version"]]),
+      fastvep_binding = "expected_binary_sha256", fastvep_expected_sha256 = hashes[["fastvep"]],
       supplementary_providers = "none", distance = "5000", output_filesystem = "synthetic"
     )
     write_fields(metadata, file.path(path, "metadata.csv"))
@@ -232,13 +233,15 @@ main <- function() {
   })
   for (field in c(
     "binding", "input_id", "input_records", "input_alt_alleles",
-    "eligible_literal_alleles", "fastvep_source_revision", "fastvep_version"
+    "eligible_literal_alleles", "fastvep_source_revision", "fastvep_version",
+    "fastvep_binding", "fastvep_expected_sha256"
   )) {
     values <- c(
       binding = "diagnostic_unbound", input_id = "fastvep_cache_probe",
       input_records = "3", input_alt_alleles = "3", eligible_literal_alleles = "3",
       fastvep_source_revision = "7038e7c17708e7d2226149e78e0bb297bcc6d1d6",
-      fastvep_version = "fastvep 0.2.0"
+      fastvep_version = "fastvep 0.2.0", fastvep_binding = "diagnostic_binary_unbound",
+      fastvep_expected_sha256 = strrep("0", 64L)
     )
     check(paste0("metadata_", field), function(path) edit_metadata(path, field, values[[field]]))
   }
@@ -376,7 +379,21 @@ main <- function() {
       "field_contracts_incomplete_0d2bdcb/duckvep_native_tab17_1_1.time")
     stopifnot(file.copy(failed, file.path(path, paste0(sort(labels)[[1L]], ".time")), overwrite = TRUE))
   }, expected_timing_reads = 1L)
+  check_cli <- function(label, args, message) {
+    output <- file.path(directory, paste0("cli-", label))
+    result <- suppressWarnings(system2("Rscript", shQuote(c(
+      file.path(root, "benchmarks/benchmark_duckvep_fastvep_run.R"), "--output", output, args
+    )), stdout = TRUE, stderr = TRUE))
+    stopifnot(!is.null(attr(result, "status")), attr(result, "status") != 0L,
+      any(grepl(message, result, fixed = TRUE)), !file.exists(output))
+  }
+  check_cli("missing-digest", character(), "published observations require --fastvep-sha256")
+  check_cli("invalid-digest", c("--fastvep-sha256", "invalid"),
+    "--fastvep-sha256 must be a lowercase SHA256 value")
+  check_cli("mismatched-digest", c("--diagnostic", "--fastvep-sha256", strrep("0", 64L),
+    "--fastvep", file.path(valid_path, "metadata.csv")), "FastVEP executable does not match --fastvep-sha256")
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
+  cat("Timing runner: missing, malformed and mismatched expected executable digests rejected\n")
 }
 
 main()

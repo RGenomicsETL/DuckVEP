@@ -1678,6 +1678,9 @@ if (!file.exists(completion_path)) {
     metadata[["input_records"]] == as.character(source_records),
     metadata[["input_alt_alleles"]] == as.character(source_alt_alleles),
     metadata[["eligible_literal_alleles"]] == "4095611",
+    metadata[["fastvep_binding"]] == "expected_binary_sha256",
+    grepl("^[0-9a-f]{64}$", metadata[["fastvep_expected_sha256"]]),
+    metadata[["fastvep_expected_sha256"]] == input_hashes[["fastvep"]],
     metadata[["fastvep_source_revision"]] == identity[["source_commit"]],
     metadata[["fastvep_version"]] == paste("fastvep", identity[["version"]]),
     metadata[["supplementary_providers"]] == "none", metadata[["distance"]] == "5000",
@@ -1764,6 +1767,9 @@ cache preparation is outside timing, and scans must leave it unchanged. Neither
 run loads supplementary annotation providers.
 `--memory-limit` and `--max-spill` set per-process DuckDB memory and spill caps;
 their defaults are 4 GB and 8 GB. Spill files use a private temporary directory.
+Published runs require `--fastvep-sha256` from an independently recorded build
+of the pinned FastVEP source. The expected digest is retained and checked against
+the timed executable and cache receipt; a matching version string is insufficient.
 Source/model/reference identities, input record and ALT counts, elapsed/user/
 system time, CPU utilization, peak RSS, bytes and complete output fingerprints
 are retained beside a completion manifest. Partial or failed runs cannot
@@ -1777,6 +1783,7 @@ Rscript r/duckhtsbench/scripts/stage_fastvep.R \
   --checkout .sync/fastVEP --executable .sync/fastVEP/target/release/fastvep
 Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
   --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
+  --fastvep-sha256 "$FASTVEP_EXECUTABLE_SHA256" \
   --output benchmarks/data/duckvep_fastvep/field_contracts
 Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
   --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \

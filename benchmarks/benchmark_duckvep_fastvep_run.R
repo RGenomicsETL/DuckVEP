@@ -42,6 +42,7 @@ main <- function() {
     optparse::make_option("--extension", default = "build/release/duckhts.duckdb_extension"),
     optparse::make_option("--extension-receipt", dest = "extension_receipt", default = ""),
     optparse::make_option("--fastvep", default = ".sync/fastVEP/target/release/fastvep"),
+    optparse::make_option("--fastvep-sha256", dest = "fastvep_sha256", default = NULL),
     optparse::make_option("--checkout", default = ".sync/fastVEP"),
     optparse::make_option("--affinity-one", dest = "affinity_one", default = "2"),
     optparse::make_option("--affinity-four", dest = "affinity_four", default = "2,4,6,8"),
@@ -54,6 +55,12 @@ main <- function() {
   if (!nzchar(opt$output) || file.exists(opt$output) || opt$repetitions < 1L) {
     stop("a new --output directory and positive repetitions are required")
   }
+  if (!opt$diagnostic && is.null(opt$fastvep_sha256)) {
+    stop("published observations require --fastvep-sha256 from a build of the pinned source")
+  }
+  if (!is.null(opt$fastvep_sha256) && !grepl("^[0-9a-f]{64}$", opt$fastvep_sha256)) {
+    stop("--fastvep-sha256 must be a lowercase SHA256 value")
+  }
   for (count in c(1L, 4L)) {
     affinity <- if (count == 1L) opt$affinity_one else opt$affinity_four
     cpus <- strsplit(affinity, ",", fixed = TRUE)[[1L]]
@@ -62,6 +69,10 @@ main <- function() {
     }
   }
   source(file.path(root, "scripts/duckvep_evidence.R"))
+  if (!is.null(opt$fastvep_sha256) &&
+      !identical(duckvep_evidence_sha256(opt$fastvep), opt$fastvep_sha256)) {
+    stop("FastVEP executable does not match --fastvep-sha256")
+  }
   source(file.path(root, "benchmarks/benchmark_duckvep_fastvep_fields.R"))
   for (name in c("registry", "stage", "duckvep", "fastvep")) {
     source(file.path(root, "r/duckhtsbench/R", paste0(name, ".R")))
@@ -99,6 +110,9 @@ main <- function() {
     cache = staged[["cache"]], cache_receipt = staged[["receipt"]],
     stats::setNames(source_files, basename(source_files)))
   hashes <- vapply(bound_files, duckvep_evidence_sha256, character(1L))
+  if (!is.null(opt$fastvep_sha256) && !identical(hashes[["fastvep"]], opt$fastvep_sha256)) {
+    stop("FastVEP executable changed after expected-digest validation")
+  }
   utils::write.csv(data.frame(artifact = names(bound_files), path = unname(bound_files), sha256 = hashes),
     file.path(opt$output, "inputs.csv"), row.names = FALSE)
   if (!file.copy(staged[["receipt"]], file.path(opt$output, "fastvep_cache_receipt.tsv"))) {
@@ -119,6 +133,8 @@ main <- function() {
   }
   metadata <- c(source_revision = revision,
     binding = if (opt$diagnostic) "diagnostic_unbound" else "source_bound",
+    fastvep_binding = if (is.null(opt$fastvep_sha256)) "diagnostic_binary_unbound" else "expected_binary_sha256",
+    fastvep_expected_sha256 = if (is.null(opt$fastvep_sha256)) "unverified" else opt$fastvep_sha256,
     fastvep_source_revision = duckvep_evidence_command("git", c("-C", opt$checkout,
       "rev-parse", "HEAD"), "cannot identify FastVEP source"),
     fastvep_version = duckvep_evidence_command(opt$fastvep, "--version", "cannot identify FastVEP executable"),
