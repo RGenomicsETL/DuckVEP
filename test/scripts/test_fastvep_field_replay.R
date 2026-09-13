@@ -64,7 +64,7 @@ local({
   table(shared, file.path(directory, "inputs_after.tsv"))
   identity <- c(source_revision = strrep("a", 40L), build_binding = "htslib_distclean_make_release",
     extension_sha256 = strrep("b", 64L), fastvep_sha256 = strrep("c", 64L),
-    fastvep_binding = "cargo_verified_tree_release_locked_offline")
+    fastvep_binding = "cargo_verified_commit_tree_release_locked_offline")
   receipt <- c(identity, mode = "replay", requested_cases = "1", completed_cases = "1",
     input_records = "1", input_alleles = "1", completed_comparisons = "3", shared_inputs_unchanged = "TRUE", errors = "0")
   table(data.frame(field = names(receipt), value = unname(receipt)), file.path(directory, "receipt.tsv"))
@@ -224,13 +224,15 @@ local({
   pins <- c(vep = "57ea5c52340acc1f156267f810ad162e26597082", variation = "2fb834b987ede3824e200197a838ce11e91aeb4b",
     fastvep = "18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6")
   writeLines("synthetic completed build", file.path(bundle, "build.log"))
-  writeLines(paste0("100644 blob ", strrep("f", 40L), "\tCargo.lock"), file.path(bundle, "source-tree.txt"))
-  write_fields(c(binding = "cargo_verified_tree_release_locked_offline", source_commit = pins[["fastvep"]],
+  source_proof <- file.path(root, "benchmarks/data/duckvep_fastvep/fastvep_verified_commit_tree")
+  stopifnot(all(file.copy(file.path(source_proof, c("source-tree.txt", "source-commit.bin")), bundle)))
+  write_fields(c(binding = "cargo_verified_commit_tree_release_locked_offline", source_commit = pins[["fastvep"]],
     cargo_lock_sha256 = strrep("f", 64L), toolchain = "1.98.1", rustc = "synthetic", cargo = "synthetic",
     rustflags = "-C target-cpu=native", command = "cargo build --release --locked --offline",
     executable_sha256 = identity[["fastvep_sha256"]], log = "build.log",
     log_sha256 = duckvep_evidence_sha256(file.path(bundle, "build.log")), exit_status = "0",
-    source_tree = "source-tree.txt", source_tree_sha256 = duckvep_evidence_sha256(file.path(bundle, "source-tree.txt"))),
+    source_tree = "source-tree.txt", source_tree_sha256 = duckvep_evidence_sha256(file.path(bundle, "source-tree.txt")),
+    source_commit_object = "source-commit.bin"),
     "fastvep_build.tsv")
   write_fields(c(source_revision = identity[["source_revision"]], path = "/synthetic/build/release/duckhts.duckdb_extension",
     binding = identity[["build_binding"]], sha256 = identity[["extension_sha256"]]), "extension_build.tsv")
@@ -275,21 +277,25 @@ local({
   write_fields(run, "run.tsv")
   seal_checkpoint(retained)
   stopifnot(report()$changed_or_missing_cells == 0L)
-  proof <- file.path(dirname(bundle), "fastvep_verified_tree")
+  proof <- file.path(dirname(bundle), "fastvep_verified_commit_tree")
   stopifnot(dir.create(proof))
   stopifnot(file.copy(file.path(bundle, "fastvep_build.tsv"), file.path(proof, "build.tsv")),
-    all(file.copy(file.path(bundle, c("build.log", "source-tree.txt")), proof)))
-  measured <- read.delim(file.path(bundle, "fastvep_build.tsv"), colClasses = "character")
-  measured <- measured[!measured$field %in% c("source_tree", "source_tree_sha256"), ]
-  measured$value[measured$field == "binding"] <- "cargo_fresh_release_locked_offline"
-  write_fields(setNames(measured$value, measured$field), "fastvep_build.tsv")
-  run[["fastvep_binding"]] <- "cargo_fresh_release_locked_offline"
-  write_fields(run, "run.tsv")
-  retained$run_hash <- duckvep_evidence_sha256(file.path(bundle, "run.tsv"))
-  seal_checkpoint(retained)
-  recorded <- duckvep_evidence_sha256(file.path(bundle, "fastvep_build.tsv"))
-  stopifnot(report()$changed_or_missing_cells == 0L,
-    identical(duckvep_evidence_sha256(file.path(bundle, "fastvep_build.tsv")), recorded))
+    all(file.copy(file.path(bundle, c("build.log", "source-tree.txt", "source-commit.bin")), proof)))
+  verified <- read.delim(file.path(bundle, "fastvep_build.tsv"), colClasses = "character")
+  for (binding in c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline")) {
+    removed <- c("source_commit_object", if (binding == "cargo_fresh_release_locked_offline")
+      c("source_tree", "source_tree_sha256"))
+    measured <- verified[!verified$field %in% removed, ]
+    measured$value[measured$field == "binding"] <- binding
+    write_fields(setNames(measured$value, measured$field), "fastvep_build.tsv")
+    run[["fastvep_binding"]] <- binding
+    write_fields(run, "run.tsv")
+    retained$run_hash <- duckvep_evidence_sha256(file.path(bundle, "run.tsv"))
+    seal_checkpoint(retained)
+    recorded <- duckvep_evidence_sha256(file.path(bundle, "fastvep_build.tsv"))
+    stopifnot(report()$changed_or_missing_cells == 0L,
+      identical(duckvep_evidence_sha256(file.path(bundle, "fastvep_build.tsv")), recorded))
+  }
   unlink(file.path(proof, "build.tsv"))
   rejects(suppressWarnings(report()))
   cat("FastVEP singleton replay and report identity, denominator and injected failure controls: OK\n")

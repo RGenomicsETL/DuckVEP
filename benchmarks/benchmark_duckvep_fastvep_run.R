@@ -143,8 +143,11 @@ main <- function() {
   if (!is.null(fastvep_build)) {
     build_files <- c(fastvep_build = opt$fastvep_build_receipt,
       fastvep_build_log = file.path(dirname(opt$fastvep_build_receipt), fastvep_build[["log"]]),
-      fastvep_source_tree = file.path(dirname(opt$fastvep_build_receipt), fastvep_build[["source_tree"]]))
-    retained <- file.path(opt$output, c("fastvep_build.tsv", fastvep_build[["log"]], fastvep_build[["source_tree"]]))
+      fastvep_source_tree = file.path(dirname(opt$fastvep_build_receipt), fastvep_build[["source_tree"]]),
+      fastvep_source_commit_object = file.path(dirname(opt$fastvep_build_receipt),
+        fastvep_build[["source_commit_object"]]))
+    retained <- file.path(opt$output, c("fastvep_build.tsv", fastvep_build[["log"]],
+      fastvep_build[["source_tree"]], fastvep_build[["source_commit_object"]]))
     if (!all(file.copy(build_files, retained))) stop("could not retain FastVEP build provenance")
     bound_files <- c(bound_files, build_files)
   }

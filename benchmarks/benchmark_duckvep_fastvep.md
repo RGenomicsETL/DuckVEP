@@ -826,7 +826,12 @@ VEP’s `c.1C>A`; that diagnostic does not replace the full campaign
 denominator. Independent-event HGVS corrections are tracked separately
 in <https://github.com/RGenomicsETL/duckhts/issues/223>.
 
-    #> Complete singleton replay evidence is not published yet.
+    #> Each replay contains one physical record with unchanged alleles and model.
+    #> Every original failure cell is reproduced in isolation; this does not establish allele/model minimization or resolve the disagreements.
+
+| original_records | replayed_records | comparison_lanes | retained_failure_cells | changed_or_missing_cells |
+|-----------------:|-----------------:|-----------------:|-----------------------:|-------------------------:|
+|           10,671 |           10,100 |           30,300 |                 41,942 |                        0 |
 
     #> Measured source: 9e14b2ef23657c660d0a4137adb2a254fb778f87
     #> FastVEP source: 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
@@ -905,22 +910,19 @@ timing, and scans must leave it unchanged. Neither run loads
 supplementary annotation providers. `--memory-limit` and `--max-spill`
 set per-process DuckDB memory and spill caps; their defaults are 4 GB
 and 8 GB. Spill files use a private temporary directory. Published runs
-require `--fastvep-build-receipt` from a fresh build of the pinned
-FastVEP Git tree in an empty Cargo target directory. The builder exports
-tracked source files and verifies their paths and Git blob hashes,
-excluding local untracked or ignored inputs. The retained tree manifest,
-build log and receipt bind the source commit, Cargo lockfile, toolchain,
-flags and executable digest. The runner checks the executable and cache
-against that receipt. Earlier execution receipts require the independent
-`fastvep_verified_tree` build bundle beside the campaign directories.
-Its verified-tree build must match the recorded commit, lockfile,
-compiler, Cargo, flags and executable bytes. This supplementary proof
-preserves the original execution binding and artifacts; it does not
-claim that earlier runs used the verified-tree builder.
-Source/model/reference identities, input record and ALT counts,
-elapsed/user/ system time, CPU utilization, peak RSS, bytes and complete
-output fingerprints are retained beside a completion manifest. Partial
-or failed runs cannot populate the table above.
+require `--fastvep-build-receipt` from a fresh pinned-source build in an
+empty Cargo target directory. Git object hashes authenticate the
+retained commit and every directory in its tree; exported file bytes are
+checked before and after compilation. The receipt binds the lockfile,
+compiler, flags and binary. Earlier receipt formats require the
+independent `fastvep_verified_commit_tree` bundle, matching those same
+identities and executable bytes. Original execution bindings and
+artifacts remain unchanged; the supplementary proof does not claim that
+earlier runs used the current builder. Source/model/reference
+identities, input record and ALT counts, elapsed/user/ system time, CPU
+utilization, peak RSS, bytes and complete output fingerprints are
+retained beside a completion manifest. Partial or failed runs cannot
+populate the table above.
 
 Choose fresh output directories for another run; published evidence is
 not overwritten.

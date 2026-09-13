@@ -48,6 +48,7 @@ main <- function() {
   dir.create(directory)
   on.exit(unlink(directory, recursive = TRUE), add = TRUE)
   sha256 <- function(path) digest::digest(file = path, algo = "sha256")
+  source_proof <- file.path(root, "benchmarks/data/duckvep_fastvep/fastvep_verified_commit_tree")
   failure_template <- file.path(directory, "empty_failures.parquet")
   failure_con <- DBI::dbConnect(duckdb::duckdb())
   on.exit(DBI::dbDisconnect(failure_con, shutdown = TRUE), add = TRUE)
@@ -68,7 +69,8 @@ main <- function() {
   }
   verification <- function(path, build, from) {
     dir.create(path, recursive = TRUE)
-    stopifnot(all(file.copy(file.path(from, c(build[["log"]], build[["source_tree"]])), path)))
+    stopifnot(all(file.copy(file.path(from,
+      c(build[["log"]], build[["source_tree"]], build[["source_commit_object"]])), path)))
     write_fields(build, file.path(path, "build.tsv"), tab = TRUE)
   }
   revision <- strrep("a", 40L)
@@ -118,16 +120,18 @@ main <- function() {
     write_fields(cache, cache_path, tab = TRUE)
     hashes <- c(hashes, cache_receipt = sha256(cache_path))
     writeLines("synthetic successful fresh Cargo build", file.path(path, "build.log"))
-    writeLines(paste0("100644 blob ", strrep("a", 40L), "\tCargo.lock"), file.path(path, "source-tree.txt"))
-    build <- c(binding = "cargo_verified_tree_release_locked_offline", source_commit = identity[["source_commit"]],
+    stopifnot(all(file.copy(file.path(source_proof, c("source-tree.txt", "source-commit.bin")), path)))
+    build <- c(binding = "cargo_verified_commit_tree_release_locked_offline", source_commit = identity[["source_commit"]],
       cargo_lock_sha256 = strrep("b", 64L), toolchain = "1.98.1", rustc = "fixture rustc",
       cargo = "fixture cargo", rustflags = "-C target-cpu=native", command = "fixture cargo build",
       executable_sha256 = hashes[["fastvep"]], log = "build.log",
       log_sha256 = sha256(file.path(path, "build.log")), exit_status = "0",
-      source_tree = "source-tree.txt", source_tree_sha256 = sha256(file.path(path, "source-tree.txt")))
+      source_tree = "source-tree.txt", source_tree_sha256 = sha256(file.path(path, "source-tree.txt")),
+      source_commit_object = "source-commit.bin")
     write_fields(build, file.path(path, "fastvep_build.tsv"), tab = TRUE)
     hashes <- c(hashes, fastvep_build = sha256(file.path(path, "fastvep_build.tsv")),
-      fastvep_build_log = build[["log_sha256"]], fastvep_source_tree = build[["source_tree_sha256"]])
+      fastvep_build_log = build[["log_sha256"]], fastvep_source_tree = build[["source_tree_sha256"]],
+      fastvep_source_commit_object = sha256(file.path(path, "source-commit.bin")))
     write_csv(data.frame(
       artifact = names(hashes), path = paste0("synthetic/", names(hashes)),
       sha256 = unname(hashes)
@@ -269,25 +273,33 @@ main <- function() {
     all(valid$env$medians$elapsed_seconds == 1),
     any(grepl("Measured source:", valid$output, fixed = TRUE))
   )
-  for (mutation in c("none", "missing_receipt", "changed_tree", "wrong_compiler", "wrong_binary")) {
-    path <- fixture(file.path(directory, paste0("supplement_", mutation), "field_contracts"))
+  for (binding in c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline"))
+  for (mutation in c("none", "missing_receipt", "changed_tree", "wrong_compiler", "wrong_binary",
+      "missing_commit", "changed_commit")) {
+    path <- fixture(file.path(directory, paste0("supplement_", binding, "_", mutation), "field_contracts"))
     build_path <- file.path(path, "fastvep_build.tsv")
     build <- read.delim(build_path, colClasses = "character")
-    proof <- file.path(dirname(path), "fastvep_verified_tree")
+    proof <- file.path(dirname(path), "fastvep_verified_commit_tree")
     verification(proof, setNames(build$value, build$field), path)
-    build <- build[!build$field %in% c("source_tree", "source_tree_sha256"), ]
-    build$value[build$field == "binding"] <- "cargo_fresh_release_locked_offline"
+    removed <- c("source_commit_object", if (binding == "cargo_fresh_release_locked_offline")
+      c("source_tree", "source_tree_sha256"))
+    build <- build[!build$field %in% removed, ]
+    build$value[build$field == "binding"] <- binding
     utils::write.table(build, build_path, sep = "\t", quote = FALSE, row.names = FALSE)
-    unlink(file.path(path, "source-tree.txt"))
-    edit_metadata(path, "fastvep_binding", "cargo_fresh_release_locked_offline")
+    unlink(file.path(path, "source-commit.bin"))
+    if (binding == "cargo_fresh_release_locked_offline") unlink(file.path(path, "source-tree.txt"))
+    edit_metadata(path, "fastvep_binding", binding)
     edit_csv(path, "inputs.csv", function(x) {
       x$sha256[x$artifact == "fastvep_build"] <- sha256(build_path)
-      x[x$artifact != "fastvep_source_tree", ]
+      x[!x$artifact %in% c("fastvep_source_commit_object",
+        if (binding == "cargo_fresh_release_locked_offline") "fastvep_source_tree"), ]
     })
     seal(path)
     original_manifest <- sha256(file.path(path, "artifacts.csv"))
     if (mutation == "missing_receipt") unlink(file.path(proof, "build.tsv"))
     if (mutation == "changed_tree") writeLines("changed tree", file.path(proof, "source-tree.txt"))
+    if (mutation == "missing_commit") unlink(file.path(proof, "source-commit.bin"))
+    if (mutation == "changed_commit") writeLines("changed commit", file.path(proof, "source-commit.bin"))
     if (mutation %in% c("wrong_compiler", "wrong_binary")) {
       file <- file.path(proof, "build.tsv")
       x <- read.delim(file, colClasses = "character")
@@ -300,7 +312,7 @@ main <- function() {
       identical(sha256(file.path(path, "artifacts.csv")), original_manifest))
     if (mutation == "none") {
       stopifnot(identical(result$env$complete_rows, valid$env$complete_rows),
-        result$env$build[["binding"]] == "cargo_fresh_release_locked_offline")
+        result$env$build[["binding"]] == binding)
     }
   }
 
@@ -360,6 +372,8 @@ main <- function() {
   check("changed_build_log", function(path) writeLines("stale build", file.path(path, "build.log")))
   check("missing_source_tree", function(path) unlink(file.path(path, "source-tree.txt")))
   check("changed_source_tree", function(path) writeLines("changed tree", file.path(path, "source-tree.txt")))
+  check("missing_source_commit", function(path) unlink(file.path(path, "source-commit.bin")))
+  check("changed_source_commit", function(path) writeLines("changed commit", file.path(path, "source-commit.bin")))
   check("missing_source_map_receipt", function(path) unlink(file.path(path, "source_map_receipt.tsv")))
   check("missing_registered_source_map", function(path) {
     unlink(file.path(paste0(path, "-cache"), map_row$cache_relpath, "source_alleles.parquet"))
@@ -536,13 +550,17 @@ main <- function() {
     "invalid FastVEP build receipt schema")
   check_cli("mismatched-binary", c("--diagnostic", "--fastvep-build-receipt", file.path(valid_path, "fastvep_build.tsv"),
     "--fastvep", file.path(valid_path, "metadata.csv")), "FastVEP executable differs from its build receipt")
-  old_build <- read.delim(file.path(valid_path, "fastvep_build.tsv"), colClasses = "character")
-  old_build <- old_build[!old_build$field %in% c("source_tree", "source_tree_sha256"), ]
-  old_build$value[old_build$field == "binding"] <- "cargo_fresh_release_locked_offline"
-  old_path <- file.path(directory, "old-build.tsv")
-  utils::write.table(old_build, old_path, sep = "\t", quote = FALSE, row.names = FALSE)
-  check_cli("old-binding", c("--diagnostic", "--fastvep-build-receipt", old_path),
-    "invalid FastVEP build receipt schema")
+  for (binding in c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline")) {
+    old_build <- read.delim(file.path(valid_path, "fastvep_build.tsv"), colClasses = "character")
+    removed <- c("source_commit_object", if (binding == "cargo_fresh_release_locked_offline")
+      c("source_tree", "source_tree_sha256"))
+    old_build <- old_build[!old_build$field %in% removed, ]
+    old_build$value[old_build$field == "binding"] <- binding
+    old_path <- file.path(directory, paste0(binding, ".tsv"))
+    utils::write.table(old_build, old_path, sep = "\t", quote = FALSE, row.names = FALSE)
+    check_cli(binding, c("--diagnostic", "--fastvep-build-receipt", old_path),
+      "invalid FastVEP build receipt schema")
+  }
   capacity_begin <- which(rmd == "```{r native-capacity-diagnostic, include=FALSE}")
   stopifnot(length(capacity_begin) == 1L)
   capacity_end <- which(seq_along(rmd) > capacity_begin & rmd == "```")[[1L]]
@@ -585,7 +603,8 @@ main <- function() {
   field_cases <- c("historical_unbound", "unbound_with_build", "bound", "missing_build",
     "missing_log", "wrong_binary", "unlisted_build", "unlisted_log",
     "missing_fastvep", "missing_fastvep_sha256", "missing_verification", "wrong_verification_binary",
-    "missing_verification_tree", "changed_verification_tree", "new_binding")
+    "missing_verification_tree", "changed_verification_tree", "new_binding", "tree_binding",
+    "missing_verification_commit", "changed_verification_commit")
   for (mutation in field_cases) {
     path <- file.path(directory, paste0("field_", mutation), "fields_seed173_9bf888e")
     dir.create(path, recursive = TRUE)
@@ -595,24 +614,32 @@ main <- function() {
     unbound <- mutation %in% c("historical_unbound", "unbound_with_build")
     if (!unbound) receipt$value[receipt$field == "fastvep_binding"] <- "cargo_fresh_release_locked_offline"
     if (mutation == "new_binding") receipt$value[receipt$field == "fastvep_binding"] <-
+      "cargo_verified_commit_tree_release_locked_offline"
+    if (mutation == "tree_binding") receipt$value[receipt$field == "fastvep_binding"] <-
       "cargo_verified_tree_release_locked_offline"
     utils::write.table(receipt, receipt_path, sep = "\t", quote = FALSE, row.names = FALSE)
     if (!mutation %in% c("historical_unbound", "missing_build")) {
       build <- read.delim(file.path(valid_path, "fastvep_build.tsv"), colClasses = "character")
       build$value[build$field == "executable_sha256"] <-
         if (mutation == "wrong_binary") strrep("0", 64L) else receipt$value[receipt$field == "fastvep_sha256"]
-      proof <- file.path(dirname(path), "fastvep_verified_tree")
+      proof <- file.path(dirname(path), "fastvep_verified_commit_tree")
       if (mutation != "missing_verification") {
         verified <- setNames(build$value, build$field)
         if (mutation == "wrong_verification_binary") verified[["executable_sha256"]] <- strrep("0", 64L)
         verification(proof, verified, valid_path)
         if (mutation == "missing_verification_tree") unlink(file.path(proof, "source-tree.txt"))
         if (mutation == "changed_verification_tree") writeLines("changed tree", file.path(proof, "source-tree.txt"))
+        if (mutation == "missing_verification_commit") unlink(file.path(proof, "source-commit.bin"))
+        if (mutation == "changed_verification_commit") writeLines("changed commit", file.path(proof, "source-commit.bin"))
       }
       if (mutation == "new_binding") {
+        stopifnot(all(file.copy(file.path(valid_path, c("source-tree.txt", "source-commit.bin")), path)))
+      } else if (mutation == "tree_binding") {
         stopifnot(file.copy(file.path(valid_path, "source-tree.txt"), path))
+        build <- build[build$field != "source_commit_object", ]
+        build$value[build$field == "binding"] <- "cargo_verified_tree_release_locked_offline"
       } else {
-        build <- build[!build$field %in% c("source_tree", "source_tree_sha256"), ]
+        build <- build[!build$field %in% c("source_tree", "source_tree_sha256", "source_commit_object"), ]
         build$value[build$field == "binding"] <- "cargo_fresh_release_locked_offline"
       }
       utils::write.table(build, file.path(path, "fastvep_build.tsv"),
@@ -634,7 +661,7 @@ main <- function() {
     env$root <- root
     env$data_dir <- dirname(path)
     rendered <- tryCatch(capture.output(eval(field_gate, envir = env)), error = function(error) error)
-    accepted <- mutation %in% c("historical_unbound", "unbound_with_build", "bound", "new_binding")
+    accepted <- mutation %in% c("historical_unbound", "unbound_with_build", "bound", "new_binding", "tree_binding")
     stopifnot(identical(!inherits(rendered, "error"), accepted))
     if (mutation %in% c("missing_fastvep", "missing_fastvep_sha256")) {
       stopifnot(identical(conditionMessage(rendered), "subscript out of bounds"))
@@ -648,8 +675,8 @@ main <- function() {
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
   cat("Timing runner: missing/malformed build receipts and mismatched executables rejected\n")
   cat("Capacity diagnostic: valid evidence rendered; three failure-artifact corruptions rejected\n")
-  cat("Supplementary tree proof: original matrix receipts unchanged; four proof corruptions rejected\n")
-  cat("Field campaign provenance: unbound, supplemented and verified-tree controls checked; eleven mutations rejected\n")
+  cat("Supplementary commit proof: original matrix receipts unchanged; twelve proof corruptions rejected\n")
+  cat("Field campaign provenance: unbound, supplemented and verified-commit controls checked; thirteen mutations rejected\n")
 }
 
 main()

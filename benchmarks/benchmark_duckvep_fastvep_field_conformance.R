@@ -161,9 +161,11 @@ main <- function() {
     build <- duckhts_bench_read_fastvep_build(opt$fastvep_build_receipt, pins[["fastvep"]], fastvep)
     fastvep_binding <- build[["binding"]]
     build_files <- c(opt$fastvep_build_receipt,
-      file.path(dirname(opt$fastvep_build_receipt), c(build[["log"]], build[["source_tree"]])))
+      file.path(dirname(opt$fastvep_build_receipt),
+        c(build[["log"]], build[["source_tree"]], build[["source_commit_object"]])))
     if (!all(file.copy(build_files,
-        file.path(directory, c("fastvep_build.tsv", build[["log"]], build[["source_tree"]]))))) {
+        file.path(directory, c("fastvep_build.tsv", build[["log"]], build[["source_tree"]],
+          build[["source_commit_object"]]))))) {
       stop("could not retain FastVEP build provenance")
     }
   }

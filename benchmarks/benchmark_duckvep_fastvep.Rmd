@@ -1615,7 +1615,8 @@ stopifnot(field_receipt[["build_binding"]] == "htslib_distclean_make_release",
   field_receipt[["shared_inputs_unchanged"]] == "TRUE", nrow(field_summary) == 24L)
 cat("DuckHTS source checkout:", field_receipt[["source_revision"]], "\n\n")
 if (field_receipt[["fastvep_binding"]] %in%
-    c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline")) {
+    c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline",
+      "cargo_verified_commit_tree_release_locked_offline")) {
   stopifnot("fastvep_build.tsv" %in% field_manifest$path)
   for (name in c("stage", "duckvep", "fastvep")) {
     source(file.path(root, "r/duckhtsbench/R", paste0(name, ".R")))
@@ -1627,12 +1628,15 @@ if (field_receipt[["fastvep_binding"]] %in%
   stopifnot(field_receipt[["fastvep"]] == field_identity[["source_commit"]])
   field_build <- duckhts_bench_read_fastvep_build(file.path(field_dir, "fastvep_build.tsv"),
     field_identity[["source_commit"]], verification_receipt =
-      if (field_receipt[["fastvep_binding"]] == "cargo_fresh_release_locked_offline")
-        file.path(data_dir, "fastvep_verified_tree", "build.tsv") else NULL)
+      if (field_receipt[["fastvep_binding"]] != "cargo_verified_commit_tree_release_locked_offline")
+        file.path(data_dir, "fastvep_verified_commit_tree", "build.tsv") else NULL)
   stopifnot(field_build[["log"]] %in% field_manifest$path,
     field_build[["binding"]] == field_receipt[["fastvep_binding"]],
     field_build[["executable_sha256"]] == field_receipt[["fastvep_sha256"]])
   if ("source_tree" %in% names(field_build)) stopifnot(field_build[["source_tree"]] %in% field_manifest$path)
+  if ("source_commit_object" %in% names(field_build)) {
+    stopifnot(field_build[["source_commit_object"]] %in% field_manifest$path)
+  }
   cat("FastVEP executable provenance: verified pinned-tree binary identity; recorded execution binding:",
     field_build[["binding"]], "\n\n")
 } else {
@@ -1689,8 +1693,9 @@ validate_replay_bundle <- function(directory, evidence, expected = c(records = 1
     extension[["source_revision"]] == run[["revision"]], extension[["binding"]] == run[["build_binding"]],
     extension[["sha256"]] == run[["extension_sha256"]])
   build <- duckhts_bench_read_fastvep_build(file.path(directory, "fastvep_build.tsv"), run[["fastvep"]],
-    verification_receipt = if (run[["fastvep_binding"]] == "cargo_fresh_release_locked_offline")
-      file.path(dirname(directory), "fastvep_verified_tree", "build.tsv") else NULL)
+    verification_receipt = if (run[["fastvep_binding"]] %in%
+        c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline"))
+      file.path(dirname(directory), "fastvep_verified_commit_tree", "build.tsv") else NULL)
   stopifnot(build[["binding"]] == run[["fastvep_binding"]],
     build[["executable_sha256"]] == run[["fastvep_sha256"]])
   manifest_path <- file.path(evidence, "artifacts.tsv")
@@ -1730,9 +1735,10 @@ if (!file.exists(file.path(replay_directory, "completion.csv"))) {
   cat("Complete singleton replay evidence is not published yet.\n")
 } else {
   replay_counts <- validate_replay_bundle(replay_directory, field_dir)
-  knitr::kable(replay_counts)
   cat("Each replay contains one physical record with unchanged alleles and model.\n",
-    "Every original failure cell is reproduced in isolation; this does not establish allele/model minimization or resolve the disagreements.\n")
+    "Every original failure cell is reproduced in isolation; this does not establish allele/model minimization or resolve the disagreements.\n",
+    sep = "")
+  knitr::kable(replay_counts, format.args = list(big.mark = ","))
 }
 ```
 
@@ -1783,11 +1789,17 @@ if (!file.exists(completion_path)) {
     registry$id == "fastvep_ensembl116_cache"])
   build <- duckhts_bench_read_fastvep_build(file.path(complete_dir, "fastvep_build.tsv"),
     identity[["source_commit"]], verification_receipt =
-      if (metadata[["fastvep_binding"]] == "cargo_fresh_release_locked_offline")
-        file.path(data_dir, "fastvep_verified_tree", "build.tsv") else NULL)
+      if (metadata[["fastvep_binding"]] %in%
+          c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline"))
+        file.path(data_dir, "fastvep_verified_commit_tree", "build.tsv") else NULL)
   if ("source_tree" %in% names(build)) {
     stopifnot(build[["source_tree"]] %in% manifest$file,
       build[["source_tree_sha256"]] == input_hashes[["fastvep_source_tree"]])
+  }
+  if ("source_commit_object" %in% names(build)) {
+    stopifnot(build[["source_commit_object"]] %in% manifest$file,
+      sha256(file.path(complete_dir, build[["source_commit_object"]])) ==
+        input_hashes[["fastvep_source_commit_object"]])
   }
   source_map <- duckhts_bench_read_fastvep_source_map(
     input_hashes[["source_map"]], input_hashes[["input"]],
@@ -1973,17 +1985,14 @@ cache preparation is outside timing, and scans must leave it unchanged. Neither
 run loads supplementary annotation providers.
 `--memory-limit` and `--max-spill` set per-process DuckDB memory and spill caps;
 their defaults are 4 GB and 8 GB. Spill files use a private temporary directory.
-Published runs require `--fastvep-build-receipt` from a fresh build of the pinned
-FastVEP Git tree in an empty Cargo target directory. The builder exports tracked
-source files and verifies their paths and Git blob hashes, excluding local
-untracked or ignored inputs. The retained tree manifest, build log and receipt
-bind the source commit, Cargo lockfile, toolchain, flags and executable digest.
-The runner checks the executable and cache against that receipt.
-Earlier execution receipts require the independent `fastvep_verified_tree`
-build bundle beside the campaign directories. Its verified-tree build must
-match the recorded commit, lockfile, compiler, Cargo, flags and executable bytes.
-This supplementary proof preserves the original execution binding and artifacts;
-it does not claim that earlier runs used the verified-tree builder.
+Published runs require `--fastvep-build-receipt` from a fresh pinned-source build
+in an empty Cargo target directory. Git object hashes authenticate the retained
+commit and every directory in its tree; exported file bytes are checked before
+and after compilation. The receipt binds the lockfile, compiler, flags and binary.
+Earlier receipt formats require the independent `fastvep_verified_commit_tree`
+bundle, matching those same identities and executable bytes. Original execution
+bindings and artifacts remain unchanged; the supplementary proof does not claim
+that earlier runs used the current builder.
 Source/model/reference identities, input record and ALT counts, elapsed/user/
 system time, CPU utilization, peak RSS, bytes and complete output fingerprints
 are retained beside a completion manifest. Partial or failed runs cannot
