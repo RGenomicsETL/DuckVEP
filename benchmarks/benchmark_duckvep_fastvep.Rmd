@@ -1681,7 +1681,9 @@ if (!file.exists(completion_path)) {
     registry$id == "fastvep_ensembl116_cache"])
   build <- duckhts_bench_read_fastvep_build(file.path(complete_dir, "fastvep_build.tsv"),
     identity[["source_commit"]])
-  source_map <- duckhts_bench_read_fastvep_source_map(input_hashes[["source_map"]], input_hashes[["input"]])
+  source_map <- duckhts_bench_read_fastvep_source_map(
+    input_hashes[["source_map"]], input_hashes[["input"]],
+    expected_extension_sha256 = input_hashes[["extension"]])
   stopifnot(sha256(source_map[["receipt"]]) == input_hashes[["source_map_receipt"]],
     sha256(file.path(complete_dir, "source_map_receipt.tsv")) == input_hashes[["source_map_receipt"]])
   stopifnot(build[["log"]] %in% manifest$file,

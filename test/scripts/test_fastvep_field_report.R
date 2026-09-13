@@ -81,8 +81,8 @@ main <- function() {
   fixture <- function(path) {
     dir.create(path, recursive = TRUE)
     hashes <- setNames(
-      vapply(seq_len(8L), function(i) strrep(as.character(i), 64L), character(1L)),
-      c("input", "model", "fasta", "gff3", "cache", "fastvep", "fasta_index", "source_map")
+      vapply(seq_len(9L), function(i) strrep(as.character(i), 64L), character(1L)),
+      c("input", "model", "fasta", "gff3", "cache", "fastvep", "fasta_index", "source_map", "extension")
     )
     hashes[["input"]] <- map_identity[["input_sha256"]]
     map_directory <- file.path(paste0(path, "-cache"), map_row$cache_relpath)
@@ -94,7 +94,7 @@ main <- function() {
     map_receipt <- c(artifact_id = map_row$id, transform = map_row$transform,
       supplier_identity = map_row$supplier_identity, source_id = "variantkey_giab_hg002_v421",
       input_sha256 = hashes[["input"]], generator_sha256 = strrep("a", 64L),
-      generator_source_sha256 = strrep("b", 64L), extension_sha256 = strrep("c", 64L),
+      generator_source_sha256 = strrep("b", 64L), extension_sha256 = hashes[["extension"]],
       duckdb_version = "synthetic", source_map_sha256 = hashes[["source_map"]],
       map_identity[c("records", "alleles", "eligible_alleles")])
     write_fields(map_receipt, paste0(map_path, ".provenance.tsv"), tab = TRUE)
@@ -323,6 +323,19 @@ main <- function() {
   })
   check("changed_registered_source_map", function(path) {
     writeLines("changed keys", file.path(paste0(path, "-cache"), map_row$cache_relpath, "source_alleles.parquet"))
+  })
+  check("source_map_from_other_extension", function(path) {
+    receipt_path <- file.path(paste0(path, "-cache"), map_row$cache_relpath,
+      "source_alleles.parquet.provenance.tsv")
+    receipt <- read.delim(receipt_path, colClasses = "character")
+    stopifnot(sum(receipt$field == "extension_sha256") == 1L)
+    receipt$value[receipt$field == "extension_sha256"] <- strrep("f", 64L)
+    utils::write.table(receipt, receipt_path, sep = "\t", quote = FALSE, row.names = FALSE)
+    stopifnot(file.copy(receipt_path, file.path(path, "source_map_receipt.tsv"), overwrite = TRUE))
+    edit_csv(path, "inputs.csv", function(x) {
+      x$sha256[x$artifact == "source_map_receipt"] <- sha256(receipt_path)
+      x
+    })
   })
   check("missing_observation", function(path) {
     unlink(file.path(path, paste0(labels[[1L]], ".csv")))
