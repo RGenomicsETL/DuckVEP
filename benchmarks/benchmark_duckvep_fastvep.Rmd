@@ -521,8 +521,9 @@ Complete CSQ includes HGVS. Supplementary annotation is measured separately.
 Performance depends on the output contract. The
 [complete-field measurements](#complete-field-contracts) compare native tab and
 common CSQ with FastVEP revision `18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6`
-(September 10, 2026), using a separately rebuilt cache. They retain all output
-rows and field disagreements; they do not establish complete VEP parity.
+(September 10, 2026), using a cache rebuilt from DuckVEP's exact 644,427-transcript
+inventory. They retain all output rows and field disagreements; they do not
+establish complete VEP parity.
 FastVEP is faster in both complete-field workloads at one and four cores in
 this retained matrix. These are end-to-end pipeline measurements, not isolated
 kernel timings.
