@@ -572,14 +572,15 @@ The four placeholders have different status:
 | `Existing_variation` | exact allele join to dbSNP, ClinVar, or another named-variant relation | No |
 | `DISTANCE` | one validated projection from VEP feature geometry and transcript endpoints; SQL may render the resulting number | No |
 | `FLAGS` | join requested transcript attributes from the model relation | No |
-| `Codons` | emit the reference/alternate triplets from the coding context the kernel already computed; SQL should only render them | No |
+| `Codons` | reconstruct reference/alternate triplets in `duckvep_transcript_projection`; the annotation kernel currently exposes only the scalar coding facts | No |
 
 Thus the comparison credits FastVEP for computing these native values. It also
 shows where DuckVEP can obtain named-variant and transcript metadata through
-ordinary joins without enlarging the consequence model. `Codons` comes from
-`duckvep_transcript_projection`, which exposes native coding facts; it is not
-reconstructed independently in SQL. The complete-field comparison below includes
-that projection. The compact timings above do not measure it.
+ordinary joins without enlarging the consequence model. The current complete-field
+adapter materializes annotations and calls `duckvep_transcript_projection`, whose
+SQL reconstructs exon/CDS geometry, codon windows and translation for each result.
+The complete-field comparison below includes that projection. The compact timings
+above do not measure it.
 
 ## Algorithm design: make the repeated biology small
 
@@ -1815,7 +1816,7 @@ if (!file.exists(file.path(replay_directory, "completion.csv"))) {
 ```
 
 ```{r complete-field-observations}
-complete_dir <- file.path(data_dir, "field_contracts_329bbe3")
+complete_dir <- file.path(data_dir, "field_contracts_matched_271ce67")
 completion_path <- file.path(complete_dir, "completion.csv")
 if (!file.exists(completion_path)) {
   cat("Whole-GIAB complete-field measurements are not published yet.\n")
@@ -1880,6 +1881,9 @@ if (!file.exists(completion_path)) {
       matched[["model_sha256"]] == identity[["model_sha256"]],
       matched[["transcript_count"]] == metadata[["matched_transcripts"]],
       matched[["transcript_count"]] == identity[["transcripts"]],
+      cache[["model_sha256"]] == metadata[["matched_model_sha256"]],
+      cache[["matched_gff_receipt_sha256"]] ==
+        input_hashes[["matched_gff_receipt"]],
       all(grepl("^[1-9][0-9]*$", matched[count_fields])),
       all(grepl("^[0-9a-f]{64}$", matched[digest_fields])),
       matched[["filtered_gff3_sha256"]] == input_hashes[["gff3"]],
@@ -2004,6 +2008,19 @@ if (!file.exists(completion_path)) {
     col.names = c("Tool", "Contract", "Cores", "Median seconds", "Median peak GiB", "Rows", "Output GiB"))
 }
 ```
+
+The complete DuckVEP adapter is not a fused text writer. It first materializes the
+event and annotation relations, then reconstructs presentation facts through
+`duckvep_transcript_projection` and joins transcript metadata before `COPY`. The
+one-core `operational17` median is `r sprintf("%.2f", medians$elapsed_seconds[
+  medians$tool == "duckvep" & medians$output_contract == "operational17" &
+    medians$threads == 1])` seconds; adding the current complete native projection
+raises that median to `r sprintf("%.2f", medians$elapsed_seconds[
+  medians$tool == "duckvep" & medians$output_contract == "native_tab17" &
+    medians$threads == 1])` seconds while retaining the same output-row count.
+This difference measures the whole adapter path and does not assign time to one
+operator. It identifies the materialized projection path as optimization work; it
+is not evidence that DuckDB's CSV writer alone is slower than FastVEP's writer.
 
 ```{r complete-field-comparison}
 if (cache_id == "fastvep_ensembl116_duckvep_matched_cache") {

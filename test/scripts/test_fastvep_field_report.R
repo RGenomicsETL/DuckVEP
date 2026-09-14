@@ -23,7 +23,9 @@ main <- function() {
   registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"),
     check.names = FALSE, colClasses = "character"
   )
-  cache_row <- registry[registry$id == "fastvep_ensembl116_cache", ]
+  cache_row <- registry[
+    registry$id == "fastvep_ensembl116_duckvep_matched_cache",
+  ]
   map_row <- registry[registry$id == "fastvep_giab_hg002_v421_source_map", ]
   stopifnot(nrow(map_row) == 1L)
   map_pairs <- strsplit(strsplit(map_row$supplier_identity, ";", fixed = TRUE)[[1L]], "=", fixed = TRUE)
@@ -42,7 +44,10 @@ main <- function() {
   stopifnot(
     identity[["source_commit"]] == "18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6",
     identity[["version"]] == "0.3.0", identity[["cache_format"]] == "FSTVEP05",
-    identity[["preparation"]] == "full_gff_hgvs", identity[["transcripts"]] == "646577"
+    identity[["preparation"]] == "duckvep_model_matched_hgvs",
+    identity[["transcripts"]] == "644427",
+    identity[["model_sha256"]] ==
+      "38da573cf9968c58e5ff42b8edddd0de952cc51cdb37c1ca03b481c7aea0853f"
   )
   directory <- tempfile("fastvep-field-report-")
   dir.create(directory)
@@ -74,7 +79,7 @@ main <- function() {
     write_fields(build, file.path(path, "build.tsv"), tab = TRUE)
   }
   revision <- strrep("a", 40L)
-  timing_pack <- "field_contracts_329bbe3"
+  timing_pack <- "field_contracts_matched_271ce67"
   configurations <- c(
     "duckvep_operational17", "duckvep_native_tab17",
     "duckvep_vep_csq", "fastvep_native_tab17", "fastvep_vep_csq"
@@ -108,11 +113,32 @@ main <- function() {
     write_fields(map_receipt, paste0(map_path, ".provenance.tsv"), tab = TRUE)
     stopifnot(file.copy(paste0(map_path, ".provenance.tsv"), file.path(path, "source_map_receipt.tsv")))
     hashes <- c(hashes, source_map_receipt = sha256(file.path(path, "source_map_receipt.tsv")))
+    matched <- c(
+      schema = "duckvep_fastvep_matched_gff_v1",
+      source_gff3_sha256 = strrep("c", 64L),
+      model_sha256 = identity[["model_sha256"]],
+      proof = "initial_derivation_six_except_all",
+      transcript_count = identity[["transcripts"]], gene_count = "1",
+      exon_count = "1", cds_segment_count = "1",
+      transcript_inventory_sha256 = strrep("d", 64L),
+      exon_geometry_sha256 = strrep("e", 64L),
+      cds_geometry_sha256 = strrep("f", 64L),
+      transcript_model_only = "0", transcript_source_only = "0",
+      exon_model_only = "0", exon_source_only = "0",
+      cds_model_only = "0", cds_source_only = "0",
+      filtered_gff3_sha256 = hashes[["gff3"]]
+    )
+    matched_path <- file.path(path, "matched_gff_receipt.tsv")
+    write_fields(matched, matched_path, tab = TRUE)
+    hashes <- c(hashes, matched_gff_receipt = sha256(matched_path))
     cache <- c(
+      artifact_id = cache_row$id,
       source_commit = identity[["source_commit"]],
       executable_version = paste("fastvep", identity[["version"]]),
-      cache_format = identity[["cache_format"]], preparation = "full_gff_hgvs",
+      cache_format = identity[["cache_format"]], preparation = identity[["preparation"]],
       transcript_count = identity[["transcripts"]],
+      model_sha256 = identity[["model_sha256"]],
+      matched_gff_receipt_sha256 = hashes[["matched_gff_receipt"]],
       cache_sha256 = unname(hashes[["cache"]]), executable_sha256 = unname(hashes[["fastvep"]]),
       gff3_sha256 = unname(hashes[["gff3"]]), fasta_sha256 = unname(hashes[["fasta"]]),
       fasta_index_sha256 = unname(hashes[["fasta_index"]])
@@ -139,6 +165,9 @@ main <- function() {
     ), file.path(path, "inputs.csv"))
     metadata <- c(
       source_revision = revision, binding = "source_bound",
+      fastvep_cache_id = cache_row$id,
+      matched_model_sha256 = identity[["model_sha256"]],
+      matched_transcripts = identity[["transcripts"]],
       input_id = "variantkey_giab_hg002_v421", input_records = "4048342",
       input_alt_alleles = "4096123", eligible_literal_alleles = "4095611",
       fastvep_source_revision = identity[["source_commit"]],
@@ -218,6 +247,19 @@ main <- function() {
     utils::write.table(cache, target, sep = "\t", quote = FALSE, row.names = FALSE)
     edit_csv(path, "inputs.csv", function(x) {
       x$sha256[x$artifact == "cache_receipt"] <- sha256(target)
+      x
+    })
+  }
+  edit_matched <- function(path, field, value) {
+    target <- file.path(path, "matched_gff_receipt.tsv")
+    matched <- read.delim(target, colClasses = "character")
+    stopifnot(sum(matched$field == field) == 1L)
+    matched$value[matched$field == field] <- value
+    utils::write.table(matched, target, sep = "\t", quote = FALSE, row.names = FALSE)
+    receipt_sha256 <- sha256(target)
+    edit_cache(path, "matched_gff_receipt_sha256", receipt_sha256)
+    edit_csv(path, "inputs.csv", function(x) {
+      x$sha256[x$artifact == "matched_gff_receipt"] <- receipt_sha256
       x
     })
   }
@@ -335,30 +377,44 @@ main <- function() {
   for (field in c(
     "binding", "input_id", "input_records", "input_alt_alleles",
     "eligible_literal_alleles", "fastvep_source_revision", "fastvep_version",
-    "fastvep_binding"
+    "fastvep_binding", "fastvep_cache_id", "matched_model_sha256",
+    "matched_transcripts"
   )) {
     values <- c(
       binding = "diagnostic_unbound", input_id = "fastvep_cache_probe",
       input_records = "3", input_alt_alleles = "3", eligible_literal_alleles = "3",
       fastvep_source_revision = "7038e7c17708e7d2226149e78e0bb297bcc6d1d6",
-      fastvep_version = "fastvep 0.2.0", fastvep_binding = "diagnostic_binary_unbound"
+      fastvep_version = "fastvep 0.2.0", fastvep_binding = "diagnostic_binary_unbound",
+      fastvep_cache_id = "fastvep_ensembl116_cache",
+      matched_model_sha256 = strrep("0", 64L), matched_transcripts = "1"
     )
     check(paste0("metadata_", field), function(path) edit_metadata(path, field, values[[field]]))
   }
   for (field in c(
     "source_commit", "executable_version", "cache_format", "preparation",
     "transcript_count", "cache_sha256", "executable_sha256", "gff3_sha256", "fasta_sha256",
-    "fasta_index_sha256"
+    "fasta_index_sha256", "model_sha256", "matched_gff_receipt_sha256"
   )) {
     values <- c(
       source_commit = "7038e7c17708e7d2226149e78e0bb297bcc6d1d6",
       executable_version = "fastvep 0.2.0", cache_format = "FSTVEP04",
-      preparation = "probe_only", transcript_count = "644427",
+      preparation = "probe_only", transcript_count = "1",
       cache_sha256 = strrep("0", 64L), executable_sha256 = strrep("0", 64L),
       gff3_sha256 = strrep("0", 64L), fasta_sha256 = strrep("0", 64L),
-      fasta_index_sha256 = strrep("0", 64L)
+      fasta_index_sha256 = strrep("0", 64L), model_sha256 = strrep("0", 64L),
+      matched_gff_receipt_sha256 = strrep("0", 64L)
     )
     check(paste0("cache_", field), function(path) edit_cache(path, field, values[[field]]))
+  }
+  matched_mutations <- c(
+    schema = "invalid", proof = "invalid", model_sha256 = strrep("0", 64L),
+    transcript_count = "1", gene_count = "0", transcript_model_only = "1",
+    filtered_gff3_sha256 = strrep("0", 64L)
+  )
+  for (field in names(matched_mutations)) {
+    check(paste0("matched_", field), function(path) {
+      edit_matched(path, field, matched_mutations[[field]])
+    })
   }
   for (field in c("binding", "source_commit", "executable_sha256", "log_sha256", "exit_status")) {
     check(paste0("build_", field), function(path) {
