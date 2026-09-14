@@ -598,27 +598,51 @@ main <- function() {
   stopifnot(length(field_begin) == 1L)
   field_end <- which(seq_along(rmd) > field_begin & rmd == "```")[[1L]]
   field_gate <- parse(text = rmd[seq.int(field_begin + 1L, field_end - 1L)])
-  field_source <- file.path(root, "benchmarks/data/duckvep_fastvep/fields_seed173_0d2bdcb")
-  original_summary <- read.csv(file.path(field_source, "summary.csv"))
-  field_cases <- c("historical_unbound", "unbound_with_build", "bound", "missing_build",
+  historical_pack <- "fields_seed173_9bf888e"
+  field_text <- paste(rmd[seq.int(field_begin + 1L, field_end - 1L)], collapse = "\n")
+  field_packs <- unique(regmatches(field_text,
+    gregexpr("fields_seed173_[0-9a-f]+", field_text))[[1L]])
+  field_pack <- setdiff(field_packs, historical_pack)
+  stopifnot(length(field_pack) == 1L,
+    any(grepl(historical_pack, rmd[seq.int(field_end + 1L, length(rmd))], fixed = TRUE)))
+  field_source <- file.path(root, "benchmarks/data/duckvep_fastvep/fields_seed173_5cdbe9d")
+  current_summary <- read.csv(file.path(field_source, "summary.csv"))
+  exact_rows <- current_summary$comparison == "duckvep_vep_csq"
+  exact_error_columns <- c("missing_keys", "extra_keys", "actual_duplicate_keys",
+    "expected_duplicate_keys", "invalid_keys", "field_failures", "source_duplicate_alleles",
+    "source_invalid_alleles", "actual_missing_source_alleles", "expected_missing_source_alleles",
+    "actual_unknown_alleles", "expected_unknown_alleles")
+  stopifnot(sum(exact_rows) == 8L, sum(current_summary$input_records[exact_rows]) == 10671L,
+    sum(current_summary$input_alleles[exact_rows]) == 10671L,
+    sum(current_summary$compared_keys[exact_rows]) == 10671L,
+    all(current_summary[exact_rows, exact_error_columns] == 0L),
+    all(current_summary$passed[exact_rows]))
+  body_paths <- function(path, comparison, file) file.path(path,
+    unique(current_summary$case[current_summary$comparison == comparison]),
+    paste0("comparison_", comparison), file)
+  field_cases <- c("diagnostic_unbound", "bound", "missing_build",
     "missing_log", "wrong_binary", "unlisted_build", "unlisted_log",
     "missing_fastvep", "missing_fastvep_sha256", "missing_verification", "wrong_verification_binary",
     "missing_verification_tree", "changed_verification_tree", "new_binding", "tree_binding",
-    "missing_verification_commit", "changed_verification_commit")
+    "missing_verification_commit", "changed_verification_commit", "summary_only",
+    "failure_artifact_only", "missing_body_failure", "missing_body_summary", "missing_body_pair",
+    "unlisted_body_failure", "changed_body_failure", "changed_body_summary",
+    "inconsistent_body_summary", "unexpected_duckvep_body", "null_body_value")
   for (mutation in field_cases) {
-    path <- file.path(directory, paste0("field_", mutation), "fields_seed173_9bf888e")
+    path <- file.path(directory, paste0("field_", mutation), field_pack)
     dir.create(path, recursive = TRUE)
     stopifnot(all(file.copy(list.files(field_source, full.names = TRUE), path, recursive = TRUE)))
+    write_csv(current_summary, file.path(path, "summary.csv"))
     receipt_path <- file.path(path, "receipt.tsv")
     receipt <- read.delim(receipt_path, colClasses = "character")
-    unbound <- mutation %in% c("historical_unbound", "unbound_with_build")
+    unbound <- mutation == "diagnostic_unbound"
     if (!unbound) receipt$value[receipt$field == "fastvep_binding"] <- "cargo_fresh_release_locked_offline"
     if (mutation == "new_binding") receipt$value[receipt$field == "fastvep_binding"] <-
       "cargo_verified_commit_tree_release_locked_offline"
     if (mutation == "tree_binding") receipt$value[receipt$field == "fastvep_binding"] <-
       "cargo_verified_tree_release_locked_offline"
     utils::write.table(receipt, receipt_path, sep = "\t", quote = FALSE, row.names = FALSE)
-    if (!mutation %in% c("historical_unbound", "missing_build")) {
+    if (mutation != "missing_build") {
       build <- read.delim(file.path(valid_path, "fastvep_build.tsv"), colClasses = "character")
       build$value[build$field == "executable_sha256"] <-
         if (mutation == "wrong_binary") strrep("0", 64L) else receipt$value[receipt$field == "fastvep_sha256"]
@@ -633,9 +657,17 @@ main <- function() {
         if (mutation == "changed_verification_commit") writeLines("changed commit", file.path(proof, "source-commit.bin"))
       }
       if (mutation == "new_binding") {
-        stopifnot(all(file.copy(file.path(valid_path, c("source-tree.txt", "source-commit.bin")), path)))
+        stopifnot(all(file.copy(
+          file.path(valid_path, c("source-tree.txt", "source-commit.bin")),
+          path,
+          overwrite = TRUE
+        )))
       } else if (mutation == "tree_binding") {
-        stopifnot(file.copy(file.path(valid_path, "source-tree.txt"), path))
+        stopifnot(file.copy(
+          file.path(valid_path, "source-tree.txt"),
+          path,
+          overwrite = TRUE
+        ))
         build <- build[build$field != "source_commit_object", ]
         build$value[build$field == "binding"] <- "cargo_verified_tree_release_locked_offline"
       } else {
@@ -644,39 +676,94 @@ main <- function() {
       }
       utils::write.table(build, file.path(path, "fastvep_build.tsv"),
         sep = "\t", quote = FALSE, row.names = FALSE)
-      if (mutation != "missing_log") stopifnot(file.copy(file.path(valid_path, "build.log"), path))
+      if (mutation != "missing_log") {
+        stopifnot(file.copy(file.path(valid_path, "build.log"), path, overwrite = TRUE))
+      }
     }
     if (mutation %in% c("missing_fastvep", "missing_fastvep_sha256")) {
       field <- sub("^missing_", "", mutation)
       receipt <- receipt[receipt$field != field, ]
       utils::write.table(receipt, receipt_path, sep = "\t", quote = FALSE, row.names = FALSE)
     }
+    exact_relative <- file.path(current_summary$case[exact_rows][[1L]],
+      "comparison_duckvep_vep_csq")
+    target_failure <- file.path(path, exact_relative, "field_failures.parquet")
+    if (mutation == "summary_only") {
+      changed <- current_summary
+      changed$field_failures[which(exact_rows)[[1L]]] <- 1L
+      changed$passed[which(exact_rows)[[1L]]] <- FALSE
+      write_csv(changed, file.path(path, "summary.csv"))
+    }
+    if (mutation == "failure_artifact_only") {
+      replacement <- paste0(target_failure, ".new")
+      DBI::dbExecute(failure_con, paste0("COPY (SELECT * FROM read_parquet(",
+        DBI::dbQuoteString(failure_con, target_failure), ") UNION ALL SELECT
+        1::UBIGINT record_index, 1::UBIGINT alt_index, 'ENST1' Feature,
+        'HGVSc' field, 'ENST1.1:c.2C>A' actual, 'ENST1.1:c.1C>A' expected) TO ",
+        DBI::dbQuoteString(failure_con, replacement), " (FORMAT PARQUET)"))
+      stopifnot(file.rename(replacement, target_failure))
+    }
+    target_body <- body_paths(path, "duckvep_vep_csq", "hgvs_body_failures.parquet")[[1L]]
+    target_body_summary <- body_paths(path, "duckvep_vep_csq", "hgvs_bodies.csv")[[1L]]
+    if (mutation == "missing_body_failure") unlink(target_body)
+    if (mutation == "missing_body_summary") unlink(target_body_summary)
+    if (mutation == "missing_body_pair") unlink(c(target_body, target_body_summary))
+    if (mutation == "inconsistent_body_summary") {
+      write_csv(data.frame(field = "HGVSc", failures = 1L), target_body_summary)
+    }
+    if (mutation == "null_body_value") {
+      fastvep_body <- body_paths(path, "fastvep_vep_csq",
+        "hgvs_body_failures.parquet")[[1L]]
+      replacement <- paste0(fastvep_body, ".new")
+      DBI::dbExecute(failure_con, paste0("COPY (SELECT record_index, alt_index, Feature, field,
+        CASE WHEN row_number() OVER () = 1 THEN NULL ELSE actual END AS actual, expected
+        FROM read_parquet(", DBI::dbQuoteString(failure_con, fastvep_body), ")) TO ",
+        DBI::dbQuoteString(failure_con, replacement), " (FORMAT PARQUET)"))
+      stopifnot(file.rename(replacement, fastvep_body))
+    }
+    if (mutation == "unexpected_duckvep_body") {
+      DBI::dbExecute(failure_con, paste0("COPY (SELECT 1::UBIGINT record_index,
+        1::UBIGINT alt_index, 'ENST1' Feature, 'HGVSc' field,
+        'c.2C>A' actual, 'c.1C>A' expected) TO ",
+        DBI::dbQuoteString(failure_con, target_body), " (FORMAT PARQUET)"))
+      write_csv(data.frame(field = "HGVSc", failures = 1L), target_body_summary)
+    }
     files <- setdiff(list.files(path, recursive = TRUE), "artifacts.tsv")
     if (mutation == "unlisted_build") files <- setdiff(files, "fastvep_build.tsv")
     if (mutation == "unlisted_log") files <- setdiff(files, "build.log")
+    if (mutation == "unlisted_body_failure") {
+      files <- setdiff(files, substring(target_body, nchar(path) + 2L))
+    }
     utils::write.table(data.frame(path = files,
       sha256 = unname(vapply(file.path(path, files), sha256, character(1L)))),
       file.path(path, "artifacts.tsv"), sep = "\t", quote = FALSE, row.names = FALSE)
+    if (mutation == "changed_body_failure") writeLines("changed", target_body)
+    if (mutation == "changed_body_summary") writeLines("changed", target_body_summary)
     env <- new.env(parent = globalenv())
     env$root <- root
     env$data_dir <- dirname(path)
     rendered <- tryCatch(capture.output(eval(field_gate, envir = env)), error = function(error) error)
-    accepted <- mutation %in% c("historical_unbound", "unbound_with_build", "bound", "new_binding", "tree_binding")
-    stopifnot(identical(!inherits(rendered, "error"), accepted))
+    accepted <- mutation %in% c("bound", "new_binding", "tree_binding", "null_body_value")
+    if (!identical(!inherits(rendered, "error"), accepted)) {
+      detail <- if (inherits(rendered, "error")) conditionMessage(rendered) else "accepted"
+      stop("field mutation verdict mismatch for ", mutation, ": ", detail)
+    }
     if (mutation %in% c("missing_fastvep", "missing_fastvep_sha256")) {
       stopifnot(identical(conditionMessage(rendered), "subscript out of bounds"))
     }
     if (accepted) {
-      stopifnot(identical(env$field_summary, original_summary),
+      stopifnot(identical(env$field_summary, current_summary),
         any(grepl("FastVEP executable provenance: binary-unbound", rendered, fixed = TRUE)) == unbound,
-        any(grepl("FastVEP executable provenance: verified pinned-tree binary identity", rendered, fixed = TRUE)) == !unbound)
+        any(grepl("FastVEP executable provenance: verified pinned-tree binary identity", rendered, fixed = TRUE)) == !unbound,
+        sum(env$field_summary$comparison == "duckvep_vep_csq" & env$field_summary$passed) == 8L)
     }
   }
   cat("Complete-field report gate: valid matrix rendered;", length(rejected), "mutation controls rejected\n")
   cat("Timing runner: missing/malformed build receipts and mismatched executables rejected\n")
   cat("Capacity diagnostic: valid evidence rendered; three failure-artifact corruptions rejected\n")
   cat("Supplementary commit proof: original matrix receipts unchanged; twelve proof corruptions rejected\n")
-  cat("Field campaign provenance: unbound, supplemented and verified-commit controls checked; thirteen mutations rejected\n")
+  cat("Field campaign provenance and HGVS-body artifacts: source-bound current pack rendered;",
+    length(field_cases) - 4L, "mutations rejected\n")
 }
 
 main()

@@ -1598,7 +1598,7 @@ Parquet. A disagreement makes the command fail; FastVEP is a comparator and
 Ensembl VEP 116 is the authority.
 
 ```{r complete-field-conformance}
-field_dir <- file.path(data_dir, "fields_seed173_9bf888e")
+field_dir <- file.path(data_dir, "fields_seed173_5cdbe9d")
 field_manifest <- read.delim(file.path(field_dir, "artifacts.tsv"), colClasses = "character")
 stopifnot(!anyDuplicated(field_manifest$path),
   !any(grepl("^/|(^|/)\\.\\.(/|$)", field_manifest$path)),
@@ -1613,6 +1613,74 @@ stopifnot(field_receipt[["build_binding"]] == "htslib_distclean_make_release",
   field_receipt[["completed_cases"]] == "8", field_receipt[["completed_comparisons"]] == "24",
   field_receipt[["input_records"]] == "10671", field_receipt[["errors"]] == "0",
   field_receipt[["shared_inputs_unchanged"]] == "TRUE", nrow(field_summary) == 24L)
+field_error_columns <- c("missing_keys", "extra_keys", "actual_duplicate_keys",
+  "expected_duplicate_keys", "invalid_keys", "field_failures", "source_duplicate_alleles",
+  "source_invalid_alleles", "actual_missing_source_alleles", "expected_missing_source_alleles",
+  "actual_unknown_alleles", "expected_unknown_alleles")
+field_count_table <- function(connection, path) {
+  result <- DBI::dbGetQuery(connection, paste0(
+    "SELECT field::VARCHAR AS field, count(*)::VARCHAR AS failures FROM read_parquet(",
+    DBI::dbQuoteString(connection, path), ") GROUP BY field ORDER BY field"))
+  row.names(result) <- NULL
+  result
+}
+field_read_counts <- function(path) {
+  result <- read.csv(path, colClasses = "character")
+  row.names(result) <- NULL
+  result
+}
+field_con <- DBI::dbConnect(duckdb::duckdb(config = list(threads = "1")))
+tryCatch({
+  for (i in seq_len(nrow(field_summary))) {
+    row <- field_summary[i, , drop = FALSE]
+    relative <- file.path(row$case, paste0("comparison_", row$comparison))
+    required <- file.path(relative, c("summary.csv", "field_failures.parquet", "fields.csv",
+      "key_failures.parquet", "duplicate_rows.parquet", "source_coverage_failures.parquet"))
+    stopifnot(all(required %in% field_manifest$path))
+
+    local_summary <- read.csv(file.path(field_dir, relative, "summary.csv"))
+    root_summary <- row[setdiff(names(field_summary),
+      c("case", "comparison", "input_records", "input_alleles"))]
+    row.names(local_summary) <- NULL
+    row.names(root_summary) <- NULL
+    stopifnot(identical(local_summary, root_summary))
+
+    failure_path <- file.path(field_dir, relative, "field_failures.parquet")
+    failure_check <- DBI::dbGetQuery(field_con, paste0(
+      "SELECT count(*)::VARCHAR AS failures, count(*) FILTER (WHERE field IS NULL OR ",
+      "actual IS NOT DISTINCT FROM expected)::VARCHAR AS invalid_rows FROM read_parquet(",
+      DBI::dbQuoteString(field_con, failure_path), ")"))
+    failure_counts <- field_count_table(field_con, failure_path)
+    stored_counts <- field_read_counts(file.path(field_dir, relative, "fields.csv"))
+    stopifnot(failure_check$invalid_rows == "0",
+      failure_check$failures == as.character(row$field_failures),
+      identical(failure_counts, stored_counts), !anyNA(stored_counts$field),
+      all(nzchar(stored_counts$field)), all(as.numeric(stored_counts$failures) > 0),
+      identical(isTRUE(row$passed), all(unlist(row[field_error_columns]) == 0)))
+
+    if (row$comparison %in% c("duckvep_vep_csq", "fastvep_vep_csq")) {
+      body_required <- file.path(relative,
+        c("hgvs_body_failures.parquet", "hgvs_bodies.csv"))
+      stopifnot(all(body_required %in% field_manifest$path))
+      body_path <- file.path(field_dir, relative, "hgvs_body_failures.parquet")
+      body_check <- DBI::dbGetQuery(field_con, paste0(
+        "SELECT count(*)::VARCHAR AS failures, count(*) FILTER (WHERE field IS NULL OR ",
+        "field NOT IN ('HGVSc', 'HGVSp') OR actual IS NOT DISTINCT FROM expected)",
+        "::VARCHAR AS invalid_rows FROM read_parquet(",
+        DBI::dbQuoteString(field_con, body_path), ")"))
+      body_counts <- field_count_table(field_con, body_path)
+      stored_body_counts <- field_read_counts(file.path(field_dir, relative, "hgvs_bodies.csv"))
+      stopifnot(body_check$invalid_rows == "0", identical(body_counts, stored_body_counts))
+      if (row$comparison == "duckvep_vep_csq") stopifnot(body_check$failures == "0")
+    }
+  }
+}, finally = DBI::dbDisconnect(field_con, shutdown = TRUE))
+field_exact <- field_summary$comparison == "duckvep_vep_csq"
+stopifnot(sum(field_exact) == 8L, all(field_summary$compared_fields[field_exact] == 31L),
+  sum(field_summary$input_records[field_exact]) == 10671L,
+  sum(field_summary$compared_keys[field_exact]) == 10671L,
+  all(field_summary[field_exact, field_error_columns] == 0),
+  all(field_summary$passed[field_exact]))
 cat("DuckHTS source checkout:", field_receipt[["source_revision"]], "\n\n")
 if (field_receipt[["fastvep_binding"]] %in%
     c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline",
@@ -1650,16 +1718,19 @@ knitr::kable(aggregate(cbind(input_alleles, compared_keys, field_failures,
   comparison, field_summary, sum))
 ```
 
-These are failing comparisons, not a conformance certificate. DuckVEP/VEP
-differences comprise 168 HGVSc fields, 3,522 HGVSp fields and two HGVS shifts.
-The fixtures lack protein accessions; the HGVSp result therefore does not
-establish peptide-suffix agreement. Source VCFs, model GFFs, raw outputs and all
-field/key failures are retained in the [field data](data/duckvep_fastvep/fields_seed173_9bf888e).
-A [singleton replay](data/duckvep_fastvep/replay_phase1_589)
-of `chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus VEP's
-`c.1C>A`; that diagnostic does not replace the full campaign denominator.
-Independent-event HGVS corrections are tracked separately in
-https://github.com/RGenomicsETL/duckhts/issues/223.
+The source-bound campaign passes all eight DuckVEP/VEP comparisons across
+10,671 physical records and exact keys. All 31 compared fields have zero
+field, key or source-coverage errors. Full serialized fields are authoritative;
+accession-stripped HGVSc/HGVSp body artifacts are retained as diagnostics.
+FastVEP and native-schema comparison lanes still contain disagreements, which
+remain visible in the table and retained artifacts.
+
+The [earlier discrepancy evidence](data/duckvep_fastvep/fields_seed173_9bf888e)
+retains 168 HGVSc differences, 3,522 HGVSp differences and two HGVS shifts. Its
+fixtures lacked protein accessions, so that run did not establish peptide-suffix
+agreement. A [singleton replay](data/duckvep_fastvep/replay_phase1_589) retains
+the phase-1 `chrDuck:158 C>A` coordinate discrepancy without replacing the
+current full-campaign denominator.
 
 ```{r complete-field-singletons}
 validate_replay_bundle <- function(directory, evidence, expected = c(records = 10671L, tasks = 10100L, cells = 41942L)) {
@@ -1734,7 +1805,8 @@ replay_directory <- file.path(data_dir, "fields_replay_9bf888e")
 if (!file.exists(file.path(replay_directory, "completion.csv"))) {
   cat("Complete singleton replay evidence is not published yet.\n")
 } else {
-  replay_counts <- validate_replay_bundle(replay_directory, field_dir)
+  replay_evidence <- file.path(data_dir, "fields_seed173_9bf888e")
+  replay_counts <- validate_replay_bundle(replay_directory, replay_evidence)
   cat("Each replay contains one physical record with unchanged alleles and model.\n",
     "Every original failure cell is reproduced in isolation; this does not establish allele/model minimization or resolve the disagreements.\n",
     sep = "")

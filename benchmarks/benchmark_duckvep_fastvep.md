@@ -805,26 +805,30 @@ union, duplicate rows, missing or extra pairs, source-coverage failures
 and every differing field in Parquet. A disagreement makes the command
 fail; FastVEP is a comparator and Ensembl VEP 116 is the authority.
 
-    #> DuckHTS source checkout: 9bf888e3188c0854ce653a0aa14aa6d95f0629b9
-    #> FastVEP executable provenance: verified pinned-tree binary identity; recorded execution binding: cargo_fresh_release_locked_offline
+    #> DuckHTS source checkout: 5cdbe9d8ed9cc35a6e551b9449a856cbc3465626
+    #> FastVEP executable provenance: verified pinned-tree binary identity; recorded execution binding: cargo_verified_commit_tree_release_locked_offline
 
 | comparison      | input_alleles | compared_keys | field_failures | missing_keys | extra_keys | actual_missing_source_alleles | expected_missing_source_alleles |
 |:----------------|--------------:|--------------:|---------------:|-------------:|-----------:|------------------------------:|--------------------------------:|
-| duckvep_vep_csq |         10671 |         10671 |           3692 |            0 |          0 |                             0 |                               0 |
-| fastvep_vep_csq |         10671 |         10671 |          30270 |            0 |          0 |                             0 |                               0 |
+| duckvep_vep_csq |         10671 |         10671 |              0 |            0 |          0 |                             0 |                               0 |
+| fastvep_vep_csq |         10671 |         10671 |          20310 |            0 |          0 |                             0 |                               0 |
 | native_tab17    |         10671 |         10671 |           7980 |            0 |          0 |                             0 |                               0 |
 
-These are failing comparisons, not a conformance certificate.
-DuckVEP/VEP differences comprise 168 HGVSc fields, 3,522 HGVSp fields
-and two HGVS shifts. The fixtures lack protein accessions; the HGVSp
-result therefore does not establish peptide-suffix agreement. Source
-VCFs, model GFFs, raw outputs and all field/key failures are retained in
-the [field data](data/duckvep_fastvep/fields_seed173_9bf888e). A
-[singleton replay](data/duckvep_fastvep/replay_phase1_589) of
-`chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus
-VEP’s `c.1C>A`; that diagnostic does not replace the full campaign
-denominator. Independent-event HGVS corrections are tracked separately
-in <https://github.com/RGenomicsETL/duckhts/issues/223>.
+The source-bound campaign passes all eight DuckVEP/VEP comparisons
+across 10,671 physical records and exact keys. All 31 compared fields
+have zero field, key or source-coverage errors. Full serialized fields
+are authoritative; accession-stripped HGVSc/HGVSp body artifacts are
+retained as diagnostics. FastVEP and native-schema comparison lanes
+still contain disagreements, which remain visible in the table and
+retained artifacts.
+
+The [earlier discrepancy
+evidence](data/duckvep_fastvep/fields_seed173_9bf888e) retains 168 HGVSc
+differences, 3,522 HGVSp differences and two HGVS shifts. Its fixtures
+lacked protein accessions, so that run did not establish peptide-suffix
+agreement. A [singleton replay](data/duckvep_fastvep/replay_phase1_589)
+retains the phase-1 `chrDuck:158 C>A` coordinate discrepancy without
+replacing the current full-campaign denominator.
 
     #> Each replay contains one physical record with unchanged alleles and model.
     #> Every original failure cell is reproduced in isolation; this does not establish allele/model minimization or resolve the disagreements.
