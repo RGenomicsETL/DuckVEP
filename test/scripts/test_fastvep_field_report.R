@@ -256,12 +256,23 @@ main <- function() {
     stopifnot(sum(matched$field == field) == 1L)
     matched$value[matched$field == field] <- value
     utils::write.table(matched, target, sep = "\t", quote = FALSE, row.names = FALSE)
+    reseal_matched(path, target)
+  }
+  reseal_matched <- function(path, target) {
     receipt_sha256 <- sha256(target)
     edit_cache(path, "matched_gff_receipt_sha256", receipt_sha256)
     edit_csv(path, "inputs.csv", function(x) {
       x$sha256[x$artifact == "matched_gff_receipt"] <- receipt_sha256
       x
     })
+  }
+  drop_matched <- function(path, field) {
+    target <- file.path(path, "matched_gff_receipt.tsv")
+    matched <- read.delim(target, colClasses = "character")
+    stopifnot(sum(matched$field == field) == 1L)
+    matched <- matched[matched$field != field, , drop = FALSE]
+    utils::write.table(matched, target, sep = "\t", quote = FALSE, row.names = FALSE)
+    reseal_matched(path, target)
   }
   evaluate <- function(path) {
     previous <- Sys.getenv(c("DUCKHTS_CACHE_DIR", "DUCKHTSBENCH_REGISTRY"), unset = NA_character_)
@@ -415,6 +426,10 @@ main <- function() {
     check(paste0("matched_", field), function(path) {
       edit_matched(path, field, matched_mutations[[field]])
     })
+  }
+  for (field in c("schema", "proof", "exon_count", "exon_geometry_sha256",
+                  "transcript_model_only")) {
+    check(paste0("matched_missing_", field), function(path) drop_matched(path, field))
   }
   for (field in c("binding", "source_commit", "executable_sha256", "log_sha256", "exit_status")) {
     check(paste0("build_", field), function(path) {

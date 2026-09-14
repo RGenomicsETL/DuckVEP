@@ -1869,13 +1869,15 @@ if (!file.exists(completion_path)) {
       "matched_gff_receipt" %in% names(input_hashes))
     matched_table <- read_receipt(file.path(complete_dir, "matched_gff_receipt.tsv"),
       c("field", "value"), sep = "\t")
-    stopifnot(!anyDuplicated(matched_table$field))
-    matched <- setNames(matched_table$value, matched_table$field)
     difference_fields <- c("transcript_model_only", "transcript_source_only",
       "exon_model_only", "exon_source_only", "cds_model_only", "cds_source_only")
     count_fields <- c("transcript_count", "gene_count", "exon_count", "cds_segment_count")
     digest_fields <- c("source_gff3_sha256", "model_sha256", "transcript_inventory_sha256",
       "exon_geometry_sha256", "cds_geometry_sha256", "filtered_gff3_sha256")
+    matched_required <- c("schema", "proof", count_fields, digest_fields, difference_fields)
+    stopifnot(!anyDuplicated(matched_table$field),
+      all(matched_required %in% matched_table$field))
+    matched <- setNames(matched_table$value, matched_table$field)
     stopifnot(matched[["schema"]] == "duckvep_fastvep_matched_gff_v1",
       matched[["proof"]] == "initial_derivation_six_except_all",
       matched[["model_sha256"]] == metadata[["matched_model_sha256"]],
