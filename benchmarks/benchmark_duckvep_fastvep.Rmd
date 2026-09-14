@@ -1815,7 +1815,7 @@ if (!file.exists(file.path(replay_directory, "completion.csv"))) {
 ```
 
 ```{r complete-field-observations}
-complete_dir <- file.path(data_dir, "field_contracts")
+complete_dir <- file.path(data_dir, "field_contracts_329bbe3")
 completion_path <- file.path(complete_dir, "completion.csv")
 if (!file.exists(completion_path)) {
   cat("Whole-GIAB complete-field measurements are not published yet.\n")
@@ -1977,6 +1977,81 @@ if (!file.exists(completion_path)) {
 }
 ```
 
+```{r complete-field-comparison}
+previous_dir <- file.path(data_dir, "field_contracts")
+previous_completion <- read_receipt(file.path(previous_dir, "completion.csv"),
+  c("source_revision", "completed", "binding", "observations", "repetitions",
+    "allele_coverage", "artifacts_sha256"))
+previous_manifest_path <- file.path(previous_dir, "artifacts.csv")
+stopifnot(nrow(previous_completion) == 1L,
+  previous_completion$source_revision == "9e14b2ef23657c660d0a4137adb2a254fb778f87",
+  previous_completion$completed == "TRUE", previous_completion$binding == "source_bound",
+  previous_completion$observations == "30", previous_completion$repetitions == "3",
+  previous_completion$allele_coverage == "verified",
+  sha256(previous_manifest_path) == previous_completion$artifacts_sha256)
+previous_manifest <- read_receipt(previous_manifest_path, c("file", "sha256"))
+stopifnot(!anyDuplicated(previous_manifest$file),
+  all(basename(previous_manifest$file) == previous_manifest$file),
+  identical(unname(vapply(file.path(previous_dir, previous_manifest$file),
+    sha256, character(1L))), previous_manifest$sha256))
+previous_metadata_table <- read_receipt(file.path(previous_dir, "metadata.csv"),
+  c("field", "value"))
+previous_inputs <- read_receipt(file.path(previous_dir, "inputs.csv"),
+  c("artifact", "sha256"))
+stopifnot(!anyDuplicated(previous_metadata_table$field),
+  !anyDuplicated(previous_inputs$artifact))
+previous_metadata <- setNames(previous_metadata_table$value, previous_metadata_table$field)
+previous_input_hashes <- setNames(previous_inputs$sha256, previous_inputs$artifact)
+same_metadata <- c("input_id", "input_records", "input_alt_alleles", "eligible_literal_alleles",
+  "fastvep_source_revision", "fastvep_version", "supplementary_providers", "distance",
+  "output_filesystem", "memory_limit", "max_spill", "affinity_one", "affinity_four")
+same_inputs <- c("input", "model", "fasta", "gff3", "fasta_index", "fastvep", "cache",
+  "cache_receipt", "source_map")
+stopifnot(identical(previous_metadata[same_metadata], metadata[same_metadata]),
+  identical(previous_input_hashes[same_inputs], input_hashes[same_inputs]))
+previous_observations <- previous_manifest$file[
+  grepl("^(duckvep|fastvep)_.*_[14]_[0-9]+[.]csv$", previous_manifest$file)]
+previous_rows <- do.call(rbind, lapply(file.path(previous_dir, previous_observations),
+  function(path) {
+    observation <- read_receipt(path, observation_fields)
+    stopifnot(nrow(observation) == 1L)
+    observation
+  }))
+previous_keys <- paste(previous_rows$tool, previous_rows$output_contract,
+  previous_rows$threads, previous_rows$run, sep = "_")
+stopifnot(!anyDuplicated(previous_keys), setequal(previous_keys, expected_keys),
+  identical(paste0(previous_keys, ".csv"), previous_observations),
+  all(previous_rows$multiset_checked == "TRUE"),
+  all(previous_rows$fingerprint_scope == "full_row"))
+for (group in split(previous_rows,
+    paste(previous_rows$tool, previous_rows$output_contract))) {
+  stopifnot(nrow(unique(group[c("row_count", "xor_hash", "low32_sum", "high32_sum")])) == 1L)
+}
+previous_times <- do.call(rbind, lapply(seq_len(nrow(previous_rows)), function(i) {
+  row <- previous_rows[i, ]
+  read_gnu_time(file.path(previous_dir, row$timing_file), row$tool, row$threads, row$run)
+}))
+previous_rows <- cbind(previous_rows,
+  previous_times[c("elapsed_seconds", "maximum_rss_kib")])
+previous_rows$row_count <- as.numeric(previous_rows$row_count)
+previous_medians <- aggregate(cbind(elapsed_seconds, maximum_rss_kib, row_count) ~
+  tool + output_contract + threads, previous_rows, median)
+comparison <- merge(previous_medians, medians,
+  by = c("tool", "output_contract", "threads"), suffixes = c("_previous", "_current"))
+stopifnot(nrow(comparison) == 10L,
+  comparison$row_count_previous == comparison$row_count_current)
+comparison$elapsed_change_percent <- 100 *
+  (comparison$elapsed_seconds_current / comparison$elapsed_seconds_previous - 1)
+comparison$maximum_rss_gib_previous <- comparison$maximum_rss_kib_previous / 1024^2
+comparison$maximum_rss_gib_current <- comparison$maximum_rss_kib_current / 1024^2
+knitr::kable(comparison[c("tool", "output_contract", "threads",
+    "elapsed_seconds_previous", "elapsed_seconds_current", "elapsed_change_percent",
+    "maximum_rss_gib_previous", "maximum_rss_gib_current")],
+  digits = 2,
+  col.names = c("Tool", "Contract", "Cores", "Previous seconds", "Current seconds",
+    "Elapsed change (%)", "Previous peak GiB", "Current peak GiB"))
+```
+
 The prepared transcript sets are not identical: DuckVEP's VEP-filtered model
 from Ensembl-116 core/funcgen dumps contains 644,427 transcripts; FastVEP's
 Ensembl-116 GFF3 cache contains 646,577. They use the same reference release
@@ -1984,11 +2059,13 @@ and primary FASTA. All expanded output rows remain counted; these pipeline
 timings do not establish whole-GIAB field concordance or use an intersection-only
 denominator. The eight-model field differential is separate evidence.
 
-Measurements ran on a shared host. The first one-core DuckVEP CSQ observation
-overlapped synthetic report checks for about 26.3 seconds and a later 1.6-second
-replay check (September 13, 22:26–22:27 Europe/Berlin). The report checks did not
-cap DuckDB thread pools. Their timing effect is unknown; the observation remains
-in the three-run median. No host-isolation claim is made.
+The previous source-bound matrix remains in
+[field_contracts](data/duckvep_fastvep/field_contracts). The comparison table
+uses identical input, output, affinity, memory and spill contracts from the two
+hash-checked packs. Measurements ran on a shared host, so the observed median
+changes are not an isolated estimate of this patch's cost and no host-isolation
+claim is made. No DuckHTS build, test or benchmark ran concurrently with the
+current matrix.
 
 Final CSQ files carry `record_index` and `alt_index` followed by the 32 common
 fields. Both engines write this 34-column transport; the native and operational

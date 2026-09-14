@@ -74,6 +74,7 @@ main <- function() {
     write_fields(build, file.path(path, "build.tsv"), tab = TRUE)
   }
   revision <- strrep("a", 40L)
+  timing_pack <- "field_contracts_329bbe3"
   configurations <- c(
     "duckvep_operational17", "duckvep_native_tab17",
     "duckvep_vep_csq", "fastvep_native_tab17", "fastvep_vep_csq"
@@ -246,7 +247,7 @@ main <- function() {
   }
   rejected <- character()
   check <- function(label, mutate, reseal = TRUE, expected_timing_reads = 0L) {
-    path <- fixture(file.path(directory, label, "field_contracts"))
+    path <- fixture(file.path(directory, label, timing_pack))
     seal(path)
     mutate(path)
     if (reseal) seal(path)
@@ -264,7 +265,7 @@ main <- function() {
     rejected <<- c(rejected, label)
   }
 
-  valid_path <- fixture(file.path(directory, "valid", "field_contracts"))
+  valid_path <- fixture(file.path(directory, "valid", timing_pack))
   seal(valid_path)
   valid <- evaluate(valid_path)
   stopifnot(
@@ -276,7 +277,7 @@ main <- function() {
   for (binding in c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline"))
   for (mutation in c("none", "missing_receipt", "changed_tree", "wrong_compiler", "wrong_binary",
       "missing_commit", "changed_commit")) {
-    path <- fixture(file.path(directory, paste0("supplement_", binding, "_", mutation), "field_contracts"))
+    path <- fixture(file.path(directory, paste0("supplement_", binding, "_", mutation), timing_pack))
     build_path <- file.path(path, "fastvep_build.tsv")
     build <- read.delim(build_path, colClasses = "character")
     proof <- file.path(dirname(path), "fastvep_verified_commit_tree")

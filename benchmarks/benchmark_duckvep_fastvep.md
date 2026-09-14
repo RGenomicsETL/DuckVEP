@@ -837,22 +837,35 @@ replacing the current full-campaign denominator.
 |-----------------:|-----------------:|-----------------:|-----------------------:|-------------------------:|
 |           10,671 |           10,100 |           30,300 |                 41,942 |                        0 |
 
-    #> Measured source: 9e14b2ef23657c660d0a4137adb2a254fb778f87
+    #> Measured source: 329bbe38470760187b8a002d4ca43e6ffd58961f
     #> FastVEP source: 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
     #> Output filesystem: tmpfs
 
 | Tool    | Contract      | Cores | Median seconds | Median peak GiB |       Rows | Output GiB |
 |:--------|:--------------|:------|---------------:|----------------:|-----------:|-----------:|
-| duckvep | native_tab17  | 1     |         391.33 |           16.86 | 47,629,345 |       5.90 |
-| fastvep | native_tab17  | 1     |         174.98 |            3.44 | 47,845,809 |       5.94 |
-| duckvep | operational17 | 1     |          59.09 |           13.70 | 47,629,345 |       5.75 |
-| duckvep | vep_csq       | 1     |         653.89 |           17.20 | 47,629,345 |       9.05 |
-| fastvep | vep_csq       | 1     |         448.61 |           16.69 | 47,845,809 |       8.26 |
-| duckvep | native_tab17  | 4     |         124.42 |           16.79 | 47,629,345 |       5.90 |
-| fastvep | native_tab17  | 4     |          70.14 |            3.44 | 47,845,809 |       5.94 |
-| duckvep | operational17 | 4     |          28.93 |           13.39 | 47,629,345 |       5.75 |
-| duckvep | vep_csq       | 4     |         193.16 |           17.98 | 47,629,345 |       9.05 |
-| fastvep | vep_csq       | 4     |         148.74 |           18.23 | 47,845,809 |       8.26 |
+| duckvep | native_tab17  | 1     |         393.45 |           16.84 | 47,629,345 |       5.90 |
+| fastvep | native_tab17  | 1     |         175.89 |            3.44 | 47,845,809 |       5.94 |
+| duckvep | operational17 | 1     |          58.84 |           13.70 | 47,629,345 |       5.75 |
+| duckvep | vep_csq       | 1     |         655.05 |           17.20 | 47,629,345 |       9.05 |
+| fastvep | vep_csq       | 1     |         451.13 |           16.69 | 47,845,809 |       8.26 |
+| duckvep | native_tab17  | 4     |         123.64 |           16.73 | 47,629,345 |       5.90 |
+| fastvep | native_tab17  | 4     |          70.35 |            3.44 | 47,845,809 |       5.94 |
+| duckvep | operational17 | 4     |          28.84 |           13.39 | 47,629,345 |       5.75 |
+| duckvep | vep_csq       | 4     |         194.94 |           17.97 | 47,629,345 |       9.05 |
+| fastvep | vep_csq       | 4     |         149.01 |           18.21 | 47,845,809 |       8.26 |
+
+| Tool    | Contract      | Cores | Previous seconds | Current seconds | Elapsed change (%) | Previous peak GiB | Current peak GiB |
+|:--------|:--------------|:------|-----------------:|----------------:|-------------------:|------------------:|-----------------:|
+| duckvep | native_tab17  | 1     |           391.33 |          393.45 |               0.54 |             16.86 |            16.84 |
+| duckvep | native_tab17  | 4     |           124.42 |          123.64 |              -0.63 |             16.79 |            16.73 |
+| duckvep | operational17 | 1     |            59.09 |           58.84 |              -0.42 |             13.70 |            13.70 |
+| duckvep | operational17 | 4     |            28.93 |           28.84 |              -0.31 |             13.39 |            13.39 |
+| duckvep | vep_csq       | 1     |           653.89 |          655.05 |               0.18 |             17.20 |            17.20 |
+| duckvep | vep_csq       | 4     |           193.16 |          194.94 |               0.92 |             17.98 |            17.97 |
+| fastvep | native_tab17  | 1     |           174.98 |          175.89 |               0.52 |              3.44 |             3.44 |
+| fastvep | native_tab17  | 4     |            70.14 |           70.35 |               0.30 |              3.44 |             3.44 |
+| fastvep | vep_csq       | 1     |           448.61 |          451.13 |               0.56 |             16.69 |            16.69 |
+| fastvep | vep_csq       | 4     |           148.74 |          149.01 |               0.18 |             18.23 |            18.21 |
 
 The prepared transcript sets are not identical: DuckVEP’s VEP-filtered
 model from Ensembl-116 core/funcgen dumps contains 644,427 transcripts;
@@ -862,12 +875,13 @@ counted; these pipeline timings do not establish whole-GIAB field
 concordance or use an intersection-only denominator. The eight-model
 field differential is separate evidence.
 
-Measurements ran on a shared host. The first one-core DuckVEP CSQ
-observation overlapped synthetic report checks for about 26.3 seconds
-and a later 1.6-second replay check (September 13, 22:26–22:27
-Europe/Berlin). The report checks did not cap DuckDB thread pools. Their
-timing effect is unknown; the observation remains in the three-run
-median. No host-isolation claim is made.
+The previous source-bound matrix remains in
+[field_contracts](data/duckvep_fastvep/field_contracts). The comparison
+table uses identical input, output, affinity, memory and spill contracts
+from the two hash-checked packs. Measurements ran on a shared host, so
+the observed median changes are not an isolated estimate of this patch’s
+cost and no host-isolation claim is made. No DuckHTS build, test or
+benchmark ran concurrently with the current matrix.
 
 Final CSQ files carry `record_index` and `alt_index` followed by the 32
 common fields. Both engines write this 34-column transport; the native
