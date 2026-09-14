@@ -1598,7 +1598,7 @@ Parquet. A disagreement makes the command fail; FastVEP is a comparator and
 Ensembl VEP 116 is the authority.
 
 ```{r complete-field-conformance}
-field_dir <- file.path(data_dir, "fields_seed173_9bf888e")
+field_dir <- file.path(data_dir, "fields_seed173_5cdbe9d")
 field_manifest <- read.delim(file.path(field_dir, "artifacts.tsv"), colClasses = "character")
 stopifnot(!anyDuplicated(field_manifest$path),
   !any(grepl("^/|(^|/)\\.\\.(/|$)", field_manifest$path)),
@@ -1613,6 +1613,74 @@ stopifnot(field_receipt[["build_binding"]] == "htslib_distclean_make_release",
   field_receipt[["completed_cases"]] == "8", field_receipt[["completed_comparisons"]] == "24",
   field_receipt[["input_records"]] == "10671", field_receipt[["errors"]] == "0",
   field_receipt[["shared_inputs_unchanged"]] == "TRUE", nrow(field_summary) == 24L)
+field_error_columns <- c("missing_keys", "extra_keys", "actual_duplicate_keys",
+  "expected_duplicate_keys", "invalid_keys", "field_failures", "source_duplicate_alleles",
+  "source_invalid_alleles", "actual_missing_source_alleles", "expected_missing_source_alleles",
+  "actual_unknown_alleles", "expected_unknown_alleles")
+field_count_table <- function(connection, path) {
+  result <- DBI::dbGetQuery(connection, paste0(
+    "SELECT field::VARCHAR AS field, count(*)::VARCHAR AS failures FROM read_parquet(",
+    DBI::dbQuoteString(connection, path), ") GROUP BY field ORDER BY field"))
+  row.names(result) <- NULL
+  result
+}
+field_read_counts <- function(path) {
+  result <- read.csv(path, colClasses = "character")
+  row.names(result) <- NULL
+  result
+}
+field_con <- DBI::dbConnect(duckdb::duckdb(config = list(threads = "1")))
+tryCatch({
+  for (i in seq_len(nrow(field_summary))) {
+    row <- field_summary[i, , drop = FALSE]
+    relative <- file.path(row$case, paste0("comparison_", row$comparison))
+    required <- file.path(relative, c("summary.csv", "field_failures.parquet", "fields.csv",
+      "key_failures.parquet", "duplicate_rows.parquet", "source_coverage_failures.parquet"))
+    stopifnot(all(required %in% field_manifest$path))
+
+    local_summary <- read.csv(file.path(field_dir, relative, "summary.csv"))
+    root_summary <- row[setdiff(names(field_summary),
+      c("case", "comparison", "input_records", "input_alleles"))]
+    row.names(local_summary) <- NULL
+    row.names(root_summary) <- NULL
+    stopifnot(identical(local_summary, root_summary))
+
+    failure_path <- file.path(field_dir, relative, "field_failures.parquet")
+    failure_check <- DBI::dbGetQuery(field_con, paste0(
+      "SELECT count(*)::VARCHAR AS failures, count(*) FILTER (WHERE field IS NULL OR ",
+      "actual IS NOT DISTINCT FROM expected)::VARCHAR AS invalid_rows FROM read_parquet(",
+      DBI::dbQuoteString(field_con, failure_path), ")"))
+    failure_counts <- field_count_table(field_con, failure_path)
+    stored_counts <- field_read_counts(file.path(field_dir, relative, "fields.csv"))
+    stopifnot(failure_check$invalid_rows == "0",
+      failure_check$failures == as.character(row$field_failures),
+      identical(failure_counts, stored_counts), !anyNA(stored_counts$field),
+      all(nzchar(stored_counts$field)), all(as.numeric(stored_counts$failures) > 0),
+      identical(isTRUE(row$passed), all(unlist(row[field_error_columns]) == 0)))
+
+    if (row$comparison %in% c("duckvep_vep_csq", "fastvep_vep_csq")) {
+      body_required <- file.path(relative,
+        c("hgvs_body_failures.parquet", "hgvs_bodies.csv"))
+      stopifnot(all(body_required %in% field_manifest$path))
+      body_path <- file.path(field_dir, relative, "hgvs_body_failures.parquet")
+      body_check <- DBI::dbGetQuery(field_con, paste0(
+        "SELECT count(*)::VARCHAR AS failures, count(*) FILTER (WHERE field IS NULL OR ",
+        "field NOT IN ('HGVSc', 'HGVSp') OR actual IS NOT DISTINCT FROM expected)",
+        "::VARCHAR AS invalid_rows FROM read_parquet(",
+        DBI::dbQuoteString(field_con, body_path), ")"))
+      body_counts <- field_count_table(field_con, body_path)
+      stored_body_counts <- field_read_counts(file.path(field_dir, relative, "hgvs_bodies.csv"))
+      stopifnot(body_check$invalid_rows == "0", identical(body_counts, stored_body_counts))
+      if (row$comparison == "duckvep_vep_csq") stopifnot(body_check$failures == "0")
+    }
+  }
+}, finally = DBI::dbDisconnect(field_con, shutdown = TRUE))
+field_exact <- field_summary$comparison == "duckvep_vep_csq"
+stopifnot(sum(field_exact) == 8L, all(field_summary$compared_fields[field_exact] == 31L),
+  sum(field_summary$input_records[field_exact]) == 10671L,
+  sum(field_summary$compared_keys[field_exact]) == 10671L,
+  all(field_summary[field_exact, field_error_columns] == 0),
+  all(field_summary$passed[field_exact]))
 cat("DuckHTS source checkout:", field_receipt[["source_revision"]], "\n\n")
 if (field_receipt[["fastvep_binding"]] %in%
     c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline",
@@ -1650,16 +1718,19 @@ knitr::kable(aggregate(cbind(input_alleles, compared_keys, field_failures,
   comparison, field_summary, sum))
 ```
 
-These are failing comparisons, not a conformance certificate. DuckVEP/VEP
-differences comprise 168 HGVSc fields, 3,522 HGVSp fields and two HGVS shifts.
-The fixtures lack protein accessions; the HGVSp result therefore does not
-establish peptide-suffix agreement. Source VCFs, model GFFs, raw outputs and all
-field/key failures are retained in the [field data](data/duckvep_fastvep/fields_seed173_9bf888e).
-A [singleton replay](data/duckvep_fastvep/replay_phase1_589)
-of `chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus VEP's
-`c.1C>A`; that diagnostic does not replace the full campaign denominator.
-Independent-event HGVS corrections are tracked separately in
-https://github.com/RGenomicsETL/duckhts/issues/223.
+The source-bound campaign passes all eight DuckVEP/VEP comparisons across
+10,671 physical records and exact keys. All 31 compared fields have zero
+field, key or source-coverage errors. Full serialized fields are authoritative;
+accession-stripped HGVSc/HGVSp body artifacts are retained as diagnostics.
+FastVEP and native-schema comparison lanes still contain disagreements, which
+remain visible in the table and retained artifacts.
+
+The [earlier discrepancy evidence](data/duckvep_fastvep/fields_seed173_9bf888e)
+retains 168 HGVSc differences, 3,522 HGVSp differences and two HGVS shifts. Its
+fixtures lacked protein accessions, so that run did not establish peptide-suffix
+agreement. A [singleton replay](data/duckvep_fastvep/replay_phase1_589) retains
+the phase-1 `chrDuck:158 C>A` coordinate discrepancy without replacing the
+current full-campaign denominator.
 
 ```{r complete-field-singletons}
 validate_replay_bundle <- function(directory, evidence, expected = c(records = 10671L, tasks = 10100L, cells = 41942L)) {
@@ -1734,7 +1805,8 @@ replay_directory <- file.path(data_dir, "fields_replay_9bf888e")
 if (!file.exists(file.path(replay_directory, "completion.csv"))) {
   cat("Complete singleton replay evidence is not published yet.\n")
 } else {
-  replay_counts <- validate_replay_bundle(replay_directory, field_dir)
+  replay_evidence <- file.path(data_dir, "fields_seed173_9bf888e")
+  replay_counts <- validate_replay_bundle(replay_directory, replay_evidence)
   cat("Each replay contains one physical record with unchanged alleles and model.\n",
     "Every original failure cell is reproduced in isolation; this does not establish allele/model minimization or resolve the disagreements.\n",
     sep = "")
@@ -1743,7 +1815,7 @@ if (!file.exists(file.path(replay_directory, "completion.csv"))) {
 ```
 
 ```{r complete-field-observations}
-complete_dir <- file.path(data_dir, "field_contracts")
+complete_dir <- file.path(data_dir, "field_contracts_329bbe3")
 completion_path <- file.path(complete_dir, "completion.csv")
 if (!file.exists(completion_path)) {
   cat("Whole-GIAB complete-field measurements are not published yet.\n")
@@ -1905,6 +1977,81 @@ if (!file.exists(completion_path)) {
 }
 ```
 
+```{r complete-field-comparison}
+previous_dir <- file.path(data_dir, "field_contracts")
+previous_completion <- read_receipt(file.path(previous_dir, "completion.csv"),
+  c("source_revision", "completed", "binding", "observations", "repetitions",
+    "allele_coverage", "artifacts_sha256"))
+previous_manifest_path <- file.path(previous_dir, "artifacts.csv")
+stopifnot(nrow(previous_completion) == 1L,
+  previous_completion$source_revision == "9e14b2ef23657c660d0a4137adb2a254fb778f87",
+  previous_completion$completed == "TRUE", previous_completion$binding == "source_bound",
+  previous_completion$observations == "30", previous_completion$repetitions == "3",
+  previous_completion$allele_coverage == "verified",
+  sha256(previous_manifest_path) == previous_completion$artifacts_sha256)
+previous_manifest <- read_receipt(previous_manifest_path, c("file", "sha256"))
+stopifnot(!anyDuplicated(previous_manifest$file),
+  all(basename(previous_manifest$file) == previous_manifest$file),
+  identical(unname(vapply(file.path(previous_dir, previous_manifest$file),
+    sha256, character(1L))), previous_manifest$sha256))
+previous_metadata_table <- read_receipt(file.path(previous_dir, "metadata.csv"),
+  c("field", "value"))
+previous_inputs <- read_receipt(file.path(previous_dir, "inputs.csv"),
+  c("artifact", "sha256"))
+stopifnot(!anyDuplicated(previous_metadata_table$field),
+  !anyDuplicated(previous_inputs$artifact))
+previous_metadata <- setNames(previous_metadata_table$value, previous_metadata_table$field)
+previous_input_hashes <- setNames(previous_inputs$sha256, previous_inputs$artifact)
+same_metadata <- c("input_id", "input_records", "input_alt_alleles", "eligible_literal_alleles",
+  "fastvep_source_revision", "fastvep_version", "supplementary_providers", "distance",
+  "output_filesystem", "memory_limit", "max_spill", "affinity_one", "affinity_four")
+same_inputs <- c("input", "model", "fasta", "gff3", "fasta_index", "fastvep", "cache",
+  "cache_receipt", "source_map")
+stopifnot(identical(previous_metadata[same_metadata], metadata[same_metadata]),
+  identical(previous_input_hashes[same_inputs], input_hashes[same_inputs]))
+previous_observations <- previous_manifest$file[
+  grepl("^(duckvep|fastvep)_.*_[14]_[0-9]+[.]csv$", previous_manifest$file)]
+previous_rows <- do.call(rbind, lapply(file.path(previous_dir, previous_observations),
+  function(path) {
+    observation <- read_receipt(path, observation_fields)
+    stopifnot(nrow(observation) == 1L)
+    observation
+  }))
+previous_keys <- paste(previous_rows$tool, previous_rows$output_contract,
+  previous_rows$threads, previous_rows$run, sep = "_")
+stopifnot(!anyDuplicated(previous_keys), setequal(previous_keys, expected_keys),
+  identical(paste0(previous_keys, ".csv"), previous_observations),
+  all(previous_rows$multiset_checked == "TRUE"),
+  all(previous_rows$fingerprint_scope == "full_row"))
+for (group in split(previous_rows,
+    paste(previous_rows$tool, previous_rows$output_contract))) {
+  stopifnot(nrow(unique(group[c("row_count", "xor_hash", "low32_sum", "high32_sum")])) == 1L)
+}
+previous_times <- do.call(rbind, lapply(seq_len(nrow(previous_rows)), function(i) {
+  row <- previous_rows[i, ]
+  read_gnu_time(file.path(previous_dir, row$timing_file), row$tool, row$threads, row$run)
+}))
+previous_rows <- cbind(previous_rows,
+  previous_times[c("elapsed_seconds", "maximum_rss_kib")])
+previous_rows$row_count <- as.numeric(previous_rows$row_count)
+previous_medians <- aggregate(cbind(elapsed_seconds, maximum_rss_kib, row_count) ~
+  tool + output_contract + threads, previous_rows, median)
+comparison <- merge(previous_medians, medians,
+  by = c("tool", "output_contract", "threads"), suffixes = c("_previous", "_current"))
+stopifnot(nrow(comparison) == 10L,
+  comparison$row_count_previous == comparison$row_count_current)
+comparison$elapsed_change_percent <- 100 *
+  (comparison$elapsed_seconds_current / comparison$elapsed_seconds_previous - 1)
+comparison$maximum_rss_gib_previous <- comparison$maximum_rss_kib_previous / 1024^2
+comparison$maximum_rss_gib_current <- comparison$maximum_rss_kib_current / 1024^2
+knitr::kable(comparison[c("tool", "output_contract", "threads",
+    "elapsed_seconds_previous", "elapsed_seconds_current", "elapsed_change_percent",
+    "maximum_rss_gib_previous", "maximum_rss_gib_current")],
+  digits = 2,
+  col.names = c("Tool", "Contract", "Cores", "Previous seconds", "Current seconds",
+    "Elapsed change (%)", "Previous peak GiB", "Current peak GiB"))
+```
+
 The prepared transcript sets are not identical: DuckVEP's VEP-filtered model
 from Ensembl-116 core/funcgen dumps contains 644,427 transcripts; FastVEP's
 Ensembl-116 GFF3 cache contains 646,577. They use the same reference release
@@ -1912,11 +2059,13 @@ and primary FASTA. All expanded output rows remain counted; these pipeline
 timings do not establish whole-GIAB field concordance or use an intersection-only
 denominator. The eight-model field differential is separate evidence.
 
-Measurements ran on a shared host. The first one-core DuckVEP CSQ observation
-overlapped synthetic report checks for about 26.3 seconds and a later 1.6-second
-replay check (September 13, 22:26–22:27 Europe/Berlin). The report checks did not
-cap DuckDB thread pools. Their timing effect is unknown; the observation remains
-in the three-run median. No host-isolation claim is made.
+The previous source-bound matrix remains in
+[field_contracts](data/duckvep_fastvep/field_contracts). The comparison table
+uses identical input, output, affinity, memory and spill contracts from the two
+hash-checked packs. Measurements ran on a shared host, so the observed median
+changes are not an isolated estimate of this patch's cost and no host-isolation
+claim is made. No DuckHTS build, test or benchmark ran concurrently with the
+current matrix.
 
 Final CSQ files carry `record_index` and `alt_index` followed by the 32 common
 fields. Both engines write this 34-column transport; the native and operational

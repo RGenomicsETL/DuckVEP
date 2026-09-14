@@ -1669,6 +1669,186 @@ local({
   expect_identical(hgvs_protein_gap$protein_hgvs_status, "not_applicable")
   expect_true(is.na(hgvs_protein_gap$protein_hgvs_reason))
 
+  # VEP's exonic-SNV HGVSc coordinate uses the first transcript exon's phase,
+  # while the stored CDS retains padding from the later first coding exon.
+  hgvs_issue_reference <- system.file(
+    "extdata",
+    "duckvep_minimal.fa",
+    package = "Rduckhts",
+    mustWork = TRUE
+  )
+  dbExecute(
+    con,
+    paste(
+      "CREATE TABLE duckvep_r_hgvs_issue_regions AS SELECT",
+      "1::UINTEGER seq_region, 260::UBIGINT sequence_length,",
+      "'chrDuck'::VARCHAR seq_region_name"
+    )
+  )
+  dbExecute(
+    con,
+    paste(
+      "CREATE TABLE duckvep_r_hgvs_later_cds_forward AS SELECT",
+      "0::UINTEGER transcript_index, 1::UINTEGER seq_region,",
+      "100::UBIGINT transcript_start, 209::UBIGINT transcript_end,",
+      "1::TINYINT strand, 0::UINTEGER gene_index, 3::UBIGINT transcript_flags,",
+      "200::UBIGINT cds_start, 209::UBIGINT cds_end,",
+      "'NNTACGTACGTA'::BLOB cds_sequence, 1::UTINYINT codon_table,",
+      "'TACGTACGTA'::BLOB pre_cds_sequence, ''::BLOB post_cds_sequence"
+    )
+  )
+  dbExecute(
+    con,
+    paste(
+      "CREATE TABLE duckvep_r_hgvs_later_cds_forward_exons AS SELECT * FROM (VALUES",
+      "(0::UINTEGER,100::UBIGINT,109::UBIGINT,1::UBIGINT,10::UBIGINT,-1::TINYINT,-1::TINYINT),",
+      "(0::UINTEGER,200::UBIGINT,209::UBIGINT,11::UBIGINT,20::UBIGINT,2::TINYINT,0::TINYINT))",
+      "e(transcript_index,exon_start,exon_end,exon_cdna_start,exon_cdna_end,phase,end_phase)"
+    )
+  )
+  dbExecute(
+    con,
+    paste(
+      "CREATE TABLE duckvep_r_hgvs_later_cds_reverse AS SELECT * REPLACE(",
+      "-1::TINYINT AS strand,100::UBIGINT AS cds_start,109::UBIGINT AS cds_end)",
+      "FROM duckvep_r_hgvs_later_cds_forward"
+    )
+  )
+  dbExecute(
+    con,
+    paste(
+      "CREATE TABLE duckvep_r_hgvs_later_cds_reverse_exons AS SELECT * FROM (VALUES",
+      "(0::UINTEGER,200::UBIGINT,209::UBIGINT,1::UBIGINT,10::UBIGINT,-1::TINYINT,-1::TINYINT),",
+      "(0::UINTEGER,100::UBIGINT,109::UBIGINT,11::UBIGINT,20::UBIGINT,2::TINYINT,0::TINYINT))",
+      "e(transcript_index,exon_start,exon_end,exon_cdna_start,exon_cdna_end,phase,end_phase)"
+    )
+  )
+  phase_models <- list(
+    forward = c("duckvep_r_hgvs_later_cds_forward", "200", "T", "C"),
+    reverse = c("duckvep_r_hgvs_later_cds_reverse", "109", "A", "G")
+  )
+  for (direction in names(phase_models)) {
+    model <- phase_models[[direction]]
+    name <- paste0("r-hgvs-later-cds-", direction)
+    expect_true(load_model(name, c(
+      "SELECT * FROM duckvep_r_hgvs_issue_regions ORDER BY seq_region",
+      paste0("SELECT * FROM ", model[[1L]],
+        " ORDER BY seq_region, transcript_start, transcript_index"),
+      paste0("SELECT * FROM ", model[[1L]],
+        "_exons ORDER BY transcript_index, exon_cdna_start")
+    ), reference_fasta = hgvs_issue_reference)$loaded)
+    phase_hgvs <- dbGetQuery(con, paste0(
+      "SELECT a.transcript_hgvs,a.hgvs_shift,a.transcript_hgvs_status ",
+      "FROM unnest(_duckvep_annotate_small_hgvs('", name,
+      "',1::UINTEGER,", model[[2L]], "::UBIGINT,'", model[[3L]],
+      "','", model[[4L]], "',0::UBIGINT)) u(a)"
+    ))
+    expect_identical(phase_hgvs$transcript_hgvs, "c.1T>C")
+    expect_equal(phase_hgvs$hgvs_shift, 0)
+    expect_identical(phase_hgvs$transcript_hgvs_status, "supported")
+    expect_true(dbGetQuery(con, paste0(
+      "SELECT duckvep_model_drop('", name, "') dropped"
+    ))$dropped)
+  }
+
+  # Retained VEP-116 rows 1178/1194 preserve their uploaded alleles while the
+  # clipped insertion coordinates are sorted in transcript order.
+  noncoding_issue_queries <- c(
+    "SELECT * FROM duckvep_r_hgvs_issue_regions ORDER BY seq_region",
+    paste(
+      "SELECT * REPLACE(0::UBIGINT AS transcript_flags,NULL::UBIGINT AS cds_start,",
+      "NULL::UBIGINT AS cds_end,NULL::BLOB AS cds_sequence,NULL::UTINYINT AS codon_table,",
+      "NULL::BLOB AS pre_cds_sequence,NULL::BLOB AS post_cds_sequence)",
+      "FROM duckvep_r_transcripts ORDER BY seq_region,transcript_start,transcript_index"
+    ),
+    paste(
+      "SELECT * REPLACE(-1::TINYINT AS phase,-1::TINYINT AS end_phase)",
+      "FROM duckvep_r_exons ORDER BY transcript_index,exon_cdna_start"
+    )
+  )
+  expect_true(load_model(
+    "r-hgvs-issue-noncoding",
+    noncoding_issue_queries,
+    reference_fasta = hgvs_issue_reference
+  )$loaded)
+  noncoding_issue_hgvs <- dbGetQuery(
+    con,
+    paste(
+      "WITH variants(ord,position,reference,alternate) AS (VALUES",
+      "(1178,249::UBIGINT,'ACGT','CAAC'),(1194,250::UBIGINT,'CG','GC'))",
+      "SELECT ord,a.transcript_hgvs,a.hgvs_shift,a.transcript_hgvs_status",
+      "FROM variants,LATERAL unnest(_duckvep_annotate_small_hgvs(",
+      "'r-hgvs-issue-noncoding',1::UINTEGER,position,reference,alternate,0::UBIGINT",
+      ")) u(a) ORDER BY ord"
+    )
+  )
+  expect_identical(
+    noncoding_issue_hgvs$transcript_hgvs,
+    c("n.100_101insCA", "n.101_102insG")
+  )
+  expect_equal(noncoding_issue_hgvs$hgvs_shift, c(0, 0))
+  expect_identical(
+    noncoding_issue_hgvs$transcript_hgvs_status,
+    rep("supported", 2L)
+  )
+  expect_true(dbGetQuery(
+    con,
+    "SELECT duckvep_model_drop('r-hgvs-issue-noncoding') dropped"
+  )$dropped)
+
+  # Reverse-strand retained rows 8/25/1245/1260 pin external shifted flanks,
+  # transcript-coordinate ordering and VEP's strand-signed HGVS_OFFSET.
+  reverse_issue_queries <- c(
+    "SELECT * FROM duckvep_r_hgvs_issue_regions ORDER BY seq_region",
+    paste(
+      "SELECT * REPLACE(-1::TINYINT AS strand,",
+      "seq_revcomp(decode(cds_sequence))::BLOB AS cds_sequence,",
+      "seq_revcomp(decode(post_cds_sequence))::BLOB AS pre_cds_sequence,",
+      "seq_revcomp(decode(pre_cds_sequence))::BLOB AS post_cds_sequence)",
+      "FROM duckvep_r_transcripts ORDER BY seq_region,transcript_start,transcript_index"
+    ),
+    paste(
+      "SELECT transcript_index,exon_start,exon_end,",
+      "(103-exon_cdna_end)::UBIGINT exon_cdna_start,",
+      "(103-exon_cdna_start)::UBIGINT exon_cdna_end,phase,end_phase",
+      "FROM duckvep_r_exons ORDER BY transcript_index,exon_cdna_start"
+    )
+  )
+  expect_true(load_model(
+    "r-hgvs-issue-reverse",
+    reverse_issue_queries,
+    reference_fasta = hgvs_issue_reference
+  )$loaded)
+  reverse_issue_hgvs <- dbGetQuery(
+    con,
+    paste(
+      "WITH variants(ord,position,reference,alternate) AS (VALUES",
+      "(8,100::UBIGINT,'T','TGCCAGAAT'),(25,101::UBIGINT,'A','AATTGT'),",
+      "(1245,249::UBIGINT,'ACGT','CAAC'),(1260,250::UBIGINT,'CG','GC'))",
+      "SELECT ord,a.transcript_hgvs,a.hgvs_shift,",
+      "-a.hgvs_shift::BIGINT AS hgvs_offset,",
+      "a.transcript_hgvs_status FROM variants,LATERAL unnest(_duckvep_annotate_small_hgvs(",
+      "'r-hgvs-issue-reverse',1::UINTEGER,position,reference,alternate,0::UBIGINT",
+      ")) u(a) ORDER BY ord"
+    )
+  )
+  expect_identical(reverse_issue_hgvs$transcript_hgvs, c(
+    "c.*20_*20+1insTTCTGGCA",
+    "c.*20_*20+1insAATAC",
+    "c.-9_-8insTG",
+    "c.-10_-9insC"
+  ))
+  expect_equal(reverse_issue_hgvs$hgvs_shift, c(1, 2, 0, 0))
+  expect_equal(reverse_issue_hgvs$hgvs_offset, c(-1, -2, 0, 0))
+  expect_identical(
+    reverse_issue_hgvs$transcript_hgvs_status,
+    rep("supported", 4L)
+  )
+  expect_true(dbGetQuery(
+    con,
+    "SELECT duckvep_model_drop('r-hgvs-issue-reverse') dropped"
+  )$dropped)
+
   ensembl_mirna_queries <- c(
     paste(
       "SELECT seq_region, sequence_length",

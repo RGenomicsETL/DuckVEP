@@ -338,8 +338,12 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE)
   aa <- pair("p.reference_amino_acids", "p.alternate_amino_acids")
   if (is_csq) aa <- paste0("CASE WHEN p.reference_amino_acids = p.alternate_amino_acids
     THEN p.reference_amino_acids ELSE ", aa, " END")
-  accession <- function(stable, version) paste0(stable,
-    " || CASE WHEN ", version, " IS NULL THEN '' ELSE '.' || ", version, "::VARCHAR END")
+  accession <- function(stable, version, allow_missing = FALSE) {
+    value <- if (allow_missing) paste0("coalesce(", stable, ", '')") else stable
+    paste0(value, " || CASE WHEN ", version, " IS NULL OR regexp_matches(coalesce(",
+      stable, ", ''), '\\.[0-9]+$') OR contains(coalesce(", stable,
+      ", ''), 'LRG') THEN '' ELSE '.' || ", version, "::VARCHAR END")
+  }
   expressions <- c(
     Uploaded_variation = "coalesce(e.variant_id, e.native_location || '_' ||
       e.native_reference || '/' || array_to_string(e.native_alternates, '/'))",
@@ -362,7 +366,7 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE)
     HGVSc = paste0("CASE WHEN a.transcript_hgvs IS NOT NULL THEN (",
       accession("t.transcript_stable_id", "t.transcript_version"), ") || ':' || a.transcript_hgvs END"),
     HGVSp = paste0("CASE WHEN a.protein_hgvs IS NOT NULL THEN (",
-      accession("t.translation_stable_id", "t.translation_version"), ") || ':' || a.protein_hgvs END"),
+      accession("t.translation_stable_id", "t.translation_version", TRUE), ") || ':' || a.protein_hgvs END"),
     CANONICAL = "CASE WHEN m.canonical THEN 'YES' END",
     MANE_SELECT = "t.mane_select_refseq", MANE_PLUS_CLINICAL = "t.mane_plus_clinical_refseq",
     TSL = "regexp_extract(m.tsl, '^(?:tsl)?([0-9]+)', 1)",

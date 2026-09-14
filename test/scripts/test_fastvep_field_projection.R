@@ -218,6 +218,22 @@ local({
   dbExecute(con, "CREATE TEMP TABLE fastvep_metadata AS SELECT transcript_index, 'GENE' AS symbol,
     TRUE AS canonical, NULL::VARCHAR AS tsl, NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds
     FROM duckvep_bench_model.model_transcripts")
+  dbExecute(con, "UPDATE duckvep_bench_model.model_transcripts SET
+    translation_stable_id=CASE transcript_index WHEN 0 THEN NULL WHEN 1 THEN 'P1.7' ELSE 'P2' END,
+    translation_version=1 WHERE transcript_index < 3")
+  identifier_query <- duckvep_fastvep_field_query(con, "vep_csq")
+  identifiers <- dbGetQuery(con, paste0("SELECT Feature,HGVSp,ENSP FROM (",
+    identifier_query, ") WHERE Uploaded_variation='site_0' AND Feature IN ('TX0','TX1','TX2')
+    ORDER BY Feature"))
+  stopifnot(
+    identical(identifiers$HGVSp,
+      c(".1:p.Lys2Glu", "P1.7:p.Lys2Glu", "P2.1:p.Lys2Glu")),
+    identifiers$ENSP[[1L]] == "", identifiers$ENSP[[2L]] == "P1.7",
+    identifiers$ENSP[[3L]] == "P2"
+  )
+  dbExecute(con, "UPDATE duckvep_bench_model.model_transcripts SET
+    translation_stable_id='P'||transcript_index::VARCHAR,
+    translation_version=1 WHERE transcript_index < 3")
   for (contract in c("native_tab17", "vep_csq")) {
     query <- duckvep_fastvep_field_query(con, contract, include_identity = contract == "vep_csq")
     fields <- duckvep_fastvep_transport_fields(contract)

@@ -22,9 +22,6 @@ typedef enum duckvep_compat_flag {
      * _check_for_peptide_duplication translates reference CDS, without a
      * codon-table argument; BioPerl selects NCBI table 1. */
     DUCKVEP_COMPAT_HGVS_CDS_STANDARD_TABLE = UINT32_C(1) << 1,
-    /* A pure insertion in an incomplete terminal codon uses distinct
-     * consequence and protein-HGVS peptide views. */
-    DUCKVEP_COMPAT_HGVS_TERMINAL_PARTIAL_INSERTION = UINT32_C(1) << 2,
     /* Perl substr with a negative start can produce VEP's position-zero
      * start-of-peptide insertion representation. */
     DUCKVEP_COMPAT_HGVS_NEGATIVE_SUBSTR = UINT32_C(1) << 3,
@@ -60,7 +57,6 @@ static inline duckvep_compat_policy_t duckvep_compat_policy(
         policy.flags =
             (uint32_t)(DUCKVEP_COMPAT_HGVS_INCOMPLETE_CODON_ASSIGNMENT |
                        DUCKVEP_COMPAT_HGVS_CDS_STANDARD_TABLE |
-                       DUCKVEP_COMPAT_HGVS_TERMINAL_PARTIAL_INSERTION |
                        DUCKVEP_COMPAT_HGVS_NEGATIVE_SUBSTR |
                        DUCKVEP_COMPAT_HGVS_XAA_AS_TER |
                        DUCKVEP_COMPAT_HGVS_THREE_LETTER_DELINS_NO_EXTENSION);

@@ -109,6 +109,13 @@ duckvep_projection_fixture <- function(con, root, inputs, case, directory) {
       pre_cds_sequence=NULL::BLOB, post_cds_sequence=NULL::BLOB")
     execute("UPDATE duckvep_exons SET phase=-1, end_phase=-1")
   }
+  # BaseGXF constructs a version-1 translation for every coding transcript.
+  # Keep one coding case without a stable protein ID to exercise VEP's `.1:p.`
+  # presentation, and give the remaining coding cases an explicit accession.
+  if (case != "noncoding" && case != "noncoding_first_exon") {
+    cds_rows <- gff$V3 == "CDS"
+    gff$V9[cds_rows] <- paste0(gff$V9[cds_rows], ";protein_id=DUCK1-P")
+  }
   gff_path <- file.path(directory, paste0(case, ".gff3"))
   writeLines("##gff-version 3", gff_path)
   utils::write.table(gff, gff_path, append = TRUE, sep = "\t", quote = FALSE,

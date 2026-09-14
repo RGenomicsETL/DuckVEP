@@ -3486,25 +3486,6 @@ static uint8_t delta_sequence_reference_peptide_base(
         edited);
 }
 
-int duckvep_coding_context_is_terminal_partial_insertion(
-    const duckvep_coding_context_t *ctx) {
-
-    size_t start0;
-    size_t partial_start0;
-
-    if (ctx == NULL || !ctx->has_single_edit ||
-        ctx->single_edit_ref_len != 0u ||
-        ctx->single_edit_alt_len == 0u ||
-        ctx->single_edit_alt == NULL ||
-        ctx->single_edit_cds_start == 0u ||
-        (ctx->ref_cds_len % 3u) == 0u) {
-        return 0;
-    }
-    start0 = (size_t)ctx->single_edit_cds_start - 1u;
-    partial_start0 = ctx->ref_cds_len - (ctx->ref_cds_len % 3u);
-    return start0 >= partial_start0 && start0 <= ctx->ref_cds_len;
-}
-
 /* TranscriptVariationAllele::codon rounds the feature to reference codons,
  * changes that nucleotide length by allele_length - feature_length, and takes
  * the resulting slice from the edited CDS. TVA::peptide then appends X for a

@@ -1442,3 +1442,162 @@ FROM unnest(_duckvep_annotate_small_hgvs(
 )) AS u(annotation);
 ----
 supported	not_applicable	-
+
+# A positive phase on the first coding exon is CDS padding, not a shift of
+# VEP's literal-SNP HGVSc coordinate when an earlier transcript exon is
+# noncoding. This holds in transcript order on either strand.
+statement ok
+CREATE TABLE duckvep_hgvs_noncoding_first_phase_transcripts AS
+SELECT * FROM (VALUES
+  (0::UINTEGER, 1::UINTEGER, 100::UBIGINT, 250::UBIGINT, 1::TINYINT,
+   0::UINTEGER, 16::UBIGINT, 158::UBIGINT, 240::UBIGINT),
+  (1::UINTEGER, 1::UINTEGER, 100::UBIGINT, 250::UBIGINT, 1::TINYINT,
+   1::UINTEGER, 16::UBIGINT, 158::UBIGINT, 240::UBIGINT),
+  (2::UINTEGER, 1::UINTEGER, 100::UBIGINT, 250::UBIGINT, -1::TINYINT,
+   2::UINTEGER, 16::UBIGINT, 110::UBIGINT, 180::UBIGINT),
+  (3::UINTEGER, 1::UINTEGER, 100::UBIGINT, 250::UBIGINT, -1::TINYINT,
+   3::UINTEGER, 16::UBIGINT, 110::UBIGINT, 180::UBIGINT)
+) t(transcript_index, seq_region, transcript_start, transcript_end, strand,
+    gene_index, transcript_flags, cds_start, cds_end)
+CROSS JOIN (SELECT NULL::BLOB cds_sequence, NULL::UTINYINT codon_table,
+                   NULL::BLOB pre_cds_sequence,
+                   NULL::BLOB post_cds_sequence);
+
+statement ok
+CREATE TABLE duckvep_hgvs_noncoding_first_phase_exons AS
+SELECT * FROM (VALUES
+  (0::UINTEGER, 100::UBIGINT, 125::UBIGINT, 1::UBIGINT, 26::UBIGINT,
+   -1::TINYINT, -1::TINYINT),
+  (0::UINTEGER, 150::UBIGINT, 180::UBIGINT, 27::UBIGINT, 57::UBIGINT,
+   1::TINYINT, 0::TINYINT),
+  (0::UINTEGER, 220::UBIGINT, 250::UBIGINT, 58::UBIGINT, 88::UBIGINT,
+   0::TINYINT, 0::TINYINT),
+  (1::UINTEGER, 100::UBIGINT, 125::UBIGINT, 1::UBIGINT, 26::UBIGINT,
+   -1::TINYINT, -1::TINYINT),
+  (1::UINTEGER, 150::UBIGINT, 180::UBIGINT, 27::UBIGINT, 57::UBIGINT,
+   2::TINYINT, 0::TINYINT),
+  (1::UINTEGER, 220::UBIGINT, 250::UBIGINT, 58::UBIGINT, 88::UBIGINT,
+   0::TINYINT, 0::TINYINT),
+  (2::UINTEGER, 220::UBIGINT, 250::UBIGINT, 1::UBIGINT, 31::UBIGINT,
+   -1::TINYINT, -1::TINYINT),
+  (2::UINTEGER, 150::UBIGINT, 180::UBIGINT, 32::UBIGINT, 62::UBIGINT,
+   1::TINYINT, 0::TINYINT),
+  (2::UINTEGER, 100::UBIGINT, 125::UBIGINT, 63::UBIGINT, 88::UBIGINT,
+   0::TINYINT, 0::TINYINT),
+  (3::UINTEGER, 220::UBIGINT, 250::UBIGINT, 1::UBIGINT, 31::UBIGINT,
+   -1::TINYINT, -1::TINYINT),
+  (3::UINTEGER, 150::UBIGINT, 180::UBIGINT, 32::UBIGINT, 62::UBIGINT,
+   2::TINYINT, 0::TINYINT),
+  (3::UINTEGER, 100::UBIGINT, 125::UBIGINT, 63::UBIGINT, 88::UBIGINT,
+   0::TINYINT, 0::TINYINT)
+) t(transcript_index, exon_start, exon_end, exon_cdna_start, exon_cdna_end,
+    phase, end_phase);
+
+query I
+SELECT loaded FROM duckvep_model_load(
+  'hgvs-noncoding-first-phase',
+  'SELECT * FROM duckvep_hgvs_regions WHERE seq_region = 1',
+  'SELECT * FROM duckvep_hgvs_noncoding_first_phase_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT * FROM duckvep_hgvs_noncoding_first_phase_exons ORDER BY transcript_index, exon_cdna_start',
+  reference_fasta := '__WORKING_DIRECTORY__/test/data/duckvep/minimal.fa'
+);
+----
+1
+
+query IIIITTTT
+WITH variants(transcript_index, strand, phase, position, reference, alternate) AS (
+  VALUES
+    (0::UINTEGER, 1, 1, 158::UBIGINT, 'C', 'A'),
+    (1::UINTEGER, 1, 2, 158::UBIGINT, 'C', 'A'),
+    (2::UINTEGER, -1, 1, 180::UBIGINT, 'T', 'C'),
+    (3::UINTEGER, -1, 2, 180::UBIGINT, 'T', 'C')
+)
+SELECT variants.transcript_index, strand, phase, position, reference, alternate,
+       annotation.transcript_hgvs,
+       annotation.transcript_hgvs_status
+FROM variants,
+LATERAL unnest(_duckvep_annotate_small_hgvs(
+  'hgvs-noncoding-first-phase', 1::UINTEGER, position, reference, alternate,
+  0::UBIGINT
+)) AS u(annotation)
+WHERE annotation.transcript_index = variants.transcript_index
+ORDER BY variants.transcript_index;
+----
+0	1	1	158	C	A	c.1C>A	supported
+1	1	2	158	C	A	c.1C>A	supported
+2	-1	1	180	T	C	c.1A>G	supported
+3	-1	2	180	T	C	c.1A>G	supported
+
+# Pinned VEP 116 field-campaign records retain source geometry while checking
+# transcript-order insertion endpoints and the signed reverse-strand offset.
+statement ok
+CREATE TABLE duckvep_hgvs_coordinate_witness_transcripts AS
+SELECT * FROM (VALUES
+  (0::UINTEGER, 1::UINTEGER, 100::UBIGINT, 250::UBIGINT, 1::TINYINT,
+   0::UINTEGER, 0::UBIGINT, NULL::UBIGINT, NULL::UBIGINT),
+  (1::UINTEGER, 1::UINTEGER, 100::UBIGINT, 250::UBIGINT, -1::TINYINT,
+   1::UINTEGER, 3::UBIGINT, 120::UBIGINT, 240::UBIGINT)
+) t(transcript_index, seq_region, transcript_start, transcript_end, strand,
+    gene_index, transcript_flags, cds_start, cds_end)
+CROSS JOIN (SELECT NULL::BLOB cds_sequence, NULL::UTINYINT codon_table,
+                   NULL::BLOB pre_cds_sequence,
+                   NULL::BLOB post_cds_sequence);
+
+statement ok
+CREATE TABLE duckvep_hgvs_coordinate_witness_exons AS
+SELECT * FROM (VALUES
+  (0::UINTEGER, 100::UBIGINT, 150::UBIGINT, 1::UBIGINT, 51::UBIGINT,
+   -1::TINYINT, -1::TINYINT),
+  (0::UINTEGER, 200::UBIGINT, 250::UBIGINT, 52::UBIGINT, 102::UBIGINT,
+   -1::TINYINT, -1::TINYINT),
+  (1::UINTEGER, 200::UBIGINT, 250::UBIGINT, 1::UBIGINT, 51::UBIGINT,
+   0::TINYINT, 0::TINYINT),
+  (1::UINTEGER, 100::UBIGINT, 150::UBIGINT, 52::UBIGINT, 102::UBIGINT,
+   1::TINYINT, 0::TINYINT)
+) t(transcript_index, exon_start, exon_end, exon_cdna_start, exon_cdna_end,
+    phase, end_phase);
+
+query I
+SELECT loaded FROM duckvep_model_load(
+  'hgvs-coordinate-witnesses',
+  'SELECT * FROM duckvep_hgvs_regions WHERE seq_region = 1',
+  'SELECT * FROM duckvep_hgvs_coordinate_witness_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT * FROM duckvep_hgvs_coordinate_witness_exons ORDER BY transcript_index, exon_cdna_start',
+  reference_fasta := '__WORKING_DIRECTORY__/test/data/duckvep/minimal.fa'
+);
+----
+1
+
+statement ok
+CREATE TABLE duckvep_hgvs_coordinate_witnesses AS
+SELECT * FROM (VALUES
+  (1178, 0::UINTEGER, 249::UBIGINT, 'ACGT', 'CAAC'),
+  (1194, 0::UINTEGER, 250::UBIGINT, 'CG', 'GC'),
+  (8, 1::UINTEGER, 100::UBIGINT, 'T', 'TGCCAGAAT'),
+  (25, 1::UINTEGER, 101::UBIGINT, 'A', 'AATTGT'),
+  (1245, 1::UINTEGER, 249::UBIGINT, 'ACGT', 'CAAC'),
+  (1260, 1::UINTEGER, 250::UBIGINT, 'CG', 'GC')
+) t(record_index, transcript_index, position, reference, alternate);
+
+query IITTITIITT
+SELECT record_index, position, reference, alternate,
+       witnesses.transcript_index, annotation.transcript_hgvs,
+       annotation.hgvs_shift,
+       annotation.hgvs_shift * transcripts.strand AS signed_offset,
+       annotation.transcript_hgvs_status,
+       coalesce(annotation.transcript_hgvs_reason, '-')
+FROM duckvep_hgvs_coordinate_witnesses witnesses
+JOIN duckvep_hgvs_coordinate_witness_transcripts transcripts USING (transcript_index),
+LATERAL unnest(_duckvep_annotate_small_hgvs(
+  'hgvs-coordinate-witnesses', 1::UINTEGER, position, reference, alternate,
+  0::UBIGINT
+)) AS u(annotation)
+WHERE annotation.transcript_index = witnesses.transcript_index
+ORDER BY record_index;
+----
+8	100	T	TGCCAGAAT	1	c.*20_*20+1insTTCTGGCA	1	-1	supported	-
+25	101	A	AATTGT	1	c.*20_*20+1insAATAC	2	-2	supported	-
+1178	249	ACGT	CAAC	0	n.100_101insCA	0	0	supported	-
+1194	250	CG	GC	0	n.101_102insG	0	0	supported	-
+1245	249	ACGT	CAAC	1	c.-9_-8insTG	0	0	supported	-
+1260	250	CG	GC	1	c.-10_-9insC	0	0	supported	-

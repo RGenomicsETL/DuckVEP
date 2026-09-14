@@ -112,6 +112,30 @@ static duckvep_hgvs_status_t hgvs_coordinate_from_cdna_bounds(
     return DUCKVEP_HGVS_OK;
 }
 
+/* TranscriptVariationAllele::hgvs_transcript orders clipped coordinates by
+ * their numeric base and intron offset, except when the second coordinate is
+ * in the 3-prime UTR. The latter exception preserves observable forms such as
+ * c.*10_*9insG. */
+static void hgvs_order_transcript_pair(
+    duckvep_hgvs_coordinate_t *first,
+    duckvep_hgvs_coordinate_t *last) {
+
+    duckvep_hgvs_coordinate_t temporary;
+
+    if (first == NULL || last == NULL ||
+        last->kind == (uint8_t)DUCKVEP_HGVS_COORDINATE_C_STAR) {
+        return;
+    }
+    if (first->base < last->base ||
+        (first->base == last->base &&
+         first->intron_offset <= last->intron_offset)) {
+        return;
+    }
+    temporary = *first;
+    *first = *last;
+    *last = temporary;
+}
+
 duckvep_hgvs_status_t duckvep_hgvs_coordinate_from_transcript(
     const duckvep_transcript_model_t      *transcripts,
     const duckvep_exon_model_t            *exons,
@@ -200,9 +224,8 @@ duckvep_hgvs_status_t duckvep_hgvs_dna_fact_build(
 
     /* TranscriptVariationAllele::hgvs_transcript bypasses
      * _get_cDNA_position only for a literal exonic VariationFeature SNP. Its
-     * TranscriptVariation::cds_start already includes the positive starting
-     * phase, so preserve that representation-specific fast path instead of
-     * shifting generic indel, MNV, or intronic coordinates. */
+     * TranscriptVariation::cds_start uses the first transcript exon phase,
+     * which can differ from the first coding exon's physical CDS padding. */
     if (edit->feature_ref_length == 1u &&
         edit->feature_alt_length == 1u &&
         edit->feature_first.exonic != 0u &&
@@ -214,6 +237,11 @@ duckvep_hgvs_status_t duckvep_hgvs_dna_fact_build(
         edit->feature_first.cdna_anchor1 <= coding_end_cdna) {
         cds_pos = edit->feature_first.cdna_anchor1 - coding_start_cdna + 1u +
             (uint32_t)phase_offset;
+        if (!duckvep_project_vep_cds_position(
+                transcripts, exons, edit->tx_idx, cds_pos, phase_offset,
+                &cds_pos, &phase_offset)) {
+            return DUCKVEP_HGVS_INVALID_PROJECTION;
+        }
         result.first.kind = (uint8_t)DUCKVEP_HGVS_COORDINATE_C;
         result.first.base = (int64_t)cds_pos;
         result.first.intron_offset = 0;
@@ -513,6 +541,48 @@ static duckvep_hgvs_status_t hgvs_project_genomic_pair(
         transcripts, exons, tx_idx, strand > 0 ? &high : &low, last_out);
 }
 
+/* VEP 116's reverse-strand _get_cDNA_position path can express the genomic
+ * base immediately below transcript start as a +1 offset from that terminal
+ * exon base. This is used only after HGVS shifting moves a plain insertion to
+ * that exact pair; the generic projector correctly rejects external bases. */
+static duckvep_hgvs_status_t hgvs_project_shifted_insertion_pair(
+    const duckvep_transcript_model_t *transcripts,
+    const duckvep_exon_model_t       *exons,
+    size_t                             tx_idx,
+    uint32_t                           genomic_low1,
+    uint32_t                           genomic_high1,
+    int8_t                             strand,
+    duckvep_hgvs_coordinate_t        *first_out,
+    duckvep_hgvs_coordinate_t        *last_out) {
+
+    duckvep_transcript_coordinate_t terminal;
+    duckvep_transcript_coordinate_t external;
+    duckvep_hgvs_status_t status;
+
+    status = hgvs_project_genomic_pair(
+        transcripts, exons, tx_idx, genomic_low1, genomic_high1, strand,
+        first_out, last_out);
+    if (status != DUCKVEP_HGVS_OUT_OF_RANGE) return status;
+    if (transcripts == NULL || transcripts->start1 == NULL ||
+        tx_idx >= transcripts->transcript_count || strand != (int8_t)-1 ||
+        genomic_low1 == UINT32_MAX || genomic_low1 + 1u != genomic_high1 ||
+        genomic_high1 != transcripts->start1[tx_idx] ||
+        duckvep_project_transcript_coordinate(
+            transcripts, exons, tx_idx, genomic_high1, &terminal) !=
+            DUCKVEP_TRANSCRIPT_EDIT_OK || terminal.exonic == 0u) {
+        return DUCKVEP_HGVS_OUT_OF_RANGE;
+    }
+    external = terminal;
+    external.genomic_pos1 = genomic_low1;
+    external.intron_offset = 1;
+    external.exonic = 0u;
+    status = duckvep_hgvs_coordinate_from_transcript(
+        transcripts, exons, tx_idx, &terminal, first_out);
+    if (status != DUCKVEP_HGVS_OK) return status;
+    return duckvep_hgvs_coordinate_from_transcript(
+        transcripts, exons, tx_idx, &external, last_out);
+}
+
 /* VEP 116 clamps a VariationFeature that overlaps only part of a transcript,
  * derives REF from that clamped transcript slice, then clips common REF/ALT
  * bases. This is observably different from clipping the uploaded alleles
@@ -640,6 +710,7 @@ static duckvep_hgvs_status_t hgvs_dna_fact_build_clamped_feature(
             transcripts, exons, edit->tx_idx, genomic_low1, genomic_high1,
             strand, &result.first, &result.last);
         if (status != DUCKVEP_HGVS_OK) return status;
+        hgvs_order_transcript_pair(&result.first, &result.last);
         result.numbering = result.first.kind ==
                 (uint8_t)DUCKVEP_HGVS_COORDINATE_N
             ? (uint8_t)DUCKVEP_HGVS_NUMBERING_N
@@ -726,6 +797,7 @@ static duckvep_hgvs_status_t hgvs_dna_fact_build_clamped_feature(
             transcripts, exons, edit->tx_idx, &last_transcript,
             &result.last);
         if (status != DUCKVEP_HGVS_OK) return status;
+        hgvs_order_transcript_pair(&result.first, &result.last);
     }
     result.numbering = result.first.kind ==
             (uint8_t)DUCKVEP_HGVS_COORDINATE_N
@@ -1050,7 +1122,7 @@ duckvep_hgvs_dna_fact_build_genomic_shifted_with_lookup(
          * insertion flanks. Re-project only when the HGVS-only shift moved
          * them; a duplication names its copied source span above. */
         if (!duplication_found && shift != 0u) {
-            status = hgvs_project_genomic_pair(
+            status = hgvs_project_shifted_insertion_pair(
                 transcripts, exons, edit->tx_idx, shifted_low1,
                 shifted_high1, edit->transcript_strand,
                 &result.first, &result.last);
@@ -1274,8 +1346,13 @@ duckvep_hgvs_status_t duckvep_hgvs_shifted_cds_edit_build(
     duckvep_hgvs_status_t status;
     duckvep_haplotype_edit_t result_edit;
     duckvep_cds_edit_status_t edit_status;
+    uint32_t feature_cds_start;
+    uint32_t coding_start_cdna;
+    uint32_t coding_end_cdna;
     size_t allele_length;
     size_t required;
+    uint8_t physical_phase;
+    uint8_t feature_phase;
     int insertion;
 
     if (required_out != NULL) *required_out = 0u;
@@ -1396,6 +1473,21 @@ duckvep_hgvs_status_t duckvep_hgvs_shifted_cds_edit_build(
     }
     status = hgvs_status_from_cds_edit(edit_status);
     if (status != DUCKVEP_HGVS_OK) return status;
+
+    /* TranscriptVariationAllele::_get_alternate_cds mutates the padded
+     * translateable sequence at TranscriptVariation::cds_start. That
+     * coordinate removes the coding start-exon phase and adds the first
+     * transcript exon phase. The genomic placement above remains the REF
+     * validation authority; only the local CDS mutation coordinate changes. */
+    if (!duckvep_project_coding_cdna_bounds(
+            transcripts, exons, edit->tx_idx, &coding_start_cdna,
+            &coding_end_cdna, NULL, &physical_phase) ||
+        !duckvep_project_vep_cds_position(
+            transcripts, exons, edit->tx_idx, result_edit.cds_start,
+            physical_phase, &feature_cds_start, &feature_phase)) {
+        return DUCKVEP_HGVS_INVALID_PROJECTION;
+    }
+    result_edit.cds_start = feature_cds_start;
     *event_out = event;
     *out = result_edit;
     return DUCKVEP_HGVS_OK;
@@ -1688,62 +1780,6 @@ static int hgvs_protein_full_window(
     return 1;
 }
 
-static int hgvs_protein_terminal_partial_insertion_window(
-    const duckvep_coding_context_t  *context,
-    duckvep_coding_peptide_window_t *window) {
-
-    size_t start0;
-    size_t nt_offset;
-
-    if (window == NULL || context == NULL ||
-        !duckvep_compat_enabled(
-            (duckvep_compat_profile_t)context->compatibility_profile,
-            DUCKVEP_COMPAT_HGVS_TERMINAL_PARTIAL_INSERTION) ||
-        !duckvep_coding_context_is_terminal_partial_insertion(context)) {
-        return 0;
-    }
-    start0 = (size_t)context->single_edit_cds_start - 1u;
-    nt_offset = (start0 / 3u) * 3u;
-    if (nt_offset > context->ref_cds_len ||
-        (size_t)context->single_edit_alt_len >
-            SIZE_MAX - (context->ref_cds_len - nt_offset)) {
-        return 0;
-    }
-    memset(window, 0, sizeof *window);
-    window->ref_peptide_offset = nt_offset / 3u;
-    window->alt_peptide_offset = nt_offset / 3u;
-    window->ref_nt_length = context->ref_cds_len - nt_offset;
-    window->alt_nt_length =
-        window->ref_nt_length + (size_t)context->single_edit_alt_len;
-    window->ref_whole_length = window->ref_nt_length / 3u;
-    window->alt_whole_length = window->alt_nt_length / 3u;
-    window->ref_partial_x =
-        (uint8_t)((window->ref_nt_length % 3u) != 0u);
-    window->alt_partial_x =
-        (uint8_t)((window->alt_nt_length % 3u) != 0u);
-    if (window->alt_partial_x && window->alt_whole_length == 1u &&
-        duckvep_coding_context_peptide_base(
-            context, 1, window->alt_peptide_offset) == (uint8_t)'*') {
-        window->alt_partial_x = 0u;
-    }
-    window->ref_length =
-        window->ref_whole_length + (size_t)window->ref_partial_x;
-    window->alt_length =
-        window->alt_whole_length + (size_t)window->alt_partial_x;
-    window->reference_span_length = window->ref_length;
-    return 1;
-}
-
-static int hgvs_protein_uses_terminal_partial_insertion_view(
-    const duckvep_coding_context_t *context) {
-
-    return context != NULL &&
-        duckvep_compat_enabled(
-            (duckvep_compat_profile_t)context->compatibility_profile,
-            DUCKVEP_COMPAT_HGVS_TERMINAL_PARTIAL_INSERTION) &&
-        duckvep_coding_context_is_terminal_partial_insertion(context);
-}
-
 static size_t hgvs_protein_reference_size(const duckvep_coding_context_t *context,
     const duckvep_hgvs_protein_reference_t *reference) {
     return reference && reference->bases ? reference->length : context->ref_peptide_len;
@@ -1754,6 +1790,14 @@ static uint8_t hgvs_protein_reference_base(const duckvep_coding_context_t *conte
     if (reference && reference->bases)
         return position0 < reference->length ? reference->bases[position0] : 0u;
     return duckvep_coding_context_peptide_base(context, 0, position0);
+}
+
+static uint8_t hgvs_protein_type_residue(
+    uint8_t residue, duckvep_compat_profile_t profile) {
+
+    return residue == (uint8_t)'*' && duckvep_compat_enabled(
+        profile, DUCKVEP_COMPAT_HGVS_XAA_AS_TER)
+        ? (uint8_t)'X' : residue;
 }
 
 /* Protein preparation changes the displayed extent, not the physical CDS
@@ -1784,20 +1828,6 @@ static uint8_t hgvs_protein_window_base(
             index > SIZE_MAX - window->ref_peptide_offset) return 0u;
         if (index == window->ref_whole_length && window->ref_partial_x) return (uint8_t)'X';
         return hgvs_protein_reference_base(context, reference, window->ref_peptide_offset + index);
-    }
-    if (hgvs_protein_uses_terminal_partial_insertion_view(context) &&
-        window != NULL && window->ref_nt_length != 0u) {
-        size_t whole_length = alternate
-            ? window->alt_whole_length : window->ref_whole_length;
-        size_t length = alternate ? window->alt_length : window->ref_length;
-        uint8_t partial_x = alternate
-            ? window->alt_partial_x : window->ref_partial_x;
-
-        if (index >= length) return 0u;
-        if (index == whole_length && partial_x) return (uint8_t)'X';
-        return duckvep_coding_context_peptide_base(
-            context, alternate, (alternate ? window->alt_peptide_offset
-                                          : window->ref_peptide_offset) + index);
     }
     return duckvep_coding_context_peptide_window_base(
         context, window, alternate, index);
@@ -2254,23 +2284,22 @@ static duckvep_hgvs_status_t hgvs_protein_duplication_reference_base(
     return DUCKVEP_HGVS_OK;
 }
 
-static duckvep_hgvs_status_t hgvs_protein_insertion_finish(
-    duckvep_hgvs_protein_fact_t *fact, int complete_reference_flanks) {
+static duckvep_hgvs_status_t hgvs_protein_insertion_duplication_finish(
+    duckvep_hgvs_protein_fact_t *fact, int complete_reference_flanks,
+    int *duplicated_out) {
 
-    const duckvep_coding_context_t *context;
     uint32_t source_start1;
     uint32_t source_end1;
-    uint32_t low;
     size_t i;
     int duplicated = 1;
     int inserted_stop_seen = 0;
     int raw_reference_lookup;
 
     if (fact == NULL || fact->context == NULL || fact->alt_length == 0u ||
-        (fact->first_position1 == 0u && fact->last_position1 == 0u)) {
+        duplicated_out == NULL) {
         return DUCKVEP_HGVS_INVALID_ARG;
     }
-    context = fact->context;
+    *duplicated_out = 0;
     raw_reference_lookup = !complete_reference_flanks && !fact->reference.bases &&
         duckvep_compat_enabled(
             (duckvep_compat_profile_t)fact->compatibility_profile,
@@ -2303,24 +2332,43 @@ static duckvep_hgvs_status_t hgvs_protein_insertion_finish(
         if (status != DUCKVEP_HGVS_OK) return status;
         if (reference == 0u || inserted != reference) duplicated = 0;
     }
-    if (duplicated) {
-        fact->shape = (uint8_t)DUCKVEP_HGVS_PROTEIN_DUPLICATION;
-        fact->first_position1 = source_start1;
-        fact->last_position1 = source_end1;
-        /* VEP names the duplicated inserted peptide, not its separately
-         * translated lookup source or the displayed reference operand. */
-        duckvep_hgvs_status_t status = duckvep_hgvs_protein_base(
-            fact, 1, 0u, &fact->reference_first);
-        if (status != DUCKVEP_HGVS_OK) return status;
-        status = duckvep_hgvs_protein_base(
-            fact, 1, fact->alt_length - 1u, &fact->reference_last);
-        if (status != DUCKVEP_HGVS_OK) return status;
-        if (raw_reference_lookup) {
-            if (fact->reference_first == (uint8_t)'*') fact->reference_first = (uint8_t)'X';
-            if (fact->reference_last == (uint8_t)'*') fact->reference_last = (uint8_t)'X';
-        }
-        return DUCKVEP_HGVS_OK;
+    if (!duplicated) return DUCKVEP_HGVS_OK;
+
+    fact->shape = (uint8_t)DUCKVEP_HGVS_PROTEIN_DUPLICATION;
+    fact->first_position1 = source_start1;
+    fact->last_position1 = source_end1;
+    /* VEP names the duplicated inserted peptide, not its separately
+     * translated lookup source or the displayed reference operand. */
+    duckvep_hgvs_status_t status = duckvep_hgvs_protein_base(
+        fact, 1, 0u, &fact->reference_first);
+    if (status != DUCKVEP_HGVS_OK) return status;
+    status = duckvep_hgvs_protein_base(
+        fact, 1, fact->alt_length - 1u, &fact->reference_last);
+    if (status != DUCKVEP_HGVS_OK) return status;
+    if (raw_reference_lookup) {
+        if (fact->reference_first == (uint8_t)'*') fact->reference_first = (uint8_t)'X';
+        if (fact->reference_last == (uint8_t)'*') fact->reference_last = (uint8_t)'X';
     }
+    *duplicated_out = 1;
+    return DUCKVEP_HGVS_OK;
+}
+
+static duckvep_hgvs_status_t hgvs_protein_insertion_finish(
+    duckvep_hgvs_protein_fact_t *fact, int complete_reference_flanks) {
+
+    const duckvep_coding_context_t *context;
+    uint32_t low;
+    int duplicated;
+    duckvep_hgvs_status_t status;
+
+    if (fact == NULL || fact->context == NULL || fact->alt_length == 0u ||
+        (fact->first_position1 == 0u && fact->last_position1 == 0u)) {
+        return DUCKVEP_HGVS_INVALID_ARG;
+    }
+    context = fact->context;
+    status = hgvs_protein_insertion_duplication_finish(
+        fact, complete_reference_flanks, &duplicated);
+    if (status != DUCKVEP_HGVS_OK || duplicated) return status;
 
     low = fact->first_position1 < fact->last_position1
         ? fact->first_position1 : fact->last_position1;
@@ -2439,11 +2487,6 @@ static duckvep_hgvs_status_t hgvs_protein_fact_build_window(
         !hgvs_protein_full_window(context, &fact.window)) {
         return DUCKVEP_HGVS_MISSING_PEPTIDE;
     }
-    if (window == NULL && hgvs_protein_uses_terminal_partial_insertion_view(context) &&
-        !hgvs_protein_terminal_partial_insertion_window(
-            context, &fact.window)) {
-        return DUCKVEP_HGVS_MISSING_PEPTIDE;
-    }
     hgvs_protein_reference_window(reference, &fact.window);
     if (fact.window.ref_length == 0u && fact.window.alt_length == 0u) {
         /* VEP has no peptide allele to format (notably a terminal insertion
@@ -2482,9 +2525,11 @@ static duckvep_hgvs_status_t hgvs_protein_fact_build_window(
             }
         }
         /* Equal local peptides skip _clip_alleles, not type selection.
-         * _get_hgvs_protein_type gives frameshift precedence and then
-         * _get_fs_peptides compares full translations from translation_start. */
-        if (equal_peptides && !(mechanism_flags & DUCKVEP_CONSEQUENCE_FLAG_FRAMESHIFT)) {
+         * Cached frameshift and start_lost mechanisms still replace the
+         * apparent equality in _get_hgvs_peptides(). */
+        if (equal_peptides &&
+            !(mechanism_flags & (DUCKVEP_CONSEQUENCE_FLAG_FRAMESHIFT |
+                                 DUCKVEP_CONSEQUENCE_FLAG_START_LOST))) {
             fact.shape = (uint8_t)DUCKVEP_HGVS_PROTEIN_EQUAL;
             fact.ref_length = ref_length;
             fact.alt_length = alt_length;
@@ -2585,16 +2630,27 @@ static duckvep_hgvs_status_t hgvs_protein_fact_build_window(
         uint8_t reference_last;
 
         if (fact.ref_length == 0u) {
-            /* _get_hgvs_peptides() treats this as a peptide insertion before
-             * its final start_lost override. Rotate the changed peptide across
-             * matching following reference residues exactly as VEP's
-             * _check_peptides_post_var()/_shift_3prime() do. */
+            /* VEP classifies and shifts the peptide insertion before its
+             * final start_lost override.  A detected duplication returns from
+             * _get_hgvs_peptides() first and therefore remains a duplication;
+             * only a non-duplicate insertion is rewritten as start_lost. */
+            int duplicated;
+            uint32_t low;
+            size_t translation_length;
+
             fact.shape = (uint8_t)DUCKVEP_HGVS_PROTEIN_INSERTION;
             status = hgvs_protein_shift_simple(&fact);
             if (status != DUCKVEP_HGVS_OK) return status;
-            uint32_t low = fact.first_position1 < fact.last_position1
+            status = hgvs_protein_insertion_duplication_finish(
+                &fact, window != NULL, &duplicated);
+            if (status != DUCKVEP_HGVS_OK) return status;
+            if (duplicated) {
+                *out = fact;
+                return DUCKVEP_HGVS_OK;
+            }
+            low = fact.first_position1 < fact.last_position1
                 ? fact.first_position1 : fact.last_position1;
-            size_t translation_length =
+            translation_length =
                 hgvs_protein_reference_length(context, &fact.reference);
             if (fact.alt_length == 0u || translation_length == 0u ||
                 (low != 0u && (size_t)low >= translation_length)) {
@@ -2679,10 +2735,10 @@ static duckvep_hgvs_status_t hgvs_protein_fact_build_window(
             if (reference == 0u || alternate == 0u) {
                 return DUCKVEP_HGVS_MISSING_PEPTIDE;
             }
-            if (xaa_as_ter && reference == (uint8_t)'*')
-                reference = (uint8_t)'X';
-            if (xaa_as_ter && alternate == (uint8_t)'*')
-                alternate = (uint8_t)'X';
+            reference = hgvs_protein_type_residue(
+                reference, (duckvep_compat_profile_t)fact.compatibility_profile);
+            alternate = hgvs_protein_type_residue(
+                alternate, (duckvep_compat_profile_t)fact.compatibility_profile);
             if (reference != alternate) {
                 normalized_equal = 0;
                 break;
@@ -3606,7 +3662,8 @@ duckvep_hgvs_status_t duckvep_hgvs_protein_fact_build_single_residue(
         fact.shape = (uint8_t)DUCKVEP_HGVS_PROTEIN_START_LOST;
         fact.ref_length = 1u;
         fact.start_lost_flanking = 1u;
-    } else if (reference == alternate) {
+    } else if (hgvs_protein_type_residue(reference, compatibility_profile) ==
+               hgvs_protein_type_residue(alternate, compatibility_profile)) {
         /* The renderer's zero-length equality form uses the cached residue and
          * does not require a peptide-window pointer. */
         fact.shape = (uint8_t)DUCKVEP_HGVS_PROTEIN_EQUAL;
