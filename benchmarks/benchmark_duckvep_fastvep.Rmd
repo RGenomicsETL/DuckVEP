@@ -2001,6 +2001,20 @@ if (!file.exists(completion_path)) {
   complete_rows$bytes <- as.numeric(complete_rows$bytes)
   medians <- aggregate(cbind(elapsed_seconds, maximum_rss_kib, row_count, bytes) ~
     tool + output_contract + threads, complete_rows, median)
+  for (contract in c("native_tab17", "vep_csq")) {
+    for (thread_count in c(1L, 4L)) {
+      duck_seconds <- medians$elapsed_seconds[
+        medians$tool == "duckvep" & medians$output_contract == contract &
+          medians$threads == thread_count
+      ]
+      fast_seconds <- medians$elapsed_seconds[
+        medians$tool == "fastvep" & medians$output_contract == contract &
+          medians$threads == thread_count
+      ]
+      stopifnot(length(duck_seconds) == 1L, length(fast_seconds) == 1L,
+        duck_seconds < fast_seconds)
+    }
+  }
   cat("Measured source: ", completion$source_revision, "\n", sep = "")
   cat("FastVEP source: ", metadata[["fastvep_source_revision"]], "\n", sep = "")
   cat("Output filesystem: ", metadata[["output_filesystem"]], "\n", sep = "")

@@ -168,7 +168,9 @@ if (opt$output_contract == "operational17") {
   invisible(dbExecute(con, "DETACH duckvep_bench_model"))
 } else {
   duckvep_fastvep_prepare_fields(con, input, opt$output_contract, opt$distance, opt$gff3)
-  query <- duckvep_fastvep_field_query(con, opt$output_contract, opt$include_identity)
+  query <- duckvep_fastvep_field_query(
+    con, opt$output_contract, opt$include_identity, opt$distance
+  )
   invisible(dbExecute(con, glue("COPY ({query}) TO {sql_q(output)}
     (FORMAT CSV, DELIMITER E'\\t', HEADER TRUE, QUOTE '', ESCAPE '')")))
   quit(status = 0L)

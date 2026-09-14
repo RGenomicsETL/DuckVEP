@@ -93,6 +93,58 @@ typedef struct duckvep_transcript_edit {
     uint8_t cds_built;  /* zero until the optional CDS extension is attached */
 } duckvep_transcript_edit_t;
 
+/* Callback-scoped display facts for one independent transcript allele.  This
+ * is the C authority behind VEP's cDNA/CDS/protein ranges, exon/intron ranks,
+ * distance, amino-acid spans and case-marked codons.  Variable text remains
+ * borrowed from the uploaded allele or coding context; callers copy it while
+ * the annotation observer is active.  Zero coordinate/rank values are absent.
+ * transcript_distance is valid only when has_transcript_distance is set. */
+typedef struct duckvep_transcript_projection_facts {
+    const uint8_t *output_allele;
+    size_t output_allele_length;
+    const duckvep_coding_context_t *coding_context;
+    duckvep_coding_peptide_window_t coding_window;
+    uint32_t cdna_start, cdna_end;
+    uint32_t cds_start, cds_end;
+    uint32_t protein_start, protein_end;
+    uint32_t exon_first, exon_last, exon_total;
+    uint32_t intron_first, intron_last, intron_total;
+    uint64_t transcript_distance;
+    uint16_t feature_ref_length, feature_alt_length;
+    uint8_t changed_codon_offset;
+    uint8_t interbase;
+    uint8_t cds_start_nf, cds_end_nf;
+    uint8_t has_transcript_distance;
+    uint8_t has_coding_window;
+    uint8_t has_amino_acids;
+} duckvep_transcript_projection_facts_t;
+
+/* Derive display facts from the same prepared event and optional coding
+ * context already consumed by consequence annotation.  The function performs
+ * no allocation and does not rebuild or translate a CDS. */
+DUCKVEP_INTERNAL_API int duckvep_transcript_projection_facts_fill(
+    const duckvep_transcript_model_t *transcripts,
+    const duckvep_exon_model_t       *exons,
+    const duckvep_variant_batch_t    *variants,
+    uint32_t                          variant_idx,
+    size_t                            tx_idx,
+    const duckvep_event_t            *event,
+    uint32_t                          region_mask,
+    const duckvep_coding_context_t   *coding_context,
+    duckvep_transcript_projection_facts_t *out);
+
+/* Read one byte from the borrowed projection facts.  Codon bytes reproduce
+ * VEP's case convention: changed feature bases are uppercase and surrounding
+ * codon context is lowercase.  Zero means invalid/out of range. */
+DUCKVEP_INTERNAL_API uint8_t duckvep_transcript_projection_output_allele_base(
+    const duckvep_transcript_projection_facts_t *facts, size_t index);
+DUCKVEP_INTERNAL_API uint8_t duckvep_transcript_projection_amino_acid_base(
+    const duckvep_transcript_projection_facts_t *facts, int alternate,
+    size_t index);
+DUCKVEP_INTERNAL_API uint8_t duckvep_transcript_projection_codon_base(
+    const duckvep_transcript_projection_facts_t *facts, int alternate,
+    size_t index);
+
 /* Project the uploaded event into transcript coordinates without constructing
  * a CDS edit. HGVSc and HGVSn consume this stage directly; protein and phased
  * mutation consumers attach the CDS extension below only when needed. */

@@ -3074,6 +3074,14 @@ static char delta_context_codon_base(
     return delta_context_cds_base(ctx, alternate, position0);
 }
 
+char duckvep_coding_context_codon_base(
+    const duckvep_coding_context_t *ctx,
+    int                             alternate,
+    size_t                          position0) {
+
+    return delta_context_codon_base(ctx, alternate != 0, position0);
+}
+
 typedef struct delta_first_stop_scan {
     const char *amino_acids;
     duckvep_codon_table_t table;
@@ -5087,8 +5095,8 @@ duckvep_feature_substitution_context_fill(
  * collapsing mapper gaps would be incorrect. Only the independent-event
  * VEP-116 consequence/HGVS view enters here.
  */
-static duckvep_feature_substitution_result_t
-delta_uploaded_feature_internal_gap_context_fill(
+duckvep_feature_substitution_result_t
+duckvep_compat_vep116_internal_gap_context_fill(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t       *exons,
     const duckvep_sequence_pool_t    *seq,
@@ -6417,7 +6425,7 @@ DUCKVEP_INTERNAL_API void duckvep_sequence_delta_fill_for_annotation_observed(
     {
         duckvep_feature_substitution_result_t feature_result;
 
-        feature_result = delta_uploaded_feature_internal_gap_context_fill(
+        feature_result = duckvep_compat_vep116_internal_gap_context_fill(
             transcripts, exons, seq, v, variant_idx, tx_idx, strand,
             scratch, prepared_event, context_out, delta);
         if (feature_result != DUCKVEP_FEATURE_SUBSTITUTION_NOT_APPLICABLE) {

@@ -265,13 +265,6 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
   if (invalid != 0) stop("literal input alleles need exactly one model region", call. = FALSE)
   execute("CREATE TEMP VIEW fastvep_ordered_events AS SELECT * FROM fastvep_events
     ORDER BY seq_region, position, record_index, alt_index")
-  execute(paste0("CREATE TEMP TABLE fastvep_annotations AS SELECT
-    event_index, transcript_index, consequence, consequence_mask, impact,
-    transcript_hgvs, protein_hgvs, hgvs_shift FROM duckvep_annotate(
-    'fastvep_ordered_events', 'fastvep_comparison', rich := TRUE, hgvs := ",
-    if (contract == "vep_csq") "TRUE" else "FALSE", ", upstream_distance := ", distance,
-    ", downstream_distance := ", distance, ")"))
-
   execute("CREATE TEMP TABLE fastvep_metadata AS SELECT transcript_index,
     NULL::VARCHAR AS symbol, NULL::BOOLEAN AS canonical, NULL::VARCHAR AS tsl,
     NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds
@@ -325,8 +318,10 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
   }
 }
 
-duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE) {
+duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE, distance = 5000) {
   stopifnot(contract %in% c("native_tab17", "vep_csq"))
+  stopifnot(length(distance) == 1L, is.numeric(distance), is.finite(distance),
+    distance == floor(distance), distance >= 0, distance <= 2^32 - 1)
   is_csq <- contract == "vep_csq"
   range <- function(first, last, absent = "''") paste0("CASE WHEN ", first,
     " IS NULL AND ", last, " IS NULL THEN ", absent,
@@ -345,28 +340,28 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE)
       ", ''), 'LRG') THEN '' ELSE '.' || ", version, "::VARCHAR END")
   }
   expressions <- c(
-    Uploaded_variation = "coalesce(e.variant_id, e.native_location || '_' ||
-      e.native_reference || '/' || array_to_string(e.native_alternates, '/'))",
-    Location = "e.native_location",
-    Allele = if (is_csq) "p.output_allele" else "e.native_alternates[e.alt_index]",
+    Uploaded_variation = "coalesce(p.variant_id, p.native_location || '_' ||
+      p.native_reference || '/' || array_to_string(p.native_alternates, '/'))",
+    Location = "p.native_location",
+    Allele = if (is_csq) "p.output_allele" else "p.native_alternates[p.alt_index]",
     Gene = "t.gene_stable_id", Feature = "t.transcript_stable_id",
-    Feature_type = "CASE WHEN a.transcript_index IS NOT NULL THEN 'Transcript' END",
-    Consequence = if (is_csq) "a.consequence" else "replace(a.consequence, '&', ',')",
+    Feature_type = "CASE WHEN p.transcript_index IS NOT NULL THEN 'Transcript' END",
+    Consequence = if (is_csq) "p.consequence" else "replace(p.consequence, '&', ',')",
     cDNA_position = range("p.cdna_start", "p.cdna_end"),
     CDS_position = range("p.cds_start", "p.cds_end"),
     Protein_position = range("p.protein_start", "p.protein_end"),
     Amino_acids = aa, Codons = pair("p.reference_codons", "p.alternate_codons"),
-    Existing_variation = "NULL::VARCHAR", IMPACT = "a.impact",
+    Existing_variation = "NULL::VARCHAR", IMPACT = "p.impact",
     DISTANCE = "p.transcript_distance::VARCHAR", STRAND = "t.strand::VARCHAR",
     FLAGS = if (is_csq) "concat_ws('&', CASE WHEN p.cds_start_nf THEN 'cds_start_NF' END,
       CASE WHEN p.cds_end_nf THEN 'cds_end_NF' END)" else "CASE WHEN m.canonical THEN 'canonical' END",
     SYMBOL = "m.symbol", BIOTYPE = "t.transcript_biotype",
     EXON = paste0("CASE WHEN p.exon_first IS NOT NULL THEN (", range("p.exon_first", "p.exon_last"), ") || '/' || p.exon_total END"),
     INTRON = paste0("CASE WHEN p.intron_first IS NOT NULL THEN (", range("p.intron_first", "p.intron_last"), ") || '/' || p.intron_total END"),
-    HGVSc = paste0("CASE WHEN a.transcript_hgvs IS NOT NULL THEN (",
-      accession("t.transcript_stable_id", "t.transcript_version"), ") || ':' || a.transcript_hgvs END"),
-    HGVSp = paste0("CASE WHEN a.protein_hgvs IS NOT NULL THEN (",
-      accession("t.translation_stable_id", "t.translation_version", TRUE), ") || ':' || a.protein_hgvs END"),
+    HGVSc = paste0("CASE WHEN p.transcript_hgvs IS NOT NULL THEN (",
+      accession("t.transcript_stable_id", "t.transcript_version"), ") || ':' || p.transcript_hgvs END"),
+    HGVSp = paste0("CASE WHEN p.protein_hgvs IS NOT NULL THEN (",
+      accession("t.translation_stable_id", "t.translation_version", TRUE), ") || ':' || p.protein_hgvs END"),
     CANONICAL = "CASE WHEN m.canonical THEN 'YES' END",
     MANE_SELECT = "t.mane_select_refseq", MANE_PLUS_CLINICAL = "t.mane_plus_clinical_refseq",
     TSL = "regexp_extract(m.tsl, '^(?:tsl)?([0-9]+)', 1)",
@@ -375,14 +370,14 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE)
     # Parser.pm::minimise_alleles retains the shared physical REF for multiple
     # ALTs and minimises unequal-length biallelic alleles. OutputFactory reads
     # REF_ALLELE from that feature, not the individual transcript allele.
-    REF_ALLELE = "CASE WHEN length(e.alternates) > 1 THEN e.native_reference
-      WHEN length(e.reference) = length(e.alternate) THEN e.reference
-      ELSE coalesce(nullif(substring(e.reference, e.geometry.reference_difference_offset + 1,
-        e.geometry.reference_difference_length), ''), '-') END",
-    UPLOADED_ALLELE = "e.uploaded_reference || '/' || array_to_string(e.alternates, ',')",
+    REF_ALLELE = "CASE WHEN length(p.alternates) > 1 THEN p.native_reference
+      WHEN length(p.reference) = length(p.alternate) THEN p.reference
+      ELSE coalesce(nullif(substring(p.reference, p.geometry.reference_difference_offset + 1,
+        p.geometry.reference_difference_length), ''), '-') END",
+    UPLOADED_ALLELE = "p.uploaded_reference || '/' || array_to_string(p.alternates, ',')",
     # VEP OutputFactory multiplies the transcript-oriented shift by strand.
-    HGVS_OFFSET = "CASE WHEN a.transcript_hgvs IS NOT NULL OR a.protein_hgvs IS NOT NULL
-      THEN (nullif(a.hgvs_shift, 0)::BIGINT * t.strand)::VARCHAR END")
+    HGVS_OFFSET = "CASE WHEN p.transcript_hgvs IS NOT NULL OR p.protein_hgvs IS NOT NULL
+      THEN (nullif(p.hgvs_shift, 0)::BIGINT * t.strand)::VARCHAR END")
   fields <- duckvep_fastvep_fields(contract)
   values <- vapply(fields, function(field) {
     value <- paste0("(", expressions[[field]], ")")
@@ -390,21 +385,25 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE)
       value <- duckvep_fastvep_csq_sql(field, value)
     } else if (!is_csq) {
       if (field %in% c("cDNA_position", "CDS_position", "Protein_position")) {
-        value <- paste0("CASE WHEN a.transcript_index IS NULL THEN '-' ELSE ", value, " END")
+        value <- paste0("CASE WHEN p.transcript_index IS NULL THEN '-' ELSE ", value, " END")
       } else if (field %in% c("IMPACT", "DISTANCE", "STRAND", "FLAGS")) {
-        value <- paste0("CASE WHEN a.transcript_index IS NULL THEN '-' ELSE coalesce(", value, ", '-') END")
+        value <- paste0("CASE WHEN p.transcript_index IS NULL THEN '-' ELSE coalesce(", value, ", '-') END")
       } else value <- paste0("coalesce(", value, ", '-')")
     }
     paste(value, "AS", DBI::dbQuoteIdentifier(con, field))
   }, character(1L))
-  if (include_identity) values <- c("e.record_index", "e.alt_index", values)
-  paste0("SELECT ", paste(values, collapse = ",\n"), "
-    FROM fastvep_annotations a
-    JOIN (SELECT *, duckvep_allele_geometry(position, reference, alternate) AS geometry
-      FROM fastvep_events) e USING(event_index)
-    JOIN duckvep_transcript_projection('fastvep_events', 'fastvep_annotations',
-      'duckvep_bench_model.model_transcripts') p
-      ON p.event_index = a.event_index AND p.transcript_index IS NOT DISTINCT FROM a.transcript_index
-    LEFT JOIN duckvep_bench_model.model_transcripts t ON t.transcript_index = a.transcript_index
-    LEFT JOIN fastvep_metadata m ON m.transcript_index = a.transcript_index")
+  if (include_identity) values <- c("p.record_index", "p.alt_index", values)
+  function_name <- if (is_csq) "_duckvep_annotate_small_projected_hgvs" else
+    "_duckvep_annotate_small_projected"
+  paste0("WITH projected AS (
+      SELECT e.*, duckvep_allele_geometry(e.position, e.reference, e.alternate) AS geometry,
+        unnest(", function_name, "('fastvep_comparison', e.seq_region, e.position,
+          e.reference, e.alternate, ", distance, ", ", distance, ")) AS projection
+      FROM fastvep_ordered_events e
+    ), facts AS (
+      SELECT * EXCLUDE(projection), projection.* FROM projected
+    ) SELECT ", paste(values, collapse = ",\n"), "
+    FROM facts p
+    LEFT JOIN duckvep_bench_model.model_transcripts t USING(transcript_index)
+    LEFT JOIN fastvep_metadata m USING(transcript_index)")
 }

@@ -60,6 +60,7 @@ local({
   outputs <- list()
   for (contract in c("operational17", "native_tab17", "vep_csq")) {
     output <- file.path(directory, paste0(contract, ".tsv"))
+    profile <- file.path(directory, paste0(contract, ".profile.json"))
     arguments <- c(
       file.path(root, "benchmarks/benchmark_duckvep_fastvep_worker.R"),
       "--extension", extension, "--model", model, "--input",
@@ -72,6 +73,7 @@ local({
         "--gff3", file.path(root, "test/data/duckvep/minimal.gff3")
       )
     }
+    if (contract == "native_tab17") arguments <- c(arguments, "--profile-json", profile)
     if (contract == "vep_csq") {
       arguments <- c(
         arguments,
@@ -84,6 +86,14 @@ local({
       quote = "", na.strings = character()
     )
     stopifnot(identical(names(outputs[[contract]]), duckvep_fastvep_fields(contract)))
+    if (contract == "native_tab17") {
+      plan <- paste(readLines(profile, warn = FALSE), collapse = "\n")
+      stopifnot(
+        grepl("_duckvep_annotate_small_projected", plan, fixed = TRUE),
+        !grepl("fastvep_annotations", plan, fixed = TRUE),
+        !grepl("duckvep_transcript_projection", plan, fixed = TRUE)
+      )
+    }
   }
   tab <- outputs$native_tab17
   csq <- outputs$vep_csq
@@ -192,9 +202,9 @@ local({
   dbExecute(con, "CREATE TABLE duckvep_bench_model.model_transcripts AS SELECT
     i::UINTEGER transcript_index, 1::UINTEGER seq_region, 1::UBIGINT transcript_start,
     12000::UBIGINT transcript_end, 1::TINYINT strand, 3::UBIGINT transcript_flags,
-    1::UBIGINT cds_start, 12000::UBIGINT cds_end,
+    0::UINTEGER gene_index, 1::UBIGINT cds_start, 12000::UBIGINT cds_end,
     ('ATG'||repeat('AAA',3998)||'TAA')::BLOB cds_sequence,
-    'ACGT'::BLOB post_cds_sequence, 1::UTINYINT codon_table,
+    ''::BLOB pre_cds_sequence, ''::BLOB post_cds_sequence, 1::UTINYINT codon_table,
     [struct_pack(exon_start:=1::UBIGINT, exon_end:=12000::UBIGINT,
       exon_cdna_start:=1::UBIGINT, exon_cdna_end:=12000::UBIGINT,
       phase:=0::TINYINT, end_phase:=0::TINYINT)] exons,
@@ -204,17 +214,28 @@ local({
     'P'||i::VARCHAR AS translation_stable_id, 1::BIGINT AS translation_version,
     NULL::VARCHAR AS mane_select_refseq, NULL::VARCHAR AS mane_plus_clinical_refseq
     FROM range(64) r(i)")
+  region_query <- "SELECT 1::UINTEGER seq_region, 12000::UBIGINT sequence_length"
+  transcript_query <- "SELECT transcript_index, seq_region, transcript_start, transcript_end,
+    strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table,
+    pre_cds_sequence, post_cds_sequence FROM duckvep_bench_model.model_transcripts
+    ORDER BY seq_region, transcript_start, transcript_index"
+  exon_query <- "SELECT transcript_index, exon.exon_start, exon.exon_end,
+    exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase
+    FROM duckvep_bench_model.model_transcripts, UNNEST(exons) e(exon)
+    ORDER BY transcript_index, exon.exon_cdna_start"
+  loaded <- dbGetQuery(con, paste0("SELECT loaded FROM duckvep_model_load(
+    'fastvep_comparison', ", dbQuoteString(con, region_query), ", ",
+    dbQuoteString(con, transcript_query), ", ", dbQuoteString(con, exon_query), ",
+    transcript_coverage_complete := TRUE)"))$loaded
+  stopifnot(length(loaded) == 1L, isTRUE(loaded[[1L]]))
   dbExecute(con, "CREATE TEMP TABLE fastvep_events AS SELECT
     (i+1)::UBIGINT AS event_index, (i+1)::UBIGINT AS record_index, 1::BIGINT AS alt_index,
     1::UINTEGER AS seq_region, 'chr1' AS chrom, 4::UBIGINT AS position,
     'site_'||i::VARCHAR AS variant_id, 'A' AS reference, 'G' AS alternate, ['G'] AS alternates,
     'A' AS uploaded_reference, 'A' AS native_reference, ['G'] AS native_alternates,
     'chr1:4' AS native_location FROM range(4096) r(i)")
-  dbExecute(con, "CREATE TEMP TABLE fastvep_annotations AS SELECT event_index, transcript_index,
-    'missense_variant' AS consequence, (SELECT consequence_mask FROM duckvep_so_terms()
-      WHERE consequence='missense_variant') AS consequence_mask, 'MODERATE' AS impact,
-    'c.4A>G' AS transcript_hgvs, 'p.Lys2Glu' AS protein_hgvs, 0::BIGINT AS hgvs_shift
-    FROM fastvep_events, duckvep_bench_model.model_transcripts")
+  dbExecute(con, "CREATE TEMP VIEW fastvep_ordered_events AS SELECT * FROM fastvep_events
+    ORDER BY seq_region, position, record_index, alt_index")
   dbExecute(con, "CREATE TEMP TABLE fastvep_metadata AS SELECT transcript_index, 'GENE' AS symbol,
     TRUE AS canonical, NULL::VARCHAR AS tsl, NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds
     FROM duckvep_bench_model.model_transcripts")
