@@ -763,6 +763,41 @@ TEST hgvs_exonic_snp_phase_fast_path_is_representation_specific(void) {
               duckvep_hgvs_dna_render_basic(
                   &fact, rendered, sizeof rendered, &required));
     ASSERT_EQ(0, strcmp("c.2A>G", rendered));
+
+    /* Physical CDS storage follows the later coding exon's phase, but VEP's
+     * displayed SNP coordinate follows the first transcript exon. */
+    s.tend = 209u; s.excnt = 2u; s.cds_s = 200u; s.cds_e = 209u;
+    s.es[0] = 100u; s.ee[0] = 109u; s.cs[0] = 1u; s.ce[0] = 10u;
+    s.es[1] = 200u; s.ee[1] = 209u; s.cs[1] = 11u; s.ce[1] = 20u;
+    s.phase[0] = -1; s.phase[1] = 2;
+    kprop_proj_scene_finish(&s);
+    edit.first.genomic_pos1 = 200u;
+    edit.first.cdna_anchor1 = 11u;
+    edit.last = edit.first;
+    edit.feature_first = edit.first;
+    edit.feature_last = edit.first;
+    edit.feature_ref = ref_a; edit.feature_ref_length = 1u;
+    edit.feature_alt = alt_g; edit.feature_alt_length = 1u;
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_dna_fact_build(&s.tx, &s.ex, &edit, &fact));
+    ASSERT_EQ(1, fact.first.base);
+
+    /* The first transcript exon is still the display authority on the
+     * reverse strand; transcript order, not genomic order, selects it. */
+    s.strand = (int8_t)-1; s.cds_s = 100u; s.cds_e = 109u;
+    s.es[0] = 200u; s.ee[0] = 209u; s.cs[0] = 1u; s.ce[0] = 10u;
+    s.es[1] = 100u; s.ee[1] = 109u; s.cs[1] = 11u; s.ce[1] = 20u;
+    s.phase[0] = -1; s.phase[1] = 2;
+    kprop_proj_scene_finish(&s);
+    edit.transcript_strand = (int8_t)-1;
+    edit.first.genomic_pos1 = 109u;
+    edit.first.cdna_anchor1 = 11u;
+    edit.last = edit.first;
+    edit.feature_first = edit.first;
+    edit.feature_last = edit.first;
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_dna_fact_build(&s.tx, &s.ex, &edit, &fact));
+    ASSERT_EQ(1, fact.first.base);
     PASS();
 }
 
@@ -2488,6 +2523,141 @@ TEST hgvs_clamped_feature_preserves_vep_preclip_multiplication_order(void) {
     PASS();
 }
 
+TEST hgvs_clamped_insertion_coordinates_follow_vep_sorting(void) {
+    static const uint8_t genomic_reference[] = {'A', 'C', 'G', 'T'};
+    static const uint8_t alternate[] = {'C', 'A', 'A', 'C'};
+    struct kprop_proj_scene s;
+    duckvep_transcript_edit_t edit;
+    duckvep_hgvs_reference_window_t reference;
+    duckvep_hgvs_dna_fact_t fact;
+    char rendered[64];
+    size_t required = 0u;
+
+    memset(&s, 0, sizeof s);
+    s.chrom = 0u; s.tstart = 100u; s.tend = 250u; s.strand = (int8_t)1;
+    s.excnt = 2u;
+    s.es[0] = 100u; s.ee[0] = 150u; s.cs[0] = 1u; s.ce[0] = 51u;
+    s.es[1] = 200u; s.ee[1] = 250u; s.cs[1] = 52u; s.ce[1] = 102u;
+    s.phase[0] = -1; s.phase[1] = -1;
+    kprop_proj_scene_finish(&s);
+    reference = (duckvep_hgvs_reference_window_t){
+        genomic_reference, sizeof genomic_reference, 249u, 0u};
+
+    memset(&edit, 0, sizeof edit);
+    edit.tx_idx = 0u; edit.transcript_strand = (int8_t)1;
+    edit.first.cdna_anchor1 = 101u; edit.first.exonic = 1u;
+    edit.last.cdna_anchor1 = 102u; edit.last.exonic = 1u;
+    edit.feature_first = edit.first; edit.feature_last = edit.last;
+    edit.feature_first.genomic_pos1 = 249u;
+    edit.feature_last.genomic_pos1 = 250u;
+    edit.ref = genomic_reference; edit.ref_length = 4u;
+    edit.alt = alternate; edit.alt_length = 4u;
+    edit.feature_ref = genomic_reference; edit.feature_ref_length = 4u;
+    edit.feature_alt = alternate; edit.feature_alt_length = 4u;
+    edit.event.chrom_id = 0u; edit.event.kind = (uint8_t)DUCKVEP_KIND_MNV;
+    edit.event.start1 = 249u; edit.event.end1 = 252u;
+    edit.event.feature_start1 = 249u; edit.event.feature_end1 = 252u;
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_dna_fact_build_genomic_shifted_with_lookup(
+                  &s.tx, &s.ex, NULL, &reference, &edit, &fact));
+    ASSERT_EQ(DUCKVEP_HGVS_DNA_INSERTION, fact.shape);
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_dna_render_basic(
+                  &fact, rendered, sizeof rendered, &required));
+    ASSERT_EQ(0, strcmp("n.100_101insCA", rendered));
+
+    s.strand = (int8_t)-1; s.cds_s = 120u; s.cds_e = 240u;
+    s.es[0] = 200u; s.ee[0] = 250u; s.cs[0] = 1u; s.ce[0] = 51u;
+    s.es[1] = 100u; s.ee[1] = 150u; s.cs[1] = 52u; s.ce[1] = 102u;
+    s.phase[0] = 0; s.phase[1] = 2;
+    kprop_proj_scene_finish(&s);
+    edit.transcript_strand = (int8_t)-1;
+    edit.first.cdna_anchor1 = 1u; edit.first.exonic = 1u;
+    edit.last.cdna_anchor1 = 2u; edit.last.exonic = 1u;
+    edit.feature_first = edit.first; edit.feature_last = edit.last;
+    edit.feature_first.genomic_pos1 = 250u;
+    edit.feature_last.genomic_pos1 = 249u;
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_dna_fact_build_genomic_shifted_with_lookup(
+                  &s.tx, &s.ex, NULL, &reference, &edit, &fact));
+    ASSERT_EQ(DUCKVEP_HGVS_DNA_INSERTION, fact.shape);
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_dna_render_basic(
+                  &fact, rendered, sizeof rendered, &required));
+    ASSERT_EQ(0, strcmp("c.-9_-8insTG", rendered));
+    PASS();
+}
+
+TEST hgvs_shifted_reverse_start_insertion_keeps_external_flank(void) {
+    static const uint8_t shift_reference_bytes[] = {'C', 'G', 'T'};
+    static const uint8_t lookup_reference_bytes[] = {'G', 'T', 'A'};
+    static const uint8_t first_alternate[] = "GCCAGAAT";
+    static const uint8_t second_alternate[] = "ATTGT";
+    static const struct {
+        const uint8_t *alternate;
+        uint16_t alternate_length;
+        uint32_t boundary0;
+        uint32_t first_cdna;
+        uint32_t shift;
+        const char *rendered;
+    } cases[] = {
+        {first_alternate, 8u, 100u, 101u, 1u,
+         "c.*20_*20+1insTTCTGGCA"},
+        {second_alternate, 5u, 101u, 100u, 2u,
+         "c.*20_*20+1insAATAC"}
+    };
+    struct kprop_proj_scene s;
+    duckvep_hgvs_reference_window_t shift_reference = {
+        shift_reference_bytes, sizeof shift_reference_bytes, 258u, 0u};
+    duckvep_hgvs_reference_window_t lookup_reference = {
+        lookup_reference_bytes, sizeof lookup_reference_bytes, 99u, 0u};
+
+    memset(&s, 0, sizeof s);
+    s.chrom = 0u; s.tstart = 100u; s.tend = 250u; s.strand = (int8_t)-1;
+    s.excnt = 2u; s.cds_s = 120u; s.cds_e = 240u;
+    s.es[0] = 200u; s.ee[0] = 250u; s.cs[0] = 1u; s.ce[0] = 51u;
+    s.es[1] = 100u; s.ee[1] = 150u; s.cs[1] = 52u; s.ce[1] = 102u;
+    s.phase[0] = 0; s.phase[1] = 2;
+    kprop_proj_scene_finish(&s);
+
+    for (size_t i = 0u; i < sizeof cases / sizeof cases[0]; i++) {
+        duckvep_transcript_edit_t edit;
+        duckvep_hgvs_dna_fact_t fact;
+        char rendered[64];
+        size_t required = 0u;
+
+        memset(&edit, 0, sizeof edit);
+        edit.tx_idx = 0u; edit.transcript_strand = (int8_t)-1;
+        edit.first.genomic_pos1 = cases[i].boundary0 + 1u;
+        edit.first.cdna_anchor1 = cases[i].first_cdna;
+        edit.first.exonic = 1u;
+        edit.last.genomic_pos1 = cases[i].boundary0;
+        edit.last.cdna_anchor1 = cases[i].first_cdna + 1u;
+        edit.last.exonic = 1u;
+        edit.alt = cases[i].alternate;
+        edit.alt_length = cases[i].alternate_length;
+        edit.event.chrom_id = 0u;
+        edit.event.kind = (uint8_t)DUCKVEP_KIND_INS;
+        edit.event.interbase = 1u;
+        edit.event.anchor_side = (uint8_t)DUCKVEP_EVENT_ANCHOR_LEFT;
+        edit.event.insertion_boundary0 = cases[i].boundary0;
+        edit.event.feature_start1 = cases[i].boundary0 + 1u;
+        edit.event.feature_end1 = cases[i].boundary0;
+        edit.event.alt_diff_length = cases[i].alternate_length;
+        ASSERT_EQ(DUCKVEP_HGVS_OK,
+                  duckvep_hgvs_dna_fact_build_genomic_shifted_with_lookup(
+                      &s.tx, &s.ex, &shift_reference, &lookup_reference,
+                      &edit, &fact));
+        ASSERT_EQ(cases[i].shift, (uint32_t)fact.shift_offset);
+        ASSERT_EQ(99u, fact.placed_insertion_boundary0);
+        ASSERT_EQ(DUCKVEP_HGVS_OK,
+                  duckvep_hgvs_dna_render_basic(
+                      &fact, rendered, sizeof rendered, &required));
+        ASSERT_EQ(0, strcmp(cases[i].rendered, rendered));
+    }
+    PASS();
+}
+
 TEST hgvs_clamped_multiplication_projects_clipped_ends_on_both_strands(void) {
     /* Source-derived VEP-116 rule: type 'dup' alone skips allele clipping.
      * Cross every nucleotide, strand, and copy count without altering the
@@ -2692,11 +2862,62 @@ TEST hgvs_single_residue_sidecar_matches_core_shapes(void) {
                   &fact, 0, rendered, sizeof rendered, &required));
     ASSERT_EQ(0, strcmp("p.Met1?", rendered));
 
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_protein_fact_build_single_residue(
+                  24u, (uint8_t)'X', (uint8_t)'*', valid,
+                  DUCKVEP_COMPAT_VEP_116, &fact));
+    ASSERT_EQ(DUCKVEP_HGVS_PROTEIN_EQUAL, fact.shape);
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_protein_render(
+                  &fact, 0, rendered, sizeof rendered, &required));
+    ASSERT_EQ(0, strcmp("p.Ter24=", rendered));
+
     ASSERT_EQ(DUCKVEP_HGVS_NOT_APPLICABLE,
               duckvep_hgvs_protein_fact_build_single_residue(
                   4u, (uint8_t)'*', (uint8_t)'Q',
                   valid | (uint32_t)DUCKVEP_CONSEQUENCE_FLAG_STOP_LOST,
                   DUCKVEP_COMPAT_VEP_116, &fact));
+    PASS();
+}
+
+TEST hgvs_cached_start_lost_overrides_equal_local_peptide(void) {
+    static const uint8_t cds[] = {'N', 'C', 'G', 'T', 'A', 'C'};
+    static const uint8_t peptide[] = {'X', 'Y'};
+    duckvep_coding_context_t context;
+    duckvep_sequence_delta_t delta;
+    duckvep_hgvs_protein_fact_t fact;
+    char rendered[64];
+    size_t required = 0u;
+
+    memset(&context, 0, sizeof context);
+    memset(&delta, 0, sizeof delta);
+    context.ref_cds = cds;
+    context.ref_cds_len = sizeof cds;
+    context.ref_peptide = peptide;
+    context.ref_peptide_len = sizeof peptide;
+    context.alt_peptide = peptide;
+    context.alt_peptide_len = sizeof peptide;
+    context.compatibility_profile = (uint8_t)DUCKVEP_COMPAT_VEP_116;
+    delta.valid = 1u;
+
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_protein_fact_build(&context, &delta, &fact));
+    ASSERT_EQ(DUCKVEP_HGVS_PROTEIN_EQUAL, fact.shape);
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_protein_render(
+                  &fact, 0, rendered, sizeof rendered, &required));
+    ASSERT_EQ(0, strcmp("p.TerTyr1=", rendered));
+
+    delta.start_lost = 1u;
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_protein_fact_build(&context, &delta, &fact));
+    ASSERT_EQ(DUCKVEP_HGVS_PROTEIN_START_LOST, fact.shape);
+    ASSERT_EQ(1u, fact.first_position1);
+    ASSERT_EQ(2u, fact.last_position1);
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_protein_render(
+                  &fact, 0, rendered, sizeof rendered, &required));
+    ASSERT_EQ(0, strcmp("p.TerTyr1_?2", rendered));
     PASS();
 }
 
@@ -2724,7 +2945,6 @@ TEST compatibility_policy_inventory_is_versioned(void) {
     const uint32_t all_vep116_language_leaks =
         (uint32_t)(DUCKVEP_COMPAT_HGVS_INCOMPLETE_CODON_ASSIGNMENT |
                    DUCKVEP_COMPAT_HGVS_CDS_STANDARD_TABLE |
-                   DUCKVEP_COMPAT_HGVS_TERMINAL_PARTIAL_INSERTION |
                    DUCKVEP_COMPAT_HGVS_NEGATIVE_SUBSTR |
                    DUCKVEP_COMPAT_HGVS_XAA_AS_TER |
                    DUCKVEP_COMPAT_HGVS_THREE_LETTER_DELINS_NO_EXTENSION);
@@ -3083,6 +3303,68 @@ TEST hgvs_protein_facts_render_core_vep_shapes(void) {
         small, sizeof small, &shape, &required));
     ASSERT_EQ(0, strcmp("p.Glu2A", small));
     ASSERT_EQ(strlen("p.Glu2Asp"), required);
+    PASS();
+}
+
+TEST hgvs_terminal_partial_insertion_reuses_codon_window(void) {
+    static const uint8_t ref_cds[] = {'G', 'G', 'T', 'A', 'A'};
+    static const uint8_t completed_alt[] = {'G', 'C', 'A'};
+    static const uint8_t partial_alt[] = {'T'};
+    static const uint8_t post_cds[] = {'A'};
+    duckvep_haplotype_edit_t edit;
+    duckvep_edit_set_t edit_set;
+    duckvep_coding_context_t context;
+    duckvep_sequence_delta_t delta;
+    duckvep_hgvs_protein_fact_t fact;
+    uint8_t alt_cds[32];
+    uint8_t ref_peptide[16];
+    uint8_t alt_peptide[16];
+    char rendered[64];
+    size_t required = 0u;
+
+    memset(&edit, 0, sizeof edit);
+    edit.cds_start = 5u;
+    edit.alt = completed_alt;
+    edit.alt_len = sizeof completed_alt;
+    edit.variant_strand = (int8_t)1;
+    edit_set.edits = &edit;
+    edit_set.count = 1u;
+    ASSERT_EQ(DUCKVEP_CODING_CONTEXT_OK,
+              duckvep_coding_context_build(
+                  ref_cds, sizeof ref_cds, &edit_set, (int8_t)1,
+                  DUCKVEP_CODON_TABLE_STANDARD,
+                  alt_cds, sizeof alt_cds,
+                  ref_peptide, sizeof ref_peptide,
+                  alt_peptide, sizeof alt_peptide, &context));
+    context.post_cds_bases = post_cds;
+    context.post_cds_length = sizeof post_cds;
+    context.post_cds_complete = 1u;
+    ASSERT_EQ(DUCKVEP_CONTEXT_DELTA_OK,
+              duckvep_coding_context_delta_fill(&context, 0u, &delta));
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_protein_fact_build(&context, &delta, &fact));
+    ASSERT_EQ(DUCKVEP_HGVS_PROTEIN_DELINS, fact.shape);
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+              duckvep_hgvs_protein_render(
+                  &fact, 0, rendered, sizeof rendered, &required));
+    ASSERT_EQ(0, strcmp("p.Ter2delinsSerLys", rendered));
+
+    edit.alt = partial_alt;
+    edit.alt_len = sizeof partial_alt;
+    ASSERT_EQ(DUCKVEP_CODING_CONTEXT_OK,
+              duckvep_coding_context_build(
+                  ref_cds, sizeof ref_cds, &edit_set, (int8_t)1,
+                  DUCKVEP_CODON_TABLE_STANDARD,
+                  alt_cds, sizeof alt_cds,
+                  ref_peptide, sizeof ref_peptide,
+                  alt_peptide, sizeof alt_peptide, &context));
+    context.post_cds_bases = post_cds;
+    context.post_cds_length = sizeof post_cds;
+    context.post_cds_complete = 1u;
+    ASSERT_EQ(DUCKVEP_CONTEXT_DELTA_OK,
+              duckvep_coding_context_delta_fill(&context, 0u, &delta));
+    ASSERT_EQ(DUCKVEP_HGVS_NOT_APPLICABLE,
+              duckvep_hgvs_protein_fact_build(&context, &delta, &fact));
     PASS();
 }
 

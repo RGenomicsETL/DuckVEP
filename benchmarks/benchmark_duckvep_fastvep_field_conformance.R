@@ -33,7 +33,8 @@ duckvep_fastvep_fixture_model <- function(con, gff, reference, output) {
       regexp_replace(g.attributes['Parent'], '^gene:', '') AS gene_stable_id,
       try_cast(g.attributes['version'] AS BIGINT) AS transcript_version,
       g.attributes['biotype'] AS transcript_biotype,
-      proteins.protein_id AS translation_stable_id, NULL::BIGINT AS translation_version,
+      proteins.protein_id AS translation_stable_id,
+      CASE WHEN proteins.transcript_id IS NULL THEN NULL ELSE 1::BIGINT END AS translation_version,
       NULL::VARCHAR AS mane_select_refseq, NULL::VARCHAR AS mane_plus_clinical_refseq,
       []::STRUCT(mature_mirna_start UBIGINT, mature_mirna_end UBIGINT)[] AS mature_mirna_regions
     FROM projection_transcripts p JOIN duckvep_transcript_names n USING(transcript_index)

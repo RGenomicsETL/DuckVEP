@@ -297,14 +297,6 @@ typedef struct duckvep_coding_context {
     uint32_t alt_first_changed_codon, alt_last_changed_codon;
 } duckvep_coding_context_t;
 
-/* Terminal partial-codon state selecting VEP's later HGVS peptide replay.
- * Consequence windows independently round the insertion's CDS endpoints:
- * insertion-only translation applies at a codon start, not every site
- * admitted by this HGVS predicate. */
-DUCKVEP_INTERNAL_API int
-duckvep_coding_context_is_terminal_partial_insertion(
-    const duckvep_coding_context_t *context);
-
 /* The compact consequence sidecar is a closed-world authority for cached
  * start/stop-lost predicates, but frameshift is positive evidence only.  A
  * length-changing splice-overlapping edit may acquire a frameshift during the

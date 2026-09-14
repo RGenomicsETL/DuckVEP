@@ -12,6 +12,9 @@ main <- function() {
   read_table <- function(path) utils::read.delim(path, colClasses = "character")
   con <- DBI::dbConnect(duckdb::duckdb())
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
+  exact_failure <- "forward/comparison_duckvep_vep_csq/field_failures.parquet"
+  body_failure <- "forward/comparison_duckvep_vep_csq/hgvs_body_failures.parquet"
+  body_summary <- "forward/comparison_duckvep_vep_csq/hgvs_bodies.csv"
   fixture <- function(name) {
     path <- file.path(work, name)
     dir.create(path)
@@ -38,9 +41,23 @@ main <- function() {
           "fastvep_vep_csq.vcf", "vep.vcf")) {
         writeLines(c("#header", paste(profile, file, "c.2C>A", "c.1C>A", sep = "\t")), file.path(path, profile, file))
       }
-      failure <- file.path(path, profile, "field_failures.parquet")
-      DBI::dbExecute(con, paste0("COPY (SELECT 'HGVSc' field, 'c.2C>A' actual, 'c.1C>A' expected) TO ",
-        DBI::dbQuoteString(con, failure), " (FORMAT PARQUET)"))
+      for (comparison in c("native_tab17", "duckvep_vep_csq", "fastvep_vep_csq")) {
+        comparison_dir <- file.path(path, profile, paste0("comparison_", comparison))
+        dir.create(comparison_dir)
+        failure <- file.path(comparison_dir, "field_failures.parquet")
+        DBI::dbExecute(con, paste0("COPY (SELECT 1::UBIGINT record_index,
+          1::UBIGINT alt_index, 'ENST1' Feature, 'HGVSc' field,
+          'ENST1.1:c.2C>A' actual, 'ENST1.1:c.1C>A' expected) TO ",
+          DBI::dbQuoteString(con, failure), " (FORMAT PARQUET)"))
+        if (comparison == "native_tab17") next
+        body <- file.path(comparison_dir, "hgvs_body_failures.parquet")
+        DBI::dbExecute(con, paste0("COPY (SELECT 1::UBIGINT record_index,
+          1::UBIGINT alt_index, 'ENST1' Feature, 'HGVSc' field,
+          'c.2C>A' actual, 'c.1C>A' expected) TO ",
+          DBI::dbQuoteString(con, body), " (FORMAT PARQUET)"))
+        utils::write.csv(data.frame(field = "HGVSc", failures = 1L),
+          file.path(comparison_dir, "hgvs_bodies.csv"), row.names = FALSE)
+      }
     }
     stopifnot(file.copy(file.path(path, "reverse/input.vcf"), file.path(path, "reverse/generated.vcf"), overwrite = TRUE))
     dir.create(file.path(path, "forward/vep_home"))
@@ -69,9 +86,17 @@ main <- function() {
   stopifnot(identical(validate(first), validate(second)),
     identical(hash(file.path(original, "artifacts.tsv")), hash(file.path(first, "execution_artifacts.tsv"))),
     identical(hash(file.path(original, "summary.csv")), hash(file.path(first, "summary.csv"))),
+    identical(hash(file.path(original, exact_failure)), hash(file.path(first, exact_failure))),
+    identical(hash(file.path(original, body_failure)), hash(file.path(first, body_failure))),
+    identical(hash(file.path(original, body_summary)), hash(file.path(first, body_summary))),
     identical(hash(file.path(original, "forward/generated.vcf")), hash(file.path(first, "forward/generated.vcf"))),
     !file.exists(file.path(first, "reverse/generated.vcf")),
     !any(grepl("model[.]duckdb|fastvep[.]cache|vep_home", list.files(first, recursive = TRUE))))
+  body_files <- list.files(first, pattern = "^hgvs_(body_failures[.]parquet|bodies[.]csv)$",
+    recursive = TRUE)
+  stopifnot(length(body_files) == 8L,
+    all(grepl("comparison_(duckvep|fastvep)_vep_csq/", body_files)),
+    !any(grepl("comparison_native_tab17/", body_files)))
   omitted <- read_table(file.path(first, "omitted_duplicates.tsv"))
   stopifnot(nrow(omitted) == 1L, omitted$file == "reverse/generated.vcf", omitted$retained_file == "reverse/input.vcf")
   compressed <- read_table(file.path(first, "compressed_outputs.tsv"))
@@ -98,7 +123,11 @@ main <- function() {
     stopifnot(inherits(error, "error"), !file.exists(output))
     rejected <<- c(rejected, label)
   }
-  check("changed_failure", function(path) writeLines("changed", file.path(path, "forward/field_failures.parquet")))
+  check("changed_failure", function(path) writeLines("changed", file.path(path, exact_failure)))
+  check("changed_hgvs_body_failure", function(path) writeLines("changed", file.path(path, body_failure)))
+  check("changed_hgvs_body_summary", function(path) writeLines("changed", file.path(path, body_summary)))
+  check("missing_hgvs_body_failure", function(path) unlink(file.path(path, body_failure)))
+  check("missing_hgvs_body_summary", function(path) unlink(file.path(path, body_summary)))
   check("changed_excluded_model", function(path) writeLines("changed", file.path(path, "forward/model.duckdb")))
   check("changed_input", function(path) {
     input <- read_table(file.path(path, "inputs_before.tsv"))$path[[1L]]
@@ -108,6 +137,11 @@ main <- function() {
     file <- file.path(path, "artifacts.tsv")
     value <- read_table(file)
     table(value[basename(value$path) != "field_failures.parquet", ], file)
+  })
+  check("missing_hgvs_body_manifest_row", function(path) {
+    file <- file.path(path, "artifacts.tsv")
+    value <- read_table(file)
+    table(value[basename(value$path) != "hgvs_body_failures.parquet", ], file)
   })
   check("unmanifested_file", function(path) writeLines("extra", file.path(path, "extra.tsv")))
   check("duplicate_manifest_row", function(path) {

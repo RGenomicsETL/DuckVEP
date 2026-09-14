@@ -80,6 +80,25 @@ duckvep_fastvep_compare <- function(con, actual, expected, source, fields, direc
       AND k.record_index IS NOT NULL AND k.alt_index IS NOT NULL")
   artifact(paste0("SELECT ", select("k", keys), ", v.*", joined,
     " AND v.actual IS DISTINCT FROM v.expected"), "field_failures")
+  hgvs_fields <- intersect(c("HGVSc", "HGVSp"), compared)
+  if (length(hgvs_fields)) {
+    body_values <- paste(vapply(hgvs_fields, function(field) paste0("(", qs(field),
+      ", regexp_replace(a.", qi(field), "::VARCHAR, '^[^:]+:', ''),",
+      " regexp_replace(e.", qi(field), "::VARCHAR, '^[^:]+:', ''))"),
+      character(1L)), collapse = ", ")
+    body_join <- paste0(" FROM ", table, " k JOIN ", qi(actual), " a ON ",
+      same_keys("k", "a"), " JOIN ", qi(expected), " e ON ", same_keys("k", "e"),
+      ", LATERAL (VALUES ", body_values, ") v(field, actual, expected)
+      WHERE k.actual_rows = 1 AND k.expected_rows = 1
+        AND k.record_index IS NOT NULL AND k.alt_index IS NOT NULL")
+    artifact(paste0("SELECT ", select("k", keys), ", v.*", body_join,
+      " AND v.actual IS DISTINCT FROM v.expected"), "hgvs_body_failures")
+    body_failures <- DBI::dbGetQuery(con, paste0("SELECT field, count(*) AS failures
+      FROM read_parquet(", qs(file.path(directory, "hgvs_body_failures.parquet")), ")
+      GROUP BY field ORDER BY field"))
+    utils::write.csv(body_failures,
+      file.path(directory, "hgvs_bodies.csv"), row.names = FALSE)
+  }
   summary <- DBI::dbGetQuery(con, paste0("SELECT
     coalesce(sum(actual_rows), 0) AS actual_rows,
     coalesce(sum(expected_rows), 0) AS expected_rows,

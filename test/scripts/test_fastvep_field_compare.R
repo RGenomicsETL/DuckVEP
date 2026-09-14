@@ -12,11 +12,12 @@ main <- function() {
     stringsAsFactors = FALSE)
   DBI::dbWriteTable(con, "expected", expected)
   source <- data.frame(record_index = as.character(1:6), alt_index = "1")
-  compare <- function(actual, label, oracle = expected, declared = source) {
+  compare <- function(actual, label, oracle = expected, declared = source,
+      fields = c("Feature", "payload")) {
     DBI::dbWriteTable(con, "actual", actual, overwrite = TRUE)
     DBI::dbWriteTable(con, "expected", oracle, overwrite = TRUE)
     DBI::dbWriteTable(con, "source", declared, overwrite = TRUE)
-    duckvep_fastvep_compare(con, "actual", "expected", "source", c("Feature", "payload"),
+    duckvep_fastvep_compare(con, "actual", "expected", "source", fields,
       file.path(directory, label))
   }
   result <- compare(expected[6:1, ], "equal")
@@ -93,6 +94,48 @@ main <- function() {
   result <- compare(rbind(expected, another_transcript), "transcript_multiplicity",
     rbind(expected, another_transcript))
   stopifnot(result$passed, result$union_keys == 7, result$source_alleles == 6)
+  hgvs_expected <- data.frame(
+    record_index = "1", alt_index = "1", Feature = "ENST1",
+    HGVSc = "ENST1.1:c.1A>G", HGVSp = "ENSP1.1:p.Met1Val"
+  )
+  hgvs_actual <- hgvs_expected
+  hgvs_actual$HGVSc <- ".1:c.1A>G"
+  hgvs_actual$HGVSp <- ".1:p.Met1Val"
+  result <- compare(hgvs_actual, "hgvs_prefix_only", hgvs_expected,
+    source[1L, ], c("Feature", "HGVSc", "HGVSp"))
+  stopifnot(!result$passed, result$field_failures == 2L)
+  body_failures <- DBI::dbGetQuery(con, paste0("SELECT * FROM read_parquet(",
+    DBI::dbQuoteString(con, file.path(directory,
+      "hgvs_prefix_only/hgvs_body_failures.parquet")), ")"))
+  stopifnot(nrow(body_failures) == 0L)
+  body_summary <- utils::read.csv(file.path(directory,
+    "hgvs_prefix_only/hgvs_bodies.csv"))
+  stopifnot(nrow(body_summary) == 0L)
+  hgvs_body_actual <- hgvs_expected
+  hgvs_body_actual$HGVSc <- "OTHER.9:c.2A>G"
+  result <- compare(hgvs_body_actual, "hgvs_body_disagreement", hgvs_expected,
+    source[1L, ], c("Feature", "HGVSc", "HGVSp"))
+  stopifnot(!result$passed, result$field_failures == 1L)
+  body_failures <- DBI::dbGetQuery(con, paste0("SELECT * FROM read_parquet(",
+    DBI::dbQuoteString(con, file.path(directory,
+      "hgvs_body_disagreement/hgvs_body_failures.parquet")), ")"))
+  stopifnot(nrow(body_failures) == 1L, body_failures$field == "HGVSc",
+    body_failures$actual == "c.2A>G", body_failures$expected == "c.1A>G")
+  body_summary <- utils::read.csv(file.path(directory,
+    "hgvs_body_disagreement/hgvs_bodies.csv"))
+  stopifnot(nrow(body_summary) == 1L, body_summary$field == "HGVSc",
+    body_summary$failures == 1L)
+  hgvs_missing_actual <- hgvs_expected
+  hgvs_missing_actual$HGVSp <- NA_character_
+  result <- compare(hgvs_missing_actual, "hgvs_body_missing", hgvs_expected,
+    source[1L, ], c("Feature", "HGVSc", "HGVSp"))
+  stopifnot(!result$passed, result$field_failures == 1L)
+  body_failures <- DBI::dbGetQuery(con, paste0("SELECT * FROM read_parquet(",
+    DBI::dbQuoteString(con, file.path(directory,
+      "hgvs_body_missing/hgvs_body_failures.parquet")), ")"))
+  stopifnot(nrow(body_failures) == 1L, body_failures$field == "HGVSp",
+    is.na(body_failures$actual), body_failures$expected == "p.Met1Val")
+  DBI::dbWriteTable(con, "source", source, overwrite = TRUE)
   source("benchmarks/benchmark_duckvep_fastvep_fields.R", local = TRUE)
   cli_rows <- source
   for (field in duckvep_fastvep_fields("native_tab17")) cli_rows[[field]] <- ""
