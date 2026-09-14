@@ -708,6 +708,79 @@ SELECT * FROM duckvep_transcript_projection('projection_events', 'projection_ann
 ----
 unsupported genetic code
 
+# Sequence decoding applies only to selected transcripts; unused cold rows do
+# not supply sequence to a projected event.
+statement ok
+CREATE TABLE projection_unused_invalid AS SELECT * FROM projection_transcripts
+UNION ALL SELECT * REPLACE(1::UINTEGER AS transcript_index,
+  from_hex('FF') AS cds_sequence, from_hex('FF') AS post_cds_sequence)
+FROM projection_transcripts;
+
+query I
+WITH actual AS (SELECT * FROM duckvep_transcript_projection(
+  'projection_events', 'projection_annotations', 'projection_unused_invalid'))
+SELECT count(*) FROM ((SELECT * FROM actual EXCEPT ALL SELECT * FROM projection_result)
+  UNION ALL (SELECT * FROM projection_result EXCEPT ALL SELECT * FROM actual));
+----
+0
+
+# An independent relational codon expansion defines the scalar translation
+# comparator. Multiple distinct residues remain X, including D/N and E/Q.
+statement ok
+CREATE MACRO projection_reference_peptide(dna, genetic_code) AS (
+  WITH triplets AS (SELECT i, substring(upper(dna), 3*i+1, 3) AS triplet
+    FROM range(length(dna) // 3) r(i)), amino_acids AS (
+    SELECT i, CASE WHEN count(DISTINCT substring(genetic_code, j+1, 1)) = 1
+      THEN min(substring(genetic_code, j+1, 1)) ELSE 'X' END AS aa
+    FROM triplets LEFT JOIN range(64) r(j) ON
+      (triplet[1]='N' OR triplet[1]=substring('TCAG',j//16+1,1)) AND
+      (triplet[2]='N' OR triplet[2]=substring('TCAG',(j//4)%4+1,1)) AND
+      (triplet[3]='N' OR triplet[3]=substring('TCAG',j%4+1,1)) GROUP BY i),
+  peptide AS (SELECT coalesce(string_agg(aa,'' ORDER BY i),'') AS aa FROM amino_acids)
+  SELECT CASE WHEN dna IS NULL THEN NULL ELSE coalesce(nullif(aa || CASE
+    WHEN length(dna)%3!=0 AND aa!='*' THEN 'X' ELSE '' END,''),'-') END FROM peptide
+);
+
+query II
+WITH codes AS (SELECT unnest([1,2,3,4,5,6,9,10,11,12,13,14,16,21,22,23,24,25,26,27,28,29,30,31])::UTINYINT AS code),
+  bases AS (SELECT unnest(['A','C','G','T','N']) AS b),
+  triplets AS (SELECT a.b || b.b || c.b AS dna FROM bases a, bases b, bases c),
+  sequences AS (SELECT dna FROM triplets UNION ALL SELECT lower(dna) FROM triplets
+    UNION ALL SELECT dna || suffix FROM triplets, (VALUES ('A'), ('NN'), ('TAA')) s(suffix)
+    UNION ALL SELECT unnest([NULL, '', 'A', 'AA', '?AA', 'AAA?']))
+SELECT count(*), count(*) FILTER (WHERE projection_reference_peptide(dna,
+  __duckvep_projection_code(code)) IS DISTINCT FROM
+  __duckvep_projection_peptide(dna, __duckvep_projection_code(code)))
+FROM codes, sequences;
+----
+15144	0
+
+# Compare virtual prefix/ALT/suffix/UTR slices with an explicit full-string
+# rebuild. This includes empty spans, partial CDS, and windows past sequence end.
+query II
+WITH sequences AS (SELECT substring('ACGTACGTACGT',1,n) AS cds FROM range(13) r(n)),
+  edits AS (SELECT cds, first1, last1, alt, post,
+    substring(cds,1,first1-1) || alt || substring(cds,last1+1) AS rebuilt,
+    least(len(cds),first1-1) AS prefix_length,
+    greatest(len(cds)-last1,0) AS suffix_length
+    FROM sequences, range(1,len(cds)+2) a(first1), range(first1-1,len(cds)+1) b(last1),
+      (VALUES (''), ('G'), ('TG'), ('GTA'), ('ACGTAC')) a(alt),
+      (VALUES (''), ('T'), ('CGTACG'), (NULL)) p(post)),
+  windows AS (SELECT *, prefix_length+len(alt)+suffix_length AS alternate_length,
+    CASE WHEN len(rebuilt)>=3 THEN rebuilt ELSE '' END || coalesce(post,'') AS whole
+    FROM edits), comparison AS (
+    SELECT substring(whole,start0+1,width) AS expected,
+      CASE WHEN alternate_length>=3 THEN
+        __duckvep_projection_span(cds,1,prefix_length,0,start0,width) ||
+        __duckvep_projection_span(alt,1,len(alt),prefix_length,start0,width) ||
+        __duckvep_projection_span(cds,last1+1,suffix_length,prefix_length+len(alt),start0,width)
+      ELSE '' END || __duckvep_projection_span(coalesce(post,''),1,len(coalesce(post,'')),
+        CASE WHEN alternate_length>=3 THEN alternate_length ELSE 0 END,start0,width) AS observed
+    FROM windows, range(0,20) a(start0), range(0,10) b(width))
+SELECT count(*), count(*) FILTER (WHERE expected IS DISTINCT FROM observed) FROM comparison;
+----
+1820000	0
+
 # Cold metadata joins must not multiply transcript rows or redefine VEP FLAGS.
 statement ok
 CREATE TABLE projection_cold AS SELECT 0::UINTEGER transcript_index,
@@ -812,3 +885,49 @@ query I
 SELECT duckvep_model_drop('projection');
 ----
 true
+
+# A long reference is shared by many distinct source events. Every identity and
+# codon result must survive without storing a whole edited CDS per event.
+statement ok
+SET memory_limit='96MB';
+
+statement ok
+SET max_temp_directory_size='0B';
+
+statement ok
+CREATE TABLE projection_resource_transcript AS SELECT
+  0::UINTEGER transcript_index, 1::UINTEGER seq_region,
+  1::UBIGINT transcript_start, 12000::UBIGINT transcript_end,
+  1::TINYINT strand, 3::UBIGINT transcript_flags,
+  1::UBIGINT cds_start, 12000::UBIGINT cds_end,
+  ('ATG'||repeat('AAA',3998)||'TAA')::BLOB cds_sequence,
+  'ACGT'::BLOB post_cds_sequence, 1::UTINYINT codon_table,
+  [struct_pack(exon_start:=1::UBIGINT, exon_end:=12000::UBIGINT,
+    exon_cdna_start:=1::UBIGINT, exon_cdna_end:=12000::UBIGINT,
+    phase:=0::TINYINT, end_phase:=0::TINYINT)] exons,
+  []::STRUCT(protein_position UINTEGER, alternate_amino_acid VARCHAR, edit_code VARCHAR)[] peptide_edits;
+
+statement ok
+CREATE TABLE projection_resource_events AS SELECT (i+1)::UBIGINT event_index,
+  1::UINTEGER seq_region, 4::UBIGINT AS position, 'A' reference, 'G' alternate
+FROM range(32768) r(i);
+
+statement ok
+CREATE TABLE projection_resource_annotations AS SELECT event_index,
+  0::UINTEGER transcript_index, 0::UBIGINT consequence_mask FROM projection_resource_events;
+
+query IIIIII
+SELECT count(*), count(DISTINCT event_index), min(event_index), max(event_index),
+  count(*) FILTER (WHERE cds_start=4 AND cds_end=4 AND protein_start=2 AND protein_end=2),
+  count(*) FILTER (WHERE reference_codons='Aaa' AND alternate_codons='Gaa'
+    AND reference_amino_acids='K' AND alternate_amino_acids='E')
+FROM duckvep_transcript_projection('projection_resource_events',
+  'projection_resource_annotations', 'projection_resource_transcript');
+----
+32768	32768	1	32768	32768	32768
+
+statement ok
+RESET memory_limit;
+
+statement ok
+RESET max_temp_directory_size;

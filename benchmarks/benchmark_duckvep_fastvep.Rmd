@@ -1,5 +1,5 @@
 ---
-title: "DuckVEP: the fastest Ensembl VEP-compatible consequence predictor in the West?"
+title: "DuckVEP and FastVEP: compact and complete-field benchmarks"
 output: github_document
 ---
 
@@ -38,6 +38,8 @@ elapsed_seconds <- function(value) {
 
 read_gnu_time <- function(path, engine, threads, run) {
   lines <- readLines(path, warn = FALSE)
+  stopifnot(time_value(lines, "Exit status") == "0",
+    !any(grepl("^Command terminated by signal ", trimws(lines))))
   elapsed <- elapsed_seconds(time_value(
     lines,
     "Elapsed \\(wall clock\\) time \\(h:mm:ss or m:ss\\)"
@@ -508,27 +510,30 @@ theme_bench <- theme_minimal(base_size = 12) +
   )
 ```
 
-Status: current measured comparison of DuckVEP and FastVEP on the complete GIAB
-HG002 GRCh38 small-variant benchmark VCF. It includes VCF decoding and real
-uncompressed tabular output. DuckVEP additionally pays for an explicit global
-coordinate sort. The consequence speed comparison excludes HGVS, regulatory/motif
-features, and supplementary annotation for both engines.
+Status: revision-labelled measured comparison of DuckVEP and FastVEP on the complete GIAB
+HG002 GRCh38 small-variant benchmark VCF. Compact and complete-field workloads
+have separate contracts and source revisions. Measurements include decoding and
+real uncompressed output; DuckVEP also performs an explicit coordinate sort.
+Complete CSQ includes HGVS. Supplementary annotation is measured separately.
 
 ## The short answer
 
-**On this declared test, yes.** DuckVEP is the fastest
-Ensembl-VEP-compatible consequence predictor measured here: it finishes the
-complete GIAB HG002 input **`r observed_median_ratio_text` times faster on one
-physical core** and **`r four_core_ratio_text` times faster on four physical
-cores** than the current native FastVEP checkout.
+Performance depends on the output contract. The
+[complete-field measurements](#complete-field-contracts) compare native tab and
+common CSQ with FastVEP revision `18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6`
+(September 10, 2026), using a separately rebuilt cache. They retain all output
+rows and field disagreements; they do not establish complete VEP parity.
+FastVEP is faster in both complete-field workloads at one and four cores in
+this retained matrix. These are end-to-end pipeline measurements, not isolated
+kernel timings.
 
-The question mark matters. This is not a census of every consequence predictor
-or every machine. FastVEP is the measured speed competitor; Ensembl VEP 116 is
-the behavioral oracle. The useful result is that DuckVEP combines the faster
-same-core pipeline with exact consequence and HGVS suffix agreement on the
-held-out VEP comparison below.
+The compact baseline below uses FastVEP `7038e7c` (July 13, 2026). On that
+declared workload, DuckVEP finished `r observed_median_ratio_text` times faster
+on one physical core and `r four_core_ratio_text` times faster on four, with
+four presentation fields left as placeholders. Those measurements do not rank
+the complete-field pipelines. Ensembl VEP 116 remains the biological authority.
 
-## What was compared
+## Compact-output baseline
 
 Both tools start from the same compressed, coordinate-sorted GIAB VCF, use the
 same Ensembl 116 GRCh38 reference product and 5,000-base transcript window, run
@@ -571,11 +576,10 @@ The four placeholders have different status:
 
 Thus the comparison credits FastVEP for computing these native values. It also
 shows where DuckVEP can obtain named-variant and transcript metadata through
-ordinary joins without enlarging the consequence model. `Codons` is a missing
-public consequence field, not a supplementary join: rebuilding it independently
-from transcript sequence in SQL would create a second coding authority. The
-shared pair-fact path should expose the triplets it already uses, and that
-additional projection remains unmeasured here.
+ordinary joins without enlarging the consequence model. `Codons` comes from
+`duckvep_transcript_projection`, which exposes native coding facts; it is not
+reconstructed independently in SQL. The complete-field comparison below includes
+that projection. The compact timings above do not measure it.
 
 ## Algorithm design: make the repeated biology small
 
@@ -1121,7 +1125,7 @@ chromosome-21 sample: 1,864 variants sampled by allele shape with seed 113.
 The exact 113 KB sample is retained as
 `benchmarks/data/duckvep_fastvep/clinvar_chr21_seed113.vcf`; reproduction does
 not depend on regenerating it from an unrecorded mutable source.
-VEP ran from its indexed cache with HGVS enabled. FastVEP ran its current native
+VEP ran from its indexed cache with HGVS enabled. FastVEP ran its recorded native
 binary with `--hgvs --output-format vcf`. DuckVEP's oracle Parquet came from the
 same VEP run and the same resident model.
 
@@ -1293,17 +1297,16 @@ and executable agreement for the declared seeds; they are not a probability
 sample of future clinical variants and are not presented as a population error
 rate.
 
-## Why this result matters
+## SQL composition and supplementary annotation
 
-The headline is not merely that one C engine outran one Rust engine. DuckVEP's
-output remains a typed DuckDB relation. Transcript identifiers, ClinVar,
+DuckVEP output remains a typed DuckDB relation. Transcript identifiers, ClinVar,
 population frequencies, prediction scores, gene constraints, conservation
 signals, BAM-derived evidence, and any other source DuckDB can read stay as
 ordinary late joins instead of becoming fields copied into a private annotation
 cache or another C object model.
 
-This speed comparison stops at the common 17-column tabular edge so the tool
-comparison remains legible. The broader DuckVEP workflow can instead filter
+The compact comparison writes 17-column files with the declared placeholder
+differences. The broader DuckVEP workflow can instead filter
 numeric consequence masks first, join only requested provider columns, and
 write Parquet or another DuckDB-supported result. The direct ClinVar result
 above measures the same fastSA source against DuckDB's typed join, while the
@@ -1312,13 +1315,13 @@ extends the evidence to AlphaMissense, REVEL, clinical arbitration, genes, and
 intervals. These costs remain separate from the consequence headline instead
 of being silently charged to only one tool.
 
-## Findings
+## Compact-baseline findings
 
-1. **DuckVEP wins the declared same-core race.** It is
+1. **The compact workload favors DuckVEP against FastVEP `7038e7c`.** It is
    `r observed_median_ratio_text` times faster at one core and
    `r four_core_ratio_text` times faster at four while paying for an explicit
    sort and real output.
-2. **The speed result survives a compatibility check.** DuckVEP is exact on all
+2. **The retained held-out differential agrees.** That run is exact on all
    56,998 held-out VEP transcript pairs, consequence sets, HGVSc suffixes, and
    HGVSp suffixes, then adds `r format(sum(property_run$trials), big.mark = ",")`
    randomized property trials and `r format(generated_differential$n, big.mark = ",")`
@@ -1329,17 +1332,13 @@ of being silently charged to only one tool.
    4.10-million-allele workload, and the checked provider campaign composes
    ClinVar, ClinvArbitration, AlphaMissense, REVEL, and BigWig without adding a
    provider-specific C or Rust engine.
-4. **The principal measured costs have moved above the biological kernel.** At
-   four cores the largest operator totals are label joining, tab writing,
-   result-list expansion, and text projection. SQL composability is already
-   fast, and the profile shows where further end-to-end gains remain.
-5. **Memory is the visible price.** DuckVEP peaks near 5.5 GiB versus FastVEP's
-   3.17 GiB. The immutable model is shared across workers, so adding cores does
-   not multiply that peak, but process RSS remains a release metric.
-6. **“Fastest in the West” stays a measured question.** The answer is yes for
-   this complete GIAB input, these versions, these core counts, and these output
-   contracts. A broader superlative requires adding competitors under an
-   equally explicit protocol rather than extrapolating this ratio.
+4. **The compact profile includes substantial presentation costs.** Its largest
+   four-core operator totals are label joining, tab writing, result-list
+   expansion and text projection. This profile does not identify the dominant
+   operators of the complete-field workloads.
+5. **Memory depends on the workload.** This compact baseline peaks near 5.5 GiB
+   for DuckVEP and 3.17 GiB for FastVEP. The complete-field measurements below
+   report their own peaks and memory settings.
 
 This held-out differential is a compatibility witness for this comparison, not
 a replacement for DuckVEP's full multi-corpus conformance ledger or statistical
@@ -1569,7 +1568,487 @@ The phased executor still needs separate sorted-native and sort-included
 throughput/memory measurements. This independent-event run does not measure
 phase preparation, carrier sharing or combined haplotype consequences.
 
-## Revisions and input receipts
+## Complete field contracts
+
+The compact operational timings above do not measure complete VEP presentation.
+Two additional projections have separate contracts: FastVEP's native 17-column
+tab format, and 31 common CSQ fields plus the uploaded record ID. Native tab
+`FLAGS` means canonical status; CSQ `FLAGS` means CDS quality. Provider-backed
+`Existing_variation` is deliberately absent from both comparisons.
+
+```{r complete-field-contracts}
+source(file.path(root, "benchmarks/benchmark_duckvep_fastvep_fields.R"))
+field_sources <- do.call(rbind, lapply(c("operational17", "native_tab17", "vep_csq"),
+  duckvep_fastvep_field_sources))
+field_groups <- aggregate(field ~ contract + source, field_sources, paste, collapse = ", ")
+knitr::kable(field_groups, col.names = c("Contract", "Authority", "Fields"))
+```
+
+`GENCODE_PRIMARY` is absent from the pinned FastVEP CLI schema. `SYMBOL_SOURCE`,
+`HGNC_ID` and `SOURCE` are not included without a common source contract. CSQ
+extraction retains escaping, ordered values, empty strings and dashes exactly;
+it rejects missing or duplicate CSQ keys and inconsistent field counts.
+
+The field differential uses the eight existing projection models and the
+unchanged witness generator. Physical record/ALT ordinals distinguish repeated
+source events. Each output must cover every declared source allele, including
+intergenic results. Comparisons retain the full key union, duplicate rows,
+missing or extra pairs, source-coverage failures and every differing field in
+Parquet. A disagreement makes the command fail; FastVEP is a comparator and
+Ensembl VEP 116 is the authority.
+
+```{r complete-field-conformance}
+field_dir <- file.path(data_dir, "fields_seed173_9bf888e")
+field_manifest <- read.delim(file.path(field_dir, "artifacts.tsv"), colClasses = "character")
+stopifnot(!anyDuplicated(field_manifest$path),
+  !any(grepl("^/|(^|/)\\.\\.(/|$)", field_manifest$path)),
+  all(c("receipt.tsv", "summary.csv") %in% field_manifest$path),
+  identical(unname(vapply(file.path(field_dir, field_manifest$path),
+    function(path) digest::digest(file = path, algo = "sha256"), character(1L))), field_manifest$sha256))
+field_receipt <- read.delim(file.path(field_dir, "receipt.tsv"), colClasses = "character")
+stopifnot(identical(names(field_receipt), c("field", "value")), !anyDuplicated(field_receipt$field))
+field_receipt <- setNames(field_receipt$value, field_receipt$field)
+field_summary <- read.csv(file.path(field_dir, "summary.csv"))
+stopifnot(field_receipt[["build_binding"]] == "htslib_distclean_make_release",
+  field_receipt[["completed_cases"]] == "8", field_receipt[["completed_comparisons"]] == "24",
+  field_receipt[["input_records"]] == "10671", field_receipt[["errors"]] == "0",
+  field_receipt[["shared_inputs_unchanged"]] == "TRUE", nrow(field_summary) == 24L)
+cat("DuckHTS source checkout:", field_receipt[["source_revision"]], "\n\n")
+if (field_receipt[["fastvep_binding"]] %in%
+    c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline",
+      "cargo_verified_commit_tree_release_locked_offline")) {
+  stopifnot("fastvep_build.tsv" %in% field_manifest$path)
+  for (name in c("stage", "duckvep", "fastvep")) {
+    source(file.path(root, "r/duckhtsbench/R", paste0(name, ".R")))
+  }
+  field_registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
+  field_pin <- field_registry[field_registry$id == "fastvep_ensembl116_cache", ]
+  stopifnot(nrow(field_pin) == 1L)
+  field_identity <- duckhts_bench_identity_fields(field_pin$supplier_identity)
+  stopifnot(field_receipt[["fastvep"]] == field_identity[["source_commit"]])
+  field_build <- duckhts_bench_read_fastvep_build(file.path(field_dir, "fastvep_build.tsv"),
+    field_identity[["source_commit"]], verification_receipt =
+      if (field_receipt[["fastvep_binding"]] != "cargo_verified_commit_tree_release_locked_offline")
+        file.path(data_dir, "fastvep_verified_commit_tree", "build.tsv") else NULL)
+  stopifnot(field_build[["log"]] %in% field_manifest$path,
+    field_build[["binding"]] == field_receipt[["fastvep_binding"]],
+    field_build[["executable_sha256"]] == field_receipt[["fastvep_sha256"]])
+  if ("source_tree" %in% names(field_build)) stopifnot(field_build[["source_tree"]] %in% field_manifest$path)
+  if ("source_commit_object" %in% names(field_build)) {
+    stopifnot(field_build[["source_commit_object"]] %in% field_manifest$path)
+  }
+  cat("FastVEP executable provenance: verified pinned-tree binary identity; recorded execution binding:",
+    field_build[["binding"]], "\n\n")
+} else {
+  stopifnot(field_receipt[["fastvep_binding"]] %in%
+    c("expected_binary_sha256", "diagnostic_binary_unbound"))
+  cat("FastVEP executable provenance: binary-unbound (", field_receipt[["fastvep_binding"]],
+    "). Source checkout and executable digest do not establish build provenance.\n\n", sep = "")
+}
+knitr::kable(aggregate(cbind(input_alleles, compared_keys, field_failures,
+  missing_keys, extra_keys, actual_missing_source_alleles, expected_missing_source_alleles) ~
+  comparison, field_summary, sum))
+```
+
+These are failing comparisons, not a conformance certificate. DuckVEP/VEP
+differences comprise 168 HGVSc fields, 3,522 HGVSp fields and two HGVS shifts.
+The fixtures lack protein accessions; the HGVSp result therefore does not
+establish peptide-suffix agreement. Source VCFs, model GFFs, raw outputs and all
+field/key failures are retained in the [field data](data/duckvep_fastvep/fields_seed173_9bf888e).
+A [singleton replay](data/duckvep_fastvep/replay_phase1_589)
+of `chrDuck:158 C>A` in the phase-1 fixture reproduces `c.2C>A` versus VEP's
+`c.1C>A`; that diagnostic does not replace the full campaign denominator.
+Independent-event HGVS corrections are tracked separately in
+https://github.com/RGenomicsETL/duckhts/issues/223.
+
+```{r complete-field-singletons}
+validate_replay_bundle <- function(directory, evidence, expected = c(records = 10671L, tasks = 10100L, cells = 41942L)) {
+  source(file.path(root, "benchmarks/benchmark_duckvep_fastvep_replay.R"), local = TRUE)
+  source(file.path(root, "scripts/duckvep_evidence.R"), local = TRUE)
+  source(file.path(root, "r/duckhtsbench/R/duckvep.R"), local = TRUE)
+  source(file.path(root, "r/duckhtsbench/R/fastvep.R"), local = TRUE)
+  sha <- function(path) digest::digest(file = path, algo = "sha256")
+  fields <- function(path) {
+    x <- read.delim(path, colClasses = "character", quote = "", comment.char = "")
+    stopifnot(identical(names(x), c("field", "value")), !anyDuplicated(x$field), !anyNA(x))
+    setNames(x$value, x$field)
+  }
+  run <- fields(file.path(directory, "run.tsv"))
+  completion <- read.csv(file.path(directory, "completion.csv"))
+  stopifnot(run[["shard"]] == "1", run[["shards"]] == "1", nrow(completion) == 1L,
+    completion$shard == 1L, completion$shards == 1L,
+    isTRUE(completion$all_records_minimized), isTRUE(completion$assigned_records_minimized),
+    identical(completion$allele_or_model_minimized, FALSE),
+    all(unlist(completion[c("required_singletons", "assigned_singletons", "completed_singletons", "passed_singletons")]) == expected[["tasks"]]),
+    run[["original_records"]] == expected[["records"]], run[["original_failure_cells"]] == expected[["cells"]],
+    run[["required_singletons"]] == expected[["tasks"]], run[["assigned_singletons"]] == expected[["tasks"]],
+    grepl("^[0-9a-f]{40}$", run[["revision"]]), run[["source_revision"]] == run[["revision"]],
+    run[["build_binding"]] == "htslib_distclean_make_release",
+    run[["vep"]] == "57ea5c52340acc1f156267f810ad162e26597082",
+    run[["variation"]] == "2fb834b987ede3824e200197a838ce11e91aeb4b",
+    run[["fastvep"]] == "18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6",
+    all(grepl("^[0-9a-f]{64}$", run[c("extension_sha256", "fastvep_sha256", "driver_sha256", "input_identity")])))
+  extension <- fields(file.path(directory, "extension_build.tsv"))
+  stopifnot(identical(names(extension), c("source_revision", "path", "binding", "sha256")),
+    extension[["source_revision"]] == run[["revision"]], extension[["binding"]] == run[["build_binding"]],
+    extension[["sha256"]] == run[["extension_sha256"]])
+  build <- duckhts_bench_read_fastvep_build(file.path(directory, "fastvep_build.tsv"), run[["fastvep"]],
+    verification_receipt = if (run[["fastvep_binding"]] %in%
+        c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline"))
+      file.path(dirname(directory), "fastvep_verified_commit_tree", "build.tsv") else NULL)
+  stopifnot(build[["binding"]] == run[["fastvep_binding"]],
+    build[["executable_sha256"]] == run[["fastvep_sha256"]])
+  manifest_path <- file.path(evidence, "artifacts.tsv")
+  manifest <- read.delim(manifest_path, colClasses = "character")
+  stopifnot(run[["original_manifest_sha256"]] == sha(manifest_path), !anyDuplicated(manifest$path),
+    !any(grepl("^/|(^|/)\\.\\.(/|$)", manifest$path)),
+    setequal(manifest$path, setdiff(list.files(evidence, recursive = TRUE), "artifacts.tsv")),
+    identical(unname(vapply(file.path(evidence, manifest$path), sha, "")), manifest$sha256))
+  con <- DBI::dbConnect(duckdb::duckdb(config = list(threads = "1")))
+  on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
+  parquet <- function(path) DBI::dbGetQuery(con, paste("SELECT * FROM read_parquet(", DBI::dbQuoteString(con, path), ")"))
+  inventory <- duckvep_replay_inventory(con, evidence)
+  tasks <- inventory$tasks
+  stopifnot(sum(inventory$cases$input_records) == expected[["records"]],
+    sum(inventory$summary$field_failures) == expected[["cells"]], length(tasks) == expected[["tasks"]])
+  jobs <- duckvep_replay_indices(run[["jobs"]], 64L)
+  files <- sprintf("worker-%02d.parquet", seq_len(jobs))
+  stopifnot(setequal(files, list.files(directory, pattern = "^worker-[0-9]+[.]parquet$")))
+  completed <- integer()
+  cells <- 0L
+  for (worker in seq_len(jobs)) {
+    path <- file.path(directory, files[[worker]])
+    stopifnot(identical(readLines(paste0(path, ".sha256")), sha(path)))
+    rows <- parquet(path)
+    assigned <- which((seq_along(tasks) - 1L) %% jobs == worker - 1L)
+    found <- duckvep_replay_resume(rows, tasks, assigned, sha(file.path(directory, "run.tsv")))
+    stopifnot(all(rows$passed), setequal(found, assigned))
+    completed <- c(completed, found)
+    cells <- cells + nrow(rows)
+  }
+  stopifnot(!anyDuplicated(completed), setequal(completed, seq_along(tasks)), cells == expected[["cells"]])
+  data.frame(original_records = expected[["records"]], replayed_records = length(completed),
+    comparison_lanes = 3L * length(completed), retained_failure_cells = cells, changed_or_missing_cells = 0L)
+}
+replay_directory <- file.path(data_dir, "fields_replay_9bf888e")
+if (!file.exists(file.path(replay_directory, "completion.csv"))) {
+  cat("Complete singleton replay evidence is not published yet.\n")
+} else {
+  replay_counts <- validate_replay_bundle(replay_directory, field_dir)
+  cat("Each replay contains one physical record with unchanged alleles and model.\n",
+    "Every original failure cell is reproduced in isolation; this does not establish allele/model minimization or resolve the disagreements.\n",
+    sep = "")
+  knitr::kable(replay_counts, format.args = list(big.mark = ","))
+}
+```
+
+```{r complete-field-observations}
+complete_dir <- file.path(data_dir, "field_contracts")
+completion_path <- file.path(complete_dir, "completion.csv")
+if (!file.exists(completion_path)) {
+  cat("Whole-GIAB complete-field measurements are not published yet.\n")
+} else {
+  read_receipt <- function(path, required, sep = ",") {
+    receipt <- read.csv(path, sep = sep, colClasses = "character", check.names = FALSE)
+    stopifnot(nrow(receipt) > 0L, !anyDuplicated(names(receipt)),
+      all(required %in% names(receipt)), !anyNA(receipt[required]),
+      all(vapply(receipt[required], function(column) all(nzchar(column)), logical(1L))))
+    receipt
+  }
+  completion <- read_receipt(completion_path, c("source_revision", "completed", "binding",
+    "observations", "repetitions", "allele_coverage", "artifacts_sha256"))
+  if (!identical(completion$allele_coverage, "verified")) {
+    stop("Complete-field timing publication requires verified final source-allele coverage")
+  }
+  stopifnot(nrow(completion) == 1L, completion$completed == "TRUE",
+    completion$binding == "source_bound", as.integer(completion$repetitions) >= 3L)
+  sha256 <- function(path) strsplit(system2("sha256sum", shQuote(path), stdout = TRUE), " +")[[1L]][[1L]]
+  manifest_path <- file.path(complete_dir, "artifacts.csv")
+  stopifnot(sha256(manifest_path) == completion$artifacts_sha256)
+  manifest <- read_receipt(manifest_path, c("file", "sha256"))
+  stopifnot(!anyDuplicated(manifest$file), all(basename(manifest$file) == manifest$file),
+    identical(unname(vapply(file.path(complete_dir, manifest$file), sha256, character(1L))), manifest$sha256))
+  required <- c("metadata.csv", "inputs.csv", "fastvep_cache_receipt.tsv", "fastvep_build.tsv",
+    "source_map_receipt.tsv", "allele_coverage.csv")
+  stopifnot(all(required %in% manifest$file))
+  metadata <- read_receipt(file.path(complete_dir, "metadata.csv"), c("field", "value"))
+  inputs <- read_receipt(file.path(complete_dir, "inputs.csv"), c("artifact", "sha256"))
+  cache <- read_receipt(file.path(complete_dir, "fastvep_cache_receipt.tsv"), c("field", "value"), sep = "\t")
+  stopifnot(!anyDuplicated(metadata$field), !anyDuplicated(inputs$artifact), !anyDuplicated(cache$field))
+  metadata <- setNames(metadata$value, metadata$field)
+  cache <- setNames(cache$value, cache$field)
+  input_hashes <- setNames(inputs$sha256, inputs$artifact)
+  source(file.path(root, "r/duckhtsbench/R/registry.R"))
+  source(file.path(root, "r/duckhtsbench/R/stage.R"))
+  source(file.path(root, "r/duckhtsbench/R/duckvep.R"))
+  source(file.path(root, "r/duckhtsbench/R/fastvep.R"))
+  source(file.path(root, "r/duckhtsbench/R/fastvep_source.R"))
+  Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
+  registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"), check.names = FALSE)
+  identity <- duckhts_bench_identity_fields(registry$supplier_identity[
+    registry$id == "fastvep_ensembl116_cache"])
+  build <- duckhts_bench_read_fastvep_build(file.path(complete_dir, "fastvep_build.tsv"),
+    identity[["source_commit"]], verification_receipt =
+      if (metadata[["fastvep_binding"]] %in%
+          c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline"))
+        file.path(data_dir, "fastvep_verified_commit_tree", "build.tsv") else NULL)
+  if ("source_tree" %in% names(build)) {
+    stopifnot(build[["source_tree"]] %in% manifest$file,
+      build[["source_tree_sha256"]] == input_hashes[["fastvep_source_tree"]])
+  }
+  if ("source_commit_object" %in% names(build)) {
+    stopifnot(build[["source_commit_object"]] %in% manifest$file,
+      sha256(file.path(complete_dir, build[["source_commit_object"]])) ==
+        input_hashes[["fastvep_source_commit_object"]])
+  }
+  source_map <- duckhts_bench_read_fastvep_source_map(
+    input_hashes[["source_map"]], input_hashes[["input"]],
+    expected_extension_sha256 = input_hashes[["extension"]])
+  stopifnot(sha256(source_map[["receipt"]]) == input_hashes[["source_map_receipt"]],
+    sha256(file.path(complete_dir, "source_map_receipt.tsv")) == input_hashes[["source_map_receipt"]])
+  stopifnot(build[["log"]] %in% manifest$file,
+    sha256(file.path(complete_dir, "fastvep_build.tsv")) == input_hashes[["fastvep_build"]],
+    build[["log_sha256"]] == input_hashes[["fastvep_build_log"]],
+    build[["executable_sha256"]] == input_hashes[["fastvep"]])
+  stopifnot(metadata[["source_revision"]] == completion$source_revision,
+    metadata[["binding"]] == "source_bound", metadata[["input_id"]] == "variantkey_giab_hg002_v421",
+    metadata[["input_records"]] == as.character(source_records),
+    metadata[["input_alt_alleles"]] == as.character(source_alt_alleles),
+    metadata[["eligible_literal_alleles"]] == "4095611",
+    metadata[["fastvep_binding"]] == build[["binding"]],
+    metadata[["fastvep_source_revision"]] == identity[["source_commit"]],
+    metadata[["fastvep_version"]] == paste("fastvep", identity[["version"]]),
+    metadata[["supplementary_providers"]] == "none", metadata[["distance"]] == "5000",
+    cache[["source_commit"]] == metadata[["fastvep_source_revision"]],
+    cache[["executable_version"]] == metadata[["fastvep_version"]],
+    cache[["cache_format"]] == identity[["cache_format"]],
+    cache[["preparation"]] == identity[["preparation"]],
+    cache[["transcript_count"]] == identity[["transcripts"]],
+    cache[["cache_sha256"]] == input_hashes[["cache"]],
+    cache[["executable_sha256"]] == input_hashes[["fastvep"]],
+    cache[["gff3_sha256"]] == input_hashes[["gff3"]],
+    cache[["fasta_sha256"]] == input_hashes[["fasta"]],
+    cache[["fasta_index_sha256"]] == input_hashes[["fasta_index"]],
+    sha256(file.path(complete_dir, "fastvep_cache_receipt.tsv")) == input_hashes[["cache_receipt"]])
+  observations <- manifest$file[grepl("^(duckvep|fastvep)_.*_[14]_[0-9]+[.]csv$", manifest$file)]
+  observation_fields <- c("tool", "output_contract", "threads", "run", "row_count", "bytes",
+    "sha256", "xor_hash", "low32_sum", "high32_sum", "timing_file", "multiset_checked", "fingerprint_scope")
+  complete_rows <- do.call(rbind, lapply(file.path(complete_dir, observations), function(path) {
+    observation <- read_receipt(path, observation_fields)
+    stopifnot(nrow(observation) == 1L)
+    observation
+  }))
+  expected <- expand.grid(configuration = c("duckvep_operational17", "duckvep_native_tab17",
+    "duckvep_vep_csq", "fastvep_native_tab17", "fastvep_vep_csq"),
+    threads = c(1L, 4L), run = seq_len(as.integer(completion$repetitions)))
+  actual_keys <- paste(complete_rows$tool, complete_rows$output_contract,
+    complete_rows$threads, complete_rows$run, sep = "_")
+  expected_keys <- paste(expected$configuration, expected$threads, expected$run, sep = "_")
+  stopifnot(!anyDuplicated(actual_keys), setequal(actual_keys, expected_keys),
+    identical(paste0(actual_keys, ".csv"), observations),
+    length(actual_keys) == as.integer(completion$observations), all(as.numeric(complete_rows$row_count) > 0),
+    all(complete_rows$timing_file %in% manifest$file), all(complete_rows$multiset_checked == "TRUE"),
+    all(complete_rows$timing_file == paste0(actual_keys, ".time")),
+    all(complete_rows$fingerprint_scope == "full_row"))
+  coverage_fields <- c("tool", "output_contract", "threads", "run", "scope", "input_sha256",
+    "output_sha256", "source_map_sha256", "source_alleles", "covered_alleles", "missing_alleles",
+    "unknown_alleles", "ambiguous_alleles", "failures_file", "failures_sha256")
+  coverage <- read_receipt(file.path(complete_dir, "allele_coverage.csv"), coverage_fields)
+  coverage_keys <- paste(coverage$tool, coverage$output_contract, coverage$threads, coverage$run, sep = "_")
+  stopifnot(!anyDuplicated(coverage_keys), setequal(coverage_keys, actual_keys))
+  coverage <- coverage[match(actual_keys, coverage_keys), ]
+  stopifnot(all(coverage$scope == "final_output"),
+    all(coverage$input_sha256 == input_hashes[["input"]]),
+    all(coverage$source_map_sha256 == input_hashes[["source_map"]]),
+    all(coverage$output_sha256 == complete_rows$sha256),
+    all(grepl("^[0-9a-f]{64}$", coverage$output_sha256)),
+    all(coverage$source_alleles == metadata[["eligible_literal_alleles"]]),
+    all(coverage$covered_alleles == coverage$source_alleles),
+    all(as.numeric(complete_rows$row_count) >= as.numeric(coverage$covered_alleles)),
+    all(coverage$missing_alleles == "0"), all(coverage$unknown_alleles == "0"),
+    all(coverage$ambiguous_alleles == "0"))
+  stopifnot(!anyDuplicated(coverage$failures_file),
+    all(coverage$failures_file == paste0(actual_keys, ".coverage.failures.parquet")),
+    all(coverage$failures_file %in% manifest$file),
+    identical(coverage$failures_sha256, manifest$sha256[match(coverage$failures_file, manifest$file)]))
+  failure_con <- DBI::dbConnect(duckdb::duckdb())
+  tryCatch({
+    files <- paste(DBI::dbQuoteString(failure_con, file.path(complete_dir, coverage$failures_file)),
+      collapse = ",")
+    failures <- paste0("read_parquet([", files, "])")
+    DBI::dbExecute(failure_con, paste0("CREATE TEMP VIEW retained_failures AS SELECT * FROM ", failures))
+    stopifnot(identical(DBI::dbListFields(failure_con, "retained_failures"),
+      c("failure", "output_key", "record_index", "alt_index", "output_rows", "source_matches")),
+      DBI::dbGetQuery(failure_con, "SELECT count(*) n FROM retained_failures")$n == 0)
+  }, finally = DBI::dbDisconnect(failure_con, shutdown = TRUE))
+  for (group in split(complete_rows, paste(complete_rows$tool, complete_rows$output_contract))) {
+    stopifnot(nrow(unique(group[c("row_count", "xor_hash", "low32_sum", "high32_sum")])) == 1L)
+  }
+  times <- do.call(rbind, lapply(seq_len(nrow(complete_rows)), function(i) {
+    row <- complete_rows[i, ]
+    read_gnu_time(file.path(complete_dir, row$timing_file), row$tool, row$threads, row$run)
+  }))
+  complete_rows <- cbind(complete_rows, times[c("elapsed_seconds", "user_seconds", "system_seconds",
+    "cpu_percent", "maximum_rss_kib")])
+  complete_rows$row_count <- as.numeric(complete_rows$row_count)
+  complete_rows$bytes <- as.numeric(complete_rows$bytes)
+  medians <- aggregate(cbind(elapsed_seconds, maximum_rss_kib, row_count, bytes) ~
+    tool + output_contract + threads, complete_rows, median)
+  cat("Measured source: ", completion$source_revision, "\n", sep = "")
+  cat("FastVEP source: ", metadata[["fastvep_source_revision"]], "\n", sep = "")
+  cat("Output filesystem: ", metadata[["output_filesystem"]], "\n", sep = "")
+  display <- medians
+  display$maximum_rss_kib <- display$maximum_rss_kib / 1024^2
+  display$bytes <- display$bytes / 1024^3
+  knitr::kable(display, digits = 2, format.args = list(big.mark = ","),
+    col.names = c("Tool", "Contract", "Cores", "Median seconds", "Median peak GiB", "Rows", "Output GiB"))
+}
+```
+
+The prepared transcript sets are not identical: DuckVEP's VEP-filtered model
+from Ensembl-116 core/funcgen dumps contains 644,427 transcripts; FastVEP's
+Ensembl-116 GFF3 cache contains 646,577. They use the same reference release
+and primary FASTA. All expanded output rows remain counted; these pipeline
+timings do not establish whole-GIAB field concordance or use an intersection-only
+denominator. The eight-model field differential is separate evidence.
+
+Measurements ran on a shared host. The first one-core DuckVEP CSQ observation
+overlapped synthetic report checks for about 26.3 seconds and a later 1.6-second
+replay check (September 13, 22:26–22:27 Europe/Berlin). The report checks did not
+cap DuckDB thread pools. Their timing effect is unknown; the observation remains
+in the three-run median. No host-isolation claim is made.
+
+Final CSQ files carry `record_index` and `alt_index` followed by the 32 common
+fields. Both engines write this 34-column transport; the native and operational
+contracts remain 17 columns. An independent source map retains every physical
+record/ALT ordinal, including explicitly excluded nonliteral alleles. Final-file
+coverage checks reject missing eligible ALTs, unknown output keys and ambiguous
+identity. Different deletion ALTs can share a displayed `Allele`, so row
+fingerprints alone do not establish source-allele coverage.
+The exact GIAB map remains in the registered artifact cache; its provenance and
+digest accompany the measurements. Rendering verifies that retained object and
+the empty failure-witness files without rebuilding either.
+The [retained incomplete run](data/duckvep_fastvep/field_contracts_incomplete_0d2bdcb)
+stopped when the native projection exhausted the
+available spill disk; it has no completion receipt or published timing median.
+An [incomplete verification run](data/duckvep_fastvep/field_contracts_incomplete_9bf888e)
+retains three successful output timings. Its CSQ source-coverage check was
+terminated after its query plan exposed an all-pairs join. It does not supply
+the repeated timing matrix; coverage now joins validated numeric identities by hash.
+The [CSQ conversion capacity failure](data/duckvep_fastvep/field_contracts_incomplete_e63d0a1)
+retains four verified observations and the fifth observation's failed timing.
+FastVEP annotation completed, but VCF-to-table conversion exhausted the 8 GB
+spill cap at 16 GB query memory. This run has no completion receipt or median.
+
+```{r native-capacity-diagnostic, include=FALSE}
+capacity_dir <- file.path(data_dir, "native_capacity_c183")
+capacity_manifest <- read.delim(file.path(capacity_dir, "artifacts.tsv"), colClasses = "character")
+stopifnot(!anyDuplicated(capacity_manifest$path),
+  all(basename(capacity_manifest$path) == capacity_manifest$path),
+  identical(unname(vapply(file.path(capacity_dir, capacity_manifest$path),
+    function(path) digest::digest(file = path, algo = "sha256"), character(1L))), capacity_manifest$sha256))
+capacity <- read.csv(file.path(capacity_dir, "native16gb.csv"), colClasses = "character")
+capacity_coverage <- read.csv(file.path(capacity_dir, "native16gb.coverage.csv"), colClasses = "character")
+stopifnot(nrow(capacity) == 1L, nrow(capacity_coverage) == 1L,
+  capacity$row_count == "47629345", capacity$timing_file == "",
+  capacity_coverage$passed == "TRUE", capacity_coverage$covered_alleles == "4095611",
+  capacity_coverage$missing_alleles == "0", capacity_coverage$unknown_alleles == "0",
+  capacity_coverage$ambiguous_alleles == "0", capacity_coverage$output_sha256 == capacity$sha256,
+  capacity_coverage$failures_file == "native16gb.coverage.failures.parquet",
+  capacity_coverage$failures_file %in% capacity_manifest$path,
+  capacity_coverage$failures_sha256 == capacity_manifest$sha256[
+    match(capacity_coverage$failures_file, capacity_manifest$path)])
+capacity_con <- DBI::dbConnect(duckdb::duckdb())
+tryCatch({
+  path <- DBI::dbQuoteString(capacity_con, file.path(capacity_dir, capacity_coverage$failures_file))
+  DBI::dbExecute(capacity_con, paste0("CREATE TEMP VIEW retained_failures AS SELECT * FROM read_parquet(", path, ")"))
+  stopifnot(identical(DBI::dbListFields(capacity_con, "retained_failures"),
+    c("failure", "output_key", "record_index", "alt_index", "output_rows", "source_matches")),
+    DBI::dbGetQuery(capacity_con, "SELECT count(*) n FROM retained_failures")$n == 0)
+}, finally = DBI::dbDisconnect(capacity_con, shutdown = TRUE))
+```
+
+A separate [capacity diagnostic](data/duckvep_fastvep/native_capacity_c183)
+completed the whole-GIAB native-tab projection at 16 GB query memory and an
+8 GB spill cap: `r capacity$row_count` rows, `r capacity$bytes` output bytes,
+and all `r capacity_coverage$covered_alleles` eligible source ALTs covered.
+The same spill cap was exhausted at 4 GB and 8 GB query memory. This untimed,
+unbound diagnostic does not supply a performance observation, CSQ validation
+or the required repeated one-/four-core matrix.
+
+The paired runner uses one and four assigned cores, three fresh-process
+observations per configuration, the same registered whole-GIAB input and local
+file output. DuckVEP includes input sorting and transcript metadata joins. FastVEP's
+CSQ measurement includes its native VCF output and extraction into the common
+flat field relation. Its cache includes coding and noncoding spliced sequences;
+cache preparation is outside timing, and scans must leave it unchanged. Neither
+run loads supplementary annotation providers.
+`--memory-limit` and `--max-spill` set per-process DuckDB memory and spill caps;
+their defaults are 4 GB and 8 GB. Spill files use a private temporary directory.
+Published runs require `--fastvep-build-receipt` from a fresh pinned-source build
+in an empty Cargo target directory. Git object hashes authenticate the retained
+commit and every directory in its tree; exported file bytes are checked before
+and after compilation. Inherited Rust and native compiler overrides are cleared
+for the build. The receipt binds the lockfile, Rust toolchain, flags and binary.
+Earlier receipt formats require the independent `fastvep_verified_commit_tree`
+bundle, matching those same identities and executable bytes. Original execution
+bindings and artifacts remain unchanged; the supplementary proof does not claim
+that earlier runs used the current builder.
+Source/model/reference identities, input record and ALT counts, elapsed/user/
+system time, CPU utilization, peak RSS, bytes and complete output fingerprints
+are retained beside a completion manifest. Partial or failed runs cannot
+populate the table above.
+
+Choose fresh output directories for another run; published evidence is not overwritten.
+
+```{bash, eval=FALSE, echo=TRUE}
+Rscript r/duckhtsbench/scripts/build_fastvep.R \
+  --checkout .sync/fastVEP --output build/fastvep-pinned
+Rscript r/duckhtsbench/scripts/stage_fastvep.R \
+  --checkout .sync/fastVEP --executable build/fastvep-pinned/fastvep
+Rscript benchmarks/benchmark_duckvep_fastvep_run.R \
+  --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv \
+  --memory-limit 16GB --max-spill 8GB \
+  --output benchmarks/data/duckvep_fastvep/field_contracts
+Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
+  --vep-prefix "$VEP_PREFIX" --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" \
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv
+# Replay a retained unique-ID record without generation or relabelling.
+Rscript benchmarks/benchmark_duckvep_fastvep_field_conformance.R \
+  --case noncoding_first_exon_phase1 --replay-input "$REPLAY_VCF" \
+  --vep-prefix "$VEP_PREFIX" --fastvep build/fastvep-pinned/fastvep \
+  --fastvep-build-receipt build/fastvep-pinned/build.tsv
+```
+
+To package a completed field campaign, set `FIELD_CAMPAIGN` to its execution
+directory and `FIELD_PACK` to a new directory under `benchmarks/data/duckvep_fastvep`:
+
+```{bash, eval=FALSE, echo=TRUE}
+Rscript benchmarks/benchmark_duckvep_fastvep_publish.R \
+  --source "$FIELD_CAMPAIGN" --output "$FIELD_PACK"
+```
+
+Replay every discrepancy-bearing physical record independently, preserving its
+alleles and model, with one CPU ID per worker:
+
+```{bash, eval=FALSE, echo=TRUE}
+Rscript benchmarks/benchmark_duckvep_fastvep_replay.R \
+  --evidence "$FIELD_PACK" --output "$REPLAY_PACK" \
+  --extension-receipt "$DUCKHTS_EXTENSION_RECEIPT" --vep-prefix "$VEP_PREFIX" \
+  --fastvep build/fastvep-pinned/fastvep --fastvep-build-receipt build/fastvep-pinned/build.tsv \
+  --jobs 4 --cpus 2,4,6,8
+```
+
+The pack retains source VCFs, model GFFs, comparison Parquets, logs, receipts and
+the three hash-checked registry fixture inputs. Raw annotation TSV/VCF outputs
+use deterministic gzip with decompressed-byte verification. It preserves the
+execution manifest and adds a relative artifact manifest. Regenerable models,
+FastVEP caches and private VEP directories are excluded; a duplicate generated
+VCF is omitted only when its bytes match a recorded retained counterpart.
+Packaging preserves disagreements and does not certify conformance.
+
+## Compact-output revisions and input receipts
 
 ```{r receipt-table}
 current_worker_sha256 <- strsplit(system2(
@@ -1631,15 +2110,18 @@ is the single-core condition; FastVEP uses CPU sets `2`, `2,4`, `2,4,6,8`, and
 process-level maximum RSS. All measurements used a warm local filesystem page
 cache and do not claim cold-storage or `fsync` latency.
 
-## Reproduction
+## Reproducing the compact-output measurements
 
 The exact measured command lines are retained verbatim in the checked-in GNU
 time files. The DuckVEP worker is
 `benchmarks/benchmark_duckvep_fastvep_worker.R`; it owns the SQL and exposes
 `--threads`, `--distance`, `--memory-limit`, and optional `--profile-json`.
-FastVEP was built with:
+These commands require FastVEP revision
+`7038e7c17708e7d2226149e78e0bb297bcc6d1d6` and its matching cache. They do not
+apply to the complete-field revision or cache. Verify the checkout before building:
 
 ```{bash, eval=FALSE, echo=TRUE}
+test "$(git -C .sync/fastVEP rev-parse HEAD)" = 7038e7c17708e7d2226149e78e0bb297bcc6d1d6
 env RUSTFLAGS='-C target-cpu=native' cargo build \
   --manifest-path .sync/fastVEP/Cargo.toml --release --locked
 ```

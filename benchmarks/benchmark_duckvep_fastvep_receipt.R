@@ -31,6 +31,11 @@ op <- add_option(
   default = 0L
 )
 op <- add_option(op, "--output", default = "")
+op <- add_option(op, "--source-map", dest = "source_map", default = "")
+op <- add_option(op, "--source-sha256", dest = "source_sha256", default = "")
+op <- add_option(op, "--coverage-output", dest = "coverage_output", default = "")
+op <- add_option(op, "--memory-limit", dest = "memory_limit", default = "4GB")
+op <- add_option(op, "--max-spill", dest = "max_spill", default = "8GB")
 opt <- parse_args(op)
 
 die <- function(...) stop(glue(..., .envir = parent.frame()), call. = FALSE)
@@ -43,22 +48,41 @@ if (!nzchar(opt$tool) || !nzchar(opt$output_contract) || !nzchar(opt$output)) {
 if (opt$threads < 1L || opt$run < 1L || opt$skip_lines < 0L) {
   die("--threads and --run must be positive; --skip-lines must be non-negative")
 }
+coverage_options <- nzchar(c(opt$source_map, opt$source_sha256, opt$coverage_output))
+if (any(coverage_options) && !all(coverage_options)) {
+  die("--source-map, --source-sha256 and --coverage-output are required together")
+}
+check_coverage <- all(coverage_options)
+if (check_coverage && (!file.exists(opt$source_map) || !grepl("^[0-9a-f]{64}$", opt$source_sha256))) {
+  die("source map must exist and source SHA256 must be a lowercase digest")
+}
 
 input <- normalizePath(opt$input)
 drv <- duckdb(dbdir = ":memory:")
 con <- dbConnect(drv)
 on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
 input_sql <- as.character(dbQuoteString(con, input))
+dbExecute(con, paste("SET threads =", opt$threads))
+dbExecute(con, paste("SET memory_limit =", dbQuoteString(con, opt$memory_limit)))
+dbExecute(con, paste("SET max_temp_directory_size =", dbQuoteString(con, opt$max_spill)))
+dbExecute(con, paste("SET temp_directory =", dbQuoteString(con, file.path(tempdir(), "duckdb"))))
+if (check_coverage) {
+  script <- sub("^--file=", "", commandArgs()[startsWith(commandArgs(), "--file=")])
+  source(file.path(dirname(script), "benchmark_duckvep_fastvep_fields.R"))
+  relation <- duckvep_fastvep_tab_relation(con, input,
+    duckvep_fastvep_transport_fields(opt$output_contract))
+} else {
+  relation <- glue("read_csv({input_sql}, delim = '\\t', header = true,
+    skip = {opt$skip_lines}, quote = '', escape = '', all_varchar = true)")
+}
+dbExecute(con, paste("CREATE TEMP VIEW fastvep_receipt_output AS SELECT * FROM", relation))
 
 fingerprint <- dbGetQuery(
   con,
   glue(
     "WITH rows AS (
        SELECT hash(row(*COLUMNS(*)))::UBIGINT AS h
-       FROM read_csv(
-         {input_sql}, delim = '\\t', header = true, skip = {opt$skip_lines},
-         quote = '', escape = '', all_varchar = true
-       )
+       FROM fastvep_receipt_output
      ), receipt AS (
        SELECT
          count(*)::UBIGINT AS row_count,
@@ -76,8 +100,16 @@ fingerprint <- dbGetQuery(
   )
 )
 
-sha256 <- strsplit(system2("sha256sum", input, stdout = TRUE), " +")[[1L]][1L]
-lines <- strsplit(system2("wc", c("-l", input), stdout = TRUE), " +")[[1L]]
+file_sha256 <- function(path) {
+  result <- system2("sha256sum", shQuote(path), stdout = TRUE)
+  value <- strsplit(result, " +")[[1L]][1L]
+  if (!is.null(attr(result, "status")) || !grepl("^[0-9a-f]{64}$", value)) {
+    die("cannot hash artifact: {path}")
+  }
+  value
+}
+sha256 <- file_sha256(input)
+lines <- strsplit(system2("wc", c("-l", shQuote(input)), stdout = TRUE), " +")[[1L]]
 lines <- lines[nzchar(lines)][[1L]]
 timing_file <- if (nzchar(opt$timing_file)) basename(opt$timing_file) else ""
 
@@ -101,3 +133,19 @@ receipt <- data.frame(
 
 dir.create(dirname(opt$output), recursive = TRUE, showWarnings = FALSE)
 utils::write.csv(receipt, opt$output, row.names = FALSE, quote = TRUE)
+if (check_coverage) {
+  dir.create(dirname(opt$coverage_output), recursive = TRUE, showWarnings = FALSE)
+  failures <- paste0(sub("\\.csv$", "", opt$coverage_output), ".failures.parquet")
+  coverage <- duckvep_fastvep_source_coverage(con, "fastvep_receipt_output",
+    opt$source_map, opt$output_contract, failures)
+  if (as.character(coverage$output_rows) != fingerprint$row_count) {
+    die("source coverage changed the final output row denominator")
+  }
+  coverage <- cbind(data.frame(tool = opt$tool, output_contract = opt$output_contract,
+    threads = opt$threads, run = opt$run, scope = "final_output",
+    input_sha256 = opt$source_sha256, output_sha256 = sha256,
+    source_map_sha256 = file_sha256(opt$source_map),
+    failures_file = basename(failures), failures_sha256 = file_sha256(failures)), coverage)
+  utils::write.csv(coverage, opt$coverage_output, row.names = FALSE, quote = TRUE)
+  if (!coverage$passed) die("final output failed physical source-ALT coverage; see {opt$coverage_output}")
+}
