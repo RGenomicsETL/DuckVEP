@@ -73,8 +73,9 @@ main <- function() {
   }
   Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
   registry <- duckhts_bench_registry()
+  cache_id <- "fastvep_ensembl116_duckvep_matched_cache"
   fastvep_identity <- duckhts_bench_identity_fields(
-    registry$supplier_identity[registry$id == "fastvep_ensembl116_cache"])
+    registry$supplier_identity[registry$id == cache_id])
   fastvep_build <- if (!is.null(opt$fastvep_build_receipt)) {
     duckhts_bench_read_fastvep_build(opt$fastvep_build_receipt,
       fastvep_identity[["source_commit"]], opt$fastvep)
@@ -87,16 +88,23 @@ main <- function() {
     duckvep_evidence_read_extension_receipt(opt$extension_receipt, root, extension, revision)
     if (opt$repetitions < 3L) stop("published paired observations require at least three repetitions")
   }
-  staged <- duckhts_bench_stage_fastvep(root, opt$checkout, opt$fastvep)
+  staged <- duckhts_bench_stage_fastvep(root, opt$checkout, opt$fastvep, cache_id = cache_id)
   inputs <- c(input = opt$input_id, model = "duckvep_ensembl116_model",
-    fasta = "ensembl116_grch38_fasta_fa", gff3 = "ensembl116_grch38_gff3")
+    fasta = "ensembl116_grch38_fasta_fa", gff3 = "fastvep_ensembl116_duckvep_gff3")
   paths <- vapply(inputs, duckhts_bench_artifact_path, character(1L))
   if (!all(file.exists(paths))) stop("all registered benchmark inputs must be staged first")
   for (id in inputs) duckhts_bench_validate_identity(id, duckhts_bench_artifact_path(id))
   identity <- duckhts_bench_identity_fields(
     registry$supplier_identity[registry$id == inputs[["model"]]])
-  duckhts_bench_validate_duckvep_ensembl116_model(paths[["model"]], extension,
-    identity[["source_manifest_sha256"]])
+  model_receipt <- duckhts_bench_validate_duckvep_ensembl116_model(
+    paths[["model"]], extension, identity[["source_manifest_sha256"]]
+  )
+  matched_receipt <- duckhts_bench_fastvep_model_gff_receipt(paths[["gff3"]])
+  if (matched_receipt[["model_sha256"]] != as.character(model_receipt$model_sha256[[1L]]) ||
+      matched_receipt[["model_sha256"]] != fastvep_identity[["model_sha256"]] ||
+      matched_receipt[["transcript_count"]] != fastvep_identity[["transcripts"]]) {
+    stop("FastVEP GFF3 is not bound to the exact DuckVEP model inventory")
+  }
   if (!dir.create(opt$output, recursive = TRUE)) stop("could not create a new output directory")
   work <- tempfile("duckvep-fastvep-", tmpdir = normalizePath(opt$work_dir, mustWork = TRUE))
   dir.create(work)
@@ -134,6 +142,11 @@ main <- function() {
     extension = extension, fastvep = normalizePath(opt$fastvep),
     cache = staged[["cache"]], cache_receipt = staged[["receipt"]], source_map = source_map,
     stats::setNames(source_files, basename(source_files)))
+  matched_gff_receipt <- file.path(opt$output, "matched_gff_receipt.tsv")
+  if (!file.copy(staged[["gff3_receipt"]], matched_gff_receipt)) {
+    stop("could not retain model-matched GFF3 provenance")
+  }
+  bound_files <- c(bound_files, matched_gff_receipt = matched_gff_receipt)
   if (!is.null(source_bundle)) {
     if (!file.copy(source_bundle[["receipt"]], file.path(opt$output, "source_map_receipt.tsv"))) {
       stop("could not retain registered source-map provenance")
@@ -170,6 +183,9 @@ main <- function() {
     fastvep_source_revision = duckvep_evidence_command("git", c("-C", opt$checkout,
       "rev-parse", "HEAD"), "cannot identify FastVEP source"),
     fastvep_version = duckvep_evidence_command(opt$fastvep, "--version", "cannot identify FastVEP executable"),
+    fastvep_cache_id = cache_id,
+    matched_model_sha256 = duckhts_bench_fastvep_model_gff_receipt(paths[["gff3"]])[["model_sha256"]],
+    matched_transcripts = fastvep_identity[["transcripts"]],
     input_id = opt$input_id, input_records = counts$records, input_alt_alleles = counts$alt_alleles,
     eligible_literal_alleles = counts$eligible_literal_alleles,
     r_version = R.version.string, duckdb_version = as.character(utils::packageVersion("duckdb")),

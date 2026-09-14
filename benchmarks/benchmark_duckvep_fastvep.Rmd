@@ -1857,8 +1857,36 @@ if (!file.exists(completion_path)) {
   source(file.path(root, "r/duckhtsbench/R/fastvep_source.R"))
   Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
   registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"), check.names = FALSE)
+  cache_id <- if ("fastvep_cache_id" %in% names(metadata)) metadata[["fastvep_cache_id"]] else
+    cache[["artifact_id"]]
   identity <- duckhts_bench_identity_fields(registry$supplier_identity[
-    registry$id == "fastvep_ensembl116_cache"])
+    registry$id == cache_id])
+  stopifnot(length(identity) > 0L, cache[["artifact_id"]] == cache_id)
+  if (cache_id == "fastvep_ensembl116_duckvep_matched_cache") {
+    stopifnot("matched_gff_receipt.tsv" %in% manifest$file,
+      "matched_gff_receipt" %in% names(input_hashes))
+    matched_table <- read_receipt(file.path(complete_dir, "matched_gff_receipt.tsv"),
+      c("field", "value"), sep = "\t")
+    stopifnot(!anyDuplicated(matched_table$field))
+    matched <- setNames(matched_table$value, matched_table$field)
+    difference_fields <- c("transcript_model_only", "transcript_source_only",
+      "exon_model_only", "exon_source_only", "cds_model_only", "cds_source_only")
+    count_fields <- c("transcript_count", "gene_count", "exon_count", "cds_segment_count")
+    digest_fields <- c("source_gff3_sha256", "model_sha256", "transcript_inventory_sha256",
+      "exon_geometry_sha256", "cds_geometry_sha256", "filtered_gff3_sha256")
+    stopifnot(matched[["schema"]] == "duckvep_fastvep_matched_gff_v1",
+      matched[["proof"]] == "initial_derivation_six_except_all",
+      matched[["model_sha256"]] == metadata[["matched_model_sha256"]],
+      matched[["model_sha256"]] == identity[["model_sha256"]],
+      matched[["transcript_count"]] == metadata[["matched_transcripts"]],
+      matched[["transcript_count"]] == identity[["transcripts"]],
+      all(grepl("^[1-9][0-9]*$", matched[count_fields])),
+      all(grepl("^[0-9a-f]{64}$", matched[digest_fields])),
+      matched[["filtered_gff3_sha256"]] == input_hashes[["gff3"]],
+      sha256(file.path(complete_dir, "matched_gff_receipt.tsv")) ==
+        input_hashes[["matched_gff_receipt"]],
+      all(matched[difference_fields] == "0"))
+  }
   build <- duckhts_bench_read_fastvep_build(file.path(complete_dir, "fastvep_build.tsv"),
     identity[["source_commit"]], verification_receipt =
       if (metadata[["fastvep_binding"]] %in%
@@ -1978,6 +2006,9 @@ if (!file.exists(completion_path)) {
 ```
 
 ```{r complete-field-comparison}
+if (cache_id == "fastvep_ensembl116_duckvep_matched_cache") {
+  cat("No historical timing comparison is reported: the retained full-GFF FastVEP runs used a different transcript inventory.\n")
+} else {
 previous_dir <- file.path(data_dir, "field_contracts")
 previous_completion <- read_receipt(file.path(previous_dir, "completion.csv"),
   c("source_revision", "completed", "binding", "observations", "repetitions",
@@ -2050,22 +2081,22 @@ knitr::kable(comparison[c("tool", "output_contract", "threads",
   digits = 2,
   col.names = c("Tool", "Contract", "Cores", "Previous seconds", "Current seconds",
     "Elapsed change (%)", "Previous peak GiB", "Current peak GiB"))
+}
 ```
 
-The prepared transcript sets are not identical: DuckVEP's VEP-filtered model
-from Ensembl-116 core/funcgen dumps contains 644,427 transcripts; FastVEP's
-Ensembl-116 GFF3 cache contains 646,577. They use the same reference release
-and primary FASTA. All expanded output rows remain counted; these pipeline
-timings do not establish whole-GIAB field concordance or use an intersection-only
-denominator. The eight-model field differential is separate evidence.
+`r if (cache_id == "fastvep_ensembl116_duckvep_matched_cache") {
+  "DuckVEP and FastVEP use the same 644,427 Ensembl-116 transcripts. The staged GFF3 receipt proves exact transcript ID/version, region, span and strand equality, exact exon geometry and phase equality, and exact CDS geometry and phase equality before FastVEP cache construction. No output row or transcript intersection is applied."
+} else {
+  "The prepared transcript sets are not identical: DuckVEP's VEP-filtered model from Ensembl-116 core/funcgen dumps contains 644,427 transcripts; FastVEP's Ensembl-116 GFF3 cache contains 646,577. They use the same reference release and primary FASTA. All expanded output rows remain counted; these pipeline timings do not establish whole-GIAB field concordance or use an intersection-only denominator."
+}` The eight-model field differential is separate evidence.
 
 The previous source-bound matrix remains in
-[field_contracts](data/duckvep_fastvep/field_contracts). The comparison table
-uses identical input, output, affinity, memory and spill contracts from the two
-hash-checked packs. Measurements ran on a shared host, so the observed median
-changes are not an isolated estimate of this patch's cost and no host-isolation
-claim is made. No DuckHTS build, test or benchmark ran concurrently with the
-current matrix.
+[field_contracts](data/duckvep_fastvep/field_contracts). `r if (cache_id ==
+"fastvep_ensembl116_duckvep_matched_cache") {
+  "It is not a timing baseline for this matched-model run because its FastVEP transcript inventory differs. Measurements ran on a shared host, so no host-isolation claim is made."
+} else {
+  "The comparison table uses identical input, output, affinity, memory and spill contracts from the two hash-checked packs. Measurements ran on a shared host, so the observed median changes are not an isolated estimate of this patch's cost and no host-isolation claim is made."
+}` No DuckHTS build, test or benchmark ran concurrently with the current matrix.
 
 Final CSQ files carry `record_index` and `alt_index` followed by the 32 common
 fields. Both engines write this 34-column transport; the native and operational
