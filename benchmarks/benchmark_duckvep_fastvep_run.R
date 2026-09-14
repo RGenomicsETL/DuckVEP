@@ -88,7 +88,8 @@ main <- function() {
     duckvep_evidence_read_extension_receipt(opt$extension_receipt, root, extension, revision)
     if (opt$repetitions < 3L) stop("published paired observations require at least three repetitions")
   }
-  staged <- duckhts_bench_stage_fastvep(root, opt$checkout, opt$fastvep, cache_id = cache_id)
+  staged <- duckhts_bench_stage_fastvep(root, opt$checkout, opt$fastvep,
+    cache_id = cache_id, extension = extension)
   inputs <- c(input = opt$input_id, model = "duckvep_ensembl116_model",
     fasta = "ensembl116_grch38_fasta_fa", gff3 = "fastvep_ensembl116_duckvep_gff3")
   paths <- vapply(inputs, duckhts_bench_artifact_path, character(1L))
