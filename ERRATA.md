@@ -115,6 +115,7 @@ question VEP answers.
 | --- | --- |
 | Retained REF bases | Equal-length uploaded spans determine local peptide windows. They can change start/stop terms even when the differing base is identical. Complete uploaded REF still requires validation. |
 | CDS phase | Displayed CDS/protein coordinates use the first transcript exon phase; stored CDS padding uses the first coding exon phase. These may differ when CDS begins in a later exon. |
+| Clipped HGVS coordinates | VEP orders clipped transcript-coordinate pairs numerically, except when the second coordinate is in the 3′ UTR. On reverse transcripts, a shifted insertion immediately below transcript start can use a `+1` offset from the terminal exon base. |
 | UTR and mapper gaps | A feature crossing the 3′ CDS end may lose peptide annotation, while one crossing the 5′ CDS start can retain start predicates. Empty annotated UTR intervals can still produce UTR terms for spanning features. |
 | Partial codons and stops | Partial-codon status depends on sequence length and first affected peptide position, not only an attribute. Terminal coordinate tests, local peptides and raw-CDS fallback translation can disagree, including after reference peptide edits. |
 | Predicate combinations | Start-lost/start-retained and stop-retained/protein-altering can coexist. In-frame insertion is not determined by length modulo three; deletion and insertion use different predicates. |
@@ -195,8 +196,10 @@ HGVS is not simply a walk along spliced CDS.
   ordinary insertion flanks. These operations must not rewrite source coordinates or
   consequence events; `shift_hgvs` is not `shift_3prime` or `shift_genomic`.
 - Literal exonic SNPs have a phase-aware HGVS coordinate path that MNVs and indels do
-  not share. A transcript-flank consequence can legitimately have no transcript HGVS;
-  missing reference or failed REF validation is instead unresolved.
+  not share. Its displayed CDS position follows the first transcript exon phase, while
+  physical CDS storage follows the first coding exon phase. A transcript-flank consequence
+  can legitimately have no transcript HGVS; missing reference or failed REF validation is
+  instead unresolved.
 - Protein notation uses cached unshifted start/stop predicates and independently
   reconstructed frameshift state. Shared peptide clipping, terminal insertion flanks
   and stop-loss precedence affect both strings and applicability.
