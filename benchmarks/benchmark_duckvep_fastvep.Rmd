@@ -1988,7 +1988,8 @@ their defaults are 4 GB and 8 GB. Spill files use a private temporary directory.
 Published runs require `--fastvep-build-receipt` from a fresh pinned-source build
 in an empty Cargo target directory. Git object hashes authenticate the retained
 commit and every directory in its tree; exported file bytes are checked before
-and after compilation. The receipt binds the lockfile, compiler, flags and binary.
+and after compilation. Inherited Rust and native compiler overrides are cleared
+for the build. The receipt binds the lockfile, Rust toolchain, flags and binary.
 Earlier receipt formats require the independent `fastvep_verified_commit_tree`
 bundle, matching those same identities and executable bytes. Original execution
 bindings and artifacts remain unchanged; the supplementary proof does not claim
