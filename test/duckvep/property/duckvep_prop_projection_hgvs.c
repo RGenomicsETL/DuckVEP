@@ -4242,6 +4242,222 @@ TEST hgvs_shift_stops_at_vep_1000_base_cap(void) {
     PASS();
 }
 
+struct kprop_projection_variant {
+    duckvep_variant_batch_t batch;
+    duckvep_event_t event;
+    uint16_t chrom;
+    uint32_t position, end, ref_offset, alt_offset;
+    uint16_t ref_length, alt_length;
+    uint8_t kind, bytes[64];
+};
+
+static int kprop_projection_variant_open(
+    struct kprop_projection_variant *variant, uint16_t chrom,
+    uint32_t position, const char *reference, const char *alternate) {
+
+    size_t reference_length, alternate_length;
+
+    if (variant == NULL || reference == NULL || alternate == NULL) return 0;
+    reference_length = strlen(reference);
+    alternate_length = strlen(alternate);
+    if (reference_length > UINT16_MAX || alternate_length > UINT16_MAX ||
+        reference_length + alternate_length > sizeof variant->bytes ||
+        reference_length == 0u) return 0;
+    memset(variant, 0, sizeof *variant);
+    memcpy(variant->bytes, reference, reference_length);
+    memcpy(variant->bytes + reference_length, alternate, alternate_length);
+    if (!duckvep_event_prepare_small(
+            position, variant->bytes, (uint16_t)reference_length,
+            variant->bytes + reference_length, (uint16_t)alternate_length,
+            &variant->event)) return 0;
+    variant->event.chrom_id = chrom;
+    variant->chrom = chrom;
+    variant->position = position;
+    variant->end = position + (uint32_t)reference_length - 1u;
+    variant->alt_offset = (uint32_t)reference_length;
+    variant->ref_length = (uint16_t)reference_length;
+    variant->alt_length = (uint16_t)alternate_length;
+    variant->kind = variant->event.kind;
+    variant->batch.chrom_id = &variant->chrom;
+    variant->batch.pos1 = &variant->position;
+    variant->batch.end1 = &variant->end;
+    variant->batch.ref_offset = &variant->ref_offset;
+    variant->batch.alt_offset = &variant->alt_offset;
+    variant->batch.ref_length = &variant->ref_length;
+    variant->batch.alt_length = &variant->alt_length;
+    variant->batch.variant_kind = &variant->kind;
+    variant->batch.allele_bytes = variant->bytes;
+    variant->batch.allele_bytes_len = reference_length + alternate_length;
+    variant->batch.count = 1u;
+    return 1;
+}
+
+TEST transcript_projection_facts_known_contract(void) {
+    struct kprop_proj_scene scene = {0};
+    struct kprop_projection_variant variant;
+    duckvep_transcript_projection_facts_t facts;
+
+    scene.chrom = 0u;
+    scene.tstart = scene.cds_s = 10u;
+    scene.tend = scene.cds_e = 30u;
+    scene.strand = (int8_t)1;
+    scene.flags = DUCKVEP_TX_HAS_TRANSLATION |
+                  DUCKVEP_TX_BIOTYPE_PROTEIN_CODING;
+    scene.excnt = 2u;
+    scene.es[0] = 10u; scene.ee[0] = 18u;
+    scene.cs[0] = 1u; scene.ce[0] = 9u;
+    scene.es[1] = 25u; scene.ee[1] = 30u;
+    scene.cs[1] = 10u; scene.ce[1] = 15u;
+    kprop_proj_scene_finish(&scene);
+
+    ASSERT(kprop_projection_variant_open(&variant, scene.chrom, 13u, "A", "G"));
+    ASSERT(duckvep_transcript_projection_facts_fill(
+        &scene.tx, &scene.ex, &variant.batch, 0u, 0u, &variant.event,
+        (uint32_t)DUCKVEP_REGION_CDS, NULL, &facts));
+    ASSERT_EQ(4u, facts.cdna_start); ASSERT_EQ(4u, facts.cdna_end);
+    ASSERT_EQ(4u, facts.cds_start); ASSERT_EQ(4u, facts.cds_end);
+    ASSERT_EQ(2u, facts.protein_start); ASSERT_EQ(2u, facts.protein_end);
+    ASSERT_EQ(1u, facts.exon_first); ASSERT_EQ(1u, facts.exon_last);
+    ASSERT_EQ(2u, facts.exon_total); ASSERT_EQ(1u, facts.intron_total);
+    ASSERT_EQ('G', duckvep_transcript_projection_output_allele_base(&facts, 0u));
+
+    ASSERT(kprop_projection_variant_open(&variant, scene.chrom, 12u, "G", "GAAA"));
+    ASSERT(duckvep_transcript_projection_facts_fill(
+        &scene.tx, &scene.ex, &variant.batch, 0u, 0u, &variant.event,
+        (uint32_t)DUCKVEP_REGION_CDS, NULL, &facts));
+    ASSERT(facts.interbase);
+    ASSERT_EQ(3u, facts.cdna_start); ASSERT_EQ(4u, facts.cdna_end);
+    ASSERT_EQ(3u, facts.cds_start); ASSERT_EQ(4u, facts.cds_end);
+
+    ASSERT(kprop_projection_variant_open(
+        &variant, scene.chrom, 17u, "CCAAAAAAGG", "A"));
+    ASSERT(duckvep_transcript_projection_facts_fill(
+        &scene.tx, &scene.ex, &variant.batch, 0u, 0u, &variant.event,
+        (uint32_t)(DUCKVEP_REGION_CDS | DUCKVEP_REGION_INTRON), NULL,
+        &facts));
+    ASSERT_EQ(1u, facts.exon_first); ASSERT_EQ(2u, facts.exon_last);
+    ASSERT_EQ(1u, facts.intron_first); ASSERT_EQ(1u, facts.intron_last);
+
+    ASSERT(kprop_projection_variant_open(&variant, scene.chrom, 5u, "A", "C"));
+    ASSERT(duckvep_transcript_projection_facts_fill(
+        &scene.tx, &scene.ex, &variant.batch, 0u, 0u, &variant.event,
+        (uint32_t)DUCKVEP_REGION_UPSTREAM, NULL, &facts));
+    ASSERT_EQ(0u, facts.cdna_start); ASSERT_EQ(0u, facts.cds_start);
+    ASSERT(facts.has_transcript_distance); ASSERT_EQ(5u, facts.transcript_distance);
+
+    scene.strand = (int8_t)-1;
+    scene.es[0] = 25u; scene.ee[0] = 30u;
+    scene.cs[0] = 1u; scene.ce[0] = 6u;
+    scene.es[1] = 10u; scene.ee[1] = 18u;
+    scene.cs[1] = 7u; scene.ce[1] = 15u;
+    kprop_proj_scene_finish(&scene);
+    ASSERT(kprop_projection_variant_open(&variant, scene.chrom, 13u, "A", "G"));
+    ASSERT(duckvep_transcript_projection_facts_fill(
+        &scene.tx, &scene.ex, &variant.batch, 0u, 0u, &variant.event,
+        (uint32_t)DUCKVEP_REGION_CDS, NULL, &facts));
+    ASSERT_EQ(12u, facts.cdna_start); ASSERT_EQ(12u, facts.cds_start);
+    ASSERT_EQ(4u, facts.protein_start); ASSERT_EQ(2u, facts.exon_first);
+    PASS();
+}
+
+TEST transcript_projection_facts_reuse_coding_window(void) {
+    struct kprop_proj_scene scene = {0};
+    struct kprop_projection_variant variant;
+    duckvep_sequence_pool_t sequences = {0};
+    static const uint8_t cds[] = "ATGAAACCCGGGTAA";
+    uint64_t cds_offset = 0u, flank_offset = 0u;
+    uint32_t cds_length = 15u, empty = 0u;
+    uint8_t codon_table = 1u;
+    duckvep_haplotype_edit_t edits[8];
+    uint8_t alternate_cds[64], reference_peptide[32], alternate_peptide[32];
+    duckvep_coding_context_t context;
+    duckvep_transcript_projection_facts_t facts;
+
+    scene.chrom = 0u;
+    scene.tstart = scene.cds_s = 10u;
+    scene.tend = scene.cds_e = 24u;
+    scene.strand = (int8_t)1;
+    scene.flags = DUCKVEP_TX_HAS_TRANSLATION |
+                  DUCKVEP_TX_BIOTYPE_PROTEIN_CODING;
+    scene.excnt = 1u;
+    scene.es[0] = 10u; scene.ee[0] = 24u;
+    scene.cs[0] = 1u; scene.ce[0] = 15u;
+    kprop_proj_scene_finish(&scene);
+    sequences.cds_bytes = cds;
+    sequences.cds_bytes_len = cds_length;
+    sequences.cds_offset = &cds_offset;
+    sequences.cds_length = &cds_length;
+    sequences.codon_table = &codon_table;
+    sequences.transcript_count = 1u;
+    sequences.flank_bytes = cds;
+    sequences.flank_bytes_len = 0u;
+    sequences.pre_cds_offset = sequences.post_cds_offset = &flank_offset;
+    sequences.pre_cds_length = sequences.post_cds_length = &empty;
+    sequences.flanks_complete = 1u;
+
+    ASSERT(kprop_projection_variant_open(&variant, scene.chrom, 13u, "A", "G"));
+    ASSERT_EQ(DUCKVEP_VARIANT_CODING_CONTEXT_OK,
+        duckvep_variant_feature_coding_context_build_prepared(
+            &scene.tx, &scene.ex, &sequences, &variant.batch, 0u, 0u,
+            scene.strand, &variant.event, 0u, NULL, edits,
+            sizeof edits / sizeof edits[0], alternate_cds,
+            sizeof alternate_cds, reference_peptide,
+            sizeof reference_peptide, alternate_peptide,
+            sizeof alternate_peptide, &context));
+    ASSERT(duckvep_transcript_projection_facts_fill(
+        &scene.tx, &scene.ex, &variant.batch, 0u, 0u, &variant.event,
+        (uint32_t)DUCKVEP_REGION_CDS, &context, &facts));
+    ASSERT(facts.has_coding_window); ASSERT(facts.has_amino_acids);
+    ASSERT_EQ(1u, facts.coding_window.ref_length);
+    ASSERT_EQ(1u, facts.coding_window.alt_length);
+    ASSERT_EQ('K', duckvep_transcript_projection_amino_acid_base(&facts, 0, 0u));
+    ASSERT_EQ('E', duckvep_transcript_projection_amino_acid_base(&facts, 1, 0u));
+    ASSERT_EQ('A', duckvep_transcript_projection_codon_base(&facts, 0, 0u));
+    ASSERT_EQ('a', duckvep_transcript_projection_codon_base(&facts, 0, 1u));
+    ASSERT_EQ('a', duckvep_transcript_projection_codon_base(&facts, 0, 2u));
+    ASSERT_EQ('G', duckvep_transcript_projection_codon_base(&facts, 1, 0u));
+
+    /* A terminal partial codon borrows post-CDS bases for ALT display only.
+     * This is the regression shape that must not emit an embedded NUL. */
+    {
+        static const uint8_t partial_cds[] = "ATGA";
+        static const uint8_t post_cds[] = "A";
+        uint32_t partial_length = 4u, post_length = 1u;
+        uint64_t post_offset = 0u;
+
+        scene.tstart = scene.cds_s = 100u;
+        scene.cds_e = 103u; scene.tend = 104u;
+        scene.es[0] = 100u; scene.ee[0] = 104u;
+        scene.cs[0] = 1u; scene.ce[0] = 5u;
+        kprop_proj_scene_finish(&scene);
+        sequences.cds_bytes = partial_cds;
+        sequences.cds_bytes_len = partial_length;
+        sequences.cds_length = &partial_length;
+        sequences.flank_bytes = post_cds;
+        sequences.flank_bytes_len = post_length;
+        sequences.post_cds_offset = &post_offset;
+        sequences.post_cds_length = &post_length;
+        ASSERT(kprop_projection_variant_open(
+            &variant, scene.chrom, 103u, "A", "C"));
+        ASSERT_EQ(DUCKVEP_VARIANT_CODING_CONTEXT_OK,
+            duckvep_variant_feature_coding_context_build_prepared(
+                &scene.tx, &scene.ex, &sequences, &variant.batch, 0u, 0u,
+                scene.strand, &variant.event, 0u, NULL, edits,
+                sizeof edits / sizeof edits[0], alternate_cds,
+                sizeof alternate_cds, reference_peptide,
+                sizeof reference_peptide, alternate_peptide,
+                sizeof alternate_peptide, &context));
+        ASSERT(duckvep_transcript_projection_facts_fill(
+            &scene.tx, &scene.ex, &variant.batch, 0u, 0u, &variant.event,
+            (uint32_t)DUCKVEP_REGION_CDS, &context, &facts));
+        ASSERT_EQ(1u, facts.coding_window.ref_nt_length);
+        ASSERT_EQ(2u, facts.coding_window.alt_nt_length);
+        ASSERT_EQ('C', duckvep_transcript_projection_codon_base(&facts, 1, 0u));
+        ASSERT_EQ('a', duckvep_transcript_projection_codon_base(&facts, 1, 1u));
+    }
+    PASS();
+}
+
 TEST projection_known_forward_reverse_and_phase(void) {
     duckvep_coding_projection_t p;
     duckvep_event_t event;

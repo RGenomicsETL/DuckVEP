@@ -15,11 +15,12 @@ Supplementary annotation is measured separately.
 Performance depends on the output contract. The [complete-field
 measurements](#complete-field-contracts) compare native tab and common
 CSQ with FastVEP revision `18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6`
-(September 10, 2026), using a separately rebuilt cache. They retain all
-output rows and field disagreements; they do not establish complete VEP
-parity. FastVEP is faster in both complete-field workloads at one and
-four cores in this retained matrix. These are end-to-end pipeline
-measurements, not isolated kernel timings.
+(September 10, 2026), using a cache rebuilt from DuckVEP’s exact
+644,427-transcript inventory. They retain all output rows and field
+disagreements; they do not establish complete VEP parity. DuckVEP is
+faster in both complete-field workloads at one and four cores in this
+retained matrix. These are end-to-end pipeline measurements, not
+isolated kernel timings.
 
 The compact baseline below uses FastVEP `7038e7c` (July 13, 2026). On
 that declared workload, DuckVEP finished 2.55 times faster on one
@@ -65,20 +66,21 @@ resident model.
 
 The four placeholders have different status:
 
-| FastVEP field        | DuckVEP route                                                                                                          | Included here? |
-|:---------------------|:-----------------------------------------------------------------------------------------------------------------------|:---------------|
-| `Existing_variation` | exact allele join to dbSNP, ClinVar, or another named-variant relation                                                 | No             |
-| `DISTANCE`           | one validated projection from VEP feature geometry and transcript endpoints; SQL may render the resulting number       | No             |
-| `FLAGS`              | join requested transcript attributes from the model relation                                                           | No             |
-| `Codons`             | emit the reference/alternate triplets from the coding context the kernel already computed; SQL should only render them | No             |
+| FastVEP field        | DuckVEP route                                                                                                    | Included here? |
+|:---------------------|:-----------------------------------------------------------------------------------------------------------------|:---------------|
+| `Existing_variation` | exact allele join to dbSNP, ClinVar, or another named-variant relation                                           | No             |
+| `DISTANCE`           | one validated projection from VEP feature geometry and transcript endpoints; SQL may render the resulting number | No             |
+| `FLAGS`              | join requested transcript attributes from the model relation                                                     | No             |
+| `Codons`             | derive reference/alternate triplets once with the annotation kernel’s typed transcript-projection facts          | No             |
 
 Thus the comparison credits FastVEP for computing these native values.
 It also shows where DuckVEP can obtain named-variant and transcript
 metadata through ordinary joins without enlarging the consequence model.
-`Codons` comes from `duckvep_transcript_projection`, which exposes
-native coding facts; it is not reconstructed independently in SQL. The
-complete-field comparison below includes that projection. The compact
-timings above do not measure it.
+The complete-field adapter requests typed projection facts from the
+annotation kernel, then formats them after one transcript-metadata join.
+It does not materialize an annotation relation or replay transcript
+projection. The complete-field comparison below includes that fused
+path; the compact timings above do not measure it.
 
 ## Algorithm design: make the repeated biology small
 
@@ -837,51 +839,60 @@ replacing the current full-campaign denominator.
 |-----------------:|-----------------:|-----------------:|-----------------------:|-------------------------:|
 |           10,671 |           10,100 |           30,300 |                 41,942 |                        0 |
 
-    #> Measured source: 329bbe38470760187b8a002d4ca43e6ffd58961f
+    #> Measured source: c28ea6c49fc171a167f06b4691254dbc900550ed
     #> FastVEP source: 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
-    #> Output filesystem: tmpfs
+    #> Output filesystem: ext2/ext3
 
 | Tool    | Contract      | Cores | Median seconds | Median peak GiB |       Rows | Output GiB |
 |:--------|:--------------|:------|---------------:|----------------:|-----------:|-----------:|
-| duckvep | native_tab17  | 1     |         393.45 |           16.84 | 47,629,345 |       5.90 |
-| fastvep | native_tab17  | 1     |         175.89 |            3.44 | 47,845,809 |       5.94 |
-| duckvep | operational17 | 1     |          58.84 |           13.70 | 47,629,345 |       5.75 |
-| duckvep | vep_csq       | 1     |         655.05 |           17.20 | 47,629,345 |       9.05 |
-| fastvep | vep_csq       | 1     |         451.13 |           16.69 | 47,845,809 |       8.26 |
-| duckvep | native_tab17  | 4     |         123.64 |           16.73 | 47,629,345 |       5.90 |
-| fastvep | native_tab17  | 4     |          70.35 |            3.44 | 47,845,809 |       5.94 |
-| duckvep | operational17 | 4     |          28.84 |           13.39 | 47,629,345 |       5.75 |
-| duckvep | vep_csq       | 4     |         194.94 |           17.97 | 47,629,345 |       9.05 |
-| fastvep | vep_csq       | 4     |         149.01 |           18.21 | 47,845,809 |       8.26 |
+| duckvep | native_tab17  | 1     |         144.50 |            7.20 | 47,629,345 |       5.90 |
+| fastvep | native_tab17  | 1     |         175.63 |            3.43 | 47,632,503 |       5.91 |
+| duckvep | operational17 | 1     |          59.64 |           13.70 | 47,629,345 |       5.75 |
+| duckvep | vep_csq       | 1     |         391.01 |            7.26 | 47,629,345 |       9.04 |
+| fastvep | vep_csq       | 1     |         452.60 |           16.68 | 47,632,503 |       8.22 |
+| duckvep | native_tab17  | 4     |          53.31 |            6.95 | 47,629,345 |       5.90 |
+| fastvep | native_tab17  | 4     |          70.97 |            3.43 | 47,632,503 |       5.91 |
+| duckvep | operational17 | 4     |          29.40 |           13.39 | 47,629,345 |       5.75 |
+| duckvep | vep_csq       | 4     |         122.55 |            6.93 | 47,629,345 |       9.04 |
+| fastvep | vep_csq       | 4     |         151.40 |           18.24 | 47,632,503 |       8.22 |
+
+The complete DuckVEP adapter carries projection facts out of the
+annotation kernel and formats them after one transcript-metadata join.
+It does not materialize a whole-genome annotation relation or replay
+transcript projection. The one-core `operational17` median is 59.64
+seconds; adding the current complete native projection raises that
+median to 144.50 seconds while retaining the same output-row count.
+Across the paired complete-output measurements, DuckVEP is 1.22 times
+faster for native output and 1.16 times faster for CSQ on one core; the
+four-core ratios are 1.33 and 1.24.
 
 | Tool    | Contract      | Cores | Previous seconds | Current seconds | Elapsed change (%) | Previous peak GiB | Current peak GiB |
 |:--------|:--------------|:------|-----------------:|----------------:|-------------------:|------------------:|-----------------:|
-| duckvep | native_tab17  | 1     |           391.33 |          393.45 |               0.54 |             16.86 |            16.84 |
-| duckvep | native_tab17  | 4     |           124.42 |          123.64 |              -0.63 |             16.79 |            16.73 |
-| duckvep | operational17 | 1     |            59.09 |           58.84 |              -0.42 |             13.70 |            13.70 |
-| duckvep | operational17 | 4     |            28.93 |           28.84 |              -0.31 |             13.39 |            13.39 |
-| duckvep | vep_csq       | 1     |           653.89 |          655.05 |               0.18 |             17.20 |            17.20 |
-| duckvep | vep_csq       | 4     |           193.16 |          194.94 |               0.92 |             17.98 |            17.97 |
-| fastvep | native_tab17  | 1     |           174.98 |          175.89 |               0.52 |              3.44 |             3.44 |
-| fastvep | native_tab17  | 4     |            70.14 |           70.35 |               0.30 |              3.44 |             3.44 |
-| fastvep | vep_csq       | 1     |           448.61 |          451.13 |               0.56 |             16.69 |            16.69 |
-| fastvep | vep_csq       | 4     |           148.74 |          149.01 |               0.18 |             18.23 |            18.21 |
+| duckvep | native_tab17  | 1     |           392.04 |          144.50 |             -63.14 |             16.85 |             7.20 |
+| duckvep | native_tab17  | 4     |           124.39 |           53.31 |             -57.14 |             16.88 |             6.95 |
+| duckvep | operational17 | 1     |            59.51 |           59.64 |               0.22 |             13.70 |            13.70 |
+| duckvep | operational17 | 4     |            29.32 |           29.40 |               0.27 |             13.39 |            13.39 |
+| duckvep | vep_csq       | 1     |           654.98 |          391.01 |             -40.30 |             17.22 |             7.26 |
+| duckvep | vep_csq       | 4     |           197.08 |          122.55 |             -37.82 |             17.68 |             6.93 |
+| fastvep | native_tab17  | 1     |           175.41 |          175.63 |               0.13 |              3.43 |             3.43 |
+| fastvep | native_tab17  | 4     |            71.20 |           70.97 |              -0.32 |              3.43 |             3.43 |
+| fastvep | vep_csq       | 1     |           449.99 |          452.60 |               0.58 |             16.66 |            16.68 |
+| fastvep | vep_csq       | 4     |           152.65 |          151.40 |              -0.82 |             18.20 |            18.24 |
 
-The prepared transcript sets are not identical: DuckVEP’s VEP-filtered
-model from Ensembl-116 core/funcgen dumps contains 644,427 transcripts;
-FastVEP’s Ensembl-116 GFF3 cache contains 646,577. They use the same
-reference release and primary FASTA. All expanded output rows remain
-counted; these pipeline timings do not establish whole-GIAB field
-concordance or use an intersection-only denominator. The eight-model
-field differential is separate evidence.
+DuckVEP and FastVEP use the same 644,427 Ensembl-116 transcripts. The
+staged GFF3 receipt proves exact transcript ID/version, region, span and
+strand equality, exact exon geometry and phase equality, and exact CDS
+geometry and phase equality before FastVEP cache construction. No output
+row or transcript intersection is applied. The eight-model field
+differential is separate evidence.
 
-The previous source-bound matrix remains in
-[field_contracts](data/duckvep_fastvep/field_contracts). The comparison
-table uses identical input, output, affinity, memory and spill contracts
-from the two hash-checked packs. Measurements ran on a shared host, so
-the observed median changes are not an isolated estimate of this patch’s
-cost and no host-isolation claim is made. No DuckHTS build, test or
-benchmark ran concurrently with the current matrix.
+The previous matched-model source-bound matrix remains in
+[field_contracts_matched_271ce67](data/duckvep_fastvep/field_contracts_matched_271ce67).
+The comparison table uses identical input, output, affinity, memory and
+spill contracts from the two retained packs. Measurements ran on a
+shared host, so the observed median changes are not an isolated estimate
+of this patch’s cost and no host-isolation claim is made. No DuckHTS
+build, test or benchmark ran concurrently with the current matrix.
 
 Final CSQ files carry `record_index` and `alt_index` followed by the 32
 common fields. Both engines write this 34-column transport; the native
@@ -1002,7 +1013,7 @@ disagreements and does not certify conformance.
 | DuckHTS measured checkout           | 2a1c37cf2938e8226a078f19ca429ffeff84de73                         |
 | DuckHTS extension binary            | 53af1444f11bd22092001fe361e36f89bd397f7fcb52af927fefb69378c5281b |
 | DuckVEP measured worker revision    | 44f3e3533c957a798939bda6106c828f0bbea75c                         |
-| DuckVEP current reproduction worker | d4a025b64bb54a9693412171795c6074a87fb2ea9d7b0011ba3782f334ac371b |
+| DuckVEP current reproduction worker | 20fb8a0557db30f9269a265265a6c28ec62db414745468e1af53a979bb43433f |
 | FastVEP checkout                    | 7038e7c17708e7d2226149e78e0bb297bcc6d1d6                         |
 | FastVEP native binary               | b4cb538537646a4eaa494e0ab29978e8ead73009f643e369b4f8ee447e392d5a |
 | FastVEP rebuilt transcript cache    | 00a3357ea30325c9d93f53ce0dabc81cb6542a0fd6d8741e895331935f89f962 |

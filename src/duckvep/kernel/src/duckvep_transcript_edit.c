@@ -8,6 +8,23 @@
 #include <limits.h>
 #include <string.h>
 
+static uint64_t transcript_projection_abs_diff(uint32_t left, uint32_t right) {
+    return left >= right ? (uint64_t)left - (uint64_t)right
+                         : (uint64_t)right - (uint64_t)left;
+}
+
+static void transcript_projection_order_pair(
+    uint32_t first, uint32_t last, uint32_t *lower, uint32_t *upper) {
+
+    if (first != 0u && last != 0u && first > last) {
+        *lower = last;
+        *upper = first;
+    } else {
+        *lower = first;
+        *upper = last;
+    }
+}
+
 static int transcript_edit_model_slice_ok(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t       *exons,
@@ -213,6 +230,253 @@ duckvep_transcript_edit_status_t duckvep_project_transcript_coordinate(
     }
     *out = result;
     return DUCKVEP_TRANSCRIPT_EDIT_OK;
+}
+
+int duckvep_transcript_projection_facts_fill(
+    const duckvep_transcript_model_t *transcripts,
+    const duckvep_exon_model_t       *exons,
+    const duckvep_variant_batch_t    *variants,
+    uint32_t                          variant_idx,
+    size_t                            tx_idx,
+    const duckvep_event_t            *event,
+    uint32_t                          region_mask,
+    const duckvep_coding_context_t   *coding_context,
+    duckvep_transcript_projection_facts_t *out) {
+
+    const uint8_t *feature_ref;
+    const uint8_t *feature_alt;
+    uint16_t feature_ref_length;
+    uint16_t feature_alt_length;
+    uint32_t feature_start1;
+    uint32_t feature_end1;
+    uint32_t first_cdna = 0u;
+    uint32_t last_cdna = 0u;
+    uint32_t raw_cdna_start = 0u;
+    uint32_t raw_cdna_end = 0u;
+    uint32_t raw_cds_start = 0u;
+    uint32_t raw_cds_end = 0u;
+    uint32_t coding_start_cdna;
+    uint32_t coding_end_cdna;
+    uint8_t first_exon_phase;
+    size_t exon_offset;
+    size_t exon_count;
+    size_t i;
+    int insertion;
+    int within_transcript;
+
+    if (out == NULL) return 0;
+    memset(out, 0, sizeof *out);
+    if (transcripts == NULL || exons == NULL || variants == NULL ||
+        event == NULL || tx_idx >= transcripts->transcript_count ||
+        (size_t)variant_idx >= variants->count ||
+        transcripts->flags == NULL ||
+        !transcript_edit_model_slice_ok(transcripts, exons, tx_idx,
+                                        &exon_offset, &exon_count) ||
+        !duckvep_event_feature_alleles(
+            variants, (size_t)variant_idx, event,
+            &feature_ref, &feature_ref_length,
+            &feature_alt, &feature_alt_length)) {
+        return 0;
+    }
+
+    feature_start1 = event->feature_start1;
+    feature_end1 = event->feature_end1;
+    if (feature_start1 == 0u || feature_end1 == 0u) return 0;
+    insertion = feature_start1 > feature_end1;
+    within_transcript = feature_end1 >= transcripts->start1[tx_idx] &&
+                        feature_start1 <= transcripts->end1[tx_idx];
+
+    out->output_allele = feature_alt;
+    out->output_allele_length = (size_t)feature_alt_length;
+    out->feature_ref_length = feature_ref_length;
+    out->feature_alt_length = feature_alt_length;
+    out->interbase = (uint8_t)insertion;
+    out->exon_total = (uint32_t)exon_count;
+    out->intron_total = exon_count > 0u ? (uint32_t)(exon_count - 1u) : 0u;
+    out->cds_start_nf = (uint8_t)((transcripts->flags[tx_idx] &
+        (uint64_t)DUCKVEP_TX_CDS_START_NF) != 0u);
+    out->cds_end_nf = (uint8_t)((transcripts->flags[tx_idx] &
+        (uint64_t)DUCKVEP_TX_CDS_END_NF) != 0u);
+
+    if (transcripts->strand[tx_idx] > 0) {
+        (void)duckvep_project_genomic_to_cdna(
+            transcripts, exons, tx_idx, feature_start1, &first_cdna, NULL);
+        (void)duckvep_project_genomic_to_cdna(
+            transcripts, exons, tx_idx, feature_end1, &last_cdna, NULL);
+    } else {
+        (void)duckvep_project_genomic_to_cdna(
+            transcripts, exons, tx_idx, feature_end1, &first_cdna, NULL);
+        (void)duckvep_project_genomic_to_cdna(
+            transcripts, exons, tx_idx, feature_start1, &last_cdna, NULL);
+    }
+    if (within_transcript) {
+        if (insertion) {
+            raw_cdna_start = first_cdna;
+            if (raw_cdna_start == 0u && last_cdna != 0u &&
+                last_cdna != UINT32_MAX) {
+                raw_cdna_start = last_cdna + 1u;
+            }
+            raw_cdna_end = last_cdna;
+            if (raw_cdna_end == 0u && first_cdna > 1u) {
+                raw_cdna_end = first_cdna - 1u;
+            }
+        } else {
+            raw_cdna_start = first_cdna;
+            raw_cdna_end = last_cdna;
+        }
+    }
+    transcript_projection_order_pair(
+        raw_cdna_start, raw_cdna_end, &out->cdna_start, &out->cdna_end);
+
+    first_exon_phase = exons->phase != NULL &&
+        exons->phase[exon_offset] > 0 ?
+        (uint8_t)exons->phase[exon_offset] : 0u;
+    if (duckvep_project_coding_cdna_bounds(
+            transcripts, exons, tx_idx, &coding_start_cdna,
+            &coding_end_cdna, NULL, NULL)) {
+        int insertion_range_valid = !insertion ||
+            (raw_cdna_start != 0u && raw_cdna_end != 0u &&
+             raw_cdna_start <= coding_end_cdna &&
+             raw_cdna_end >= coding_start_cdna);
+        uint64_t projected;
+
+        if (raw_cdna_start >= coding_start_cdna &&
+            raw_cdna_start <= coding_end_cdna && insertion_range_valid) {
+            projected = (uint64_t)raw_cdna_start - coding_start_cdna +
+                first_exon_phase + 1u;
+            if (projected <= UINT32_MAX) raw_cds_start = (uint32_t)projected;
+        }
+        if (raw_cdna_end >= coding_start_cdna &&
+            raw_cdna_end <= coding_end_cdna && insertion_range_valid) {
+            projected = (uint64_t)raw_cdna_end - coding_start_cdna +
+                first_exon_phase + 1u;
+            if (projected <= UINT32_MAX) raw_cds_end = (uint32_t)projected;
+        }
+    }
+    transcript_projection_order_pair(
+        raw_cds_start, raw_cds_end, &out->cds_start, &out->cds_end);
+    if (raw_cds_start != 0u) {
+        out->protein_start = (raw_cds_start - 1u) / 3u + 1u;
+    }
+    if (raw_cds_end != 0u) {
+        out->protein_end = (raw_cds_end - 1u) / 3u + 1u;
+    }
+    transcript_projection_order_pair(
+        out->protein_start, out->protein_end,
+        &out->protein_start, &out->protein_end);
+
+    for (i = 0u; i < exon_count; i++) {
+        size_t exon_idx = exon_offset + i;
+        uint32_t rank = (uint32_t)i + 1u;
+        if (feature_start1 <= exons->end1[exon_idx] &&
+            feature_end1 >= exons->start1[exon_idx]) {
+            if (out->exon_first == 0u) out->exon_first = rank;
+            out->exon_last = rank;
+        }
+        if (i + 1u < exon_count) {
+            size_t next_idx = exon_idx + 1u;
+            uint32_t high_start = exons->start1[exon_idx] >
+                exons->start1[next_idx] ? exons->start1[exon_idx]
+                                         : exons->start1[next_idx];
+            uint32_t low_end = exons->end1[exon_idx] <
+                exons->end1[next_idx] ? exons->end1[exon_idx]
+                                       : exons->end1[next_idx];
+            uint64_t intron_high = high_start == 0u ? 0u :
+                (uint64_t)high_start - 1u;
+            uint64_t intron_low = (uint64_t)low_end + 1u;
+            if ((uint64_t)feature_start1 <= intron_high &&
+                (uint64_t)feature_end1 >= intron_low) {
+                if (out->intron_first == 0u) out->intron_first = rank;
+                out->intron_last = rank;
+            }
+        }
+    }
+
+    if ((region_mask & ((uint32_t)DUCKVEP_REGION_UPSTREAM |
+                        (uint32_t)DUCKVEP_REGION_DOWNSTREAM)) != 0u) {
+        uint64_t distance = transcript_projection_abs_diff(
+            feature_start1, transcripts->start1[tx_idx]);
+        uint64_t candidate = transcript_projection_abs_diff(
+            feature_start1, transcripts->end1[tx_idx]);
+        if (candidate < distance) distance = candidate;
+        candidate = transcript_projection_abs_diff(
+            feature_end1, transcripts->start1[tx_idx]);
+        if (candidate < distance) distance = candidate;
+        candidate = transcript_projection_abs_diff(
+            feature_end1, transcripts->end1[tx_idx]);
+        if (candidate < distance) distance = candidate;
+        out->transcript_distance = distance;
+        out->has_transcript_distance = 1u;
+    }
+
+    if (coding_context != NULL && raw_cds_start != 0u &&
+        raw_cds_end != 0u && duckvep_coding_context_peptide_window_open(
+            coding_context, &out->coding_window)) {
+        out->coding_context = coding_context;
+        out->changed_codon_offset = (uint8_t)((raw_cds_start - 1u) % 3u);
+        out->has_coding_window = 1u;
+        out->has_amino_acids = (uint8_t)(
+            duckvep_feature_allele_peptide_eligible(
+                feature_ref, feature_ref_length) &&
+            duckvep_feature_allele_peptide_eligible(
+                feature_alt, feature_alt_length));
+    }
+    return 1;
+}
+
+uint8_t duckvep_transcript_projection_output_allele_base(
+    const duckvep_transcript_projection_facts_t *facts, size_t index) {
+
+    if (facts == NULL || facts->output_allele == NULL ||
+        index >= facts->output_allele_length) return 0u;
+    return duckvep_event_ascii_upper(facts->output_allele[index]);
+}
+
+uint8_t duckvep_transcript_projection_amino_acid_base(
+    const duckvep_transcript_projection_facts_t *facts, int alternate,
+    size_t index) {
+
+    size_t length;
+    if (facts == NULL || !facts->has_coding_window ||
+        !facts->has_amino_acids || facts->coding_context == NULL) return 0u;
+    length = alternate ? facts->coding_window.alt_length
+                       : facts->coding_window.ref_length;
+    if (index >= length) return 0u;
+    return duckvep_coding_context_peptide_window_base(
+        facts->coding_context, &facts->coding_window, alternate, index);
+}
+
+uint8_t duckvep_transcript_projection_codon_base(
+    const duckvep_transcript_projection_facts_t *facts, int alternate,
+    size_t index) {
+
+    size_t length;
+    size_t peptide_offset;
+    size_t nucleotide_offset;
+    size_t changed_length;
+    uint8_t base;
+
+    if (facts == NULL || !facts->has_coding_window ||
+        facts->coding_context == NULL) return 0u;
+    length = alternate ? facts->coding_window.alt_nt_length
+                       : facts->coding_window.ref_nt_length;
+    peptide_offset = alternate ? facts->coding_window.alt_peptide_offset
+                               : facts->coding_window.ref_peptide_offset;
+    if (index >= length || peptide_offset > SIZE_MAX / 3u ||
+        index > SIZE_MAX - peptide_offset * 3u) return 0u;
+    nucleotide_offset = peptide_offset * 3u + index;
+    base = (uint8_t)duckvep_coding_context_codon_base(
+        facts->coding_context, alternate, nucleotide_offset);
+    if (base == 0u) return 0u;
+    changed_length = alternate ? (size_t)facts->feature_alt_length
+                               : (size_t)facts->feature_ref_length;
+    if (index < (size_t)facts->changed_codon_offset ||
+        index - (size_t)facts->changed_codon_offset >= changed_length) {
+        if (base >= (uint8_t)'A' && base <= (uint8_t)'Z') {
+            base = (uint8_t)(base + ((uint8_t)'a' - (uint8_t)'A'));
+        }
+    }
+    return base;
 }
 
 duckvep_transcript_edit_status_t duckvep_transcript_edit_project_prepared_hint(

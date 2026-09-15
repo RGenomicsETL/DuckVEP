@@ -385,6 +385,16 @@ DUCKVEP_INTERNAL_API char duckvep_coding_context_cds_base(
     int                             alternate,
     size_t                          position0);
 
+/* Read one normalized nucleotide from the codon-display sequence.  The
+ * reference side is the physical CDS; the alternate side is the edited CDS
+ * followed by the borrowed 3-prime transcript suffix, matching VEP 116's
+ * TranscriptVariationAllele::codon view.  Keep this distinct from the CDS
+ * accessor above: suffix bytes are display context, not physical CDS. */
+DUCKVEP_INTERNAL_API char duckvep_coding_context_codon_base(
+    const duckvep_coding_context_t *ctx,
+    int                             alternate,
+    size_t                          position0);
+
 /* Scan one alternate CDS prefix followed by a caller-owned transcript suffix
  * and report the first translated stop. This is the sequential authority for
  * consumers that need a stop position without materializing the complete
@@ -698,6 +708,26 @@ typedef enum duckvep_feature_substitution_result {
     DUCKVEP_FEATURE_SUBSTITUTION_DELTA_ONLY = 1,
     DUCKVEP_FEATURE_SUBSTITUTION_CONTEXT_READY = 2
 } duckvep_feature_substitution_result_t;
+
+/* Reproduce VEP 116's independent-event peptide projection when both feature
+ * endpoints map to CDS but the uploaded genomic span crosses an internal
+ * transcript gap.  This is deliberately separate from the physical/phased
+ * edit-set projector: VEP replaces the outer mapped CDS span with the complete
+ * feature ALT for this display.  All returned sequence views borrow `scratch`.
+ * NOT_APPLICABLE leaves the caller free to use the ordinary projection path. */
+DUCKVEP_INTERNAL_API duckvep_feature_substitution_result_t
+duckvep_compat_vep116_internal_gap_context_fill(
+    const duckvep_transcript_model_t *transcripts,
+    const duckvep_exon_model_t       *exons,
+    const duckvep_sequence_pool_t    *seq,
+    const duckvep_variant_batch_t    *variants,
+    uint32_t                          variant_idx,
+    size_t                            tx_idx,
+    int8_t                            transcript_strand,
+    duckvep_delta_scratch_t          *scratch,
+    const duckvep_event_t            *event,
+    duckvep_coding_context_t         *context_out,
+    duckvep_sequence_delta_t         *delta_out);
 
 DUCKVEP_INTERNAL_API duckvep_feature_substitution_result_t
 duckvep_feature_substitution_context_fill(

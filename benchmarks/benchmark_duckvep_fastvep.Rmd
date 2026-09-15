@@ -44,7 +44,7 @@ read_gnu_time <- function(path, engine, threads, run) {
     lines,
     "Elapsed \\(wall clock\\) time \\(h:mm:ss or m:ss\\)"
   ))
-  data.frame(
+  result <- data.frame(
     engine = engine,
     threads = threads,
     run = run,
@@ -65,6 +65,13 @@ read_gnu_time <- function(path, engine, threads, run) {
     )),
     stringsAsFactors = FALSE
   )
+  numeric_values <- unlist(result[c("elapsed_seconds", "user_seconds", "system_seconds",
+    "cpu_percent", "maximum_rss_kib", "filesystem_output_blocks")], use.names = FALSE)
+  stopifnot(all(is.finite(numeric_values)), result$elapsed_seconds > 0,
+    result$user_seconds >= 0, result$system_seconds >= 0,
+    result$cpu_percent > 0, result$maximum_rss_kib > 0,
+    result$filesystem_output_blocks >= 0)
+  result
 }
 
 timings <- do.call(rbind, list(
@@ -521,9 +528,10 @@ Complete CSQ includes HGVS. Supplementary annotation is measured separately.
 Performance depends on the output contract. The
 [complete-field measurements](#complete-field-contracts) compare native tab and
 common CSQ with FastVEP revision `18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6`
-(September 10, 2026), using a separately rebuilt cache. They retain all output
-rows and field disagreements; they do not establish complete VEP parity.
-FastVEP is faster in both complete-field workloads at one and four cores in
+(September 10, 2026), using a cache rebuilt from DuckVEP's exact 644,427-transcript
+inventory. They retain all output rows and field disagreements; they do not
+establish complete VEP parity.
+DuckVEP is faster in both complete-field workloads at one and four cores in
 this retained matrix. These are end-to-end pipeline measurements, not isolated
 kernel timings.
 
@@ -572,14 +580,15 @@ The four placeholders have different status:
 | `Existing_variation` | exact allele join to dbSNP, ClinVar, or another named-variant relation | No |
 | `DISTANCE` | one validated projection from VEP feature geometry and transcript endpoints; SQL may render the resulting number | No |
 | `FLAGS` | join requested transcript attributes from the model relation | No |
-| `Codons` | emit the reference/alternate triplets from the coding context the kernel already computed; SQL should only render them | No |
+| `Codons` | derive reference/alternate triplets once with the annotation kernel's typed transcript-projection facts | No |
 
 Thus the comparison credits FastVEP for computing these native values. It also
 shows where DuckVEP can obtain named-variant and transcript metadata through
-ordinary joins without enlarging the consequence model. `Codons` comes from
-`duckvep_transcript_projection`, which exposes native coding facts; it is not
-reconstructed independently in SQL. The complete-field comparison below includes
-that projection. The compact timings above do not measure it.
+ordinary joins without enlarging the consequence model. The complete-field
+adapter requests typed projection facts from the annotation kernel, then formats
+them after one transcript-metadata join. It does not materialize an annotation
+relation or replay transcript projection. The complete-field comparison below
+includes that fused path; the compact timings above do not measure it.
 
 ## Algorithm design: make the repeated biology small
 
@@ -1815,7 +1824,7 @@ if (!file.exists(file.path(replay_directory, "completion.csv"))) {
 ```
 
 ```{r complete-field-observations}
-complete_dir <- file.path(data_dir, "field_contracts_329bbe3")
+complete_dir <- file.path(data_dir, "field_contracts_fused_c28ea6c")
 completion_path <- file.path(complete_dir, "completion.csv")
 if (!file.exists(completion_path)) {
   cat("Whole-GIAB complete-field measurements are not published yet.\n")
@@ -1857,8 +1866,41 @@ if (!file.exists(completion_path)) {
   source(file.path(root, "r/duckhtsbench/R/fastvep_source.R"))
   Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
   registry <- read.delim(file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"), check.names = FALSE)
+  cache_id <- if ("fastvep_cache_id" %in% names(metadata)) metadata[["fastvep_cache_id"]] else
+    cache[["artifact_id"]]
   identity <- duckhts_bench_identity_fields(registry$supplier_identity[
-    registry$id == "fastvep_ensembl116_cache"])
+    registry$id == cache_id])
+  stopifnot(length(identity) > 0L, cache[["artifact_id"]] == cache_id)
+  if (cache_id == "fastvep_ensembl116_duckvep_matched_cache") {
+    stopifnot("matched_gff_receipt.tsv" %in% manifest$file,
+      "matched_gff_receipt" %in% names(input_hashes))
+    matched_table <- read_receipt(file.path(complete_dir, "matched_gff_receipt.tsv"),
+      c("field", "value"), sep = "\t")
+    difference_fields <- c("transcript_model_only", "transcript_source_only",
+      "exon_model_only", "exon_source_only", "cds_model_only", "cds_source_only")
+    count_fields <- c("transcript_count", "gene_count", "exon_count", "cds_segment_count")
+    digest_fields <- c("source_gff3_sha256", "model_sha256", "transcript_inventory_sha256",
+      "exon_geometry_sha256", "cds_geometry_sha256", "filtered_gff3_sha256")
+    matched_required <- c("schema", "proof", count_fields, digest_fields, difference_fields)
+    stopifnot(!anyDuplicated(matched_table$field),
+      all(matched_required %in% matched_table$field))
+    matched <- setNames(matched_table$value, matched_table$field)
+    stopifnot(matched[["schema"]] == "duckvep_fastvep_matched_gff_v1",
+      matched[["proof"]] == "initial_derivation_six_except_all",
+      matched[["model_sha256"]] == metadata[["matched_model_sha256"]],
+      matched[["model_sha256"]] == identity[["model_sha256"]],
+      matched[["transcript_count"]] == metadata[["matched_transcripts"]],
+      matched[["transcript_count"]] == identity[["transcripts"]],
+      cache[["model_sha256"]] == metadata[["matched_model_sha256"]],
+      cache[["matched_gff_receipt_sha256"]] ==
+        input_hashes[["matched_gff_receipt"]],
+      all(grepl("^[1-9][0-9]*$", matched[count_fields])),
+      all(grepl("^[0-9a-f]{64}$", matched[digest_fields])),
+      matched[["filtered_gff3_sha256"]] == input_hashes[["gff3"]],
+      sha256(file.path(complete_dir, "matched_gff_receipt.tsv")) ==
+        input_hashes[["matched_gff_receipt"]],
+      all(matched[difference_fields] == "0"))
+  }
   build <- duckhts_bench_read_fastvep_build(file.path(complete_dir, "fastvep_build.tsv"),
     identity[["source_commit"]], verification_receipt =
       if (metadata[["fastvep_binding"]] %in%
@@ -1966,6 +2008,20 @@ if (!file.exists(completion_path)) {
   complete_rows$bytes <- as.numeric(complete_rows$bytes)
   medians <- aggregate(cbind(elapsed_seconds, maximum_rss_kib, row_count, bytes) ~
     tool + output_contract + threads, complete_rows, median)
+  for (contract in c("native_tab17", "vep_csq")) {
+    for (thread_count in c(1L, 4L)) {
+      duck_seconds <- medians$elapsed_seconds[
+        medians$tool == "duckvep" & medians$output_contract == contract &
+          medians$threads == thread_count
+      ]
+      fast_seconds <- medians$elapsed_seconds[
+        medians$tool == "fastvep" & medians$output_contract == contract &
+          medians$threads == thread_count
+      ]
+      stopifnot(length(duck_seconds) == 1L, length(fast_seconds) == 1L,
+        duck_seconds < fast_seconds)
+    }
+  }
   cat("Measured source: ", completion$source_revision, "\n", sep = "")
   cat("FastVEP source: ", metadata[["fastvep_source_revision"]], "\n", sep = "")
   cat("Output filesystem: ", metadata[["output_filesystem"]], "\n", sep = "")
@@ -1977,14 +2033,29 @@ if (!file.exists(completion_path)) {
 }
 ```
 
+The complete DuckVEP adapter carries projection facts out of the annotation kernel
+and formats them after one transcript-metadata join. It does not materialize a
+whole-genome annotation relation or replay transcript projection. The one-core
+`operational17` median is `r sprintf("%.2f", medians$elapsed_seconds[
+  medians$tool == "duckvep" & medians$output_contract == "operational17" &
+    medians$threads == 1])` seconds; adding the current complete native projection
+raises that median to `r sprintf("%.2f", medians$elapsed_seconds[
+  medians$tool == "duckvep" & medians$output_contract == "native_tab17" &
+    medians$threads == 1])` seconds while retaining the same output-row count.
+Across the paired complete-output measurements, DuckVEP is
+`r sprintf("%.2f", medians$elapsed_seconds[medians$tool == "fastvep" & medians$output_contract == "native_tab17" & medians$threads == 1] / medians$elapsed_seconds[medians$tool == "duckvep" & medians$output_contract == "native_tab17" & medians$threads == 1])` times faster for native output and
+`r sprintf("%.2f", medians$elapsed_seconds[medians$tool == "fastvep" & medians$output_contract == "vep_csq" & medians$threads == 1] / medians$elapsed_seconds[medians$tool == "duckvep" & medians$output_contract == "vep_csq" & medians$threads == 1])` times faster for CSQ on one core; the four-core ratios are
+`r sprintf("%.2f", medians$elapsed_seconds[medians$tool == "fastvep" & medians$output_contract == "native_tab17" & medians$threads == 4] / medians$elapsed_seconds[medians$tool == "duckvep" & medians$output_contract == "native_tab17" & medians$threads == 4])` and
+`r sprintf("%.2f", medians$elapsed_seconds[medians$tool == "fastvep" & medians$output_contract == "vep_csq" & medians$threads == 4] / medians$elapsed_seconds[medians$tool == "duckvep" & medians$output_contract == "vep_csq" & medians$threads == 4])`.
+
 ```{r complete-field-comparison}
-previous_dir <- file.path(data_dir, "field_contracts")
+previous_dir <- file.path(data_dir, "field_contracts_matched_271ce67")
 previous_completion <- read_receipt(file.path(previous_dir, "completion.csv"),
   c("source_revision", "completed", "binding", "observations", "repetitions",
     "allele_coverage", "artifacts_sha256"))
 previous_manifest_path <- file.path(previous_dir, "artifacts.csv")
 stopifnot(nrow(previous_completion) == 1L,
-  previous_completion$source_revision == "9e14b2ef23657c660d0a4137adb2a254fb778f87",
+  previous_completion$source_revision == "271ce6767c4058f40c9dc6586a1b7d14d1df89a7",
   previous_completion$completed == "TRUE", previous_completion$binding == "source_bound",
   previous_completion$observations == "30", previous_completion$repetitions == "3",
   previous_completion$allele_coverage == "verified",
@@ -2052,20 +2123,19 @@ knitr::kable(comparison[c("tool", "output_contract", "threads",
     "Elapsed change (%)", "Previous peak GiB", "Current peak GiB"))
 ```
 
-The prepared transcript sets are not identical: DuckVEP's VEP-filtered model
-from Ensembl-116 core/funcgen dumps contains 644,427 transcripts; FastVEP's
-Ensembl-116 GFF3 cache contains 646,577. They use the same reference release
-and primary FASTA. All expanded output rows remain counted; these pipeline
-timings do not establish whole-GIAB field concordance or use an intersection-only
-denominator. The eight-model field differential is separate evidence.
+`r if (cache_id == "fastvep_ensembl116_duckvep_matched_cache") {
+  "DuckVEP and FastVEP use the same 644,427 Ensembl-116 transcripts. The staged GFF3 receipt proves exact transcript ID/version, region, span and strand equality, exact exon geometry and phase equality, and exact CDS geometry and phase equality before FastVEP cache construction. No output row or transcript intersection is applied."
+} else {
+  "The prepared transcript sets are not identical: DuckVEP's VEP-filtered model from Ensembl-116 core/funcgen dumps contains 644,427 transcripts; FastVEP's Ensembl-116 GFF3 cache contains 646,577. They use the same reference release and primary FASTA. All expanded output rows remain counted; these pipeline timings do not establish whole-GIAB field concordance or use an intersection-only denominator."
+}` The eight-model field differential is separate evidence.
 
-The previous source-bound matrix remains in
-[field_contracts](data/duckvep_fastvep/field_contracts). The comparison table
-uses identical input, output, affinity, memory and spill contracts from the two
-hash-checked packs. Measurements ran on a shared host, so the observed median
-changes are not an isolated estimate of this patch's cost and no host-isolation
-claim is made. No DuckHTS build, test or benchmark ran concurrently with the
-current matrix.
+The previous matched-model source-bound matrix remains in
+[field_contracts_matched_271ce67](data/duckvep_fastvep/field_contracts_matched_271ce67).
+The comparison table uses identical input, output, affinity, memory and spill
+contracts from the two retained packs. Measurements ran on a shared host, so
+the observed median changes are not an isolated estimate of this patch's cost
+and no host-isolation claim is made. No DuckHTS build, test or benchmark ran
+concurrently with the current matrix.
 
 Final CSQ files carry `record_index` and `alt_index` followed by the 32 common
 fields. Both engines write this 34-column transport; the native and operational

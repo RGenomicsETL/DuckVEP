@@ -48,6 +48,21 @@ typedef struct duckvep_hgvs_scalar_result {
 	uint8_t protein_reason;
 } duckvep_hgvs_scalar_result_t;
 
+typedef struct duckvep_projection_scalar_result {
+	uint32_t output_allele_offset, output_allele_length;
+	uint32_t reference_amino_acids_offset, reference_amino_acids_length;
+	uint32_t alternate_amino_acids_offset, alternate_amino_acids_length;
+	uint32_t reference_codons_offset, reference_codons_length;
+	uint32_t alternate_codons_offset, alternate_codons_length;
+	uint32_t cdna_start, cdna_end, cds_start, cds_end;
+	uint32_t protein_start, protein_end;
+	uint32_t exon_first, exon_last, exon_total;
+	uint32_t intron_first, intron_last, intron_total;
+	uint64_t transcript_distance;
+	uint8_t interbase, cds_start_nf, cds_end_nf;
+	uint8_t has_transcript_distance, has_amino_acids, has_codons;
+} duckvep_projection_scalar_result_t;
+
 typedef struct duckvep_scalar_state {
 	duckvep_registry_t *registry;
 	duckvep_model_entry_t *entry;
@@ -87,6 +102,11 @@ typedef struct duckvep_scalar_state {
 	size_t result_merge_capacity;
 	duckvep_hgvs_scalar_result_t *hgvs_results;
 	size_t hgvs_result_capacity;
+	duckvep_projection_scalar_result_t *projection_results;
+	size_t projection_result_capacity;
+	char *projection_text;
+	size_t projection_text_size;
+	size_t projection_text_capacity;
 	uint8_t *hgvs_allele_scratch;
 	size_t hgvs_allele_capacity;
 	char *hgvs_render_scratch;
@@ -224,6 +244,49 @@ duckvep_scalar_hgvs_result_reserve(duckvep_scalar_state_t *state,
 }
 
 static int
+duckvep_scalar_projection_result_reserve(duckvep_scalar_state_t *state,
+	size_t needed)
+{
+	size_t capacity;
+
+	if (needed <= state->projection_result_capacity)
+		return 1;
+	capacity = duckvep_sql_next_capacity(
+	    state->projection_result_capacity, needed);
+	if (!duckvep_sql_resize((void **)&state->projection_results,
+	    sizeof(*state->projection_results), capacity))
+		return 0;
+	state->projection_result_capacity = capacity;
+	return 1;
+}
+
+static char *
+duckvep_scalar_projection_text_append(duckvep_scalar_state_t *state,
+	size_t length, uint32_t *offset_out)
+{
+	size_t needed, capacity;
+	char *destination;
+
+	if (state == NULL || offset_out == NULL || length > UINT32_MAX ||
+	    state->projection_text_size > UINT32_MAX ||
+	    length > UINT32_MAX - state->projection_text_size)
+		return NULL;
+	needed = state->projection_text_size + length;
+	if (needed > state->projection_text_capacity) {
+		capacity = duckvep_sql_next_capacity(
+		    state->projection_text_capacity, needed);
+		if (!duckvep_sql_resize((void **)&state->projection_text,
+		    sizeof(*state->projection_text), capacity))
+			return NULL;
+		state->projection_text_capacity = capacity;
+	}
+	*offset_out = (uint32_t)state->projection_text_size;
+	destination = state->projection_text + state->projection_text_size;
+	state->projection_text_size = needed;
+	return destination;
+}
+
+static int
 duckvep_scalar_hgvs_allele_reserve(duckvep_scalar_state_t *state,
 	size_t needed)
 {
@@ -317,6 +380,8 @@ duckvep_scalar_state_destroy(void *pointer)
 	free(state->results);
 	free(state->result_merge);
 	free(state->hgvs_results);
+	free(state->projection_results);
+	free(state->projection_text);
 	free(state->hgvs_allele_scratch);
 	free(state->hgvs_render_scratch);
 	free(state->hgvs_text);
@@ -381,6 +446,7 @@ duckvep_scalar_state_release(duckvep_scalar_state_t *state)
 	duckvep_scalar_release_model(state);
 	state->result_count = 0;
 	state->hgvs_text_size = 0;
+	state->projection_text_size = 0;
 	pthread_mutex_lock(&registry->mutex);
 	state->next_free = registry->annotation_state_pool;
 	registry->annotation_state_pool = state;
@@ -1500,12 +1566,15 @@ duckvep_scalar_build_hgvs_pair(duckvep_scalar_state_t *state,
 typedef struct duckvep_scalar_hgvs_observer {
 	duckvep_scalar_state_t *state;
 	size_t next_result;
+	size_t next_projection_result;
 	size_t prepared_variant;
 	duckvep_hgvs_reference_window_t shift_reference;
 	duckvep_hgvs_reference_window_t lookup_reference;
 	duckvep_hgvs_status_t uploaded_reference_status;
 	int reference_available;
 	int variant_prepared;
+	int with_hgvs;
+	int with_projection;
 	char *error;
 	size_t error_size;
 } duckvep_scalar_hgvs_observer_t;
@@ -1589,6 +1658,204 @@ duckvep_scalar_hgvs_observe(void *observer_context,
 	    observer->reference_available ? &observer->lookup_reference : NULL,
 	    observer->uploaded_reference_status, consequence, facts, result,
 	    observer->error, observer->error_size);
+}
+
+static int
+duckvep_scalar_projection_store(duckvep_scalar_hgvs_observer_t *observer,
+	const duckvep_variant_batch_t *batch,
+	const duckvep_consequence_t *consequence,
+	const duckvep_pair_facts_t *pair_facts)
+{
+	duckvep_transcript_projection_facts_t facts;
+	duckvep_coding_context_t compatibility_context;
+	duckvep_sequence_delta_t compatibility_delta;
+	duckvep_projection_scalar_result_t result;
+	duckvep_owned_model_t *model;
+	duckvep_delta_scratch_t *scratch;
+	const duckvep_coding_context_t *coding_context;
+	char *text;
+	size_t index, length;
+
+	if (observer == NULL || observer->state == NULL || batch == NULL ||
+	    consequence == NULL || consequence->variant_idx >= batch->count) {
+		duckvep_sql_set_error(observer != NULL ? observer->error : NULL,
+		    observer != NULL ? observer->error_size : 0u,
+		    "duckvep_annotate: projected row is missing its live pair facts");
+		return 0;
+	}
+	if (!duckvep_scalar_projection_result_reserve(observer->state,
+	    observer->next_projection_result + 1u)) {
+		duckvep_sql_set_error(observer->error, observer->error_size,
+		    "duckvep_annotate: out of memory growing projection facts");
+		return 0;
+	}
+	memset(&result, 0, sizeof(result));
+	if (consequence->overlap_object_kind !=
+	    (uint8_t)DUCKVEP_OVERLAP_OBJECT_TRANSCRIPT) {
+		observer->state->projection_results[
+		    observer->next_projection_result++] = result;
+		return 1;
+	}
+	if (pair_facts == NULL || pair_facts->event == NULL) {
+		duckvep_sql_set_error(observer->error, observer->error_size,
+		    "duckvep_annotate: transcript projection is missing its live pair facts");
+		return 0;
+	}
+	model = &observer->state->entry->model;
+	coding_context = pair_facts->coding_context;
+	if (coding_context == NULL && observer->state->workspace != NULL) {
+		scratch = duckvep_workspace_delta_scratch(
+		    observer->state->workspace);
+		if (scratch != NULL &&
+		    duckvep_compat_vep116_internal_gap_context_fill(
+		        &model->transcripts, &model->exons, &model->sequences,
+		        batch, consequence->variant_idx, consequence->tx_idx,
+		        model->transcripts.strand[consequence->tx_idx], scratch,
+		        pair_facts->event, &compatibility_context,
+		        &compatibility_delta) ==
+		        DUCKVEP_FEATURE_SUBSTITUTION_CONTEXT_READY) {
+			coding_context = &compatibility_context;
+		}
+	}
+	if (!duckvep_transcript_projection_facts_fill(
+	    &model->transcripts, &model->exons, batch,
+	    consequence->variant_idx, consequence->tx_idx, pair_facts->event,
+	    consequence->region_mask, coding_context, &facts)) {
+		duckvep_sql_set_error(observer->error, observer->error_size,
+		    "duckvep_annotate: could not derive transcript projection facts");
+		return 0;
+	}
+	result.cdna_start = facts.cdna_start;
+	result.cdna_end = facts.cdna_end;
+	result.cds_start = facts.cds_start;
+	result.cds_end = facts.cds_end;
+	result.protein_start = facts.protein_start;
+	result.protein_end = facts.protein_end;
+	result.exon_first = facts.exon_first;
+	result.exon_last = facts.exon_last;
+	result.exon_total = facts.exon_total;
+	result.intron_first = facts.intron_first;
+	result.intron_last = facts.intron_last;
+	result.intron_total = facts.intron_total;
+	result.transcript_distance = facts.transcript_distance;
+	result.interbase = facts.interbase;
+	result.cds_start_nf = facts.cds_start_nf;
+	result.cds_end_nf = facts.cds_end_nf;
+	result.has_transcript_distance = facts.has_transcript_distance;
+
+	length = facts.output_allele_length != 0u ?
+	    facts.output_allele_length : 1u;
+	text = duckvep_scalar_projection_text_append(observer->state, length,
+	    &result.output_allele_offset);
+	if (text == NULL) goto text_failed;
+	result.output_allele_length = (uint32_t)length;
+	if (facts.output_allele_length == 0u) {
+		text[0] = '-';
+	} else {
+		for (index = 0u; index < length; index++) {
+			text[index] = (char)
+			    duckvep_transcript_projection_output_allele_base(
+			        &facts, index);
+		}
+	}
+
+	if (facts.has_amino_acids) {
+		length = facts.coding_window.ref_length != 0u ?
+		    facts.coding_window.ref_length : 1u;
+		text = duckvep_scalar_projection_text_append(observer->state,
+		    length, &result.reference_amino_acids_offset);
+		if (text == NULL) goto text_failed;
+		result.reference_amino_acids_length = (uint32_t)length;
+		if (facts.coding_window.ref_length == 0u) {
+			text[0] = '-';
+		} else {
+			for (index = 0u; index < length; index++) {
+				text[index] = (char)
+				    duckvep_transcript_projection_amino_acid_base(
+				        &facts, 0, index);
+			}
+		}
+		length = facts.coding_window.alt_length != 0u ?
+		    facts.coding_window.alt_length : 1u;
+		text = duckvep_scalar_projection_text_append(observer->state,
+		    length, &result.alternate_amino_acids_offset);
+		if (text == NULL) goto text_failed;
+		result.alternate_amino_acids_length = (uint32_t)length;
+		if (facts.coding_window.alt_length == 0u) {
+			text[0] = '-';
+		} else {
+			for (index = 0u; index < length; index++) {
+				text[index] = (char)
+				    duckvep_transcript_projection_amino_acid_base(
+				        &facts, 1, index);
+			}
+		}
+		result.has_amino_acids = 1u;
+	}
+
+	if (facts.has_coding_window) {
+		length = facts.coding_window.ref_nt_length != 0u ?
+		    facts.coding_window.ref_nt_length : 1u;
+		text = duckvep_scalar_projection_text_append(observer->state,
+		    length, &result.reference_codons_offset);
+		if (text == NULL) goto text_failed;
+		result.reference_codons_length = (uint32_t)length;
+		if (facts.coding_window.ref_nt_length == 0u) {
+			text[0] = '-';
+		} else {
+			for (index = 0u; index < length; index++) {
+				text[index] = (char)
+				    duckvep_transcript_projection_codon_base(
+				        &facts, 0, index);
+			}
+		}
+		length = facts.coding_window.alt_nt_length != 0u ?
+		    facts.coding_window.alt_nt_length : 1u;
+		text = duckvep_scalar_projection_text_append(observer->state,
+		    length, &result.alternate_codons_offset);
+		if (text == NULL) goto text_failed;
+		result.alternate_codons_length = (uint32_t)length;
+		if (facts.coding_window.alt_nt_length == 0u) {
+			text[0] = '-';
+		} else {
+			for (index = 0u; index < length; index++) {
+				text[index] = (char)
+				    duckvep_transcript_projection_codon_base(
+				        &facts, 1, index);
+			}
+		}
+		result.has_codons = 1u;
+	}
+
+	observer->state->projection_results[
+	    observer->next_projection_result++] = result;
+	return 1;
+
+text_failed:
+	duckvep_sql_set_error(observer->error, observer->error_size,
+	    "duckvep_annotate: projected text exceeds the vector limit");
+	return 0;
+}
+
+static int
+duckvep_scalar_pair_observe(void *observer_context,
+	const duckvep_variant_batch_t *batch,
+	const duckvep_consequence_t *consequence,
+	const duckvep_pair_facts_t *facts)
+{
+	duckvep_scalar_hgvs_observer_t *observer;
+
+	observer = (duckvep_scalar_hgvs_observer_t *)observer_context;
+	if (observer == NULL)
+		return 0;
+	if (observer->with_projection &&
+	    !duckvep_scalar_projection_store(
+	        observer, batch, consequence, facts))
+		return 0;
+	if (observer->with_hgvs)
+		return duckvep_scalar_hgvs_observe(
+		    observer_context, batch, consequence, facts);
+	return 1;
 }
 
 static int
@@ -1776,7 +2043,7 @@ static int
 duckvep_scalar_run(duckvep_scalar_state_t *state,
 	const duckvep_variant_batch_t *batch, size_t begin, size_t count,
 	uint64_t upstream_distance, uint64_t downstream_distance,
-	int with_hgvs, char *error, size_t error_size)
+	int with_hgvs, int with_projection, char *error, size_t error_size)
 {
 	duckvep_variant_batch_t slice;
 	duckvep_annotate_cursor_t *cursor;
@@ -1856,13 +2123,16 @@ duckvep_scalar_run(duckvep_scalar_state_t *state,
 		return 0;
 	}
 	memset(&hgvs_observer, 0, sizeof(hgvs_observer));
-	if (with_hgvs) {
+	if (with_hgvs || with_projection) {
 		hgvs_observer.state = state;
 		hgvs_observer.next_result = state->result_count;
+		hgvs_observer.next_projection_result = state->result_count;
+		hgvs_observer.with_hgvs = with_hgvs;
+		hgvs_observer.with_projection = with_projection;
 		hgvs_observer.error = error;
 		hgvs_observer.error_size = error_size;
 		duckvep_annotate_cursor_set_observer(
-		    cursor, duckvep_scalar_hgvs_observe, &hgvs_observer);
+		    cursor, duckvep_scalar_pair_observe, &hgvs_observer);
 	}
 	while (!duckvep_annotate_cursor_done(cursor)) {
 		duckvep_result_builder_t builder;
@@ -1900,6 +2170,13 @@ duckvep_scalar_run(duckvep_scalar_state_t *state,
 			duckvep_annotate_cursor_close(cursor);
 			duckvep_sql_set_error(error, error_size,
 			    "duckvep_annotate: fused result streams diverged");
+			return 0;
+		}
+		if (with_projection &&
+		    hgvs_observer.next_projection_result != state->result_count) {
+			duckvep_annotate_cursor_close(cursor);
+			duckvep_sql_set_error(error, error_size,
+			    "duckvep_annotate: fused projection stream diverged");
 			return 0;
 		}
 		if (status == DUCKVEP_ERR_RESULT_FULL)
@@ -2933,6 +3210,146 @@ duckvep_scalar_write_compact_output(duckvep_scalar_state_t *state,
 	return 1;
 }
 
+static int
+duckvep_scalar_projection_text_valid(
+	const duckvep_scalar_state_t *state, uint32_t offset, uint32_t length)
+{
+	return state != NULL && length != 0u &&
+	    (size_t)offset <= state->projection_text_size &&
+	    (size_t)length <= state->projection_text_size - (size_t)offset;
+}
+
+static int
+duckvep_scalar_write_projection_output(duckvep_scalar_state_t *state,
+	duckdb_vector output, idx_t input_rows, size_t first_column,
+	char *error, size_t error_size)
+{
+	duckdb_vector child, vectors[21];
+	uint64_t *validity[21];
+	uint32_t *u32[12];
+	uint64_t *distances;
+	bool *interbase, *cds_start_nf, *cds_end_nf;
+	size_t output_count, source, row, column;
+
+	if (state == NULL || state->projection_result_capacity <
+	    state->result_count) {
+		duckvep_sql_set_error(error, error_size,
+		    "duckvep_annotate: incomplete projection result stream");
+		return 0;
+	}
+	child = duckdb_list_vector_get_child(output);
+	for (column = 0u; column < 21u; column++) {
+		vectors[column] = duckdb_struct_vector_get_child(
+		    child, (idx_t)(first_column + column));
+		validity[column] = duckdb_vector_get_validity(vectors[column]);
+		duckvep_scalar_set_null_range(vectors[column], &validity[column],
+		    state->result_count + (size_t)input_rows);
+	}
+	for (column = 0u; column < 12u; column++) {
+		u32[column] = duckdb_vector_get_data(vectors[column + 2u]);
+	}
+	distances = duckdb_vector_get_data(vectors[14]);
+	interbase = duckdb_vector_get_data(vectors[1]);
+	cds_start_nf = duckdb_vector_get_data(vectors[15]);
+	cds_end_nf = duckdb_vector_get_data(vectors[16]);
+
+	output_count = 0u;
+	source = 0u;
+	for (row = 0u; row < (size_t)input_rows; row++) {
+		size_t begin = source;
+		while (source < state->result_count &&
+		    state->results[source].variant_idx == (uint32_t)row) {
+			source++;
+		}
+		if (!duckvep_result_range_has_transcript(state, begin, source)) {
+			output_count++;
+		}
+		for (source = begin; source < state->result_count &&
+		    state->results[source].variant_idx == (uint32_t)row;
+		    source++, output_count++) {
+			const duckvep_consequence_t *annotation =
+			    &state->results[source];
+			const duckvep_projection_scalar_result_t *projection =
+			    &state->projection_results[source];
+			uint32_t values[12];
+			uint32_t offsets[5];
+			uint32_t lengths[5];
+
+			if (annotation->overlap_object_kind !=
+			    (uint8_t)DUCKVEP_OVERLAP_OBJECT_TRANSCRIPT)
+				continue;
+			if (!duckvep_scalar_projection_text_valid(state,
+			    projection->output_allele_offset,
+			    projection->output_allele_length)) {
+				duckvep_sql_set_error(error, error_size,
+				    "duckvep_annotate: projected allele exceeds its text arena");
+				return 0;
+			}
+			duckvep_scalar_assign_ascii_valid(vectors[0], validity[0],
+			    (idx_t)output_count,
+			    state->projection_text + projection->output_allele_offset,
+			    projection->output_allele_length);
+			interbase[output_count] = projection->interbase != 0u;
+			duckvep_scalar_set_valid(validity[1], (idx_t)output_count);
+			values[0] = projection->cdna_start;
+			values[1] = projection->cdna_end;
+			values[2] = projection->cds_start;
+			values[3] = projection->cds_end;
+			values[4] = projection->protein_start;
+			values[5] = projection->protein_end;
+			values[6] = projection->exon_first;
+			values[7] = projection->exon_last;
+			values[8] = projection->exon_total;
+			values[9] = projection->intron_first;
+			values[10] = projection->intron_last;
+			values[11] = projection->intron_total;
+			for (column = 0u; column < 12u; column++) {
+				if (values[column] != 0u || column == 11u) {
+					u32[column][output_count] = values[column];
+					duckvep_scalar_set_valid(validity[column + 2u],
+					    (idx_t)output_count);
+				}
+			}
+			if (projection->has_transcript_distance) {
+				distances[output_count] = projection->transcript_distance;
+				duckvep_scalar_set_valid(validity[14],
+				    (idx_t)output_count);
+			}
+			cds_start_nf[output_count] = projection->cds_start_nf != 0u;
+			cds_end_nf[output_count] = projection->cds_end_nf != 0u;
+			duckvep_scalar_set_valid(validity[15], (idx_t)output_count);
+			duckvep_scalar_set_valid(validity[16], (idx_t)output_count);
+
+			offsets[0] = projection->reference_amino_acids_offset;
+			offsets[1] = projection->alternate_amino_acids_offset;
+			offsets[2] = projection->reference_codons_offset;
+			offsets[3] = projection->alternate_codons_offset;
+			offsets[4] = 0u;
+			lengths[0] = projection->reference_amino_acids_length;
+			lengths[1] = projection->alternate_amino_acids_length;
+			lengths[2] = projection->reference_codons_length;
+			lengths[3] = projection->alternate_codons_length;
+			lengths[4] = 0u;
+			for (column = 0u; column < 4u; column++) {
+				int present = column < 2u ?
+				    projection->has_amino_acids : projection->has_codons;
+				if (!present)
+					continue;
+				if (!duckvep_scalar_projection_text_valid(
+				    state, offsets[column], lengths[column])) {
+					duckvep_sql_set_error(error, error_size,
+					    "duckvep_annotate: projected sequence exceeds its text arena");
+					return 0;
+				}
+				duckvep_scalar_assign_ascii_valid(vectors[17u + column],
+				    validity[17u + column], (idx_t)output_count,
+				    state->projection_text + offsets[column], lengths[column]);
+			}
+		}
+	}
+	return 1;
+}
+
 typedef enum duckvep_scalar_event_family {
 	DUCKVEP_SCALAR_SMALL = 0,
 	DUCKVEP_SCALAR_STRUCTURAL,
@@ -2942,7 +3359,7 @@ typedef enum duckvep_scalar_event_family {
 static void
 duckvep_annotate_scalar_execute(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output, int compact, int with_hgvs,
-	duckvep_scalar_event_family_t event_family)
+	int with_projection, duckvep_scalar_event_family_t event_family)
 {
 	duckvep_scalar_state_t *state;
 	duckvep_variant_batch_t batch;
@@ -3009,6 +3426,7 @@ duckvep_annotate_scalar_execute(duckdb_function_info info,
 	    duckdb_vector_get_data(downstream_distance_vector) : NULL;
 	state->result_count = 0;
 	state->hgvs_text_size = 0;
+	state->projection_text_size = 0;
 	begin = 0;
 	while (begin < (size_t)rows) {
 		uint64_t upstream_distance;
@@ -3067,6 +3485,7 @@ duckvep_annotate_scalar_execute(duckdb_function_info info,
 		} else if (!duckvep_scalar_run(
 		    state, &batch, begin, end - begin,
 		    upstream_distance, downstream_distance, with_hgvs,
+		    with_projection,
 		    error, sizeof(error))) {
 			goto failed;
 		}
@@ -3075,6 +3494,10 @@ duckvep_annotate_scalar_execute(duckdb_function_info info,
 	if (!(compact ? duckvep_scalar_write_compact_output(state, output, rows,
 	    with_hgvs, error, sizeof(error)) : duckvep_scalar_write_output(state,
 	    output, rows, with_hgvs, error, sizeof(error))))
+		goto failed;
+	if (with_projection && !duckvep_scalar_write_projection_output(
+	    state, output, rows, with_hgvs ? 36u : 29u,
+	    error, sizeof(error)))
 		goto failed;
 	duckvep_scalar_state_release(state);
 	return;
@@ -3089,21 +3512,23 @@ static void
 duckvep_annotate_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_annotate_scalar_execute(info, input, output, 0, 0, 0);
+	duckvep_annotate_scalar_execute(info, input, output, 0, 0, 0,
+	    DUCKVEP_SCALAR_SMALL);
 }
 
 static void
 duckvep_annotate_compact_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_annotate_scalar_execute(info, input, output, 1, 0, 0);
+	duckvep_annotate_scalar_execute(info, input, output, 1, 0, 0,
+	    DUCKVEP_SCALAR_SMALL);
 }
 
 static void
 duckvep_annotate_hgvs_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_annotate_scalar_execute(info, input, output, 1, 1,
+	duckvep_annotate_scalar_execute(info, input, output, 1, 1, 0,
 	    DUCKVEP_SCALAR_SMALL);
 }
 
@@ -3111,7 +3536,7 @@ static void
 duckvep_annotate_rich_hgvs_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_annotate_scalar_execute(info, input, output, 0, 1,
+	duckvep_annotate_scalar_execute(info, input, output, 0, 1, 0,
 	    DUCKVEP_SCALAR_SMALL);
 }
 
@@ -3119,7 +3544,7 @@ static void
 duckvep_annotate_sv_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_annotate_scalar_execute(info, input, output, 0, 0,
+	duckvep_annotate_scalar_execute(info, input, output, 0, 0, 0,
 	    DUCKVEP_SCALAR_STRUCTURAL);
 }
 
@@ -3127,7 +3552,7 @@ static void
 duckvep_annotate_sv_compact_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_annotate_scalar_execute(info, input, output, 1, 0,
+	duckvep_annotate_scalar_execute(info, input, output, 1, 0, 0,
 	    DUCKVEP_SCALAR_STRUCTURAL);
 }
 
@@ -3135,7 +3560,7 @@ static void
 duckvep_annotate_breakend_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_annotate_scalar_execute(info, input, output, 0, 0,
+	duckvep_annotate_scalar_execute(info, input, output, 0, 0, 0,
 	    DUCKVEP_SCALAR_BREAKEND);
 }
 
@@ -3143,14 +3568,30 @@ static void
 duckvep_annotate_breakend_compact_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_annotate_scalar_execute(info, input, output, 1, 0,
+	duckvep_annotate_scalar_execute(info, input, output, 1, 0, 0,
 	    DUCKVEP_SCALAR_BREAKEND);
 }
 
-static duckdb_logical_type
-duckvep_annotation_list_type(int with_hgvs)
+static void
+duckvep_annotate_projected_scalar(duckdb_function_info info,
+	duckdb_data_chunk input, duckdb_vector output)
 {
-	const char *names[] = {
+	duckvep_annotate_scalar_execute(info, input, output, 0, 0, 1,
+	    DUCKVEP_SCALAR_SMALL);
+}
+
+static void
+duckvep_annotate_projected_hgvs_scalar(duckdb_function_info info,
+	duckdb_data_chunk input, duckdb_vector output)
+{
+	duckvep_annotate_scalar_execute(info, input, output, 0, 1, 1,
+	    DUCKVEP_SCALAR_SMALL);
+}
+
+static duckdb_logical_type
+duckvep_annotation_list_type(int with_hgvs, int with_projection)
+{
+	static const char *const base_names[] = {
 		"transcript_index", "gene_index", "consequence", "impact",
 		"region", "status", "reason", "cdna_position", "cds_position",
 		"protein_position", "reference_amino_acid",
@@ -3161,38 +3602,69 @@ duckvep_annotation_list_type(int with_hgvs)
 		"consequence_mask", "region_mask", "impact_code", "status_code",
 		"reason_code", "reference_amino_acid_code",
 		"alternate_amino_acid_code", "nmd_prediction_code",
-		"nmd_escape_reasons", "overlap_object_code",
+		"nmd_escape_reasons", "overlap_object_code"
+	};
+	static const char *const hgvs_names[] = {
 		"transcript_hgvs", "protein_hgvs", "hgvs_shift",
 		"transcript_hgvs_status", "transcript_hgvs_reason",
 		"protein_hgvs_status", "protein_hgvs_reason"
 	};
-	duckdb_logical_type types[36], structure, list;
+	static const char *const projection_names[] = {
+		"output_allele", "interbase", "cdna_start", "cdna_end",
+		"cds_start", "cds_end", "protein_start", "protein_end",
+		"exon_first", "exon_last", "exon_total", "intron_first",
+		"intron_last", "intron_total", "transcript_distance",
+		"cds_start_nf", "cds_end_nf", "reference_amino_acids",
+		"alternate_amino_acids", "reference_codons",
+		"alternate_codons"
+	};
+	const char *names[57];
+	duckdb_logical_type types[57], structure, list;
 	size_t index, column_count;
 
-	types[0] = duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER);
-	types[1] = duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER);
-	for (index = 2; index <= 6; index++)
-		types[index] = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-	for (index = 7; index <= 9; index++)
-		types[index] = duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER);
-	types[10] = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-	types[11] = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-	types[12] = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-	for (index = 13; index < 17; index++)
-		types[index] = duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN);
-	types[17] = duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER);
-	types[18] = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-	types[19] = duckdb_create_logical_type(DUCKDB_TYPE_UBIGINT);
-	types[20] = duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER);
-	for (index = 21; index < 29; index++)
-		types[index] = duckdb_create_logical_type(DUCKDB_TYPE_UTINYINT);
-	column_count = with_hgvs ? 36u : 29u;
-	if (with_hgvs) {
-		types[29] = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-		types[30] = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-		types[31] = duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER);
-		for (index = 32; index < 36; index++)
+	for (index = 0u; index < 29u; index++) {
+		names[index] = base_names[index];
+		if (index <= 1u || (index >= 7u && index <= 9u) || index == 17u ||
+		    index == 20u) {
+			types[index] = duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER);
+		} else if ((index >= 2u && index <= 6u) ||
+		    (index >= 10u && index <= 12u) || index == 18u) {
 			types[index] = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
+		} else if (index >= 13u && index <= 16u) {
+			types[index] = duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN);
+		} else if (index == 19u) {
+			types[index] = duckdb_create_logical_type(DUCKDB_TYPE_UBIGINT);
+		} else {
+			types[index] = duckdb_create_logical_type(DUCKDB_TYPE_UTINYINT);
+		}
+	}
+	column_count = 29u;
+	if (with_hgvs) {
+		for (index = 0u; index < 7u; index++) {
+			names[column_count] = hgvs_names[index];
+			types[column_count] = duckdb_create_logical_type(
+			    index == 2u ? DUCKDB_TYPE_UINTEGER : DUCKDB_TYPE_VARCHAR);
+			column_count++;
+		}
+	}
+	if (with_projection) {
+		for (index = 0u; index < 21u; index++) {
+			names[column_count] = projection_names[index];
+			if (index == 0u || index >= 17u) {
+				types[column_count] = duckdb_create_logical_type(
+				    DUCKDB_TYPE_VARCHAR);
+			} else if (index == 1u || index == 15u || index == 16u) {
+				types[column_count] = duckdb_create_logical_type(
+				    DUCKDB_TYPE_BOOLEAN);
+			} else if (index == 14u) {
+				types[column_count] = duckdb_create_logical_type(
+				    DUCKDB_TYPE_UBIGINT);
+			} else {
+				types[column_count] = duckdb_create_logical_type(
+				    DUCKDB_TYPE_UINTEGER);
+			}
+			column_count++;
+		}
 	}
 	structure = duckdb_create_struct_type(types, names, column_count);
 	list = duckdb_create_list_type(structure);
@@ -3291,7 +3763,7 @@ duckvep_register_annotate_scalar(duckdb_connection connection,
 
 	scalar = duckdb_create_scalar_function();
 	result_type = compact ? duckvep_compact_annotation_list_type() :
-	    duckvep_annotation_list_type(0);
+	    duckvep_annotation_list_type(0, 0);
 	if (event_family == DUCKVEP_SCALAR_STRUCTURAL)
 		name = compact ? "_duckvep_annotate_structural_compact" :
 		    "_duckvep_annotate_structural_rich";
@@ -3350,7 +3822,7 @@ duckvep_register_hgvs_scalar(duckdb_connection connection,
 	duckdb_logical_type result_type;
 
 	scalar = duckdb_create_scalar_function();
-	result_type = rich ? duckvep_annotation_list_type(1) :
+	result_type = rich ? duckvep_annotation_list_type(1, 0) :
 	    duckvep_hgvs_annotation_list_type();
 	duckdb_scalar_function_set_name(scalar,
 	    rich ? "_duckvep_annotate_small_rich_hgvs" :
@@ -3371,6 +3843,42 @@ duckvep_register_hgvs_scalar(duckdb_connection connection,
 	    duckvep_registry_release);
 	duckdb_scalar_function_set_function(scalar, rich ?
 	    duckvep_annotate_rich_hgvs_scalar : duckvep_annotate_hgvs_scalar);
+	(void)duckdb_register_scalar_function(connection, scalar);
+	duckdb_destroy_scalar_function(&scalar);
+	duckdb_destroy_logical_type(&result_type);
+}
+
+static void
+duckvep_register_projected_scalar(duckdb_connection connection,
+	duckvep_registry_t *registry, duckdb_logical_type varchar_type,
+	duckdb_logical_type uinteger_type, duckdb_logical_type ubigint_type,
+	int distance_parameters, int with_hgvs)
+{
+	duckdb_scalar_function scalar;
+	duckdb_logical_type result_type;
+
+	scalar = duckdb_create_scalar_function();
+	result_type = duckvep_annotation_list_type(with_hgvs, 1);
+	duckdb_scalar_function_set_name(scalar, with_hgvs ?
+	    "_duckvep_annotate_small_projected_hgvs" :
+	    "_duckvep_annotate_small_projected");
+	duckdb_scalar_function_add_parameter(scalar, varchar_type);
+	duckdb_scalar_function_add_parameter(scalar, uinteger_type);
+	duckdb_scalar_function_add_parameter(scalar, ubigint_type);
+	duckdb_scalar_function_add_parameter(scalar, varchar_type);
+	duckdb_scalar_function_add_parameter(scalar, varchar_type);
+	if (distance_parameters >= 1)
+		duckdb_scalar_function_add_parameter(scalar, ubigint_type);
+	if (distance_parameters >= 2)
+		duckdb_scalar_function_add_parameter(scalar, ubigint_type);
+	duckdb_scalar_function_set_return_type(scalar, result_type);
+	duckdb_scalar_function_set_volatile(scalar);
+	duckvep_registry_retain(registry);
+	duckdb_scalar_function_set_extra_info(scalar, registry,
+	    duckvep_registry_release);
+	duckdb_scalar_function_set_function(scalar, with_hgvs ?
+	    duckvep_annotate_projected_hgvs_scalar :
+	    duckvep_annotate_projected_scalar);
 	(void)duckdb_register_scalar_function(connection, scalar);
 	duckdb_destroy_scalar_function(&scalar);
 	duckdb_destroy_logical_type(&result_type);
@@ -3417,6 +3925,18 @@ register_duckvep_functions(duckdb_connection connection,
 	duckvep_register_hgvs_scalar(connection, registry, varchar_type,
 	    uinteger_type, ubigint_type, 1, 1);
 	duckvep_register_hgvs_scalar(connection, registry, varchar_type,
+	    uinteger_type, ubigint_type, 2, 1);
+	duckvep_register_projected_scalar(connection, registry, varchar_type,
+	    uinteger_type, ubigint_type, 0, 0);
+	duckvep_register_projected_scalar(connection, registry, varchar_type,
+	    uinteger_type, ubigint_type, 1, 0);
+	duckvep_register_projected_scalar(connection, registry, varchar_type,
+	    uinteger_type, ubigint_type, 2, 0);
+	duckvep_register_projected_scalar(connection, registry, varchar_type,
+	    uinteger_type, ubigint_type, 0, 1);
+	duckvep_register_projected_scalar(connection, registry, varchar_type,
+	    uinteger_type, ubigint_type, 1, 1);
+	duckvep_register_projected_scalar(connection, registry, varchar_type,
 	    uinteger_type, ubigint_type, 2, 1);
 	duckvep_register_annotate_scalar(connection, registry, varchar_type,
 	    uinteger_type, ubigint_type, 0, 0, DUCKVEP_SCALAR_STRUCTURAL);
