@@ -17,7 +17,7 @@ measurements](#complete-field-contracts) compare native tab and common
 CSQ with FastVEP revision `18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6`
 (September 10, 2026), using a cache rebuilt from DuckVEP’s exact
 644,427-transcript inventory. They retain all output rows and field
-disagreements; they do not establish complete VEP parity. FastVEP is
+disagreements; they do not establish complete VEP parity. DuckVEP is
 faster in both complete-field workloads at one and four cores in this
 retained matrix. These are end-to-end pipeline measurements, not
 isolated kernel timings.
@@ -66,21 +66,21 @@ resident model.
 
 The four placeholders have different status:
 
-| FastVEP field        | DuckVEP route                                                                                                                                     | Included here? |
-|:---------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------|:---------------|
-| `Existing_variation` | exact allele join to dbSNP, ClinVar, or another named-variant relation                                                                            | No             |
-| `DISTANCE`           | one validated projection from VEP feature geometry and transcript endpoints; SQL may render the resulting number                                  | No             |
-| `FLAGS`              | join requested transcript attributes from the model relation                                                                                      | No             |
-| `Codons`             | reconstruct reference/alternate triplets in `duckvep_transcript_projection`; the annotation kernel currently exposes only the scalar coding facts | No             |
+| FastVEP field        | DuckVEP route                                                                                                    | Included here? |
+|:---------------------|:-----------------------------------------------------------------------------------------------------------------|:---------------|
+| `Existing_variation` | exact allele join to dbSNP, ClinVar, or another named-variant relation                                           | No             |
+| `DISTANCE`           | one validated projection from VEP feature geometry and transcript endpoints; SQL may render the resulting number | No             |
+| `FLAGS`              | join requested transcript attributes from the model relation                                                     | No             |
+| `Codons`             | derive reference/alternate triplets once with the annotation kernel’s typed transcript-projection facts          | No             |
 
 Thus the comparison credits FastVEP for computing these native values.
 It also shows where DuckVEP can obtain named-variant and transcript
 metadata through ordinary joins without enlarging the consequence model.
-The current complete-field adapter materializes annotations and calls
-`duckvep_transcript_projection`, whose SQL reconstructs exon/CDS
-geometry, codon windows and translation for each result. The
-complete-field comparison below includes that projection. The compact
-timings above do not measure it.
+The complete-field adapter requests typed projection facts from the
+annotation kernel, then formats them after one transcript-metadata join.
+It does not materialize an annotation relation or replay transcript
+projection. The complete-field comparison below includes that fused
+path; the compact timings above do not measure it.
 
 ## Algorithm design: make the repeated biology small
 
