@@ -79,7 +79,7 @@ main <- function() {
     write_fields(build, file.path(path, "build.tsv"), tab = TRUE)
   }
   revision <- strrep("a", 40L)
-  timing_pack <- "field_contracts_matched_271ce67"
+  timing_pack <- "field_contracts_fused_c28ea6c"
   configurations <- c(
     "duckvep_operational17", "duckvep_native_tab17",
     "duckvep_vep_csq", "fastvep_native_tab17", "fastvep_vep_csq"
@@ -181,9 +181,11 @@ main <- function() {
       configuration <- matrix$configuration[[i]]
       group <- match(configuration, configurations)
       timing <- paste0(labels[[i]], ".time")
+      elapsed <- if (startsWith(configuration, "fastvep_")) "0:02.00" else "0:01.00"
       writeLines(c(
         "User time (seconds): 0.8", "System time (seconds): 0.2",
-        "Percent of CPU this job got: 100%", "Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.00",
+        "Percent of CPU this job got: 100%",
+        paste("Elapsed (wall clock) time (h:mm:ss or m:ss):", elapsed),
         "Maximum resident set size (kbytes): 1024", "File system outputs: 0", "Exit status: 0"
       ), file.path(path, timing))
       observation <- data.frame(
@@ -324,7 +326,8 @@ main <- function() {
   stopifnot(
     inherits(valid$value, "knitr_kable"), valid$timing_reads == 30L,
     nrow(valid$env$complete_rows) == 30L, nrow(valid$env$medians) == 10L,
-    all(valid$env$medians$elapsed_seconds == 1),
+    all(valid$env$medians$elapsed_seconds[valid$env$medians$tool == "duckvep"] == 1),
+    all(valid$env$medians$elapsed_seconds[valid$env$medians$tool == "fastvep"] == 2),
     any(grepl("Measured source:", valid$output, fixed = TRUE))
   )
   for (binding in c("cargo_fresh_release_locked_offline", "cargo_verified_tree_release_locked_offline"))
@@ -541,6 +544,32 @@ main <- function() {
       x
     })
   })
+  for (contract in c("native_tab17", "vep_csq")) for (threads in c(1L, 4L)) {
+    check(paste("duckvep_slower", contract, threads, sep = "_"), function(path) {
+      for (run in 1:2) {
+        timing <- file.path(path, paste("duckvep", contract, threads, run, sep = "_"))
+        timing <- paste0(timing, ".time")
+        lines <- readLines(timing)
+        elapsed <- grepl("Elapsed (wall clock)", lines, fixed = TRUE)
+        lines[elapsed] <- "Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.00"
+        writeLines(lines, timing)
+      }
+    }, expected_timing_reads = 30L)
+  }
+  check("zero_elapsed", function(path) {
+    timing <- file.path(path, paste0(sort(labels)[[1L]], ".time"))
+    lines <- readLines(timing)
+    elapsed <- grepl("Elapsed (wall clock)", lines, fixed = TRUE)
+    lines[elapsed] <- "Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.00"
+    writeLines(lines, timing)
+  }, expected_timing_reads = 1L)
+  check("nonfinite_rss", function(path) {
+    timing <- file.path(path, paste0(sort(labels)[[1L]], ".time"))
+    lines <- readLines(timing)
+    rss <- grepl("Maximum resident set size", lines, fixed = TRUE)
+    lines[rss] <- "Maximum resident set size (kbytes): Inf"
+    writeLines(lines, timing)
+  }, expected_timing_reads = 1L)
   check("duplicate_metadata_key", function(path) {
     edit_csv(path, "metadata.csv", function(x) rbind(x, x[x$field == "binding", ]))
   })
