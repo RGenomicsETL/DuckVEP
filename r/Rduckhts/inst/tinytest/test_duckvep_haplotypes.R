@@ -316,11 +316,13 @@ local({
     "(VALUES (1,repeat('CAG',11)),(2,repeat('CAG',5)||'CAT'||repeat('CAG',5)))",
     "r(event_index,sequence)")
   exact <- dbGetQuery(con, calls)
-  prepared <- paste("SELECT * REPLACE('G'||(duckvep_repeat_sequence(",
-    "[{unit:'CAG',count:10}],true)).sequence AS reference,",
-    "'G'||(duckvep_repeat_sequence(CASE event_index WHEN 1 THEN [{unit:'CAG',count:11}]",
+  prepared <- paste("WITH calls AS (", calls, "), prepared AS (SELECT *,",
+    "duckvep_repeat_alleles([{unit:'CAG',count:10}],",
+    "CASE event_index WHEN 1 THEN [{unit:'CAG',count:11}]",
     "ELSE [{unit:'CAG',count:5},{unit:'CAT',count:1},{unit:'CAG',count:5}] END,true,",
-    "max_sequence_bases:=33)).sequence AS alternate) FROM (", calls, ")")
+    "max_allele_bases:=33) repeat_fact FROM calls)",
+    "SELECT * EXCLUDE(repeat_fact) REPLACE('G'||repeat_fact.reference AS reference,",
+    "'G'||repeat_fact.alternate AS alternate) FROM prepared")
   expect_identical(dbGetQuery(con, prepared), exact)
   annotations <- lapply(list(literal = calls, prepared = prepared), function(query) {
     dbExecute(con, paste("CREATE OR REPLACE TABLE repeat_events AS SELECT event_index,",

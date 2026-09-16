@@ -499,21 +499,23 @@ and the nominal/imprecise consequence multisets matched for all six event-kind p
 both engines. The sampled oracle VCF retains `IMPRECISE`, `CIPOS`, and `CIEND`; this is a
 nominal-coordinate consequence test, not evidence that the uncertainty interval is exact.
 
-The exact repeat preparer has a seeded SQL differential against base R's ordered
-string repetition. Run from the repository root:
+The paired repeat-allele preparer has a seeded SQL differential against base R's ordered
+string repetition and byte lengths. Run from the repository root:
 
 ```sh
-Rscript test/duckvep/conformance/repeat_sequence_differential.R --trials 100000 --seed 173
-Rscript test/duckvep/conformance/repeat_sequence_differential.R --trials 100000 --seed 20260906
+Rscript test/duckvep/conformance/repeat_alleles_differential.R --trials 100000 --seed 173
+Rscript test/duckvep/conformance/repeat_alleles_differential.R --trials 100000 --seed 20260906
 ```
 
-Seven required strata exercise exact multi-component sequences, summary-only evidence,
-missing counts, missing units, fractional counts, empty sequences and unavailable component
-lists. The run retains all input components and complete expected/observed rows in Parquet,
-checks 32 generated capacity failures with recovery when enough exact scenes are available,
-and rejects dropped rows, duplicate identities, changed sequence and changed status.
-Receipts bind the seed, R RNG, extension bytes and source snapshots. These diagnostic runs
-do not enter release history or claim VEP raw-STR parsing or biological population coverage.
+The full 7-by-7 reference/alternate matrix pairs exact multi-component alleles,
+summary-only evidence, missing counts, missing units, fractional counts, empty alleles and
+unavailable component lists. It verifies both sequences and lengths, signed length change,
+GAIN/LOSS/NEUTRAL length direction, and summary/incomplete/nonintegral status precedence while
+retaining every scene and complete expected/observed rows in Parquet. Capacity exhaustion
+targets both allele axes and requires exact recovery; corruption controls reject dropped or
+duplicate identities and changed reference, alternate, length, direction or status. Receipts
+bind the seed, R RNG, extension bytes and source snapshots. These diagnostic runs do not
+enter release history or claim VEP raw-STR parsing or biological population coverage.
 SQL/R regressions separately compose exact pure and interrupted repeats through annotation
 and haplotype inputs; summary metadata is not an exact-sequence oracle.
 

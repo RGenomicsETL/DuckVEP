@@ -5,106 +5,128 @@
 require duckhts
 
 query T
-SELECT typeof(duckvep_repeat_sequence([{unit:'CAG',count:2}],true));
+SELECT typeof(duckvep_repeat_alleles(
+ [{unit:'CAG',count:2}],[{unit:'CAG',count:3}],true));
 ----
-STRUCT("sequence" VARCHAR, status VARCHAR)
+STRUCT(reference VARCHAR, alternate VARCHAR, reference_length UBIGINT, alternate_length UBIGINT, length_change BIGINT, length_direction VARCHAR, status VARCHAR)
 
-# Ordered exact components preserve interruptions, case and ambiguous DNA codes.
-query TT
-SELECT r.sequence,r.status FROM (SELECT duckvep_repeat_sequence(
+# One exact fact owns both alleles and their signed base-length direction. Ordered
+# components preserve interruptions, case, and ambiguous DNA codes.
+query TTIIITT
+SELECT r.reference,r.alternate,r.reference_length,r.alternate_length,
+       r.length_change,r.length_direction,r.status
+FROM (SELECT duckvep_repeat_alleles(
+ [{unit:'CAG',count:2},{unit:'CAT',count:1}],
  [{unit:'CAG',count:2},{unit:'CAT',count:1},{unit:'nRy',count:2}],true,
- max_sequence_bases:=15) r);
+ max_allele_bases:=15) r);
 ----
-CAGCAGCATnRynRy	ok
+CAGCAGCAT	CAGCAGCATnRynRy	9	15	6	GAIN	ok
 
-query TT
-SELECT r.sequence,r.status FROM (SELECT duckvep_repeat_sequence(
- []::STRUCT(unit VARCHAR,count DOUBLE)[],true,max_sequence_bases:=0) r);
+query IIITT
+SELECT r.reference_length,r.alternate_length,r.length_change,r.length_direction,r.status
+FROM (SELECT duckvep_repeat_alleles(
+ [{unit:'AC',count:4}],[{unit:'AC',count:1}],true) r);
 ----
-(empty)	ok
+8	2	-6	LOSS	ok
 
-query TT
-SELECT r.sequence,r.status FROM (SELECT duckvep_repeat_sequence(
- [{unit:'CAG',count:0}],true,max_sequence_bases:=0) r);
+query TTIIITT
+SELECT r.reference,r.alternate,r.reference_length,r.alternate_length,
+       r.length_change,r.length_direction,r.status
+FROM (SELECT duckvep_repeat_alleles(
+ []::STRUCT(unit VARCHAR,count DOUBLE)[],[{unit:'CAG',count:0}],true,
+ max_allele_bases:=0) r);
 ----
-(empty)	ok
+(empty)	(empty)	0	0	0	NEUTRAL	ok
 
 # A summary does not establish exact sequence even with integral, known counts.
-query IT
-SELECT r.sequence IS NULL,r.status FROM (SELECT duckvep_repeat_sequence(
- [{unit:'CAG',count:1000000000000000000}],false,max_sequence_bases:=0) r);
+query IIIIIIIT
+SELECT r.reference IS NULL,r.alternate IS NULL,r.reference_length IS NULL,
+       r.alternate_length IS NULL,r.length_change IS NULL,r.length_direction IS NULL,
+       r.status='summary_only',r.status
+FROM (SELECT duckvep_repeat_alleles(
+ [{unit:'CAG',count:1000000000000000000}],
+ [{unit:'CAG',count:1000000000000000001}],false,max_allele_bases:=0) r);
 ----
-1	summary_only
+1	1	1	1	1	1	1	summary_only
 
 query IT
-SELECT r.sequence IS NULL,r.status FROM (SELECT duckvep_repeat_sequence(
- [{unit:'CAG',count:11.5}],true) r);
+SELECT r.reference IS NULL,r.status FROM (SELECT duckvep_repeat_alleles(
+ [{unit:'CAG',count:11}],[{unit:'CAG',count:11.5}],true) r);
 ----
 1	nonintegral_count
 
 # Test integrality before converting arbitrary caller numeric types to DOUBLE.
 query IT
-SELECT r.sequence IS NULL,r.status FROM (SELECT duckvep_repeat_sequence(
+SELECT r.alternate IS NULL,r.status FROM (SELECT duckvep_repeat_alleles(
+ [{unit:'A',count:1}],
  [{unit:'A',count:1.000000000000000001::DECIMAL(38,18)}],true) r);
 ----
 1	nonintegral_count
 
 query IT
-SELECT count(*),min(r.status) FROM (SELECT duckvep_repeat_sequence(parts,true) r
+SELECT count(*),min(r.status) FROM (SELECT duckvep_repeat_alleles(
+ [{unit:'A',count:1}],parts,true) r
  FROM (VALUES (NULL::STRUCT(unit VARCHAR,count DOUBLE)[]),([NULL]),
  ([{unit:NULL,count:1}]),([{unit:'CAG',count:NULL}])) v(parts))
- WHERE r.sequence IS NULL;
+ WHERE r.alternate IS NULL;
 ----
 4	incomplete_input
 
-# The complete concatenation, not each component separately, is capacity checked.
+# Each complete allele, not each component separately, is capacity checked.
 statement error
-SELECT duckvep_repeat_sequence([{unit:'AC',count:2},{unit:'GT',count:2}],true,
- max_sequence_bases:=7);
+SELECT duckvep_repeat_alleles([{unit:'AC',count:2},{unit:'GT',count:2}],
+ [{unit:'A',count:1}],true,max_allele_bases:=7);
 ----
-exceeds max_sequence_bases=7
+exceeds max_allele_bases=7
 
 statement error
-SELECT duckvep_repeat_sequence([{unit:'AC',count:1e300}],true);
+SELECT duckvep_repeat_alleles([{unit:'A',count:1}],
+ [{unit:'AC',count:1e300}],true);
 ----
-exceeds max_sequence_bases=5000
+exceeds max_allele_bases=5000
 
 statement error
-SELECT duckvep_repeat_sequence([{unit:'A',count:1}],true,max_sequence_bases:=1.000000000000000001::DECIMAL(38,18));
+SELECT duckvep_repeat_alleles([{unit:'A',count:1}],[{unit:'A',count:2}],true,
+ max_allele_bases:=1.000000000000000001::DECIMAL(38,18));
 ----
-max_sequence_bases must be an integer
+max_allele_bases must be an integer
 
 statement error
-SELECT duckvep_repeat_sequence([{unit:'A',count:-1}],false);
-----
-counts must be finite and nonnegative
-
-statement error
-SELECT duckvep_repeat_sequence([{unit:'A',count:'NaN'::DOUBLE}],false);
+SELECT duckvep_repeat_alleles([{unit:'A',count:-1}],[{unit:'A',count:2}],false);
 ----
 counts must be finite and nonnegative
 
 statement error
-SELECT duckvep_repeat_sequence([{unit:'A.',count:1}],true);
+SELECT duckvep_repeat_alleles([{unit:'A',count:1}],
+ [{unit:'A',count:'NaN'::DOUBLE}],false);
+----
+counts must be finite and nonnegative
+
+statement error
+SELECT duckvep_repeat_alleles([{unit:'A.',count:1}],[{unit:'A',count:2}],true);
 ----
 repeat units must contain non-empty IUPAC DNA
 
 statement error
-SELECT duckvep_repeat_sequence([{unit:'A',count:1}],NULL);
+SELECT duckvep_repeat_alleles([{unit:'A',count:1}],[{unit:'A',count:2}],NULL);
 ----
 sequence_exact is required
 
-# Input-dependent certainty, counts and capacities cross several output vectors.
-query III
+# Input-dependent certainty, lengths, direction, and capacities cross several
+# output vectors.
+query IIII
 WITH prepared AS (
- SELECT i,duckvep_repeat_sequence([{unit:'CAG',count:i%13}],i%3<>0,
- max_sequence_bases:=(i%13)*3) r FROM range(10000) v(i)
+ SELECT i,duckvep_repeat_alleles([{unit:'CAG',count:i%7}],
+ [{unit:'CAG',count:i%13}],i%3<>0,max_allele_bases:=greatest(i%7,i%13)*3) r
+ FROM range(10000) v(i)
 )
-SELECT count(*),count(*) FILTER (WHERE r.status='summary_only' AND r.sequence IS NULL),
- count(*) FILTER (WHERE r.status='ok' AND r.sequence=repeat('CAG',(i%13)::BIGINT))
+SELECT count(*),count(*) FILTER (WHERE r.status='summary_only' AND r.reference IS NULL),
+ count(*) FILTER (WHERE r.status='ok' AND r.reference=repeat('CAG',(i%7)::BIGINT)
+   AND r.alternate=repeat('CAG',(i%13)::BIGINT)),
+ count(*) FILTER (WHERE r.status='ok' AND r.length_change=3*((i%13)-(i%7)))
 FROM prepared;
 ----
-10000	3334	6666
+10000	3334	6666	6666
 
 query T
 SELECT typeof(duckvep_breakend_geometry('N[chr:1['));

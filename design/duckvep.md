@@ -1088,16 +1088,18 @@ perfect repeat. The preparation contract must retain ordered repeat components, 
 ordinals, nullable counts and lengths, confidence intervals, and exactness separately;
 `RUC` is a floating-point field and must not be silently narrowed to an integer count.
 
-`duckvep_repeat_sequence` prepares an exact ordered list of `(unit, count)` components
-in SQL; reference and alternate descriptions use the same operation. A required
-`sequence_exact` assertion separates exact descriptions from summaries. Missing data and
-fractional counts withhold the sequence with an explicit status. Complete integral counts
-expand only after the sum of all component lengths fits `max_sequence_bases`. This limit
-belongs to the SQL call, not to VEP's per-component parser limit. Empty lists describe an
-empty allele; a missing list means unavailable sequence. Input component order, case and
-IUPAC codes are preserved. The caller still supplies reference validation, genomic
-coordinates and source identity before annotation; summary data cannot enter sequence
-replay merely because its nominal counts happen to be integers.
+`duckvep_repeat_alleles` prepares reference and alternate ordered `(unit, count)`
+descriptions as one event fact. A required `sequence_exact` assertion separates exact
+descriptions from summaries. Missing data and fractional counts withhold both sequences
+with an explicit status. Complete integral counts expand only after each complete allele
+fits `max_allele_bases`; the result includes both lengths, their signed difference and the
+gain/loss/neutral base-length direction. This is not a copy-number inference. The limit
+belongs to the SQL call, not to VEP's per-component parser limit. Empty lists describe
+empty alleles; a missing list means
+unavailable sequence. Input component order, case and IUPAC codes are preserved. The
+caller still supplies reference validation, genomic coordinates and source identity
+before annotation; summary data cannot enter sequence replay merely because its nominal
+counts happen to be integers.
 
 The paired-breakend native lane accepts the local and mate regions and raw one-based VCF
 positions from that same public event row. It queries the resident cgranges transcript and
