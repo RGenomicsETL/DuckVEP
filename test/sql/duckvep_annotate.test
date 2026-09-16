@@ -10,6 +10,45 @@ SELECT typeof(duckvep_repeat_alleles(
 ----
 STRUCT(reference VARCHAR, alternate VARCHAR, reference_length UBIGINT, alternate_length UBIGINT, length_change BIGINT, length_direction VARCHAR, status VARCHAR)
 
+# Each call argument is evaluated once before normalization and validation.
+statement ok
+CREATE SEQUENCE repeat_reference_eval START 1;
+
+query ITI
+WITH evaluated AS MATERIALIZED (
+ SELECT duckvep_repeat_alleles(
+  [{unit:'A',count:CASE nextval('repeat_reference_eval') WHEN 1 THEN 1.5 ELSE 2 END}],
+  [{unit:'C',count:1}],true) r
+)
+SELECT r.reference IS NULL,r.status,currval('repeat_reference_eval') FROM evaluated;
+----
+1	nonintegral_count	1
+
+statement ok
+CREATE SEQUENCE repeat_alternate_eval START 1;
+
+query ITI
+WITH evaluated AS MATERIALIZED (
+ SELECT duckvep_repeat_alleles([{unit:'A',count:1}],
+  [{unit:'C',count:CASE nextval('repeat_alternate_eval') WHEN 1 THEN 1.5 ELSE 2 END}],
+  true) r
+)
+SELECT r.alternate IS NULL,r.status,currval('repeat_alternate_eval') FROM evaluated;
+----
+1	nonintegral_count	1
+
+statement ok
+CREATE SEQUENCE repeat_capacity_eval START 1;
+
+query TTI
+WITH evaluated AS MATERIALIZED (
+ SELECT duckvep_repeat_alleles([{unit:'A',count:1}],[{unit:'C',count:1}],true,
+  max_allele_bases:=CASE nextval('repeat_capacity_eval') WHEN 1 THEN 1 ELSE 1.5 END) r
+)
+SELECT r.reference,r.alternate,currval('repeat_capacity_eval') FROM evaluated;
+----
+A	C	1
+
 # One exact fact owns both alleles and their signed base-length direction. Ordered
 # components preserve interruptions, case, and ambiguous DNA codes.
 query TTIIITT
@@ -1820,3 +1859,23 @@ SELECT duckvep_model_drop('fixture'), duckvep_model_drop('fixture2'),
        duckvep_model_drop('partial-cds-end');
 ----
 1	1	1	1	1	1	1	0	1
+
+# Decide event availability before materializing either allele. The complete
+# axis is intentionally larger than this query's memory limit and must remain
+# unevaluated when its mate is incomplete or nonintegral.
+statement ok
+SET memory_limit='16MB';
+
+query IT
+SELECT r.reference IS NULL,r.status FROM (SELECT duckvep_repeat_alleles(
+ [{unit:'A',count:32000000}],[{unit:'A',count:NULL}],true,
+ max_allele_bases:=32000000) r);
+----
+1	incomplete_input
+
+query IT
+SELECT r.alternate IS NULL,r.status FROM (SELECT duckvep_repeat_alleles(
+ [{unit:'A',count:1.5}],[{unit:'A',count:32000000}],true,
+ max_allele_bases:=32000000) r);
+----
+1	nonintegral_count
