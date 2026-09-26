@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifdef DUCKHTS_WASM_DUCKDB_RUNTIME
+#ifdef DUCKVEP_WASM_DUCKDB_RUNTIME
 /*
  * duckdb-wasm's MAIN_MODULE exports legalized wrappers for several libc
  * symbols that use 64-bit arguments/returns, plus native i64 versions under

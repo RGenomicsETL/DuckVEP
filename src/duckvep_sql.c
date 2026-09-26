@@ -585,7 +585,7 @@ duckvep_register_projection_relation(duckhts_registration_t *registration)
 		"    list_filter(range(1, length(exons)), i ->\n",
 		"      vf_start <= greatest(exons[i].exon_start, exons[i+1].exon_start)::BIGINT - 1 AND\n",
 		"      vf_end >= least(exons[i].exon_end, exons[i+1].exon_end)::BIGINT + 1) AS intron_hits,\n",
-		"    CASE WHEN strand > 0 THEN feature_alternate ELSE seq_revcomp(feature_alternate) END\n",
+		"    CASE WHEN strand > 0 THEN feature_alternate ELSE _duckvep_revcomp(feature_alternate) END\n",
 		"      AS transcript_alternate\n",
 		"  FROM features\n",
 		"), cdna AS (\n",

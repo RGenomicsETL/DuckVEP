@@ -225,7 +225,7 @@ WITH components AS MATERIALIZED (
   SELECT seq_region_id, chrom, sequence_length, asm_start,
          CASE ori
            WHEN 1 THEN substring(sequence, cmp_start, cmp_end - cmp_start + 1)
-           ELSE seq_revcomp(
+           ELSE _duckvep_revcomp(
              substring(sequence, cmp_start, cmp_end - cmp_start + 1)
            )
          END AS piece

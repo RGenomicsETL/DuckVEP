@@ -126,7 +126,7 @@ FROM duckvep_transcript_projection('projection_events', 'projection_repeated', '
 # allele stays in the submitted reference orientation.
 statement ok
 CREATE TABLE projection_reverse AS SELECT * REPLACE(-1::TINYINT AS strand,
-  seq_revcomp(decode(cds_sequence))::BLOB AS cds_sequence,
+  _duckvep_revcomp(decode(cds_sequence))::BLOB AS cds_sequence,
   list_reverse(list_transform(exons, e -> struct_pack(exon_start := e.exon_start,
     exon_end := e.exon_end, exon_cdna_start := (16-e.exon_cdna_end)::UBIGINT,
     exon_cdna_end := (16-e.exon_cdna_start)::UBIGINT, phase := e.phase,
@@ -442,8 +442,8 @@ CREATE TABLE projection_terminal_events AS SELECT e.* REPLACE(
   (2*t.transcript_index+v.ord)::UBIGINT AS event_index, t.seq_region AS seq_region,
   CASE WHEN strand=1 THEN 99+v.cds_start
     ELSE 113-v.cds_start-length(v.reference) END::UBIGINT AS position,
-  CASE WHEN strand=1 THEN v.reference ELSE seq_revcomp(v.reference) END AS reference,
-  CASE WHEN strand=1 THEN v.alternate ELSE seq_revcomp(v.alternate) END AS alternate)
+  CASE WHEN strand=1 THEN v.reference ELSE _duckvep_revcomp(v.reference) END AS reference,
+  CASE WHEN strand=1 THEN v.alternate ELSE _duckvep_revcomp(v.alternate) END AS alternate)
 FROM projection_events e CROSS JOIN projection_terminal_transcripts t
 JOIN (VALUES (0,1,9,'GT','TT'), (0,2,11,'A','G'),
   (1,1,9,'TA','AT'), (1,2,10,'A','T')) v(shape,ord,cds_start,reference,alternate)
@@ -668,7 +668,7 @@ WITH cases(site,payload,terms) AS (VALUES
     (CASE WHEN strand=1 THEN 111+site ELSE 101-site END)::UBIGINT,
     CASE WHEN strand=1 THEN CASE WHEN site=0 THEN 'G' ELSE 'T' END ELSE 'A' END,
     CASE WHEN strand=1 THEN (CASE WHEN site=0 THEN 'G' ELSE 'T' END)||payload
-      ELSE 'A'||seq_revcomp(payload) END, 0::UBIGINT)) u(a)
+      ELSE 'A'||_duckvep_revcomp(payload) END, 0::UBIGINT)) u(a)
 )
 SELECT count(*), count(*) FILTER (WHERE status_code=0),
   count(*) FILTER (WHERE terms=(SELECT string_agg(s.consequence,'&' ORDER BY s.consequence)

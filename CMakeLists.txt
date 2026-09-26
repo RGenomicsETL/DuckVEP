@@ -52,7 +52,7 @@ set(EXTENSION_SOURCES
 if(DUCKDB_WASM_EXTENSION)
     add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fwasm-exceptions")
-    target_compile_definitions(${EXTENSION_NAME} PRIVATE DUCKHTS_WASM_DUCKDB_RUNTIME=1)
+    target_compile_definitions(${EXTENSION_NAME} PRIVATE DUCKVEP_WASM_DUCKDB_RUNTIME=1)
     target_compile_options(${EXTENSION_NAME} PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/wasm_socket_compat.h)
 else()
     add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})

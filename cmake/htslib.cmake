@@ -80,7 +80,7 @@ if(DUCKDB_WASM_EXTENSION)
     # The duckdb-wasm host exports native i64 file APIs as orig$lseek /
     # orig$ftruncate, so mark the top-level DuckDB wasm build explicitly while
     # leaving the webR/package wasm path on the default symbols.
-    set(HTSLIB_BUILD_CPPFLAGS "-DDUCKHTS_WASM_DUCKDB_RUNTIME=1 -include ${CMAKE_SOURCE_DIR}/src/include/wasm_socket_compat.h")
+    set(HTSLIB_BUILD_CPPFLAGS "-DDUCKVEP_WASM_DUCKDB_RUNTIME=1 -include ${CMAKE_SOURCE_DIR}/src/include/wasm_socket_compat.h")
 endif()
 
 # ------------------------------------------------------------------
