@@ -1,0 +1,5 @@
+#define HTS_CC "/usr/bin/cc"
+#define HTS_CPPFLAGS ""
+#define HTS_CFLAGS "-O2 -fPIC "
+#define HTS_LDFLAGS ""
+#define HTS_LIBS "-lssl -lcrypto -lz -llzma -lbz2 -lpthread -ldl"

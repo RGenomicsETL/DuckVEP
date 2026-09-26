@@ -1,0 +1,41 @@
+PROJ_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+EXTENSION_NAME=duckvep
+USE_UNSTABLE_C_API=0
+TARGET_DUCKDB_VERSION=v1.2.0
+DUCKDB_HEADER_VERSION=v1.5.3
+
+ifeq ($(DUCKDB_PLATFORM),windows_amd64_mingw)
+override GEN=
+override VCPKG_TOOLCHAIN_PATH=
+override VCPKG_TARGET_TRIPLET=
+override VCPKG_HOST_TRIPLET=
+endif
+ifeq ($(DUCKDB_PLATFORM),windows_amd64_rtools)
+override GEN=
+override VCPKG_TOOLCHAIN_PATH=
+override VCPKG_TARGET_TRIPLET=
+override VCPKG_HOST_TRIPLET=
+endif
+
+include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
+include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
+
+.PHONY: all test test_debug test_release test-extension-symbols readme
+all: configure release
+configure: venv platform extension_version
+extension_version:
+	@$(VERSION_COMMAND)
+build_extension_with_metadata_debug build_extension_with_metadata_release: extension_version
+debug: build_extension_library_debug build_extension_with_metadata_debug
+release: build_extension_library_release build_extension_with_metadata_release
+test: test_debug
+test_debug: debug test_extension_debug
+test_release: release test_extension_release test-extension-symbols
+test-extension-symbols: release
+	@set -e; file=build/release/duckvep.duckdb_extension; \
+		test -f "$$file"; \
+		actual=$$(nm -D --defined-only "$$file" | awk '$$2 ~ /^[TDB]$$/ && $$3 !~ /^(_init|_fini)$$/ {print $$3}' | sort -u); \
+		test "$$actual" = duckvep_init_c_api || { printf 'Unexpected exports: %s\n' "$$actual"; exit 1; }; \
+		nm -D -u "$$file" | awk '$$NF ~ /^duckdb_/ {print "Unexpected DuckDB API import: " $$0; bad=1} END {exit bad}'
+readme: release
+	Rscript scripts/render-readme.R

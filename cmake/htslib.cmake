@@ -1,0 +1,314 @@
+# ---- htslib ----
+# Build vendored htslib using its own configure + make.  CMake drives the
+# process via ExternalProject_Add so it runs once, in-tree, producing a
+# static libhts.a with -fPIC.  htslib's configure auto-detects every
+# available library (zlib, bz2, lzma, libdeflate, libcurl, openssl …).
+include(ExternalProject)
+
+set(HTSLIB_SRC_DIR "${CMAKE_SOURCE_DIR}/third_party/htslib")
+set(HTSLIB_BUILD_DIR "${HTSLIB_SRC_DIR}")  # build in-tree like upstream expects
+
+# ------------------------------------------------------------------
+# Dependency detection.
+#
+# We use find_package() which works everywhere:
+#   • In CI the vcpkg toolchain intercepts these and finds vcpkg ports
+#     (declared in vcpkg.json).
+#   • On Linux with system packages, CMake's standard modules find them.
+#   • On macOS, Homebrew installs into /opt/homebrew (ARM) or /usr/local
+#     (Intel) — both are in CMake's default search paths.
+# ------------------------------------------------------------------
+
+# zlib — always required
+find_package(ZLIB REQUIRED)
+
+# Optional compression libraries
+find_package(BZip2 QUIET)
+find_package(LibLZMA QUIET)
+
+# libdeflate has no standard FindModule; use find_library + find_path
+find_library(LIBDEFLATE_LIBRARY NAMES deflate)
+find_path(LIBDEFLATE_INCLUDE_DIR NAMES libdeflate.h)
+if(LIBDEFLATE_LIBRARY AND LIBDEFLATE_INCLUDE_DIR)
+    set(LIBDEFLATE_FOUND TRUE)
+else()
+    set(LIBDEFLATE_FOUND FALSE)
+endif()
+
+# Optional network / crypto
+find_package(CURL QUIET)
+find_package(OpenSSL QUIET)
+find_package(PkgConfig QUIET)
+
+# Threads (portable: resolves to -lpthread on Linux, nothing on macOS)
+find_package(Threads REQUIRED)
+
+# MinGW regex (regcomp/regexec are in libgnurx)
+if(WIN32 AND MINGW)
+    find_library(GNUREGEX_LIBRARY NAMES gnurx regex)
+    find_library(MINGW_LIBPSL_LIBRARY NAMES psl)
+    find_library(MINGW_LIBIDN2_LIBRARY NAMES idn2)
+    find_library(MINGW_LIBUNISTRING_LIBRARY NAMES unistring)
+    find_library(MINGW_LIBICONV_LIBRARY NAMES iconv)
+    find_library(MINGW_LIBSSH2_LIBRARY NAMES ssh2)
+    find_library(MINGW_LIBGCRYPT_LIBRARY NAMES gcrypt)
+    find_library(MINGW_LIBGPG_ERROR_LIBRARY NAMES gpg-error)
+    find_library(MINGW_LIBZSTD_LIBRARY NAMES zstd)
+endif()
+if(WIN32 AND MINGW AND PKG_CONFIG_FOUND)
+    pkg_check_modules(PC_LIBCURL QUIET libcurl)
+endif()
+
+# ------------------------------------------------------------------
+# Build paths for htslib's Makefile.
+#
+# When vcpkg is active, libraries are installed under
+#   ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/
+# and we pass CPPFLAGS/LDFLAGS/LIBS directly to make. On plain system builds
+# these are empty and harmless.
+# ------------------------------------------------------------------
+set(HTSLIB_EXTRA_CFLAGS "")
+set(HTSLIB_EXTRA_CPPFLAGS "")
+set(HTSLIB_BUILD_CPPFLAGS "")
+set(HTSLIB_EXTRA_LDFLAGS "")
+
+# duckdb-wasm uses -fwasm-exceptions throughout; htslib must match so its
+# setjmp/longjmp uses __wasm_longjmp rather than emscripten_longjmp.
+if(DUCKDB_WASM_EXTENSION)
+    set(HTSLIB_EXTRA_CFLAGS "-fwasm-exceptions")
+    # Keep the shared compatibility shim wasm-only.
+    # The duckdb-wasm host exports native i64 file APIs as orig$lseek /
+    # orig$ftruncate, so mark the top-level DuckDB wasm build explicitly while
+    # leaving the webR/package wasm path on the default symbols.
+    set(HTSLIB_BUILD_CPPFLAGS "-DDUCKHTS_WASM_DUCKDB_RUNTIME=1 -include ${CMAKE_SOURCE_DIR}/src/include/wasm_socket_compat.h")
+endif()
+
+# ------------------------------------------------------------------
+# macOS cross-compilation support (htslib build flags).
+# ------------------------------------------------------------------
+if(APPLE AND DEFINED OSX_BUILD_ARCH AND NOT "${OSX_BUILD_ARCH}" STREQUAL "")
+    set(HTSLIB_EXTRA_CFLAGS "-arch ${OSX_BUILD_ARCH}")
+    set(HTSLIB_EXTRA_LDFLAGS "-arch ${OSX_BUILD_ARCH}")
+    message(STATUS "macOS htslib arch: ${OSX_BUILD_ARCH}")
+endif()
+
+if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+    set(_vcpkg_prefix "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+    if(EXISTS "${_vcpkg_prefix}")
+        set(HTSLIB_EXTRA_CFLAGS "${HTSLIB_EXTRA_CFLAGS} -I${_vcpkg_prefix}/include")
+        set(HTSLIB_EXTRA_LDFLAGS "${HTSLIB_EXTRA_LDFLAGS} -L${_vcpkg_prefix}/lib")
+        set(HTSLIB_EXTRA_CPPFLAGS "${HTSLIB_EXTRA_CPPFLAGS} -I${_vcpkg_prefix}/include")
+        set(HTSLIB_BUILD_CPPFLAGS "${HTSLIB_BUILD_CPPFLAGS} -I${_vcpkg_prefix}/include")
+        message(STATUS "vcpkg prefix for htslib: ${_vcpkg_prefix}")
+    endif()
+endif()
+
+# Strip leading whitespace that may appear when no arch flags were prepended
+string(STRIP "${HTSLIB_EXTRA_CFLAGS}" HTSLIB_EXTRA_CFLAGS)
+string(STRIP "${HTSLIB_EXTRA_CPPFLAGS}" HTSLIB_EXTRA_CPPFLAGS)
+string(STRIP "${HTSLIB_BUILD_CPPFLAGS}" HTSLIB_BUILD_CPPFLAGS)
+string(STRIP "${HTSLIB_EXTRA_LDFLAGS}" HTSLIB_EXTRA_LDFLAGS)
+
+set(HTSLIB_MAKE_ARGS
+    "CC=${CMAKE_C_COMPILER}"
+    "CFLAGS=-O2 -fPIC ${HTSLIB_EXTRA_CFLAGS}"
+    "LDFLAGS=${HTSLIB_EXTRA_LDFLAGS}"
+)
+
+if(NOT "${HTSLIB_BUILD_CPPFLAGS}" STREQUAL "")
+    list(APPEND HTSLIB_MAKE_ARGS "CPPFLAGS=${HTSLIB_BUILD_CPPFLAGS}")
+endif()
+
+# Static-library transitive dependencies.
+# When vcpkg (or similar) provides static .a archives, configure's link
+# checks like `gcc test.c -lcurl` fail because libcurl.a itself needs
+# -lssl -lcrypto -lz -lpthread etc.  Autotools' LIBS variable is
+# appended to every link check, so we collect all transitive deps here.
+set(HTSLIB_EXTRA_LIBS "")
+if(OPENSSL_FOUND AND NOT DUCKDB_WASM_EXTENSION)
+    list(APPEND HTSLIB_EXTRA_LIBS "-lssl" "-lcrypto")
+endif()
+list(APPEND HTSLIB_EXTRA_LIBS "-lz")
+if(LIBLZMA_FOUND AND NOT DUCKDB_WASM_EXTENSION)
+    list(APPEND HTSLIB_EXTRA_LIBS "-llzma")
+endif()
+if(BZIP2_FOUND)
+    list(APPEND HTSLIB_EXTRA_LIBS "-lbz2")
+endif()
+if(APPLE)
+    # macOS: pthreads are in libSystem (no -lpthread), and curl with
+    # SecureTransport needs macOS frameworks for TLS.
+    list(APPEND HTSLIB_EXTRA_LIBS "-lpthread")
+    if(CURL_FOUND)
+        list(APPEND HTSLIB_EXTRA_LIBS
+            "-framework CoreFoundation"
+            "-framework SystemConfiguration"
+            "-framework Security"
+        )
+    endif()
+else()
+    list(APPEND HTSLIB_EXTRA_LIBS "-lpthread")
+    if(NOT DUCKDB_WASM_EXTENSION)
+        list(APPEND HTSLIB_EXTRA_LIBS "-ldl")
+    endif()
+endif()
+if(WIN32 AND MINGW AND GNUREGEX_LIBRARY)
+    list(APPEND HTSLIB_EXTRA_LIBS "-lgnurx")
+endif()
+list(JOIN HTSLIB_EXTRA_LIBS " " HTSLIB_EXTRA_LIBS_STR)
+list(APPEND HTSLIB_MAKE_ARGS "LIBS=${HTSLIB_EXTRA_LIBS_STR}")
+
+message(STATUS "htslib make args: ${HTSLIB_MAKE_ARGS}")
+
+# htslib uses GNU Makefiles (not Ninja), so we must always use `make`
+# even when the outer CMake build uses Ninja.
+find_program(MAKE_COMMAND NAMES gmake make REQUIRED)
+find_program(SH_COMMAND NAMES sh bash REQUIRED)
+
+set(HTSLIB_CONFIGURE_FLAGS "")
+if(NOT BZIP2_FOUND)
+    list(APPEND HTSLIB_CONFIGURE_FLAGS --disable-bz2)
+endif()
+if(NOT LIBLZMA_FOUND)
+    list(APPEND HTSLIB_CONFIGURE_FLAGS --disable-lzma)
+endif()
+if(NOT LIBDEFLATE_FOUND)
+    list(APPEND HTSLIB_CONFIGURE_FLAGS --disable-libdeflate)
+endif()
+if(DUCKDB_WASM_EXTENSION)
+    # Curl-based HTTP and plugin loading both fail in a WASM SIDE_MODULE context
+    # (no socket access in Web Workers, no dlopen support).  HTTP/HTTPS access
+    # is provided by wasm_http_hfile.c (synchronous XHR via EM_ASM) instead.
+    # Curl's internal function pointer callbacks also produce i64 call_indirect
+    # signatures that mismatch duckdb-wasm's function table ABI.
+    # Match the stricter webR/browser path: no curl, no remote plugin loaders,
+    # and no wasm-side lzma dependency.
+    list(APPEND HTSLIB_CONFIGURE_FLAGS --disable-libcurl --disable-plugins --disable-s3 --disable-gcs --disable-lzma)
+elseif(WIN32 AND MINGW)
+    # MinGW/Rtools builds should not rely on htslib's checked-in config.mk.
+    # Keep plugins off for now, but allow libcurl when the outer link can
+    # provide the full dependency chain.
+    list(APPEND HTSLIB_CONFIGURE_FLAGS --disable-plugins)
+elseif(NOT CURL_FOUND)
+    list(APPEND HTSLIB_CONFIGURE_FLAGS --disable-libcurl)
+endif()
+
+set(HTSLIB_CONFIGURE_ENV_VARS "")
+if(DUCKDB_WASM_EXTENSION)
+    # Match the package configure path: skip htslib's recv() library probe in
+    # browser wasm builds, where socket libraries do not exist.
+    list(APPEND HTSLIB_CONFIGURE_ENV_VARS "ac_cv_search_recv=none required")
+endif()
+
+set(HTSLIB_CONFIGURE_COMMAND
+    ${CMAKE_COMMAND} -E env
+    "CC=${CMAKE_C_COMPILER}"
+    "CPPFLAGS=${HTSLIB_EXTRA_CPPFLAGS}"
+    "CFLAGS=-O2 -fPIC ${HTSLIB_EXTRA_CFLAGS}"
+    "LDFLAGS=${HTSLIB_EXTRA_LDFLAGS}"
+    "LIBS=${HTSLIB_EXTRA_LIBS_STR}"
+    ${HTSLIB_CONFIGURE_ENV_VARS}
+    ${SH_COMMAND} ./configure ${HTSLIB_CONFIGURE_FLAGS}
+)
+
+ExternalProject_Add(htslib_build
+    SOURCE_DIR        "${HTSLIB_SRC_DIR}"
+    BUILD_IN_SOURCE   TRUE
+    CONFIGURE_COMMAND ${HTSLIB_CONFIGURE_COMMAND}
+    BUILD_COMMAND     ${MAKE_COMMAND} -j lib-static ${HTSLIB_MAKE_ARGS}
+    BUILD_ALWAYS      TRUE
+    INSTALL_COMMAND   ""   # no install step; we link libhts.a directly
+    BUILD_BYPRODUCTS  "${HTSLIB_BUILD_DIR}/libhts.a"
+    LOG_CONFIGURE     TRUE
+    LOG_BUILD         TRUE
+)
+
+# Import the static library so CMake knows about it
+add_library(hts STATIC IMPORTED GLOBAL)
+set_target_properties(hts PROPERTIES
+    IMPORTED_LOCATION "${HTSLIB_BUILD_DIR}/libhts.a"
+    INTERFACE_INCLUDE_DIRECTORIES "${HTSLIB_SRC_DIR}"
+)
+add_dependencies(hts htslib_build)
+
+# ------------------------------------------------------------------
+# Link hts + transitive dependencies (only what was found).
+# Uses CMake imported targets for correctness & portability.
+# ------------------------------------------------------------------
+set(HTSLIB_LINK_LIBS hts ZLIB::ZLIB)
+
+if(BZIP2_FOUND)
+    list(APPEND HTSLIB_LINK_LIBS BZip2::BZip2)
+endif()
+if(LIBLZMA_FOUND)
+    list(APPEND HTSLIB_LINK_LIBS LibLZMA::LibLZMA)
+endif()
+if(LIBDEFLATE_FOUND)
+    list(APPEND HTSLIB_LINK_LIBS ${LIBDEFLATE_LIBRARY})
+endif()
+if(CURL_FOUND AND NOT DUCKDB_WASM_EXTENSION)
+    if(WIN32 AND MINGW)
+        if(PC_LIBCURL_FOUND)
+            string(STRIP "${PC_LIBCURL_LDFLAGS}" PC_LIBCURL_LDFLAGS_STRIPPED)
+            separate_arguments(PC_LIBCURL_LDFLAGS_LIST NATIVE_COMMAND "${PC_LIBCURL_LDFLAGS_STRIPPED}")
+            list(APPEND HTSLIB_LINK_LIBS ${PC_LIBCURL_LDFLAGS_LIST})
+        else()
+            list(APPEND HTSLIB_LINK_LIBS
+                -lcurl
+                -lbcrypt
+                -lssl
+                -lcrypto
+                -lcrypt32
+                -lwsock32
+                -lwldap32
+            )
+            if(MINGW_LIBPSL_LIBRARY)
+                list(APPEND HTSLIB_LINK_LIBS ${MINGW_LIBPSL_LIBRARY})
+            endif()
+            if(MINGW_LIBIDN2_LIBRARY)
+                list(APPEND HTSLIB_LINK_LIBS ${MINGW_LIBIDN2_LIBRARY})
+            endif()
+            if(MINGW_LIBUNISTRING_LIBRARY)
+                list(APPEND HTSLIB_LINK_LIBS ${MINGW_LIBUNISTRING_LIBRARY})
+            endif()
+            if(MINGW_LIBICONV_LIBRARY)
+                list(APPEND HTSLIB_LINK_LIBS ${MINGW_LIBICONV_LIBRARY})
+            endif()
+            if(MINGW_LIBSSH2_LIBRARY)
+                list(APPEND HTSLIB_LINK_LIBS ${MINGW_LIBSSH2_LIBRARY})
+            endif()
+            if(MINGW_LIBGCRYPT_LIBRARY)
+                list(APPEND HTSLIB_LINK_LIBS ${MINGW_LIBGCRYPT_LIBRARY})
+            endif()
+            if(MINGW_LIBGPG_ERROR_LIBRARY)
+                list(APPEND HTSLIB_LINK_LIBS ${MINGW_LIBGPG_ERROR_LIBRARY})
+            endif()
+            if(MINGW_LIBZSTD_LIBRARY)
+                list(APPEND HTSLIB_LINK_LIBS ${MINGW_LIBZSTD_LIBRARY})
+            endif()
+        endif()
+    else()
+        list(APPEND HTSLIB_LINK_LIBS CURL::libcurl)
+    endif()
+endif()
+
+if(OPENSSL_FOUND AND NOT DUCKDB_WASM_EXTENSION)
+    list(APPEND HTSLIB_LINK_LIBS OpenSSL::Crypto)
+endif()
+if(WIN32 AND MINGW AND GNUREGEX_LIBRARY)
+    list(APPEND HTSLIB_LINK_LIBS ${GNUREGEX_LIBRARY})
+endif()
+if(WIN32 AND MINGW)
+    list(APPEND HTSLIB_LINK_LIBS ws2_32)
+endif()
+
+# Threads::Threads is portable (pthread on Linux, nothing on macOS)
+list(APPEND HTSLIB_LINK_LIBS Threads::Threads)
+
+# libm: needed on Linux/musl, not present on Windows
+if(NOT APPLE AND NOT WIN32)
+    list(APPEND HTSLIB_LINK_LIBS m)
+endif()
+
+message(STATUS "htslib link libs: ${HTSLIB_LINK_LIBS}")
+
