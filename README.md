@@ -5,14 +5,14 @@ DuckVEP implements Ensembl VEP 116 consequence semantics as a resident, relation
 
 ## Evidence
 
-| Executable-VEP comparison                                | Transcript/event pairs |     Exact | Unresolved | Receipt                                                                      |
-|:---------------------------------------------------------|-----------------------:|----------:|-----------:|:-----------------------------------------------------------------------------|
-| final-dbsnp                                              |                 73,620 |    73,620 |          0 | [conformance history](test/duckvep/conformance/data/conformance_history.csv) |
-| final-grch37                                             |                486,464 |   486,464 |          0 | [conformance history](test/duckvep/conformance/data/conformance_history.csv) |
-| plasmodium-falciparum-63                                 |                 40,732 |    40,732 |          0 | [conformance history](test/duckvep/conformance/data/conformance_history.csv) |
-| GRCh38 HGVSc suffix agreement (present)                  |                 44,871 |    44,871 |          0 | [executable-VEP comparison](benchmarks/data/duckvep_fastvep/conformance.csv) |
-| GRCh38 HGVSp suffix agreement (present)                  |                 20,782 |    20,782 |          0 | [executable-VEP comparison](benchmarks/data/duckvep_fastvep/conformance.csv) |
-| GRCh38 sorted rich-output variants/second, single thread |       100,957 variants | 448,698/s |          — | [timing receipt](benchmarks/data/duckvep_throughput.csv)                     |
+| Evidence                                 | Pairs / variants |   Exact | Different | Unresolved | Variants/s | Receipt                                                                      |
+|:-----------------------------------------|-----------------:|--------:|----------:|-----------:|-----------:|:-----------------------------------------------------------------------------|
+| final-dbsnp                              |           73,620 |  73,620 |         0 |          0 |          — | [conformance history](test/duckvep/conformance/data/conformance_history.csv) |
+| final-grch37                             |          486,464 | 486,464 |         0 |          0 |          — | [conformance history](test/duckvep/conformance/data/conformance_history.csv) |
+| plasmodium-falciparum-63                 |           40,732 |  40,732 |         0 |          0 |          — | [conformance history](test/duckvep/conformance/data/conformance_history.csv) |
+| GRCh38 HGVSc suffix agreement (present)  |           44,871 |  44,871 |         0 |          0 |          — | [executable-VEP comparison](benchmarks/data/duckvep_fastvep/conformance.csv) |
+| GRCh38 HGVSp suffix agreement (present)  |           20,782 |  20,782 |         0 |          0 |          — | [executable-VEP comparison](benchmarks/data/duckvep_fastvep/conformance.csv) |
+| GRCh38 sorted rich-output, single thread |          100,957 |       — |         — |          — |    448,698 | [timing receipt](benchmarks/data/duckvep_throughput.csv)                     |
 
 Each corpus result applies to the named receipt and model, not an arbitrary deployment sample. See the [conformance report](benchmarks/duckvep_conformance.md) and [throughput report](benchmarks/duckvep_throughput.md) for methods and limitations.
 
