@@ -3,7 +3,7 @@
  * The C workspace is allocated at init and retains only the active window. */
 #include "duckdb_extension.h"
 DUCKDB_EXTENSION_EXTERN
-#include "duckdb_list.h"
+#include "duckvep_list.h"
 
 #include "duckvep_model.h"
 #include "kernel/src/duckvep_haplotype_stream.h"
@@ -631,7 +631,7 @@ static int append_sequence_differences(duckdb_vector vector, idx_t row, haplotyp
         }
     }
     duckdb_list_entry entry;
-    if (!duckhts_list_extend(vector, result.count, &entry)) return 0;
+    if (!duckvep_list_extend(vector, result.count, &entry)) return 0;
     idx_t base = entry.offset;
     ((duckdb_list_entry *)duckdb_vector_get_data(vector))[row] = entry;
     if (!known) null_cell(vector, row);
@@ -898,7 +898,7 @@ static int append_leaf(duckdb_data_chunk output, idx_t row, haplotype_state_t *s
         duckdb_vector vector = v[HAPLOTYPE_LIST_COLUMN + list];
         size_t count = counts[list];
         duckdb_list_entry entry;
-        if (!duckhts_list_extend(vector, count, &entry)) return 0;
+        if (!duckvep_list_extend(vector, count, &entry)) return 0;
         idx_t base = entry.offset;
         ((duckdb_list_entry *)duckdb_vector_get_data(vector))[row] = entry;
         if (list >= 2u && !leaf->cds) null_cell(vector, row);
@@ -912,7 +912,7 @@ static int append_leaf(duckdb_data_chunk output, idx_t row, haplotype_state_t *s
         if (list == 2u && leaf->cds) {
             duckdb_vector event_vector = fields[HAPLOTYPE_BLOCK_EVENT_FIELD];
             duckdb_list_entry events;
-            if (!duckhts_list_extend(event_vector, leaf->edit_count, &events)) return 0;
+            if (!duckvep_list_extend(event_vector, leaf->edit_count, &events)) return 0;
             event_base = events.offset;
             duckdb_vector ids = duckdb_list_vector_get_child(event_vector);
             duckdb_vector_ensure_validity_writable(ids);
