@@ -1,43 +1,19 @@
 This package bundles third-party sources.
 
 HTSlib
-	Source: inst/duckhts_extension/htslib
-	Authors: Genome Research Ltd and contributors (see LICENSE in that directory)
-	License: MIT/Expat for files outside cram/ and Modified BSD 3-Clause for cram/
-	Reference: inst/duckhts_extension/htslib/LICENSE
+	Source: inst/duckvep_extension/third_party/htslib
+	Authors: Genome Research Ltd and contributors
+	License: MIT/Expat outside cram/ and Modified BSD 3-Clause in cram/
+	Reference: inst/duckvep_extension/third_party/htslib/LICENSE
 
 DuckDB C API headers
-	Source: inst/duckhts_extension/duckdb_capi/duckdb.h and duckdb_extension.h
+	Source: inst/duckvep_extension/duckdb_capi
 	Authors: DuckDB contributors
-	License: See the DuckDB project license for the version of these headers
+	License: DuckDB project license
+	Reference: inst/duckvep_extension/duckdb_capi/README.md
 
-VariantKey / RegionKey C API
-	Source: inst/duckhts_extension/include/variantkey/{hex.h,variantkey.h,regionkey.h}
-	Authors: Nicola Asuni and contributors
+cgranges
+	Source: inst/duckvep_extension/third_party/cgranges
+	Authors: Dana-Farber Cancer Institute and contributors
 	License: MIT
-	Reference: inst/duckhts_extension/include/variantkey/variantkey.h and inst/duckhts_extension/include/variantkey/regionkey.h
-
-libBigWig
-	Source: inst/duckhts_extension/libBigWig
-	Author: Devon Ryan
-	License: MIT
-	Reference: inst/duckhts_extension/libBigWig/LICENSE
-
-Mosdepth test fixtures
-	Source: inst/extdata/{bad.bed,big.bam,empty-tids.*,full-fragment-pairs.*,missing.bed,nanopore.*,overlapping-pairs.*,ovl.*,track.bed,unordered.bed}
-	Authors: Brent Pedersen and mosdepth contributors
-	License: MIT
-	Reference: upstream mosdepth project LICENSE
-
-Somalier-derived numerical methods
-	Source: inst/duckhts_extension/somalier.c
-	Author: Brent Pedersen and Somalier contributors
-	License: MIT
-	Reference: Somalier v0.3.4, commit ff58fdade8f4f8293d904f10e0a4a13f1fac808d
-	Note: DuckHTS ports a defined computational subset; no Somalier Nim source or .somalier store is bundled.
-
-GenBank test fixtures
-	Source: inst/extdata/phix174.gb, inst/extdata/genbank_phase.gb, inst/extdata/genbank_gene_order.gb
-	Authors: NCBI RefSeq record NC_001422.1 (Escherichia phage phiX174); the genbank_*.gb records are hand-written probes
-	License: NCBI places no restrictions on the use or distribution of sequence records
-	Reference: https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1
+	Reference: inst/duckvep_extension/third_party/cgranges/cgranges.h
