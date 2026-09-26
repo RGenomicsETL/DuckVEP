@@ -225,10 +225,11 @@ ExternalProject_Add(htslib_build
 
 # On Windows, htslib marks its public API __declspec(dllexport) (each .c file
 # defines HTS_BUILDING_LIBRARY), so every htslib function would be re-exported
-# from the extension DLL and could collide with another extension's htslib in the
-# same DuckDB process. Those exports are "-export:" directives in each object's
-# .drectve section; strip them from the static archive so the DLL exports only
-# its entrypoint, as the ELF and Mach-O builds do (checked by test-extension-symbols).
+# from the extension DLL. PE exports do not interpose between DLLs the way ELF
+# symbols do, but the extension's only interface is its entrypoint. The exports
+# are "-export:" directives in each object's .drectve section; strip them from the
+# static archive so the DLL exports only the entrypoint, as the ELF and Mach-O
+# builds do (checked by test-extension-symbols).
 if(WIN32)
     if(NOT CMAKE_OBJCOPY)
         message(FATAL_ERROR "objcopy is required to strip htslib's DLL exports on Windows")
