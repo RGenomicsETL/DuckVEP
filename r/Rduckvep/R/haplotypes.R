@@ -109,7 +109,9 @@
 #' preparation may run per registry at a time. Nested or concurrent preparation
 #' returns a busy error; completed scans use independent native workspaces.
 #'
-#' @inheritParams rduckhts_geno
+#' @param con An open DuckDB connection with DuckVEP loaded.
+#' @param table_name Optional output table name.
+#' @param overwrite Whether to replace an existing output table.
 #' @param calls_query One nonempty SELECT query supplying the call relation.
 #' @param model_name Name of an already loaded DuckVEP model.
 #' @param phase_policy Strict GT/PS interpretation or VEP-116 called-slot order.
@@ -123,14 +125,14 @@
 #'   `max_sequence_bases`, `max_ploidy`, `max_phase_sets`, and `workspace_limit`.
 #' @return A data frame, or invisible `TRUE` when creating `table_name`.
 #' @export
-rduckhts_haplotypes <- function(con, calls_query, model_name,
+rduckvep_haplotypes <- function(con, calls_query, model_name,
                                phase_policy = c("strict", "vep116_compat"),
                                ..., input_mode = c("alt_events", "source_records"),
                                hgvs = FALSE, table_name = NULL, overwrite = FALSE) {
   if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
     stop("overwrite must be TRUE or FALSE", call. = FALSE)
   }
-  .duckhts_check_table_target(con, table_name, overwrite)
+  .duckvep_check_table_target(con, table_name, overwrite)
   for (name in c("calls_query", "model_name")) {
     value <- get(name)
     if (!is.character(value) || length(value) != 1L || is.na(value) || !nzchar(value)) {
@@ -163,6 +165,6 @@ rduckhts_haplotypes <- function(con, calls_query, model_name,
   query <- paste0("SELECT * FROM duckvep_haplotypes(", sql_quote_string(con, calls_query),
                   ",", sql_quote_string(con, model_name), build_param_str(params), ")")
   if (is.null(table_name)) return(DBI::dbGetQuery(con, query))
-  .duckhts_create_table(con, table_name, query, overwrite)
+  .duckvep_create_table(con, table_name, query, overwrite)
   invisible(TRUE)
 }

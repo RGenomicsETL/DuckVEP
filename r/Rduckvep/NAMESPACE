@@ -1,0 +1,4 @@
+export(rduckvep_connect)
+export(rduckvep_load)
+export(rduckvep_haplotypes)
+importFrom(DBI, dbConnect, dbDisconnect, dbExecute, dbGetQuery, dbQuoteIdentifier, dbQuoteString, dbExistsTable)
