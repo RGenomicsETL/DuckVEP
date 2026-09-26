@@ -2197,6 +2197,7 @@ test/duckvep/vendor/theft/src/theft_trial.c
 test/duckvep/vendor/theft/src/theft_trial.h
 test/duckvep/vendor/theft/src/theft_trial_internal.h
 test/duckvep/vendor/theft/src/theft_types_internal.h
+test/scripts/generate_model_publication_fixture.R
 test/scripts/prepare_duckvep_ensembl_fixture.sql
 test/scripts/test_ambiguous_codon.R
 test/scripts/test_ambiguous_indel.R
@@ -2216,6 +2217,7 @@ test/scripts/test_haplotype_geometry.R
 test/scripts/test_haplotype_model_history.R
 test/scripts/test_haplotype_phase_history.R
 test/scripts/test_hgvs_cis_codon.R
+test/scripts/test_indel_predicate_witnesses.R
 test/scripts/test_reference_translation.R
 test/scripts/test_vep_cache_staging.R
 test/sql/duckvep_annotate.test

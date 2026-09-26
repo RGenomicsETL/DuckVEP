@@ -27,3 +27,5 @@ scripts/parse_vep_vcf.R
 .github/workflows/duckvep-provenance.yml
 r/Rduckhts/R/haplotypes.R
 glob:r/Rduckhts/inst/tinytest/test_duckvep*.R
+test/scripts/generate_model_publication_fixture.R
+test/scripts/test_indel_predicate_witnesses.R

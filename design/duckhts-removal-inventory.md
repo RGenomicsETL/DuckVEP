@@ -1,6 +1,6 @@
 # DuckHTS follow-up inventory
 
-Source of truth: DuckHTS `origin/develop` at the extraction date. The [path manifest](duckhts-removal-paths.txt) enumerates 2,227 paths to remove or repoint. The [history filter](extraction-paths.txt) also retained four shared test fixtures that stay in DuckHTS.
+Source of truth: DuckHTS `origin/develop` at the extraction date. The [path manifest](duckhts-removal-paths.txt) enumerates 2,229 paths to remove or repoint. The [history filter](extraction-paths.txt) also retained four shared test fixtures that stay in DuckHTS.
 
 ## Native extension
 

@@ -59,9 +59,11 @@ for (i in seq_len(nrow(scope))) {
     row$model, fmt(row$n), fmt(row$exact_agree), fmt(row$unresolved)))
 }
 cat(sprintf("| GRCh38 HGVSc suffix agreement (present) | %s | %s | %s | [executable-VEP comparison](benchmarks/data/duckvep_fastvep/conformance.csv) |\n",
-  fmt(metric("shared_keys")), fmt(metric("hgvsc_suffix_exact_present")), fmt(metric("hgvsc_suffix_discordant"))))
+  fmt(metric("shared_keys") - metric("hgvsc_suffix_both_absent")),
+  fmt(metric("hgvsc_suffix_exact_present")), fmt(metric("hgvsc_suffix_discordant"))))
 cat(sprintf("| GRCh38 HGVSp suffix agreement (present) | %s | %s | %s | [executable-VEP comparison](benchmarks/data/duckvep_fastvep/conformance.csv) |\n",
-  fmt(metric("shared_keys")), fmt(metric("hgvsp_suffix_exact_present")), fmt(metric("hgvsp_suffix_discordant"))))
+  fmt(metric("shared_keys") - metric("hgvsp_suffix_both_absent")),
+  fmt(metric("hgvsp_suffix_exact_present")), fmt(metric("hgvsp_suffix_discordant"))))
 row <- tail(throughput, 1L)
 cat(sprintf("| GRCh38 sorted rich-output variants/second, single thread | %s variants | %s/s | — | [timing receipt](benchmarks/data/duckvep_throughput.csv) |\n",
   fmt(row$variants), fmt(round(row$variants_per_second))))
