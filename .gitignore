@@ -18,6 +18,12 @@ README.html
 third_party/htslib/confdefs.h
 third_party/htslib/conftest.*
 third_party/htslib/config.mk
+third_party/htslib/config.log
+third_party/htslib/config.status
+third_party/htslib/config_vars.h
+third_party/htslib/htscodecs.mk
+third_party/htslib/htslib.pc.tmp
+third_party/htslib/version.h
 third_party/htslib/config.h
 third_party/htslib/htslib/hts_version.h
 third_party/htslib/htslib/htslib.pc
