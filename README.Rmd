@@ -1,0 +1,94 @@
+---
+output:
+  github_document:
+    pandoc_args: ["--wrap=preserve"]
+---
+
+```{r setup, include=FALSE}
+library(duckknit)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+knitr::knit_engines$set(sql = knitr::knit_engines$get("duckdb"))
+knitr::knit_hooks$set(document = function(x) gsub("(?m)^``` duckdb", "```sql", x, perl = TRUE))
+cli <- Sys.getenv("DUCKDB_CLI")
+stopifnot(nzchar(cli), file.exists(cli))
+options(duckknit.duckdb = cli)
+local({
+  ns <- asNamespace("duckknit")
+  proc <- processx::process$new(cli, args = c("-unsigned", ":memory:"),
+    stdin = "|", stdout = "|", stderr = "|", cleanup = TRUE, cleanup_tree = TRUE)
+  unlockBinding(".sessions", ns)
+  ns$.sessions[["readme"]] <- proc
+  lockBinding(".sessions", ns)
+  unlockBinding(".state", ns)
+  ns$.state$last_session <- "readme"
+  lockBinding(".state", ns)
+  extension <- normalizePath("build/release/duckvep.duckdb_extension", mustWork = TRUE)
+  load <- duckknit:::duckknit_exec(proc, sprintf("LOAD '%s';", extension))
+  if (nzchar(trimws(load$stderr))) stop(load$stderr)
+  duckknit:::duckknit_exec(proc, "SET lambda_syntax='ENABLE_SINGLE_ARROW';")
+  fixture <- paste(readLines("test/data/duckvep/readme.sql"), collapse = "\n")
+  setup <- duckknit:::duckknit_exec(proc, fixture)
+  if (nzchar(trimws(setup$stderr))) stop(setup$stderr)
+})
+fmt <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+history <- read.csv("test/duckvep/conformance/data/conformance_history.csv")
+scope <- subset(history, engine == "duckvep" & stratum_kind == "all" &
+  model %in% c("final-dbsnp", "final-grch37", "plasmodium-falciparum-63"))
+scope <- scope[order(scope$run_date, scope$source_revision), ]
+scope <- scope[!duplicated(scope$model, fromLast = TRUE), ]
+hgvs <- read.csv("benchmarks/data/duckvep_fastvep/conformance.csv")
+hgvs <- subset(hgvs, engine == "duckvep")
+metric <- function(name) hgvs$n[match(name, hgvs$metric)]
+throughput <- read.csv("benchmarks/data/duckvep_throughput.csv")
+throughput <- subset(throughput, workload == "ensembl116_grch38_giab_sites_hash40" &
+  output_mode == "rich" & threads == 1)
+throughput <- throughput[order(throughput$run_date), ]
+```
+
+# DuckVEP
+
+DuckVEP implements Ensembl VEP 116 consequence semantics as a resident, relation-first DuckDB kernel. Models are loaded from ordered relations; annotation, transcript HGVS, and phased haplotypes remain queryable relations. The extension uses htslib for indexed reference access, not a DuckHTS runtime dependency.
+
+## Evidence
+
+```{r evidence, results='asis', echo=FALSE}
+cat("| Executable-VEP comparison | Transcript/event pairs | Exact | Unresolved | Receipt |\n|:--|--:|--:|--:|:--|\n")
+for (i in seq_len(nrow(scope))) {
+  row <- scope[i, ]
+  cat(sprintf("| %s | %s | %s | %s | [conformance history](test/duckvep/conformance/data/conformance_history.csv) |\n",
+    row$model, fmt(row$n), fmt(row$exact_agree), fmt(row$unresolved)))
+}
+cat(sprintf("| GRCh38 HGVSc suffix agreement (present) | %s | %s | %s | [executable-VEP comparison](benchmarks/data/duckvep_fastvep/conformance.csv) |\n",
+  fmt(metric("shared_keys")), fmt(metric("hgvsc_suffix_exact_present")), fmt(metric("hgvsc_suffix_discordant"))))
+cat(sprintf("| GRCh38 HGVSp suffix agreement (present) | %s | %s | %s | [executable-VEP comparison](benchmarks/data/duckvep_fastvep/conformance.csv) |\n",
+  fmt(metric("shared_keys")), fmt(metric("hgvsp_suffix_exact_present")), fmt(metric("hgvsp_suffix_discordant"))))
+row <- tail(throughput, 1L)
+cat(sprintf("| GRCh38 sorted rich-output variants/second, single thread | %s variants | %s/s | — | [timing receipt](benchmarks/data/duckvep_throughput.csv) |\n",
+  fmt(row$variants), fmt(round(row$variants_per_second))))
+```
+
+Each corpus result applies to the named receipt and model, not an arbitrary deployment sample. See the [conformance report](benchmarks/duckvep_conformance.md) and [throughput report](benchmarks/duckvep_throughput.md) for methods and limitations.
+
+## Query a model
+
+The [small model setup](test/data/duckvep/readme.sql) loads a transcript and exons and stages a variant from a [committed Parquet fixture](test/data/duckvep/minimal_bcsq.parquet). The README runs against a locally built extension in a DuckDB CLI session.
+
+```{sql annotate, eval=TRUE}
+SELECT event_index, consequence_mask, transcript_hgvs, transcript_hgvs_status
+FROM duckvep_annotate('readme_events', 'readme', hgvs := true);
+```
+
+Calls are relations too:
+
+```{sql haplotypes, eval=TRUE}
+CREATE TABLE readme_calls AS SELECT event_index, seq_region, position,
+  reference, alternate, 1::UINTEGER alt_index, 0::UINTEGER transcript_index,
+  0::UBIGINT sample_index, [1,0]::INTEGER[] alleles,
+  [false,true]::BOOLEAN[] phase_before, NULL::BIGINT phase_set
+FROM readme_events;
+SELECT transcript_index, carrier_count, sequence_status,
+  length(contributors) AS contributors
+FROM duckvep_haplotypes('SELECT * FROM readme_calls', 'readme');
+```
+
+The [design](design/duckvep.md) describes model and consequence contracts. [Rduckvep](r/Rduckvep) builds the same sources offline and provides a connection and haplotype front end; DuckHTS is optional for VCF reading.

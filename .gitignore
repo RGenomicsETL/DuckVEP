@@ -11,6 +11,12 @@ venv/
 *.a
 *.so
 *.duckdb_extension
+*.tar.gz
+README_files/
+README.knit.md
+README.html
+third_party/htslib/confdefs.h
+third_party/htslib/conftest.*
 third_party/htslib/config.mk
 third_party/htslib/config.h
 third_party/htslib/htslib/hts_version.h
