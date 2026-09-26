@@ -223,6 +223,24 @@ ExternalProject_Add(htslib_build
     LOG_BUILD         TRUE
 )
 
+# On Windows, htslib marks its public API __declspec(dllexport) (each .c file
+# defines HTS_BUILDING_LIBRARY), so every htslib function would be re-exported
+# from the extension DLL and could collide with another extension's htslib in the
+# same DuckDB process. Those exports are "-export:" directives in each object's
+# .drectve section; strip them from the static archive so the DLL exports only
+# its entrypoint, as the ELF and Mach-O builds do (checked by test-extension-symbols).
+if(WIN32)
+    if(NOT CMAKE_OBJCOPY)
+        message(FATAL_ERROR "objcopy is required to strip htslib's DLL exports on Windows")
+    endif()
+    ExternalProject_Add_Step(htslib_build strip_dllexport
+        COMMAND "${CMAKE_OBJCOPY}" --remove-section=.drectve "${HTSLIB_BUILD_DIR}/libhts.a"
+        DEPENDEES build
+        ALWAYS TRUE
+        COMMENT "Removing htslib DLL export directives from libhts.a"
+    )
+endif()
+
 # Import the static library so CMake knows about it
 add_library(hts STATIC IMPORTED GLOBAL)
 set_target_properties(hts PROPERTIES
