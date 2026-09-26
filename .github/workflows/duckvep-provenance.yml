@@ -38,7 +38,7 @@ jobs:
       - name: Build and test independent extension
         run: |
           make configure
-          make test_release
+          make release test_release
       - name: Record source, binary and evidence hashes
         run: |
           git rev-parse HEAD > build/release/source_revision.txt
