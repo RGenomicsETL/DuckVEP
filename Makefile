@@ -39,8 +39,11 @@ test_debug: test_extension_debug
 test_release: test_extension_release test-extension-symbols
 test-extension-symbols:
 	@set -e; file=build/release/duckvep.duckdb_extension; test -f "$$file"; \
+		case "$$(uname -s)" in MINGW*|MSYS*|CYGWIN*|Windows_NT) windows=1 ;; *) windows=0 ;; esac; \
 		if test "$$(uname -s)" = Darwin; then \
 			actual=$$(nm -gU "$$file" | awk '$$2 ~ /^[TDB]$$/ {sub(/^_/, "", $$3); print $$3}' | sort -u); \
+		elif test "$$windows" = 1; then \
+			actual=$$(objdump -p "$$file" | awk '/\[Ordinal\/Name Pointer\] Table/ {t=1; next} t && /^\t\[ *[0-9]+\]/ {print $$NF; next} t && NF == 0 {t=0}' | sort -u); \
 		else \
 			actual=$$(nm -D --defined-only "$$file" | awk '$$2 ~ /^[TDB]$$/ && $$3 !~ /^(_init|_fini)$$/ {print $$3}' | sort -u); \
 			nm -D -u "$$file" | awk '$$NF ~ /^duckdb_/ {print "Unexpected DuckDB API import: " $$0; bad=1} END {exit bad}'; \
