@@ -57,3 +57,7 @@ FROM duckvep_haplotypes('SELECT * FROM readme_calls', 'readme');
 ```
 
 The [design](design/duckvep.md) describes model and consequence contracts. [Rduckvep](r/Rduckvep) builds the same sources offline and provides a connection and haplotype front end; DuckHTS is optional for VCF reading.
+
+## License
+
+GPL-2.0-or-later; see [LICENSE](LICENSE). Vendored htslib and cgranges keep their own licences.
