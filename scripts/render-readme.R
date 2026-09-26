@@ -5,4 +5,6 @@ Sys.setenv(DUCKDB_CLI = normalizePath(cli, mustWork = TRUE))
 rmarkdown::render("README.Rmd", output_file = "README.md", quiet = TRUE,
                   envir = new.env(parent = globalenv()))
 lines <- readLines("README.md", warn = FALSE)
-writeLines(sub("[[:blank:]]+$", "", lines), "README.md")
+lines <- sub("[[:blank:]]+$", "", lines)
+lines <- sub("^``` (sql|sh|r)$", "```\\1", lines)
+writeLines(lines, "README.md")
