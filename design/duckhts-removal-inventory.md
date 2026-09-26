@@ -1,6 +1,6 @@
 # DuckHTS follow-up inventory
 
-Source of truth: DuckHTS `origin/develop` at the extraction date. The [path manifest](duckhts-removal-paths.txt) enumerates 2,229 paths to remove or repoint. The [history filter](extraction-paths.txt) also retained four shared test fixtures that stay in DuckHTS.
+Source of truth: DuckHTS `origin/develop` at the extraction date. The [path manifest](duckhts-removal-paths.txt) enumerates 2,230 paths to remove or repoint. The [history filter](extraction-paths.txt) also retained four shared test fixtures that stay in DuckHTS.
 
 ## Native extension
 
@@ -12,6 +12,7 @@ Source of truth: DuckHTS `origin/develop` at the extraction date. The [path mani
 
 - Remove/repoint the 14 `duckvep_*` entries in `functions.yaml`: `duckvep_ensembl_regions`, `duckvep_ensembl_transcripts`, `duckvep_ensembl_regulation_features`, `duckvep_model_receipt`, `duckvep_model_load`, `duckvep_model_drop`, `duckvep_allele_geometry`, `duckvep_transcript_projection`, `duckvep_repeat_alleles`, `duckvep_breakend_geometry`, `duckvep_haplotypes`, `duckvep_phase_call`, `duckvep_annotate`, `duckvep_so_terms`. Regenerate `r/Rduckhts/inst/function_catalog/functions.yaml`, `functions.tsv`, `functions.md` and `reference.md` with the DuckVEP entries removed; keep the BCF/CSQ reader documentation.
 - Move or link `test/sql/duckvep_*.test`, `test/duckvep/`, DuckVEP-only `test/data/` and `test/scripts/`, `pipelines/duckvep/`, `benchmarks/*duckvep*`, `benchmarks/fastvep_*`, `benchmarks/data/duckvep_*`, `design/duckvep*.md`, and DuckVEP-only scripts. The enumerated paths are in the manifest. Replace DuckVEP Makefile recipes and DuckVEP branches in `scripts/run_sqllogictest.py` and `scripts/test_sanitized_extension.sh` with sibling-repository invocations only if those workflows still run cross-extension tests.
+- Move the top-level `ERRATA.md` (entirely DuckVEP compatibility and errata; now in DuckVEP with its history) and point DuckHTS readers to it.
 - Repoint the root `README.Rmd` DuckVEP section (lines 199–1446) and regenerate `README.md`; point readers to the sibling repository rather than presenting the model as a DuckHTS-owned extension. Repoint `r/Rduckhts/README.Rmd` lines 457–605 and regenerate its README.
 
 ## R and CI

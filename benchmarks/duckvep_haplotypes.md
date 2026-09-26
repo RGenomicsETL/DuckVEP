@@ -20,7 +20,7 @@ fingerprints.
 
 ## Workload and verification
 
-The [registry](../r/duckhtsbench/inst/benchmark_registry.tsv) stages two
+The [registry](https://github.com/RGenomicsETL/duckhts/blob/develop/r/duckhtsbench/inst/benchmark_registry.tsv) stages two
 committed, checksum-verified fixtures without network access: a 180-base
 CDS and four ALT events. Two substitutions share a codon; an
 insertion/deletion pair displaces and restores the frame. Four diploid

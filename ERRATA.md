@@ -180,7 +180,7 @@ remain the source authorities, not biological simplifications of their term name
   becoming symbolic structural records.
 
 These rules do not establish a general structural-variant or pangenome annotation
-engine. The [structural kernel](src/duckvep/kernel/src/duckvep_sv.c) and
+engine. The [structural kernel](src/kernel/src/duckvep_sv.c) and
 [classification tests](test/duckvep/property/duckvep_prop_classify.c) define the typed
 subset; original ALT, confidence, orientation and source identity remain necessary.
 
@@ -214,7 +214,7 @@ HGVS is not simply a walk along spliced CDS.
 - Default independent-event VEP protein strings omit prediction parentheses.
   Parentheses alone do not change the asserted protein edit.
 
-The [compatibility policy](src/duckvep/kernel/src/duckvep_compat.h) is the single inventory
+The [compatibility policy](src/kernel/src/duckvep_compat.h) is the single inventory
 of explicitly gated runtime behavior. The
 [HGVS properties](test/duckvep/property/duckvep_prop_projection_hgvs.c),
 [original-record witnesses](test/duckvep/conformance/data/hgvs_compatibility_witnesses.tsv)

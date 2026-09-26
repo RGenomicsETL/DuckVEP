@@ -2227,3 +2227,4 @@ test/sql/duckvep_haplotypes.test
 test/sql/duckvep_hgvs.test
 test/sql/duckvep_phase.test
 test/sql/duckvep_projection.test
+ERRATA.md

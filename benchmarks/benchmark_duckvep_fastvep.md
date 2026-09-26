@@ -177,8 +177,8 @@ would be fast but biologically false. The BigWig result decodes
 9,314,560 stored phyloP intervals in 0.994 seconds on one thread; 20
 independent indexed ranges scale from 0.498 to 0.130 seconds. The source
 revisions and full receipts remain in [the exact/interval provider
-report](benchmark_variantkey_join_overlap.md) and [the BigWig reader
-report](benchmark_bigwig_reader.md).
+report](https://github.com/RGenomicsETL/duckhts/blob/develop/benchmarks/benchmark_variantkey_join_overlap.md) and [the BigWig reader
+report](https://github.com/RGenomicsETL/duckhts/blob/develop/benchmarks/benchmark_bigwig_reader.md).
 
 ### The composability bet
 
@@ -530,7 +530,7 @@ numeric consequence masks first, join only requested provider columns,
 and write Parquet or another DuckDB-supported result. The direct ClinVar
 result above measures the same fastSA source against DuckDB’s typed
 join, while the [supplementary-provider
-benchmark](benchmark_variantkey_join_overlap.md) extends the evidence to
+benchmark](https://github.com/RGenomicsETL/duckhts/blob/develop/benchmarks/benchmark_variantkey_join_overlap.md) extends the evidence to
 AlphaMissense, REVEL, clinical arbitration, genes, and intervals. These
 costs remain separate from the consequence headline instead of being
 silently charged to only one tool.
@@ -1098,7 +1098,7 @@ release:
 The DuckDB side stages the same eight payload fields into reversible and
 hashed Parquet relations. Its source projection is the ClinVar
 preparation query in [the provider
-report](benchmark_variantkey_join_overlap.md), without normalizing away
+report](https://github.com/RGenomicsETL/duckhts/blob/develop/benchmarks/benchmark_variantkey_join_overlap.md), without normalizing away
 the uploaded tuple for this direct fastSA comparison. The HG002 query
 relation contains the 4,095,611 literal ALT alleles from the shared VCF.
 Provider construction and query decoding are outside both lookup timers.
