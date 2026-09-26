@@ -20,13 +20,15 @@ case "$(uname -s):$(uname -m)" in
 esac
 build="$(mktemp -d)"
 trap 'rm -rf "$build"' EXIT HUP INT TERM
-cmake -S "$extension" -B "$build" -DEXTENSION_NAME=duckvep \
+cp -R "$extension" "$build/source"
+mv "$build/source/third_party/htslib/Makefile.hts" "$build/source/third_party/htslib/Makefile"
+cmake -S "$build/source" -B "$build/build" -DEXTENSION_NAME=duckvep \
   -DTARGET_DUCKDB_VERSION_MAJOR="${version%%.*}" \
   -DCMAKE_BUILD_TYPE=Release
-cmake --build "$build" --parallel "${MAKEFLAGS:--j2}"
+cmake --build "$build/build" --parallel 2
 case "$(uname -s)" in
-  Darwin) library="$build/libduckvep.dylib" ;;
-  *) library="$build/libduckvep.so" ;;
+  Darwin) library="$build/build/libduckvep.dylib" ;;
+  *) library="$build/build/libduckvep.so" ;;
 esac
 artifact="$(pwd)/inst/duckvep_extension/artifacts/v${version}/duckvep.duckdb_extension"
 mkdir -p "$(dirname "$artifact")"

@@ -5,4 +5,4 @@ if (requireNamespace("duckdb", quietly = TRUE)) local({
   expect_identical(DBI::dbGetQuery(con,
     "SELECT duckvep_repeat_alleles([{unit:'A',count:1}], [{unit:'C',count:2}], TRUE).alternate AS allele")$allele,
     "CC")
-}
+})

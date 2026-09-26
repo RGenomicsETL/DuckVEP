@@ -9,9 +9,12 @@ tracked <- system2("git", c("-C", shQuote(repo), "ls-files", "--",
                             "src", "cmake", "duckdb_capi", "third_party/htslib",
                             "third_party/cgranges", "CMakeLists.txt"), stdout = TRUE)
 if (!length(tracked)) stop("No extension sources found in ", repo)
+tracked <- tracked[!grepl("^third_party/htslib/(test/|htscodecs/tests/)", tracked)]
 for (path in tracked) {
   if (startsWith(path, "src/duckvep/")) stop("Sources must be at the repository root")
-  target <- file.path(destination, path)
+  target_path <- if (identical(path, "third_party/htslib/Makefile"))
+    paste0(path, ".hts") else path
+  target <- file.path(destination, target_path)
   dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
   if (!file.copy(file.path(repo, path), target, overwrite = TRUE))
     stop("Cannot copy ", path)

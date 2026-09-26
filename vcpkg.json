@@ -1,0 +1,21 @@
+{
+  "name": "duckvep",
+  "version-string": "1.5.2.9002",
+  "description": "Ensembl VEP consequence annotation in DuckDB",
+  "dependencies": ["zlib"],
+  "default-features": ["compression", "net"],
+  "features": {
+    "compression": {
+      "description": "htslib compression",
+      "dependencies": ["bzip2", "liblzma"]
+    },
+    "net": {
+      "description": "htslib remote reference access",
+      "dependencies": ["curl", "openssl"]
+    },
+    "deflate": {
+      "description": "htslib accelerated decompression",
+      "dependencies": ["libdeflate"]
+    }
+  }
+}
