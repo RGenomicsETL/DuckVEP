@@ -4,7 +4,7 @@ Version: 0.1.0
 Authors@R: person("Sounkou Mahamane", "Toure", role = c("aut", "cre"), email = "sounkoutoure@gmail.com")
 Description: Builds and loads the bundled DuckVEP C extension for relation-first variant consequence and phased-haplotype annotation.
 License: GPL (>= 2)
-URL: https://github.com/RGenomicsETL/DuckVEP
+URL: https://rgenomicsetl.github.io/DuckVEP/Rduckvep/, https://github.com/RGenomicsETL/DuckVEP
 BugReports: https://github.com/RGenomicsETL/DuckVEP/issues
 Copyright: See inst/COPYRIGHT
 Encoding: UTF-8

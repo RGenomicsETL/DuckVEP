@@ -48,3 +48,10 @@ test-extension-symbols:
 		test "$$actual" = duckvep_init_c_api || { printf 'Unexpected exports: %s\n' "$$actual"; exit 1; }
 readme: release
 	Rscript scripts/render-readme.R
+
+.PHONY: site site-check
+site:
+	Rscript scripts/build-site.R
+
+site-check: site
+	Rscript scripts/check-site-links.R

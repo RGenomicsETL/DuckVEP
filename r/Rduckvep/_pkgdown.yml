@@ -1,0 +1,11 @@
+url: https://rgenomicsetl.github.io/DuckVEP/Rduckvep/
+template:
+  bootstrap: 5
+navbar:
+  structure:
+    left: [reference, news]
+    right: [project, search, github]
+  components:
+    project:
+      text: DuckVEP project
+      href: https://rgenomicsetl.github.io/DuckVEP/
