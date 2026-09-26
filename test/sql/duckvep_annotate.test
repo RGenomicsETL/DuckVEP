@@ -1,8 +1,8 @@
 # name: test/sql/duckvep_annotate.test
 # description: Stable-API DuckVEP model registry and vector annotation vertical
-# group: [duckhts]
+# group: [duckvep]
 
-require duckhts
+require duckvep
 
 query T
 SELECT typeof(duckvep_repeat_alleles(

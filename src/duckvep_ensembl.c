@@ -315,7 +315,7 @@ duckvep_register_ensembl_transcripts(duckhts_registration_t *registration)
 		"), exon_sequences AS MATERIALIZED (",
 		"SELECT ne.source_exon_id, ",
 		"CASE WHEN ne.exon_strand = 1 THEN ges.genomic_sequence ",
-		"ELSE seq_revcomp(ges.genomic_sequence) END AS transcript_sequence, ",
+		"ELSE _duckvep_revcomp(ges.genomic_sequence) END AS transcript_sequence, ",
 		"ne.exon_end0 - ne.exon_start0 AS expected_length ",
 		"FROM needed_exons ne LEFT JOIN genomic_exon_sequences ges USING (source_exon_id)",
 		"), transcript_sequences AS MATERIALIZED (",

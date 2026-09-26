@@ -1,8 +1,8 @@
 # name: test/sql/duckvep_projection.test
 # description: SQL reference for typed, independent transcript presentation
-# group: [duckhts]
+# group: [duckvep]
 
-require duckhts
+require duckvep
 
 statement ok
 CREATE TABLE projection_regions AS SELECT 1::UINTEGER AS seq_region;

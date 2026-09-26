@@ -1,4 +1,4 @@
-require duckhts
+require duckvep
 
 # VCF 4.4 indicators qualify the following allele. An omitted leading marker
 # is '/' when another marker is '/'; a later '|' cannot phase the prior slot.
@@ -18,7 +18,7 @@ WITH expected(r,gt,phases,lanes,statuses) AS (VALUES
  (11,[0,1,2],[false,false,true],[NULL,NULL,3],['unphased','unphased','called'])
 ), observed AS (
  SELECT r,c,duckvep_phase_call(c.alleles,c.phase_before,phase_set:=c.phase_set) assignments
- FROM (SELECT record_index r,calls[1] c FROM read_geno('test/data/geno_phase_partial.vcf'))
+ FROM (SELECT record_index r,calls[1] c FROM read_parquet('test/data/duckvep/geno_phase_partial.parquet'))
 )
 SELECT count(*),count(*) FILTER (WHERE c.alleles IS NOT DISTINCT FROM gt AND c.phase_before=phases),
  count(*) FILTER (WHERE list_transform(assignments,x->x.haplotype_lane) IS NOT DISTINCT FROM lanes
@@ -122,7 +122,7 @@ true	0
 query IIIITT
 SELECT record_index, c.sample_index, a.input_slot, a.haplotype_lane, a.phase_scope, a.status
 FROM (SELECT record_index, c, unnest(duckvep_phase_call(c.alleles, c.phase_before)) a
-      FROM (SELECT record_index, unnest(calls) c FROM read_geno('test/data/geno_vcf44.vcf')))
+      FROM (SELECT record_index, unnest(calls) c FROM read_parquet('test/data/duckvep/geno_vcf44.parquet')))
 ORDER BY record_index, c.sample_index, a.input_slot
 ----
 0	0	1	1	phase_set	called

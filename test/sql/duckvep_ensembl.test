@@ -1,8 +1,8 @@
 # name: test/sql/duckvep_ensembl.test
 # description: Ensembl core plus tiled FASTA to validated resident DuckVEP model
-# group: [duckhts]
+# group: [duckvep]
 
-require duckhts
+require duckvep
 
 statement ok
 CREATE SCHEMA duckvep_core;

@@ -1,4 +1,4 @@
-require duckhts
+require duckvep
 
 # GT markers describe individual alleles. Unresolved slots cannot acquire a
 # called ALT from the next slot's pipe, or poison an explicitly phased slot.
@@ -20,7 +20,7 @@ CREATE TABLE hap_partial_calls AS SELECT i AS event_index,0 AS seq_region,POS AS
  REF AS reference,ALT[i] AS alternate,i AS alt_index,0 AS transcript_index,
  record_index AS sample_index,calls[1].alleles AS alleles,calls[1].phase_before AS phase_before,
  calls[1].phase_set AS phase_set
-FROM read_geno('test/data/geno_phase_partial.vcf') CROSS JOIN range(1,3) alts(i)
+FROM read_parquet('test/data/duckvep/geno_phase_partial.parquet') CROSS JOIN range(1,3) alts(i)
 WHERE record_index IN (3,5,6,8);
 
 query IITII

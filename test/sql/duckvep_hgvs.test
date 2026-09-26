@@ -1,8 +1,8 @@
 # name: test/sql/duckvep_hgvs.test
 # description: Cumulative DuckVEP consequence and independent-event HGVS projection
-# group: [duckhts]
+# group: [duckvep]
 
-require duckhts
+require duckvep
 
 # Pinned VEP 116 ambiguous_indel_consensus original events, including standard
 # controls, retained in conformance/data/indel_translation_witnesses.jsonl.gz.
@@ -1344,13 +1344,8 @@ SELECT loaded FROM duckvep_model_load(
 
 query TITT
 WITH reference_region AS (
-  SELECT string_agg(seq, '' ORDER BY start) AS sequence
-  FROM fasta_nuc(
-    '__WORKING_DIRECTORY__/test/data/ce.fa',
-    bin_width := 5000,
-    region := 'CHROMOSOME_I:1000-5999',
-    include_seq := TRUE
-  )
+  SELECT sequence
+  FROM read_parquet('__WORKING_DIRECTORY__/test/data/duckvep/ce_1000_5999.parquet')
 ), variant AS (
   SELECT 3499::UBIGINT AS pos,
          substr(sequence, 2500, 1) AS uploaded_ref,

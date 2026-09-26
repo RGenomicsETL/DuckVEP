@@ -24,6 +24,13 @@ DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection,
                  "DuckVEP requires DuckDB 1.4.0 or newer; loaded runtime is %s", version);
         return duckvep_registration_error(&registration, message);
     }
+    if (!duckvep_register_sql(&registration,
+        "CREATE OR REPLACE MACRO _duckvep_revcomp(sequence) AS "
+        "translate(reverse(CAST(sequence AS VARCHAR)), "
+        "'ACGTRYSWKMBDHVNacgtryswkmbdhvn', "
+        "'TGCAYRSWMKVHDBNtgcayrswmkvhdbn')")) {
+        return false;
+    }
     return register_duckvep_functions(connection, *access->get_database(info)) &&
            register_duckvep_sql_kernels(&registration) &&
            register_duckvep_sql_functions(&registration) &&
