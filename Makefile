@@ -36,7 +36,12 @@ release: build_extension_library_release build_extension_with_metadata_release
 test: debug
 	$(MAKE) test_debug
 test_debug: test_extension_debug
-test_release: test_extension_release test-extension-symbols
+test_release: test_extension_release test-extension-symbols test-sql-lambda-syntax
+
+# DuckDB 2.0 rejects single-arrow SQL lambdas by default.
+.PHONY: test-sql-lambda-syntax
+test-sql-lambda-syntax:
+	python3 test/scripts/check_sql_lambdas.py
 test-extension-symbols:
 	@set -e; file=build/release/duckvep.duckdb_extension; test -f "$$file"; \
 		case "$$(uname -s)" in MINGW*|MSYS*|CYGWIN*|Windows_NT) windows=1 ;; *) windows=0 ;; esac; \
