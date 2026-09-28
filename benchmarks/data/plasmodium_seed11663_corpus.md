@@ -1,6 +1,6 @@
 # P. falciparum release-63 model-derived small variants
 
-- Generator: `Rscript scripts/stage_plasmodium_corpus.R /tmp/duckvep-species/plasmodium.duckdb /tmp/duckvep-species/plasmodium.fa /tmp/duckvep-species/species-seed11663.vcf 11663`
+- Generator: `Rscript scripts/stage_species_corpus.R /tmp/duckvep-species/plasmodium.duckdb /tmp/duckvep-species/plasmodium.fa /tmp/duckvep-species/species-seed11663.vcf 11663 plasmodium_falciparum`
 - Seed: `11663`; model artifact SHA-256: `8967ed0e33191e2abfcdbe41720239967c06cc42be9074faa90c8fee1034f3c2`; FASTA SHA-256: `568077a04d51b190e294d9811453934510ca8740e4ef0cd877e1cd7dd990fa67`.
 - VCF: `/tmp/duckvep-species/species-seed11663.vcf`; 5,366 unique variants; SHA-256: `0cf5cd410b76fbb72318ffdee4862ffd2150ee0a20cb2a8ccbe7ac6ecd0a24a2`. Per-variant provenance: adjacent `.vcf.provenance.tsv`. These generated files are not tracked.
 - Sampling: at most 32 transcripts per observed contig × biotype × strand; one each of SNV (1,331), MNV (1,331), insertion (1,331) and deletion (1,330) per selected transcript, plus 43 codon witnesses. Seven biotypes and all 16 contigs are represented. Table 1 witnesses change TGG→TGA (W→stop); table 4 witnesses change TGG→TGA (W→W); table 11 witnesses change the start codon ATG→GTG (GTG is an alternative initiator under table 11, but encodes V in table-1 translation). The VCF records are reference-checked against the indexed assembly FASTA.

@@ -9,9 +9,12 @@ suppressPackageStartupMessages({
 })
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 4L) {
-  stop("usage: stage_plasmodium_corpus.R MODEL_DB FASTA OUTPUT_VCF SEED", call. = FALSE)
+if (!length(args) %in% c(5L, 6L) || !nzchar(args[[5L]])) {
+  stop("usage: stage_species_corpus.R MODEL_DB FASTA OUTPUT_VCF SEED SPECIES [SAMPLE_PER_GROUP]", call. = FALSE)
 }
+species <- args[[5L]]
+sample_size <- if (length(args) == 6L) as.integer(args[[6L]]) else 32L
+stopifnot(!is.na(sample_size), sample_size > 0L)
 model <- normalizePath(args[[1L]], mustWork = TRUE)
 fasta <- normalizePath(args[[2L]], mustWork = TRUE)
 output <- args[[3L]]
@@ -30,14 +33,15 @@ transcripts <- dbGetQuery(con, "
          exons[1].exon_start AS exon_start, exons[1].exon_end AS exon_end,
          length(exons) AS exon_count
   FROM model_transcripts ORDER BY transcript_stable_id")
-stopifnot(identical(sort(unique(transcripts$codon_table[!is.na(transcripts$codon_table)])), c(1L, 4L, 11L)))
+tables <- sort(unique(transcripts$codon_table[!is.na(transcripts$codon_table)]))
+stopifnot(length(tables) > 0L)
 
 # One bounded sample per observed contig/biotype/strand, with independent
 # positions for each allele shape. The seed also controls grouping ranks.
 groups <- split(seq_len(nrow(transcripts)),
                 interaction(transcripts$chrom, transcripts$biotype,
                             transcripts$strand, drop = TRUE))
-chosen <- unlist(lapply(groups, function(i) i[sample.int(length(i), min(length(i), 32L))]),
+chosen <- unlist(lapply(groups, function(i) i[sample.int(length(i), min(length(i), sample_size))]),
                  use.names = FALSE)
 fa <- FaFile(fasta)
 open(fa)
@@ -58,7 +62,7 @@ for (i in chosen) {
   t <- transcripts[i, ]
   width <- t$end - t$start + 1L
   if (width < 10L) next
-  pos <- sample(seq.int(t$start + 2L, t$end - 3L), 1L)
+  pos <- t$start + 1L + sample.int(width - 5L, 1L)
   ref <- base_at(t$chrom, pos, pos + 2L)
   if (!grepl("^[ACGT]{3}$", ref)) next
   add(t$chrom, pos, substr(ref, 1L, 1L), other(substr(ref, 1L, 1L)),
@@ -74,9 +78,9 @@ for (i in chosen) {
 }
 
 # Translation-table witnesses are mapped from single-exon CDS coordinates.
-# Table 4 reassigns TGA from stop to W; table 11 permits GTG as an
-# initiator (M) whereas table 1 uses V outside initiation.
-for (table in c(1L, 4L, 11L)) {
+# TGG-to-TGA witnesses distinguish table 1 from tables 2 and 4;
+# table 11 also admits ATG-to-GTG initiation witnesses.
+for (table in tables) {
   candidates <- transcripts[transcripts$codon_table == table &
                               transcripts$exon_count == 1L &
                               !is.na(transcripts$cds) &
@@ -113,13 +117,14 @@ variants <- do.call(rbind, variants)
 variants <- variants[order(variants$chrom, variants$pos, variants$ref,
                            variants$alt, variants$source), ]
 variants <- variants[!duplicated(variants[c("chrom", "pos", "ref", "alt")]), ]
-variants$id <- sprintf("PF%06d", seq_len(nrow(variants)))
+prefix <- paste0(toupper(substr(strsplit(species, "_", fixed = TRUE)[[1L]], 1L, 1L)),
+                 collapse = "")
+variants$id <- sprintf("%s%06d", prefix, seq_len(nrow(variants)))
 missing_biotypes <- setdiff(unique(transcripts$biotype),
                             transcripts$biotype[match(unique(variants$tx), transcripts$tx)])
 if (length(missing_biotypes)) stop("missing biotypes: ", paste(missing_biotypes, collapse = ", "))
 stopifnot(all(c("SNV", "MNV", "insertion", "deletion", "codon_witness") %in% variants$source),
-          setequal(regions$chrom, unique(variants$chrom)),
-          all(c(1L, 4L, 11L) %in% variants$table[variants$source == "codon_witness"]))
+          all(tables %in% variants$table[variants$source == "codon_witness"]))
 writeLines(c("##fileformat=VCFv4.2",
              paste0("##reference=", fasta),
              paste0("##duckvep_seed=", seed),
