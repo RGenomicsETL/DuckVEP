@@ -1,0 +1,41 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")"
+if ! command -v cmake >/dev/null 2>&1; then
+  echo 'Rduckvep requires CMake to compile its bundled extension' >&2
+  exit 1
+fi
+extension="$(pwd)/inst/duckvep_extension"
+if [ ! -f "$extension/CMakeLists.txt" ]; then
+  echo 'Run Rscript r/Rduckvep/bootstrap.R <repo> before building Rduckvep' >&2
+  exit 1
+fi
+version="$("${R_HOME}/bin/Rscript" -e 'cat(as.character(utils::packageVersion("duckdb")))')"
+case "$(uname -m)" in
+  x86_64) platform=windows_amd64 ;;
+  aarch64) platform=windows_arm64 ;;
+  *) echo 'Unsupported DuckDB extension platform' >&2; exit 1 ;;
+esac
+# R CMD config selects the Rtools compiler and its platform-specific flags.
+cc=$("${R_HOME}/bin/R" CMD config CC)
+cc=${cc%% *}
+cflags=$("${R_HOME}/bin/R" CMD config CFLAGS)
+cppflags=$("${R_HOME}/bin/R" CMD config CPPFLAGS)
+picflags=$("${R_HOME}/bin/R" CMD config CPICFLAGS)
+ldflags=$("${R_HOME}/bin/R" CMD config LDFLAGS)
+build="$(mktemp -d)"
+trap 'rm -rf "$build"' EXIT HUP INT TERM
+cp -R "$extension" "$build/source"
+mv "$build/source/third_party/htslib/Makefile.hts" "$build/source/third_party/htslib/Makefile"
+cmake -S "$build/source" -B "$build/build" -DEXTENSION_NAME=duckvep \
+  -DCMAKE_BUILD_TYPE=Release "-DCMAKE_C_COMPILER=$cc" \
+  "-DCMAKE_C_FLAGS=$cppflags $cflags $picflags" \
+  "-DCMAKE_SHARED_LINKER_FLAGS=$ldflags"
+cmake --build "$build/build" --parallel 2
+artifact="$(pwd)/inst/duckvep_extension/artifacts/v${version}/duckvep.duckdb_extension"
+mkdir -p "$(dirname "$artifact")"
+"${R_HOME}/bin/Rscript" tools/append_extension_metadata.R \
+  --library-file "$build/build/libduckvep.dll" --out-file "$artifact" \
+  --extension-name duckvep --duckdb-platform "$platform" \
+  --duckdb-version "v${version}" --extension-version "v${version}" \
+  --abi-type C_STRUCT_UNSTABLE
