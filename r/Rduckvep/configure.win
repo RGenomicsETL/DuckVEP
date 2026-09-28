@@ -11,11 +11,15 @@ if [ ! -f "$extension/CMakeLists.txt" ]; then
   exit 1
 fi
 version="$("${R_HOME}/bin/Rscript" -e 'cat(as.character(utils::packageVersion("duckdb")))')"
-case "$(uname -m)" in
-  x86_64) platform=windows_amd64 ;;
-  aarch64) platform=windows_arm64 ;;
-  *) echo 'Unsupported DuckDB extension platform' >&2; exit 1 ;;
-esac
+# R's duckdb on Windows is built with Rtools (MinGW), so it loads only
+# *_mingw extensions. DUCKDB_PLATFORM overrides the target when needed.
+platform="${DUCKDB_PLATFORM:-}"
+if [ -z "$platform" ]; then
+  case "$(uname -m)" in
+    x86_64) platform=windows_amd64_mingw ;;
+    *) echo "Set DUCKDB_PLATFORM for Windows $(uname -m) builds" >&2; exit 1 ;;
+  esac
+fi
 # R CMD config selects the Rtools compiler and its platform-specific flags.
 cc=$("${R_HOME}/bin/R" CMD config CC)
 cc=${cc%% *}
