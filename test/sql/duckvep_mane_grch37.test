@@ -29,20 +29,23 @@ statement ok
 INSERT INTO grch37_mapping VALUES
   ('model-A', 10, 'MANE Select', 'exact_model_match'),
   ('model-A', 10, 'MANE Plus Clinical', 'exact_model_match'),
-  ('model-A', 11, 'MANE Select', 'geometry_mismatch'),
+  ('model-A', 11, 'MANE Select', 'cds_exact_utr_differs'),
+  ('model-A', 11, 'MANE Plus Clinical', 'geometry_mismatch'),
   ('model-B', 11, 'MANE Select', 'exact_model_match');
 
 statement ok
 CREATE VIEW grch37_enriched AS
-WITH exact_mapped AS (
-  SELECT model_sha256, transcript_index, list(mane_status ORDER BY mane_status) AS mapped_mane
-  FROM grch37_mapping WHERE mapping_status = 'exact_model_match'
+WITH mapped AS (
+  SELECT model_sha256, transcript_index,
+    list(mane_status ORDER BY mane_status) FILTER (WHERE mapping_status = 'exact_model_match') AS mapped_mane,
+    list(mane_status ORDER BY mane_status) FILTER (WHERE mapping_status = 'cds_exact_utr_differs') AS coding_mane
+  FROM grch37_mapping WHERE mapping_status IN ('exact_model_match', 'cds_exact_utr_differs')
   GROUP BY model_sha256, transcript_index
 )
-SELECT c.*, n.canonical, n.gencode_basic, n.gencode_primary, n.native_mane, m.mapped_mane
+SELECT c.*, n.canonical, n.gencode_basic, n.gencode_primary, n.native_mane, m.mapped_mane, m.coding_mane
 FROM grch37_consequences c
 JOIN grch37_native n USING (model_sha256, transcript_index)
-LEFT JOIN exact_mapped m USING (model_sha256, transcript_index);
+LEFT JOIN mapped m USING (model_sha256, transcript_index);
 
 query I
 SELECT count(*) FROM grch37_enriched;
@@ -54,6 +57,12 @@ SELECT sum(canonical::INTEGER), sum(gencode_basic::INTEGER), sum(mapped_mane IS 
 FROM grch37_enriched;
 ----
 2	1	2
+
+query II
+SELECT sum(mapped_mane IS NOT NULL)::INTEGER, sum(coding_mane IS NOT NULL)::INTEGER
+FROM grch37_enriched;
+----
+2	1
 
 query I
 SELECT count(*) FROM grch37_enriched WHERE gencode_primary OR native_mane;

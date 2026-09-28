@@ -49,7 +49,8 @@ if (!identical(model_hash, "21e113d9148132491bc935f3d1b0ec7d50663f450b62e346cb1f
 
 mane <- fread(cmd = paste("gzip -dc", shQuote(paths["mane"])), sep = "\t", header = TRUE, check.names = FALSE)
 setnames(mane, "#NCBI_GeneID", "NCBI_GeneID")
-stopifnot(nrow(mane) == 19437L, !anyDuplicated(mane$RefSeq_nuc))
+stopifnot(nrow(mane) == 19437L, !anyDuplicated(mane$RefSeq_nuc),
+  all(grepl("^(NM|NR)_[0-9]+\\.[0-9]+$", mane$RefSeq_nuc)))
 mane[, `:=`(mane_row = .I, enst_root = sub("\\.[0-9]+$", "", Ensembl_nuc))]
 
 report <- fread(paths["report"], skip = "# Sequence-Name", sep = "\t")
@@ -210,9 +211,10 @@ classify <- function(row) {
     target_annotation_release = "GCF_000001405.25", candidate_enst = NA_character_,
     candidate_enst_version = NA_integer_, transcript_index = NA_integer_,
     canonical = NA, gencode_basic = NA, gencode_primary = FALSE,
-    exact_refseq = FALSE, exon_chain_match = FALSE, cds_phase_match = FALSE,
-    spliced_sequence_match = FALSE, translated_sequence_match = FALSE,
-    reference_difference = FALSE, reference_difference_bases = NA_integer_,
+    exact_refseq = FALSE, exon_chain_match = NA, utr_exon_chain_match = NA,
+    cds_phase_match = NA, spliced_sequence_match = NA, translated_sequence_match = NA,
+    reference_difference = NA, reference_difference_bases = NA_integer_,
+    cds_reference_difference_bases = NA_integer_,
     target_reference_sha256 = NA_character_, refseq_rna_sha256 = NA_character_,
     refseq_protein_sha256 = NA_character_, mapping_status = "target_transcript_absent",
     mapping_label = NA_character_,
@@ -251,8 +253,9 @@ classify <- function(row) {
     if (is.na(ref_protein)) NULL else ref_protein)
   for (name in names(gate$evidence)) result[[name]] <- gate$evidence[[name]]
   result$mapping_status <- gate$status
-  if (gate$status != "exact_model_match") return(result)
-  result$mapping_label <- "MANE mapped to GRCh37"
+  if (!gate$status %in% c("exact_model_match", "cds_exact_utr_differs")) return(result)
+  result$mapping_label <- if (gate$status == "exact_model_match")
+    "MANE mapped to GRCh37" else "MANE mapped to GRCh37 (coding region only)"
   selected <- gate$selected
   result$candidate_enst <- selected$transcript_stable_id
   result$candidate_enst_version <- as.integer(selected$transcript_version)
@@ -265,7 +268,8 @@ rows <- lapply(seq_len(nrow(mane)), function(i) classify(mane[i]))
 mapping <- rbindlist(rows)
 stopifnot(nrow(mapping) == nrow(mane), !anyDuplicated(mapping$mane_row),
           all(mapping$gencode_primary == FALSE),
-          all(is.na(mapping$transcript_index) == (mapping$mapping_status != "exact_model_match")))
+          all(is.na(mapping$transcript_index) ==
+        !mapping$mapping_status %in% c("exact_model_match", "cds_exact_utr_differs")))
 setorder(mapping, mane_row)
 # Stable checksum of ordered UTF-8 TSV rows, including column names and explicit NA.
 checksum_file <- tempfile("mane-mapping-")

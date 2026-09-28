@@ -12,7 +12,8 @@ target <- list(strand = "+", contig = "1", exons = "1-9", cdna = "ATGAAATAA",
 gate <- function(t = target, c = candidate, r = "ATGAAATAA", p = "MK") mane_pair_gate(t, c, r, p)
 stopifnot(gate()$status == "exact_model_match",
   gate()$evidence$spliced_sequence_match,
-  gate(c = candidate[0])$status == "refseq_only_no_gencode19_match")
+  gate(c = candidate[0])$status == "refseq_only_no_gencode19_match",
+  is.na(gate(c = candidate[0])$evidence$translated_sequence_match))
 
 # Exact accession versions gate target resolution; stable roots never stand in.
 targets <- list("NM_1.1" = target)
@@ -32,7 +33,11 @@ stopifnot(nrow(mane_supported_loci(par, "Y")) == 1L,
           mane_supported_loci(par, "Y")$model_contig == "Y",
           nrow(mane_supported_loci(par, "MT")) == 2L)
 wrong_exon <- copy(target); wrong_exon$exons <- "1-8"
-stopifnot(gate(t = wrong_exon)$status == "geometry_mismatch")
+wrong_exon$cds_rows$end <- 8L
+stopifnot(gate(t = wrong_exon)$status == "geometry_mismatch",
+  identical(gate(t = wrong_exon)$evidence$cds_phase_match, FALSE),
+  identical(gate(t = wrong_exon)$evidence$spliced_sequence_match, TRUE),
+  identical(gate(t = wrong_exon)$evidence$translated_sequence_match, FALSE))
 wrong_phase <- copy(target); wrong_phase$cds_rows$phase <- "1"
 stopifnot(gate(t = wrong_phase)$status == "cds_phase_mismatch")
 wrong_sequence <- copy(target); wrong_sequence$cdna <- "ATGAAATAG"
@@ -46,6 +51,52 @@ stopifnot(reference_difference$status == "exact_model_match",
   reference_difference$evidence$reference_difference,
   reference_difference$evidence$reference_difference_bases == 1L)
 stopifnot(gate(c = rbind(candidate, candidate))$status == "ambiguous_gencode19_candidate")
+
+# The model omits two 5' UTR bases; the coding coordinates and GFF phase agree.
+coding <- copy(candidate)
+coding$cds_start <- 4L; coding$cds_end <- 12L
+coding$pre <- "A"
+coding$transcript_index <- 1L
+coding$transcript_stable_id <- "ENST00000000001"
+coding[, exons := list(data.frame(rank = 1L, exon_start = 3L, exon_end = 12L))]
+coding_target <- copy(target)
+coding_target$exons <- "1-12"
+coding_target$cdna <- "AAAATGAAATAA"
+coding_target$cds_rows <- data.table(start = 4L, end = 12L, phase = "0")
+coding_target$exon_rows <- data.table(start = 1L, end = 12L)
+coding_gate <- function(r = coding_target$cdna, p = "MK", c = coding)
+  gate(t = coding_target, c = c, r = r, p = p)
+accepted <- coding_gate(r = "CAAATGAAATAA")
+stopifnot(accepted$status == "cds_exact_utr_differs",
+  !accepted$evidence$utr_exon_chain_match, accepted$evidence$cds_phase_match,
+  !accepted$evidence$spliced_sequence_match, accepted$evidence$translated_sequence_match,
+  accepted$evidence$cds_reference_difference_bases == 0L,
+  accepted$evidence$reference_difference_bases == 1L)
+decoy <- copy(coding)
+decoy[, exons := list(data.frame(rank = 1L, exon_start = 1L, exon_end = 12L))]
+decoy$pre <- ""; decoy$cds <- coding_target$cdna
+decoy$cds_start <- 1L
+with_decoy <- coding_gate(c = rbind(coding, decoy))
+stopifnot(with_decoy$status == "cds_exact_utr_differs",
+  !with_decoy$evidence$utr_exon_chain_match,
+  !with_decoy$evidence$spliced_sequence_match)
+coding_other <- copy(coding)
+coding_other$transcript_index <- 2L
+coding_other$transcript_stable_id <- "ENST00000000002"
+stopifnot(coding_gate(p = "ME")$status == "geometry_mismatch",
+  identical(coding_gate(p = "ME")$evidence$translated_sequence_match, FALSE),
+  coding_gate(r = "AAAATGGAATAA")$status == "geometry_mismatch",
+  coding_gate(r = "AAAATGGAATAA")$evidence$cds_reference_difference_bases == 1L,
+  coding_gate(c = rbind(coding, coding_other))$status == "ambiguous_gencode19_candidate",
+  is.na(coding_gate(r = NULL)$evidence$cds_reference_difference_bases),
+  coding_gate(r = NULL)$status == "geometry_mismatch")
+coding_wrong_phase <- copy(coding_target)
+coding_wrong_phase$cds_rows$phase <- "1"
+stopifnot(gate(t = coding_wrong_phase, c = coding, r = coding_target$cdna, p = "MK")$status == "geometry_mismatch")
+coding_no_table <- copy(coding)
+coding_no_table$codon_table <- NA_integer_
+stopifnot(coding_gate(c = coding_no_table)$status == "geometry_mismatch",
+  is.na(coding_gate(c = coding_no_table)$evidence$translated_sequence_match))
 
 # Transcript orientation is part of the complete exon-chain comparison.
 minus <- copy(candidate)

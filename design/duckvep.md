@@ -456,28 +456,48 @@ The mapping resolves **exact versioned RefSeq nucleotide accessions** in the NCB
 GFF before considering the MANE ENST stable root as a candidate. MANE v1.5
 contains 19,367 `NM_` and 70 `NR_` rows; the pinned GRCh37.p13 GFF contains
 19,306 `NM_` and 61 `NR_` accessions. The 61 absent `NM_` and nine absent
-`NR_` rows remain rejected. The initial 19,306 audit counted mRNA accessions;
-the complete audit retains the 61 exact noncoding RNA accessions too. The assembly
-report links the original NCBI accession to the target FASTA region; no implicit
-chromosome alias is evidence of transcript identity. For accessions annotated on
-multiple loci, the model's contig restricts the candidate locus but cannot itself
-establish an association; the complete validation gates still apply. Candidate association requires
-the exon chain in transcript orientation, CDS coordinates and phases, model
-spliced sequence versus target genomic FASTA, and RefSeq RNA translation versus
-its versioned protein. RNA substitutions relative to the target reference are
-reported explicitly; a RefSeq protein inconsistent with its RNA rejects the
-candidate. A row is joinable only at `mapping_status = 'exact_model_match'`;
-other rows retain their reason, target accession, and candidate where available.
-The receipt counts statuses over **all** MANE rows and hashes the canonical
-ordered TSV representation of the full relation, independently of Parquet metadata.
-Validate an exported run with
-`Rscript test/scripts/test_mane_grch37_receipt.R OUTPUT_DIR benchmarks/data/mane_grch37_receipts.csv`.
+`NR_` rows remain rejected. The assembly report links the original NCBI
+accession to the target FASTA region; no implicit chromosome alias is evidence
+of transcript identity. For accessions annotated on multiple loci, the model's
+contig restricts the candidate locus but cannot itself establish an association;
+the validation gates still apply. Strict association requires the exon chain in
+transcript orientation, CDS coordinates and phases, model spliced sequence
+versus target genomic FASTA, and RefSeq RNA translation versus its versioned
+protein. `exact_model_match` retains the full-transcript association.
+RNA substitutions relative to the target reference are reported explicitly; a
+RefSeq protein inconsistent with its RNA rejects the strict candidate.
+
+`cds_exact_utr_differs` is a separate coding-only association. It requires the
+exact versioned RefSeq accession on the target reference, exactly one candidate
+with the same contig, strand, CDS segments and phases, a reference-genome CDS
+that translates to the pinned RefSeq protein, and zero RefSeq RNA/reference
+mismatches within the CDS. UTR or non-coding exon chains may differ. Evidence
+columns record true/false when checked and NULL when not evaluable;
+`utr_exon_chain_match` distinguishes full exon-chain identity from CDS identity,
+while `cds_reference_difference_bases` compares coding positions in the
+versioned RefSeq RNA against the target reference. If the RNA is absent or its
+length differs from the target spliced transcript, that comparison is NULL and
+the coding tier is not admitted. The protein gate uses RefSeq RNA for strict
+matches and target-reference CDS for coding-only matches. A substitution
+outside the CDS does not disqualify the coding tier. Ambiguous CDS candidates
+are not associated.
+Coding c./p. HGVS and coding consequences are equivalent for this tier; UTR
+c.-N / c.*N, n. positions, and UTR/non-coding exon consequences are **not**
+claimed. Other rows retain their reason, target accession, and candidate where
+available. The receipt counts statuses over **all** MANE rows and hashes the
+canonical ordered TSV representation of the full relation, independently of
+Parquet metadata. Run offline policy fixtures with `make test_mane_grch37`;
+validate an exported full release with
+`make test_mane_grch37 MANE_GRCH37_OUTPUT=OUTPUT_DIR` (the receipt test requires
+the external Parquet directory and the last row of the receipt ledger).
 
 A caller joins the native cold relation by model SHA-256 and `transcript_index`,
-then joins *only exact* mapped MANE rows by the same two fields **after**
-consequence expansion. If several MANE rows reference one transcript, aggregate
-the mapped statuses into a list before the join rather than duplicating consequences.
-Canonical, GENCODE Basic, and mapped MANE are distinct source-attributed facts;
+then joins mapped MANE rows by the same two fields **after** consequence expansion.
+`scripts/mane_grch37_caller.sql` exposes `mane_mapped_to_grch37` for strict
+matches and `mane_coding_region_only` separately; the latter is usable only for
+coding consequences or coding c./p. HGVS. If several MANE rows reference one
+transcript, aggregate each tier into a list before joining rather than duplicating
+consequences. Canonical, GENCODE Basic, and mapped MANE are distinct source-attributed facts;
 selecting a representative is an explicit caller policy, not VEP `--pick`. If a
 RefSeq transcript is valid on GRCh37 but has no exact GENCODE-19 match, leave it
 unmapped or annotate it in a separately receipted RefSeq model.

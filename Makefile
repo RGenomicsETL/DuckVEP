@@ -20,7 +20,7 @@ endif
 include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
 include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
 
-.PHONY: all test test_debug test_release test-extension-symbols readme
+.PHONY: all test test_debug test_release test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme
 all: configure release
 configure: venv platform extension_version
 platform: venv
@@ -37,6 +37,16 @@ test: debug
 	$(MAKE) test_debug
 test_debug: test_extension_debug
 test_release: test_extension_release test-extension-symbols test-sql-lambda-syntax
+
+# Pure policy fixtures run offline. The full-release receipt needs the external
+# Parquet output and is invoked explicitly after building a staged release.
+test_mane_grch37:
+	Rscript test/scripts/test_mane_grch37_policy.R
+	@if test -n "$(MANE_GRCH37_OUTPUT)"; then $(MAKE) test_mane_grch37_receipt MANE_GRCH37_OUTPUT="$(MANE_GRCH37_OUTPUT)"; else echo 'Full-release receipt needs MANE_GRCH37_OUTPUT'; fi
+
+test_mane_grch37_receipt:
+	@test -n "$(MANE_GRCH37_OUTPUT)" || { echo 'Set MANE_GRCH37_OUTPUT to the full-release output directory' >&2; exit 1; }
+	Rscript test/scripts/test_mane_grch37_receipt.R "$(MANE_GRCH37_OUTPUT)" benchmarks/data/mane_grch37_receipts.csv
 
 # DuckDB 2.0 rejects single-arrow SQL lambdas by default.
 .PHONY: test-sql-lambda-syntax

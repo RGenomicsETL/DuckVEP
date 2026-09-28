@@ -40,6 +40,7 @@ mane_protein_matches <- function(target, ref_rna, protein, codon_table) {
   if (nrow(target$cds_rows) == 0L) return(FALSE)
   cds <- mane_cds_from_rna(target, ref_rna)
   if (is.na(cds) || nchar(cds) == 0L || nchar(cds) %% 3L != 0L) return(FALSE)
+  if (is.na(codon_table)) return(NA)
   code <- if (codon_table == 2L) Biostrings::getGeneticCode("SGC1") else Biostrings::GENETIC_CODE
   translated <- as.character(Biostrings::translate(Biostrings::DNAString(cds),
     genetic.code = code, if.fuzzy.codon = "X"))
@@ -47,49 +48,74 @@ mane_protein_matches <- function(target, ref_rna, protein, codon_table) {
 }
 
 mane_pair_gate <- function(target, candidates, ref_rna, protein) {
-  evidence <- list(exon_chain_match = FALSE, cds_phase_match = FALSE,
-    spliced_sequence_match = FALSE, translated_sequence_match = FALSE,
-    reference_difference = FALSE, reference_difference_bases = NA_integer_)
-  reject <- function(status) list(status = status, selected = NULL, evidence = evidence)
-  if (!nrow(candidates)) return(reject("refseq_only_no_gencode19_match"))
+  evidence <- list(exon_chain_match = NA, utr_exon_chain_match = NA,
+    cds_phase_match = NA, spliced_sequence_match = NA,
+    translated_sequence_match = NA, reference_difference = NA,
+    reference_difference_bases = NA_integer_, cds_reference_difference_bases = NA_integer_)
+  finish <- function(status, selected = NULL) list(status = status, selected = selected, evidence = evidence)
+  if (!nrow(candidates)) return(finish("refseq_only_no_gencode19_match"))
   strand <- if (target$strand == "+") "1" else "-1"
-  geometry <- vapply(seq_len(nrow(candidates)), function(i) {
-    x <- candidates[i]
-    if (!identical(x$seq_region_name, target$contig) ||
-        !identical(as.character(x$strand), strand)) return(FALSE)
-    ex <- x$exons[[1]]
-    identical(paste(paste(ex$exon_start, ex$exon_end, sep = "-"), collapse = ";"), target$exons)
-  }, logical(1))
-  evidence$exon_chain_match <- any(geometry)
-  if (!any(geometry)) return(reject("geometry_mismatch"))
-  candidates <- candidates[geometry]
-  cds <- vapply(seq_len(nrow(candidates)), function(i) {
-    x <- candidates[i]
-    mane_model_cds_geometry(x$exons[[1]], x$cds_start, x$cds_end) ==
-      paste(paste(target$cds_rows$start, target$cds_rows$end,
-                  target$cds_rows$phase, sep = "-"), collapse = ";")
-  }, logical(1))
+  locus <- candidates$seq_region_name == target$contig & as.character(candidates$strand) == strand
+  candidates <- candidates[which(locus)]
+  if (!nrow(candidates)) return(finish("geometry_mismatch"))
+  exon <- vapply(candidates$exons, function(ex)
+    identical(paste(paste(ex$exon_start, ex$exon_end, sep = "-"), collapse = ";"), target$exons),
+    logical(1))
+  evidence$exon_chain_match <- any(exon)
+  evidence$utr_exon_chain_match <- any(exon)
+  target_cds <- paste(paste(target$cds_rows$start, target$cds_rows$end,
+                            target$cds_rows$phase, sep = "-"), collapse = ";")
+  cds <- vapply(seq_len(nrow(candidates)), function(i)
+    identical(mane_model_cds_geometry(candidates$exons[[i]], candidates$cds_start[i],
+                                      candidates$cds_end[i]), target_cds), logical(1))
   evidence$cds_phase_match <- any(cds)
-  if (!any(cds)) return(reject("cds_phase_mismatch"))
-  candidates <- candidates[cds]
   reference <- vapply(seq_len(nrow(candidates)), function(i) {
-    x <- candidates[i]
-    transcript <- paste0(ifelse(is.na(x$pre), "", x$pre),
-                         ifelse(is.na(x$cds), "", x$cds),
-                         ifelse(is.na(x$post), "", x$post))
+    transcript <- paste0(ifelse(is.na(candidates$pre[i]), "", candidates$pre[i]),
+                         ifelse(is.na(candidates$cds[i]), "", candidates$cds[i]),
+                         ifelse(is.na(candidates$post[i]), "", candidates$post[i]))
     identical(transcript, target$cdna)
   }, logical(1))
   evidence$spliced_sequence_match <- any(reference)
-  if (!any(reference)) return(reject("sequence_mismatch"))
-  candidates <- candidates[reference]
-  if (is.null(ref_rna) || nchar(ref_rna) != nchar(target$cdna)) return(reject("sequence_mismatch"))
-  difference <- sum(strsplit(ref_rna, "", fixed = TRUE)[[1]] !=
-                    strsplit(target$cdna, "", fixed = TRUE)[[1]])
-  evidence$reference_difference_bases <- difference
-  evidence$reference_difference <- difference > 0L
-  evidence$translated_sequence_match <- mane_protein_matches(target, ref_rna, protein,
-    candidates$codon_table[1])
-  if (!evidence$translated_sequence_match) return(reject("translation_mismatch"))
-  if (nrow(candidates) != 1L) return(reject("ambiguous_gencode19_candidate"))
-  list(status = "exact_model_match", selected = candidates[1], evidence = evidence)
+
+  if (!is.null(ref_rna) && nchar(ref_rna) == nchar(target$cdna)) {
+    difference <- sum(strsplit(ref_rna, "", fixed = TRUE)[[1]] !=
+                      strsplit(target$cdna, "", fixed = TRUE)[[1]])
+    evidence$reference_difference_bases <- difference
+    evidence$reference_difference <- difference > 0L
+    if (nrow(target$cds_rows)) {
+      ref_cds <- mane_cds_from_rna(target, ref_rna)
+      genome_cds <- mane_cds_from_rna(target, target$cdna)
+      if (!is.na(ref_cds) && !is.na(genome_cds) && nchar(ref_cds) == nchar(genome_cds))
+        evidence$cds_reference_difference_bases <- sum(
+          strsplit(ref_cds, "", fixed = TRUE)[[1]] !=
+          strsplit(genome_cds, "", fixed = TRUE)[[1]])
+    }
+  }
+  # Strict matches retain RNA-to-protein validation; coding-only matches
+  # validate the reference-genome CDS against the pinned RefSeq protein.
+  strict <- which(exon & cds & reference)
+  coding <- which(cds & !exon & nrow(target$cds_rows) > 0L)
+  scope <- if (length(strict) > 0L) strict else if (length(coding) > 0L) coding else seq_len(nrow(candidates))
+  sequence <- if (length(strict) > 0L) ref_rna else target$cdna
+  if (!is.null(sequence) && (!is.null(protein) || !nrow(target$cds_rows)))
+    evidence$translated_sequence_match <- any(vapply(scope, function(i)
+      mane_protein_matches(target, sequence, protein, candidates$codon_table[i]), logical(1)))
+  if (length(strict) > 0L) {
+    if (is.na(evidence$reference_difference_bases)) return(finish("sequence_mismatch"))
+    if (!isTRUE(evidence$translated_sequence_match)) return(finish("translation_mismatch"))
+    if (length(strict) != 1L) return(finish("ambiguous_gencode19_candidate"))
+    return(finish("exact_model_match", candidates[strict]))
+  }
+  if (length(coding) > 0L && sum(cds) != 1L) return(finish("ambiguous_gencode19_candidate"))
+  if (length(coding) == 1L && isTRUE(evidence$translated_sequence_match) &&
+      identical(evidence$cds_reference_difference_bases, 0L) && !is.null(protein)) {
+    evidence$exon_chain_match <- FALSE
+    evidence$utr_exon_chain_match <- FALSE
+    evidence$spliced_sequence_match <- reference[coding]
+    return(finish("cds_exact_utr_differs", candidates[coding]))
+  }
+  if (!any(exon)) return(finish("geometry_mismatch"))
+  if (!any(exon & cds)) return(finish("cds_phase_mismatch"))
+  if (!any(exon & cds & reference)) return(finish("sequence_mismatch"))
+  finish("translation_mismatch")
 }

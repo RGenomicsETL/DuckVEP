@@ -4,17 +4,23 @@
 WITH mapped AS (
   SELECT model_sha256, transcript_index,
          list(struct_pack(status := mane_status, refseq_nuc := refseq_nuc,
-                          refseq_prot := refseq_prot, source_digest := mane_sha256,
-                          target_assembly := target_assembly)
-              ORDER BY mane_status, refseq_nuc) AS mane_mapped_to_grch37
+                          refseq_prot := refseq_prot, mapping_label := mapping_label,
+                          source_digest := mane_sha256, target_assembly := target_assembly)
+              ORDER BY mane_status, refseq_nuc)
+           FILTER (WHERE mapping_status = 'exact_model_match') AS mane_mapped_to_grch37,
+         list(struct_pack(status := mane_status, refseq_nuc := refseq_nuc,
+                          refseq_prot := refseq_prot, mapping_label := mapping_label,
+                          source_digest := mane_sha256, target_assembly := target_assembly)
+              ORDER BY mane_status, refseq_nuc)
+           FILTER (WHERE mapping_status = 'cds_exact_utr_differs') AS mane_coding_region_only
   FROM read_parquet('OUTPUT_DIR/mane_grch37_mapping.parquet')
-  WHERE mapping_status = 'exact_model_match'
+  WHERE mapping_status IN ('exact_model_match', 'cds_exact_utr_differs')
   GROUP BY model_sha256, transcript_index
 )
 SELECT c.*, n.canonical AS ensembl_grch37_canonical,
        n.gencode_basic AS gencode19_basic,
        n.no_retained_canonical, n.model_sha256 AS native_model_sha256,
-       mapped.mane_mapped_to_grch37
+       mapped.mane_mapped_to_grch37, mapped.mane_coding_region_only
 FROM consequence_rows AS c
 JOIN read_parquet('OUTPUT_DIR/grch37_transcript_authorities.parquet') AS n
   ON n.model_sha256 = c.model_sha256 AND n.transcript_index = c.transcript_index
