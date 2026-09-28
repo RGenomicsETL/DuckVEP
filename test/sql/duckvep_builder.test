@@ -1,0 +1,20 @@
+require duckvep
+
+query IIII
+SELECT contains(s, '"quote""semi;\nλ"'),
+       contains(s, '''line\n'''),
+       s = duckvep_model_receipt_sql('quote"semi;\nλ', 't', 'line\n', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all') ,
+       contains(s, '"r'';\nλ"')
+FROM (SELECT duckvep_model_receipt_sql('quote"semi;\nλ', 't', 'line\n', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {regulation_features_table: 'r'';\nλ'}) AS s);
+----
+1	1	1	1
+
+statement error
+SELECT duckvep_model_receipt_sql('r', 't', 's', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {unknown: 'x'});
+----
+unknown option 'unknown'
+
+statement error
+SELECT duckvep_model_receipt_sql('r', 't', 's', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {regulation_features_table: 1});
+----
+expected VARCHAR for option 'regulation_features_table'
