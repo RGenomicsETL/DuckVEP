@@ -9,6 +9,12 @@ FROM (SELECT duckvep_model_receipt_sql('quote"semi;' || chr(10) || 'λ', 't', 'l
 ----
 1	1	1	1
 
+query I
+SELECT duckvep_model_receipt_sql('r', 't', 's', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {regulation_features_table: NULL}) =
+       duckvep_model_receipt_sql('r', 't', 's', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all');
+----
+1
+
 statement error
 SELECT duckvep_model_receipt_sql('r', 't', 's', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {unknown: 'x'});
 ----

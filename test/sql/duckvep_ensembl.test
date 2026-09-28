@@ -473,6 +473,32 @@ FROM query(duckvep_model_receipt_sql(
 statement ok
 ROLLBACK;
 
+statement ok
+CREATE TEMP TABLE "receipt"";
+λ" AS SELECT * FROM duckvep_prepared_regions;
+
+statement ok
+CREATE TEMP TABLE "trans';
+λ" AS SELECT * FROM duckvep_prepared_transcripts;
+
+statement ok
+CREATE TEMP TABLE "reg';
+λ" AS SELECT * FROM duckvep_prepared_regulation;
+
+query III
+SELECT source_name = 'En'';' || chr(10) || 'λ',
+       model_sha256 != (SELECT model_sha256 FROM duckvep_prepared_receipt),
+       regulation_feature_count = (SELECT regulation_feature_count FROM duckvep_prepared_receipt)
+FROM query(duckvep_model_receipt_sql(
+  'receipt";' || chr(10) || 'λ', 'trans'';' || chr(10) || 'λ',
+  'En'';' || chr(10) || 'λ', '116', 'GRCh38',
+  repeat('a', 64), repeat('b', 64),
+  'all current transcripts on FASTA-covered assembly regions',
+  {regulation_features_table: 'reg'';' || chr(10) || 'λ'}
+));
+----
+1	1	1
+
 statement error
 SELECT * FROM query(duckvep_model_receipt_sql(
   'duckvep_prepared_regions', 'duckvep_prepared_transcripts',

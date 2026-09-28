@@ -126,84 +126,6 @@ duckvep_register_so_terms(duckdb_connection connection)
 }
 
 static bool
-duckvep_register_repeat_alleles(duckhts_registration_t *registration)
-{
-	static const char *const sql[] = {
-		"CREATE OR REPLACE MACRO duckvep_repeat_alleles(reference_components, ",
-		"alternate_components, sequence_exact, max_allele_bases := 5000) AS (",
-		"WITH raw_input AS MATERIALIZED (SELECT ",
-		"reference_components AS ref_arg, alternate_components AS alt_arg, ",
-		"sequence_exact AS exact_arg, max_allele_bases AS capacity_arg), ",
-		"input AS (SELECT CAST(exact_arg AS BOOLEAN) AS exact, ",
-		"CAST(capacity_arg AS DOUBLE) AS capacity, ",
-		"capacity_arg <> trunc(capacity_arg) AS fractional_capacity, ",
-		"list_transform(ref_arg, lambda c: struct_pack(",
-		"unit := CAST(c.unit AS VARCHAR), count := CAST(c.count AS DOUBLE))) AS ref_parts, ",
-		"list_transform(alt_arg, lambda c: struct_pack(",
-		"unit := CAST(c.unit AS VARCHAR), count := CAST(c.count AS DOUBLE))) AS alt_parts, ",
-		"coalesce(list_bool_or(list_transform(ref_arg, lambda c: ",
-		"c.count <> trunc(c.count))), false) AS ref_fractional, ",
-		"coalesce(list_bool_or(list_transform(alt_arg, lambda c: ",
-		"c.count <> trunc(c.count))), false) AS alt_fractional FROM raw_input), ",
-		"axes AS (SELECT exact, capacity, fractional_capacity, u.axis, u.name, ",
-		"u.parts, u.fractional FROM (SELECT exact, capacity, fractional_capacity, unnest([",
-		"struct_pack(axis := 0, name := 'reference', parts := ref_parts, ",
-		"fractional := ref_fractional), ",
-		"struct_pack(axis := 1, name := 'alternate', parts := alt_parts, ",
-		"fractional := alt_fractional)]) AS u FROM input) allele_axes), ",
-		"facts AS (SELECT *, ",
-		"coalesce(list_bool_or(list_transform(parts, lambda c: c.unit IS NOT NULL AND ",
-		"NOT regexp_full_match(c.unit, '[ACGTRYSWKMBDHVNacgtryswkmbdhvn]+'))), false) AS invalid_unit, ",
-		"coalesce(list_bool_or(list_transform(parts, lambda c: c.count IS NOT NULL AND ",
-		"(NOT isfinite(c.count) OR c.count < 0))), false) AS invalid_count, ",
-		"parts IS NULL OR coalesce(list_bool_or(list_transform(parts, lambda c: ",
-		"c.unit IS NULL OR c.count IS NULL)), false) AS incomplete, ",
-		"coalesce(list_sum(list_transform(parts, lambda c: length(c.unit) * c.count)), 0) AS required ",
-		"FROM axes), ",
-		"checked AS (SELECT *, CASE ",
-		"WHEN exact IS NULL THEN error('duckvep_repeat_alleles: sequence_exact is required') ",
-		"WHEN capacity IS NULL OR NOT isfinite(capacity) OR capacity < 0 ",
-		"OR capacity > 2147483647 OR fractional_capacity ",
-		"THEN error('duckvep_repeat_alleles: max_allele_bases must be an integer from 0 through ",
-		"2147483647') WHEN invalid_unit THEN error('duckvep_repeat_alleles: repeat units must ",
-		"contain non-empty IUPAC DNA') WHEN invalid_count THEN error('duckvep_repeat_alleles: ",
-		"repeat counts must be finite and nonnegative') ",
-		"WHEN NOT exact THEN 'summary_only' WHEN incomplete THEN 'incomplete_input' ",
-		"WHEN fractional THEN 'nonintegral_count' ",
-		"WHEN required > capacity THEN error('duckvep_repeat_alleles: ' || name || ",
-		"' requires ' || CAST(required AS VARCHAR) || ",
-		"' bases which exceeds max_allele_bases=' || CAST(capacity AS VARCHAR)) ",
-		"ELSE 'ok' END AS status FROM facts), ",
-		"paired_status AS (SELECT CASE ",
-		"WHEN bool_or(status = 'incomplete_input') THEN 'incomplete_input' ",
-		"WHEN bool_or(status = 'nonintegral_count') THEN 'nonintegral_count' ",
-		"WHEN bool_or(status = 'summary_only') THEN 'summary_only' ELSE 'ok' END AS status ",
-		"FROM checked), expanded AS (SELECT checked.*, paired_status.status AS paired_status, ",
-		"CASE WHEN paired_status.status = 'ok' THEN ",
-		"coalesce(array_to_string(list_transform(parts, lambda c: ",
-		"repeat(c.unit, CAST(c.count AS BIGINT))), ''), '') ELSE NULL END AS sequence ",
-		"FROM checked CROSS JOIN paired_status), paired AS (SELECT ",
-		"max(CASE WHEN axis = 0 THEN sequence END) AS reference, ",
-		"max(CASE WHEN axis = 1 THEN sequence END) AS alternate, ",
-		"max(paired_status) AS status FROM expanded) ",
-		"SELECT CASE WHEN status = 'ok' THEN ",
-		"struct_pack(reference := reference, alternate := alternate, ",
-		"reference_length := CAST(length(reference) AS UBIGINT), ",
-		"alternate_length := CAST(length(alternate) AS UBIGINT), ",
-		"length_change := CAST(length(alternate) AS BIGINT) - CAST(length(reference) AS BIGINT), ",
-		"length_direction := CASE WHEN length(alternate) > length(reference) THEN 'GAIN' ",
-		"WHEN length(alternate) < length(reference) THEN 'LOSS' ELSE 'NEUTRAL' END, ",
-		"status := 'ok') ELSE struct_pack(reference := NULL::VARCHAR, ",
-		"alternate := NULL::VARCHAR, reference_length := NULL::UBIGINT, ",
-		"alternate_length := NULL::UBIGINT, length_change := NULL::BIGINT, ",
-		"length_direction := NULL::VARCHAR, status := status) END FROM paired)"
-	};
-
-	return duckhts_register_sql_parts(registration, sql,
-	    sizeof(sql) / sizeof(sql[0]));
-}
-
-static bool
 duckvep_register_annotate_relation(duckhts_registration_t *registration)
 {
 	static const char *const sql[] = {
@@ -688,8 +610,7 @@ duckvep_register_projection_relation(duckhts_registration_t *registration)
 bool
 register_duckvep_sql_functions(duckhts_registration_t *registration)
 {
-	return duckvep_register_phase_call(registration) &&
-	    duckvep_register_repeat_alleles(registration) &&
+	return duckvep_register_repeat_alleles(registration->connection) &&
 	    duckvep_register_annotate_relation(registration) &&
 	    duckvep_register_projection_relation(registration);
 }
