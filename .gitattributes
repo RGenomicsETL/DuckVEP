@@ -1,0 +1,16 @@
+# Genomic fixtures are byte-exact: CRLF conversion on Windows checkouts
+# shifts FASTA .fai offsets and changes checksums, so never convert them.
+*.fa      -text
+*.fa.fai  -text
+*.fai     -text
+*.fasta   -text
+*.vcf     -text
+*.gff     -text
+*.gff3    -text
+*.gtf     -text
+*.bed     -text
+*.tsv     -text
+*.gz      binary
+*.bgz     binary
+*.parquet binary
+*.duckdb  binary
