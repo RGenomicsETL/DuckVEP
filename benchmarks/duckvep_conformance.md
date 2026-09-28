@@ -240,7 +240,7 @@ the current model.
 | `ensemblorg/ensembl-vep@sha256:f354dd8d09073e4d943acbbd02f5eb234a9d9e9d444371c1c349910f2123de11` | 116.0 | `plasmodium_falciparum/63_GCA000002765v3` | `2ed9cdafff5e96a4c1430fdd3993b38504ef9ed35e314d213fd009ab6fea36ab` |
 
 Cache URL: `https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-63/protists/variation/indexed_vep_cache/plasmodium_falciparum_vep_63_GCA000002765v3.tar.gz`.
-`scripts/run_plasmodium_vep116_docker.sh` mounts the extracted cache and
+`scripts/run_species_vep116_docker.sh` mounts the extracted cache and
 indexed FASTA read-only and disables networking. The seed-11663
 model-derived VCF has 5,366 reference-checked variants, SHA-256 `0cf5cd410b76fbb72318ffdee4862ffd2150ee0a20cb2a8ccbe7ac6ecd0a24a2`.
 The oracle JSON has SHA-256 `69e0bb4a7a8eca7da9f871fe7561a4acaeea80d265ffc6ebc54f8ff560634c3a`.
