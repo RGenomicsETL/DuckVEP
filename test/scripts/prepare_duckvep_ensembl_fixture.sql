@@ -11,7 +11,7 @@
 
 INSTALL mysql;
 LOAD mysql;
-LOAD 'build/release/duckhts.duckdb_extension';
+LOAD 'build/release/duckvep.duckdb_extension';
 
 -- The archive server predates START TRANSACTION READ ONLY. These are immutable
 -- anonymous source catalogs, so staging does not need remote transactions.
@@ -445,26 +445,31 @@ SELECT assembly,
 FROM source_manifests
 GROUP BY assembly;
 
+SET VARIABLE grch38_source_manifest = (SELECT source_manifest_sha256 FROM canonical_source_manifests WHERE assembly = 'GRCh38');
+SET VARIABLE grch37_source_manifest = (SELECT source_manifest_sha256 FROM canonical_source_manifests WHERE assembly = 'GRCh37');
+SET VARIABLE grch38_reference_manifest = (SELECT reference_sha256 FROM canonical_reference_manifests WHERE assembly = 'GRCh38');
+SET VARIABLE grch37_reference_manifest = (SELECT reference_sha256 FROM canonical_reference_manifests WHERE assembly = 'GRCh37');
+
 CREATE TEMP TABLE grch38_regions AS
-SELECT * FROM duckvep_ensembl_regions(
+SELECT * FROM query(duckvep_ensembl_regions_sql(
   'duckvep_grch38_core', 'duckvep_grch38_reference', 'GRCh38'
-);
+));
 CREATE TEMP TABLE grch38_transcripts AS
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_grch38_core', 'duckvep_grch38_reference', 'GRCh38'
-);
+));
 CREATE TEMP TABLE grch38_regulation AS
-SELECT * FROM duckvep_ensembl_regulation_features(
+SELECT * FROM query(duckvep_ensembl_regulation_features_sql(
   'duckvep_grch38_funcgen', 'grch38_regions'
-);
+));
 CREATE TEMP TABLE grch37_regions AS
-SELECT * FROM duckvep_ensembl_regions(
+SELECT * FROM query(duckvep_ensembl_regions_sql(
   'duckvep_grch37_core', 'duckvep_grch37_reference', 'GRCh37'
-);
+));
 CREATE TEMP TABLE grch37_transcripts AS
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_grch37_core', 'duckvep_grch37_reference', 'GRCh37'
-);
+));
 CREATE TEMP TABLE grch37_regulation(
   regulation_feature_index UINTEGER,
   seq_region UINTEGER,
@@ -477,10 +482,8 @@ CREATE TEMP TABLE fixture_receipts AS
 SELECT * FROM query(duckvep_model_receipt_sql(
   'grch38_regions', 'grch38_transcripts',
   'Ensembl', '116', 'GRCh38',
-  (SELECT source_manifest_sha256 FROM canonical_source_manifests
-   WHERE assembly = 'GRCh38'),
-  (SELECT reference_sha256 FROM canonical_reference_manifests
-   WHERE assembly = 'GRCh38'),
+  getvariable('grch38_source_manifest'),
+  getvariable('grch38_reference_manifest'),
   'all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH',
   {regulation_features_table: 'grch38_regulation'}
 ))
@@ -488,10 +491,8 @@ UNION ALL
 SELECT * FROM query(duckvep_model_receipt_sql(
   'grch37_regions', 'grch37_transcripts',
   'Ensembl', '116', 'GRCh37',
-  (SELECT source_manifest_sha256 FROM canonical_source_manifests
-   WHERE assembly = 'GRCh37'),
-  (SELECT reference_sha256 FROM canonical_reference_manifests
-   WHERE assembly = 'GRCh37'),
+  getvariable('grch37_source_manifest'),
+  getvariable('grch37_reference_manifest'),
   'all current transcripts on MT and GL000201.1'
 ));
 
