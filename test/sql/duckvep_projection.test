@@ -4,6 +4,17 @@
 
 require duckvep
 
+query TTTT
+SELECT _duckvep_revcomp('AéC') = 'GéT',
+  _duckvep_revcomp('ACGTRYSWKMBDHVNacgtryswkmbdhvn!') =
+  translate(reverse('ACGTRYSWKMBDHVNacgtryswkmbdhvn!'),
+    'ACGTRYSWKMBDHVNacgtryswkmbdhvn',
+    'TGCAYRSWMKVHDBNtgcayrswmkvhdbn'),
+  _duckvep_revcomp(NULL) IS NULL,
+  _duckvep_revcomp('') = '';
+----
+true	true	true	true
+
 statement ok
 CREATE TABLE projection_regions AS SELECT 1::UINTEGER AS seq_region;
 
