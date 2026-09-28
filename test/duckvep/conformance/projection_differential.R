@@ -244,8 +244,8 @@ main <- function() {
           phase := CASE WHEN e.exon_cdna_start=1 THEN exons[2].phase ELSE e.phase END,
           end_phase := e.end_phase)) AS exons) FROM projection_transcripts")
       wrong <- DBI::dbGetQuery(con, "SELECT p.* EXCLUDE(event_index, transcript_index), e.ID,
-        n.transcript_id FROM duckvep_transcript_projection(
-          'projection_events', 'projection_annotations', 'wrong_projection_phase') p
+        n.transcript_id FROM query(duckvep_transcript_projection_sql(
+          'projection_events', 'projection_annotations', 'wrong_projection_phase')) p
         JOIN projection_events e USING(event_index)
         LEFT JOIN duckvep_transcript_names n USING(transcript_index)")
       wrong <- as.data.frame(lapply(wrong[names(expected)], as.character), stringsAsFactors = FALSE)

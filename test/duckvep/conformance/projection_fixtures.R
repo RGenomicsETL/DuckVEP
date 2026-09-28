@@ -145,8 +145,8 @@ duckvep_projection_input <- function(con, vcf) {
   DBI::dbExecute(con, "CREATE OR REPLACE TABLE projection_annotations AS
     SELECT * FROM duckvep_annotate('projection_events', 'projection')")
   DBI::dbExecute(con, "CREATE OR REPLACE TABLE projection_actual AS
-    SELECT p.*, e.ID, n.transcript_id FROM duckvep_transcript_projection(
-      'projection_events', 'projection_annotations', 'projection_transcripts') p
+    SELECT p.*, e.ID, n.transcript_id FROM query(duckvep_transcript_projection_sql(
+      'projection_events', 'projection_annotations', 'projection_transcripts')) p
     JOIN projection_events e USING(event_index)
     LEFT JOIN duckvep_transcript_names n USING(transcript_index)")
   invisible(NULL)

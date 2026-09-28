@@ -2,7 +2,7 @@ DuckVEP SQL transcript presentation
 ================
 
 This measures the complete 23-column result of
-`duckvep_transcript_projection(events, annotations, transcripts)` as a
+`query(duckvep_transcript_projection_sql(events, annotations, transcripts))` as a
 DuckDB temporary table. It is the SQL reference, not a fused native
 implementation. The literal alleles and consequence rows are prepared
 before timing. The timer includes the macro’s validation, joins,

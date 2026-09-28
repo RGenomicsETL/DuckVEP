@@ -448,7 +448,7 @@ static int input_open(haplotype_state_t *s, const haplotype_bind_t *b, char *err
         "alleles::INTEGER[] alleles, phase_before::BOOLEAN[] phase_before, phase_set::BIGINT phase_set FROM (";
     const char *middle =
         ") source), calls AS MATERIALIZED (SELECT *, "
-        "list_contains(list_transform(duckvep_phase_call(alleles,phase_before,phase_set := phase_set), "
+        "list_contains(list_transform(duckvep_phase_call(alleles,phase_before,{phase_set: phase_set}), "
         "lambda a: a.phase_scope), 'phase_set') scoped FROM raw), domains AS (SELECT transcript_index, sample_index, ";
     const char *domain = b->policy == DUCKVEP_PHASE_STRICT ?
         "coalesce(list(DISTINCT phase_set ORDER BY phase_set NULLS FIRST) FILTER(WHERE scoped), [NULL]::BIGINT[]) AS domain_sets " :
