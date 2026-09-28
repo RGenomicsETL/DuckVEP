@@ -223,10 +223,32 @@ candidate traversal.
 These are complete model-build receipts, not counts inferred from a
 differential. The ledger retains the full source-manifest, reference,
 and model SHA-256 values, the exact VEP transcript filter, every count
-above, CDS/flank base totals, and the external artifact name. The
-Plasmodium row is an Ensembl Genomes release-63 cache paired with the
-VEP/core-116 executable libraries, which is why both release numbers are
-recorded.
+above, CDS/flank base totals, and the external artifact name. The Plasmodium row records Ensembl Genomes release-63 source data paired
+with VEP/core-116 executable libraries. Its July hash `c011cdd4deab…`
+cannot be reproduced from the public `plasmodium_falciparum_core_63_116_2`
+core (the only release-63 core available at mysql-eg-publicsql.ebi.ac.uk:4157).
+A rebuild with the pinned FASTA reproduces every count and the codon-table
+distribution, but its July-definition hash is `eae6106d…`; the current
+receipt definition gives `d9c7056823755f83d5b189b9e59fdd1129ebe3e342095453e0d2208f3081d81b`.
+The July model and input VCF are not retained. The July differential does
+not establish equivalence for this rebuild; a current row requires a new
+transcript-pair differential on a traceable input corpus.
+
+### Protist Docker oracle environment
+
+| Image | VEP | Indexed cache | Cache archive SHA-256 |
+|:------|:----|:--------------|:---------------------|
+| `ensemblorg/ensembl-vep@sha256:f354dd8d09073e4d943acbbd02f5eb234a9d9e9d444371c1c349910f2123de11` | 116.0 | `plasmodium_falciparum/63_GCA000002765v3` | `2ed9cdafff5e96a4c1430fdd3993b38504ef9ed35e314d213fd009ab6fea36ab` |
+
+Cache URL: `https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-63/protists/variation/indexed_vep_cache/plasmodium_falciparum_vep_63_GCA000002765v3.tar.gz`.
+`scripts/run_plasmodium_vep116_docker.sh` mounts the extracted cache and
+indexed FASTA read-only and disables networking. A one-variant smoke run
+(`Pf3D7_01_v3:30000:C>A`) returned `PF3D7_0100100.1` as a missense variant;
+this is an oracle check, not a DuckVEP differential. The July input VCF
+for `plasmodium-falciparum-vep63-seed11663` is not declared by
+`scripts/stage_duckvep_conformance_corpora.sh` or
+`pipelines/duckvep/campaigns.tsv`, and no copy survives in the repository.
+The 40,732-pair July result remains historical evidence for the July model.
 
 ## History
 
