@@ -53,7 +53,7 @@ The mapping was validated against, and applies only to, the Ensembl 116 GRCh37 m
 model_sha256 = 21e113d9148132491bc935f3d1b0ec7d50663f450b62e346cb1f0f447de0b290
 ```
 
-That is the deterministic hash `duckvep_model_receipt(...)` computes over the model's
+That is the deterministic hash `query(duckvep_model_receipt_sql(...))` computes over the model's
 declared source, transcripts, exons, and reference sequence. A caller joins on
 `model_sha256` together with `transcript_index`; a model built from a different core dump or
 reference FASTA has a different `model_sha256`, was not validated against this release, and
