@@ -11,24 +11,32 @@ permissions:
 
 jobs:
   check:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+      MAKEFLAGS: -j2
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: r-lib/actions/setup-r@v2
         with:
+          r-version: release
           use-public-rspm: true
-      - name: Install R dependencies
-        shell: bash
-        run: Rscript -e 'install.packages(c("DBI", "duckdb", "tinytest"))'
-      - name: Build package
-        shell: bash
-        run: R CMD build r/Rduckvep
-      - name: Check package
-        shell: bash
-        run: R CMD check --no-manual Rduckvep_0.1.0.tar.gz
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          working-directory: r/Rduckvep
+          extra-packages: any::rcmdcheck
+          needs: check
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          working-directory: r/Rduckvep
+          args: 'c("--no-manual", "--as-cran")'
+          build_args: 'c("--no-manual", "--no-build-vignettes")'
+          error-on: '"warning"'
