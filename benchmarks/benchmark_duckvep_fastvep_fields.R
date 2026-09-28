@@ -318,7 +318,19 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
   }
 }
 
-duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE, distance = 5000) {
+duckvep_fastvep_transcript_dimension <- function(con) {
+  DBI::dbExecute(con, "CREATE OR REPLACE TEMP TABLE fastvep_transcript_dimension AS
+    SELECT t.transcript_index, t.gene_stable_id, t.transcript_stable_id, t.strand,
+      m.canonical
+    FROM duckvep_bench_model.model_transcripts t
+    LEFT JOIN fastvep_metadata m USING(transcript_index)")
+  if (DBI::dbGetQuery(con, "SELECT count(*) AS n FROM fastvep_transcript_dimension
+      WHERE canonical IS NULL")$n != 0) stop("missing canonical status in transcript dimension")
+  invisible(NULL)
+}
+
+duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE, distance = 5000,
+                                        model_name = "fastvep_comparison") {
   stopifnot(contract %in% c("native_tab17", "vep_csq"))
   stopifnot(length(distance) == 1L, is.numeric(distance), is.finite(distance),
     distance == floor(distance), distance >= 0, distance <= 2^32 - 1)
@@ -354,7 +366,7 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE,
     Existing_variation = "NULL::VARCHAR", IMPACT = "p.impact",
     DISTANCE = "p.transcript_distance::VARCHAR", STRAND = "t.strand::VARCHAR",
     FLAGS = if (is_csq) "concat_ws('&', CASE WHEN p.cds_start_nf THEN 'cds_start_NF' END,
-      CASE WHEN p.cds_end_nf THEN 'cds_end_NF' END)" else "CASE WHEN m.canonical THEN 'canonical' END",
+      CASE WHEN p.cds_end_nf THEN 'cds_end_NF' END)" else "CASE WHEN t.canonical THEN 'canonical' END",
     SYMBOL = "m.symbol", BIOTYPE = "t.transcript_biotype",
     EXON = paste0("CASE WHEN p.exon_first IS NOT NULL THEN (", range("p.exon_first", "p.exon_last"), ") || '/' || p.exon_total END"),
     INTRON = paste0("CASE WHEN p.intron_first IS NOT NULL THEN (", range("p.intron_first", "p.intron_last"), ") || '/' || p.intron_total END"),
@@ -393,11 +405,17 @@ duckvep_fastvep_field_query <- function(con, contract, include_identity = FALSE,
     paste(value, "AS", DBI::dbQuoteIdentifier(con, field))
   }, character(1L))
   if (include_identity) values <- c("p.record_index", "p.alt_index", values)
-  function_name <- if (is_csq) "_duckvep_annotate_small_projected_hgvs" else
-    "_duckvep_annotate_small_projected"
+  if (!is_csq) {
+    duckvep_fastvep_transcript_dimension(con)
+    builder <- paste0("duckvep_annotate_projected_sql('fastvep_ordered_events', ",
+      DBI::dbQuoteString(con, model_name), ", {upstream_distance: ", distance,
+      ", downstream_distance: ", distance, "})")
+    return(paste0("SELECT ", paste(values, collapse = ",\n"),
+      " FROM query(", builder, ") p LEFT JOIN fastvep_transcript_dimension t USING(transcript_index)"))
+  }
   paste0("WITH projected AS (
       SELECT e.*, duckvep_allele_geometry(e.position, e.reference, e.alternate) AS geometry,
-        unnest(", function_name, "('fastvep_comparison', e.seq_region, e.position,
+        unnest(_duckvep_annotate_small_projected_hgvs('fastvep_comparison', e.seq_region, e.position,
           e.reference, e.alternate, ", distance, ", ", distance, ")) AS projection
       FROM fastvep_ordered_events e
     ), facts AS (

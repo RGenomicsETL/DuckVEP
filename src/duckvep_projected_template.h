@@ -1,0 +1,25 @@
+/* Small-variant projected facts for presentation from one annotation cursor. */
+static const char *const duckvep_projected_parts[] = {
+    "WITH parameters AS (SELECT CAST(__DUCKVEP_MODEL__ AS VARCHAR) AS model_name, ",
+    "CAST(__DUCKVEP_UPSTREAM__ AS UBIGINT) AS upstream_distance, ",
+    "CAST(__DUCKVEP_DOWNSTREAM__ AS UBIGINT) AS downstream_distance), ",
+    "source AS MATERIALIZED (SELECT e.*, ",
+    "duckvep_allele_geometry(e.position, e.reference, e.alternate) AS geometry ",
+    "FROM __DUCKVEP_EVENTS__ e), ",
+    "validation AS MATERIALIZED (SELECT CASE ",
+    "WHEN (SELECT model_name IS NULL OR model_name = '' FROM parameters) ",
+    "THEN error('duckvep_annotate_projected: model_name must be non-empty') ",
+    "WHEN EXISTS (SELECT 1 FROM source WHERE event_index IS NULL OR seq_region IS NULL ",
+    "OR position IS NULL OR position = 0 OR reference IS NULL OR reference = '' ",
+    "OR alternate IS NULL OR alternate = '' OR alternate IN ('<*>', '<NON_REF>', '*', '.') ",
+    "OR starts_with(alternate, '<') OR contains(alternate, '[') OR contains(alternate, ']')) ",
+    "THEN error('duckvep_annotate_projected: expected literal small-variant events') ",
+    "ELSE true END AS valid), ",
+    "ordered AS (SELECT s.* FROM source s CROSS JOIN validation WHERE validation.valid ",
+    "ORDER BY s.seq_region, s.position, s.event_index), ",
+    "projected AS (SELECT e.*, unnest(_duckvep_annotate_small_projected( ",
+    "p.model_name, e.seq_region, e.position, e.reference, e.alternate, ",
+    "p.upstream_distance, p.downstream_distance)) AS projection ",
+    "FROM ordered e CROSS JOIN parameters p) ",
+    "SELECT * EXCLUDE (projection), projection.* FROM projected"
+};

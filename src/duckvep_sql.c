@@ -131,6 +131,7 @@ static bool duckvep_projection_table(duckvep_sql_text *sql, const char *name);
 
 /* Annotation SQL keeps the event relation in the caller's transaction. */
 #include "duckvep_annotate_template.h"
+#include "duckvep_projected_template.h"
 
 static bool
 duckvep_annotate_number(duckdb_vector vector, idx_t row, duckvep_sql_text *sql)
@@ -175,7 +176,8 @@ duckvep_annotate_boolean(duckdb_vector vector, idx_t row, duckvep_sql_text *sql)
 }
 
 static void
-duckvep_annotate_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output)
+duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input,
+    duckdb_vector output, bool projected)
 {
     const char *const keys[] = {"hgvs", "upstream_distance", "downstream_distance", "rich"};
     const duckvep_option_kind kinds[] = {DUCKVEP_OPTION_BOOLEAN, DUCKVEP_OPTION_INTEGER,
@@ -214,8 +216,10 @@ duckvep_annotate_builder(duckdb_function_info info, duckdb_data_chunk input, duc
                 duckvep_annotate_number(fields[i], row, &values[dest]);
         }
         duckvep_sql_text sql = {0};
-        for (size_t i = 0; ok && i < sizeof(duckvep_annotate_parts) / sizeof(*duckvep_annotate_parts); i++) {
-            const char *part = duckvep_annotate_parts[i];
+        size_t part_count = projected ? sizeof(duckvep_projected_parts) / sizeof(*duckvep_projected_parts) :
+            sizeof(duckvep_annotate_parts) / sizeof(*duckvep_annotate_parts);
+        for (size_t i = 0; ok && i < part_count; i++) {
+            const char *part = projected ? duckvep_projected_parts[i] : duckvep_annotate_parts[i];
             while (ok && *part) {
                 const char *mark = strstr(part, "__DUCKVEP_");
                 if (!mark) { ok = duckvep_sql_append(&sql, part); break; }
@@ -240,11 +244,25 @@ duckvep_annotate_builder(duckdb_function_info info, duckdb_data_chunk input, duc
     }
 }
 
+static void
+duckvep_annotate_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output)
+{
+    duckvep_annotate_builder_impl(info, input, output, false);
+}
+
+static void
+duckvep_projected_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output)
+{
+    duckvep_annotate_builder_impl(info, input, output, true);
+}
+
 static bool
 duckvep_register_annotate_relation(duckhts_registration_t *registration)
 {
     return duckvep_register_builder(registration->connection, "duckvep_annotate_sql", 2,
-        duckvep_annotate_builder);
+        duckvep_annotate_builder) &&
+        duckvep_register_builder(registration->connection, "duckvep_annotate_projected_sql", 2,
+        duckvep_projected_builder);
 }
 
 /* SQL presentation uses the kernel's immutable genetic-code authority. The
