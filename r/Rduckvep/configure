@@ -11,8 +11,26 @@ if [ ! -f "$extension/CMakeLists.txt" ]; then
   exit 1
 fi
 version="$("${R_HOME}/bin/Rscript" -e 'cat(as.character(utils::packageVersion("duckdb")))')"
-# DUCKDB_PLATFORM overrides the target, e.g. when cross-compiling.
+# rwasm invokes configure through emconfigure with an Emscripten compiler.
+wasm=no
+host_triplet=
+build_triplet=
+cache_vars=
+for arg in "$@"; do
+  case "$arg" in
+    --host=*) host_triplet=${arg#--host=} ;;
+    --build=*) build_triplet=${arg#--build=} ;;
+    ac_cv_*=*) cache_vars="${cache_vars}${cache_vars:+;}${arg}" ;;
+  esac
+done
+case "${CC:-}:$host_triplet" in
+  *emcc*|*wasm*|*emscripten*) wasm=yes ;;
+esac
+# DuckDB's Emscripten R runtime identifies itself as linux_i686_musl.
 platform="${DUCKDB_PLATFORM:-}"
+if [ -z "$platform" ] && [ "$wasm" = yes ]; then
+  platform=linux_i686_musl
+fi
 if [ -z "$platform" ]; then
   case "$(uname -s):$(uname -m)" in
     Linux:x86_64) platform=linux_amd64 ;;
@@ -38,6 +56,16 @@ if [ "$(uname -s)" = Darwin ]; then
     "-DCMAKE_C_FLAGS=$cppflags $cflags $picflags" \
     "-DCMAKE_EXE_LINKER_FLAGS=$ldflags" \
     "-DCMAKE_SHARED_LINKER_FLAGS=$ldflags"
+elif [ "$wasm" = yes ]; then
+  set -- "-DCMAKE_TOOLCHAIN_FILE=${EMSCRIPTEN}/cmake/Modules/Platform/Emscripten.cmake" \
+    "-DCMAKE_C_COMPILER=${CC:-emcc}" \
+    -DDUCKDB_WASM_EXTENSION=ON -DDUCKVEP_WEBR_EXTENSION=ON \
+    "-DHTSLIB_BUILD_TRIPLET=$build_triplet" \
+    "-DHTSLIB_AUTOCONF_CACHE=$cache_vars" \
+    "-DZLIB_LIBRARY=${EMSCRIPTEN}/cache/sysroot/lib/wasm32-emscripten/pic/libz.a" \
+    "-DCMAKE_C_FLAGS=-s USE_ZLIB=1 ${CFLAGS:-}" \
+    "-DCMAKE_EXE_LINKER_FLAGS=-s USE_ZLIB=1 ${LDFLAGS:-}" \
+    "-DCMAKE_SHARED_LINKER_FLAGS=-s USE_ZLIB=1 ${LDFLAGS:-}"
 else
   set --
 fi

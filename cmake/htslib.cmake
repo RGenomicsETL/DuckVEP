@@ -21,7 +21,8 @@ if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
     endif()
 endif()
 if(DUCKDB_WASM_EXTENSION)
-    string(APPEND HTSLIB_CFLAGS " -fwasm-exceptions")
+    string(APPEND HTSLIB_CFLAGS " -fwasm-exceptions -s USE_ZLIB=1")
+    string(APPEND HTSLIB_LDFLAGS " -s USE_ZLIB=1")
     string(APPEND HTSLIB_CPPFLAGS " -DDUCKVEP_WASM_DUCKDB_RUNTIME=1 -include ${CMAKE_SOURCE_DIR}/src/include/wasm_socket_compat.h")
 endif()
 
@@ -30,7 +31,16 @@ set(HTSLIB_CONFIGURE_FLAGS
     --disable-bz2 --disable-lzma --without-libdeflate)
 set(HTSLIB_CONFIGURE_ENV_VARS "")
 if(DUCKDB_WASM_EXTENSION)
-    list(APPEND HTSLIB_CONFIGURE_ENV_VARS "ac_cv_search_recv=none required")
+    list(APPEND HTSLIB_CONFIGURE_ENV_VARS
+        "ac_cv_search_recv=none required"
+        "ac_cv_lib_z_inflate=yes"
+        "ac_cv_func_fork=no" "ac_cv_func_vfork=no"
+        "ac_cv_func_getrandom=no")
+    list(APPEND HTSLIB_CONFIGURE_FLAGS --host=wasm32-unknown-emscripten)
+    if(DEFINED HTSLIB_BUILD_TRIPLET AND NOT "${HTSLIB_BUILD_TRIPLET}" STREQUAL "")
+        list(APPEND HTSLIB_CONFIGURE_FLAGS "--build=${HTSLIB_BUILD_TRIPLET}")
+    endif()
+    list(APPEND HTSLIB_CONFIGURE_ENV_VARS ${HTSLIB_AUTOCONF_CACHE})
 endif()
 set(HTSLIB_MAKE_ARGS
     "CC=${CMAKE_C_COMPILER}"
