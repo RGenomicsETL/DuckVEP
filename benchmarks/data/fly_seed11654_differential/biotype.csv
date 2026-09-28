@@ -1,0 +1,11 @@
+"biotype","verdict","n"
+"miRNA","exact",2816
+"ncRNA","exact",2307
+"pre_miRNA","exact",1448
+"protein_coding","exact",18383
+"pseudogene","exact",1137
+"rRNA","exact",1514
+"snRNA","exact",264
+"snoRNA","exact",1720
+"tRNA","exact",2641
+"transposable_element","exact",3906

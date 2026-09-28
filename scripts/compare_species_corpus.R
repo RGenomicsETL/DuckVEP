@@ -106,7 +106,7 @@ dbExecute(con, "CREATE TEMP VIEW annotated_diff AS
            CASE WHEN length(v.ref) = 1 THEN 'SNV' ELSE 'MNV' END
            WHEN length(v.ref) < length(v.alt) THEN 'insertion' ELSE 'deletion' END AS allele_shape,
          t.codon_table, t.biotype, t.strand,
-         CASE WHEN v.chrom IN ('MT', 'M') OR v.chrom LIKE '%MIT%' THEN 'mitochondrion'
+         CASE WHEN v.chrom IN ('MT', 'M', 'mitochondrion_genome') OR v.chrom LIKE '%MIT%' THEN 'mitochondrion'
               WHEN v.chrom LIKE '%API%' THEN 'apicoplast' ELSE 'nuclear' END AS contig_class
   FROM differential x JOIN variants v ON x.id = v.id
   LEFT JOIN duckvep_transcript_names t ON x.tx = t.transcript_id")

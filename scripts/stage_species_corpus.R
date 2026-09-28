@@ -78,7 +78,7 @@ for (i in chosen) {
 }
 
 # Translation-table witnesses are mapped from single-exon CDS coordinates.
-# TGG-to-TGA witnesses distinguish table 1 from tables 2 and 4;
+# TGG-to-TGA witnesses distinguish table 1 from tables 2, 4, and 5;
 # table 11 also admits ATG-to-GTG initiation witnesses.
 for (table in tables) {
   candidates <- transcripts[transcripts$codon_table == table &
