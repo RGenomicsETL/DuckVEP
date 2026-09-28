@@ -1,11 +1,11 @@
 require duckvep
 
 query IIII
-SELECT contains(s, '"quote""semi;\nλ"'),
-       contains(s, '''line\n'''),
-       s = duckvep_model_receipt_sql('quote"semi;\nλ', 't', 'line\n', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all') ,
-       contains(s, '"r'';\nλ"')
-FROM (SELECT duckvep_model_receipt_sql('quote"semi;\nλ', 't', 'line\n', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {regulation_features_table: 'r'';\nλ'}) AS s);
+SELECT contains(s, '"quote""semi;' || chr(10) || 'λ"'),
+       contains(s, '''line' || chr(10) || ''''),
+       s = duckvep_model_receipt_sql('quote"semi;' || chr(10) || 'λ', 't', 'line' || chr(10), 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {regulation_features_table: 'r'';' || chr(10) || 'λ'}),
+       contains(s, '"r'';' || chr(10) || 'λ"')
+FROM (SELECT duckvep_model_receipt_sql('quote"semi;' || chr(10) || 'λ', 't', 'line' || chr(10), 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {regulation_features_table: 'r'';' || chr(10) || 'λ'}) AS s);
 ----
 1	1	1	1
 

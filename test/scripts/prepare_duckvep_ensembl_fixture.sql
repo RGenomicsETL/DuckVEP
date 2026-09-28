@@ -474,7 +474,7 @@ CREATE TEMP TABLE grch37_regulation(
 );
 
 CREATE TEMP TABLE fixture_receipts AS
-SELECT * FROM duckvep_model_receipt(
+SELECT * FROM query(duckvep_model_receipt_sql(
   'grch38_regions', 'grch38_transcripts',
   'Ensembl', '116', 'GRCh38',
   (SELECT source_manifest_sha256 FROM canonical_source_manifests
@@ -482,10 +482,10 @@ SELECT * FROM duckvep_model_receipt(
   (SELECT reference_sha256 FROM canonical_reference_manifests
    WHERE assembly = 'GRCh38'),
   'all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH',
-  regulation_features_table := 'grch38_regulation'
-)
+  {regulation_features_table: 'grch38_regulation'}
+))
 UNION ALL
-SELECT * FROM duckvep_model_receipt(
+SELECT * FROM query(duckvep_model_receipt_sql(
   'grch37_regions', 'grch37_transcripts',
   'Ensembl', '116', 'GRCh37',
   (SELECT source_manifest_sha256 FROM canonical_source_manifests
@@ -493,7 +493,7 @@ SELECT * FROM duckvep_model_receipt(
   (SELECT reference_sha256 FROM canonical_reference_manifests
    WHERE assembly = 'GRCh37'),
   'all current transcripts on MT and GL000201.1'
-);
+));
 
 CREATE TEMP TABLE fixture_acceptance AS
 SELECT CASE

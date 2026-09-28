@@ -9,6 +9,7 @@ DUCKDB_EXTENSION_EXTERN
 #include <string.h>
 
 #include "duckvep_sql.h"
+#include "duckvep_builder.h"
 
 static bool
 duckvep_register_ensembl_regions(duckhts_registration_t *registration)
@@ -525,23 +526,7 @@ duckvep_register_ensembl_regulation_features(duckhts_registration_t *registratio
 	    sizeof(sql) / sizeof(sql[0]));
 }
 
-static bool
-duckvep_register_model_receipt(duckhts_registration_t *registration)
-{
-	static const char *const sql[] = {
-		"CREATE OR REPLACE MACRO duckvep_model_receipt(regions_table, transcripts_table, source_name, source_version, ",
-		"assembly, source_manifest_sha256, reference_sha256, transcript_filter, ",
-		"regulation_features_table := NULL) AS TABLE ",
-		"WITH regions AS MATERIALIZED (SELECT * FROM query_table(regions_table)), ",
-		"model AS MATERIALIZED (SELECT * FROM query_table(transcripts_table)), ",
-		"regulation AS MATERIALIZED (SELECT regulation_feature_index, seq_region, ",
-		"feature_start, feature_end, feature_kind FROM query(CASE WHEN ",
-		"regulation_features_table IS NULL THEN 'SELECT NULL::UINTEGER AS ",
-		"regulation_feature_index, NULL::UINTEGER AS seq_region, NULL::UINTEGER AS ",
-		"feature_start, NULL::UINTEGER AS feature_end, NULL::UTINYINT AS ",
-		"feature_kind WHERE false' ELSE 'SELECT regulation_feature_index, seq_region, ",
-		"feature_start, feature_end, feature_kind FROM query_table(''' || ",
-		"replace(regulation_features_table, '''', '''''') || ''')' END)), ",
+static const char *const receipt_body[] = {
 		"validation AS MATERIALIZED (SELECT CASE ",
 		"WHEN source_name IS NULL OR source_name = '' OR source_version IS NULL OR source_version = '' ",
 		"OR assembly IS NULL OR assembly = '' OR transcript_filter IS NULL OR transcript_filter = '' THEN ",
@@ -578,7 +563,7 @@ duckvep_register_model_receipt(duckhts_registration_t *registration)
 		"f.feature_end < f.feature_start OR f.feature_end > r.sequence_length OR ",
 		"f.feature_kind NOT IN (1, 2)) THEN ",
 		"error('duckvep_model_receipt: regulation-feature geometry, region, or kind is invalid') ",
-		"ELSE true END AS valid), ",
+		"ELSE true END AS valid FROM parameters), ",
 		"region_fingerprint AS MATERIALIZED (SELECT sha256(string_agg(sha256(CAST(struct_pack(",
 		"seq_region := seq_region, seq_region_name := seq_region_name, sequence_length := sequence_length, ",
 		"source_seq_region_id := source_seq_region_id, source_coord_system_id := source_coord_system_id, ",
@@ -620,7 +605,7 @@ duckvep_register_model_receipt(duckhts_registration_t *registration)
 		"source_name := source_name, source_version := source_version, assembly := assembly, ",
 		"source_manifest_sha256 := lower(source_manifest_sha256), ",
 		"reference_sha256 := lower(reference_sha256), transcript_filter := transcript_filter) ",
-		"AS VARCHAR)) AS provenance_sha256), ",
+		"AS VARCHAR)) AS provenance_sha256 FROM parameters), ",
 		"fingerprint AS MATERIALIZED (SELECT sha256(provenance_sha256 || region_sha256 || ",
 		"transcript_sha256 || regulation_sha256) AS model_sha256 FROM provenance_fingerprint ",
 		"CROSS JOIN region_fingerprint CROSS JOIN transcript_fingerprint ",
@@ -652,12 +637,69 @@ duckvep_register_model_receipt(duckhts_registration_t *registration)
 		"summary.peptide_edit_count, summary.transcript_flank_base_count, ",
 		"regulation_summary.regulation_feature_count, ",
 		"regulation_summary.regulatory_region_count, regulation_summary.motif_feature_count ",
-		"FROM summary CROSS JOIN regulation_summary CROSS JOIN fingerprint ",
+		"FROM parameters CROSS JOIN summary CROSS JOIN regulation_summary CROSS JOIN fingerprint ",
 		"CROSS JOIN validation WHERE validation.valid"
 	};
 
-	return duckhts_register_sql_parts(registration, sql,
-	    sizeof(sql) / sizeof(sql[0]));
+static void duckvep_model_receipt_sql(duckdb_function_info info,
+                                     duckdb_data_chunk input, duckdb_vector output) {
+    static const char *const parameters[] = {"source_name", "source_version", "assembly",
+        "source_manifest_sha256", "reference_sha256", "transcript_filter"};
+    static const char *const options[] = {"regulation_features_table"};
+    idx_t argc = duckdb_data_chunk_get_column_count(input);
+    duckdb_vector args[9];
+    for (idx_t i = 0; i < argc; i++) args[i] = duckdb_data_chunk_get_vector(input, i);
+    for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
+        char *values[8] = {0};
+        for (idx_t i = 0; i < 8; i++) {
+            uint64_t *valid = duckdb_vector_get_validity(args[i]);
+            if (valid && !duckdb_validity_row_is_valid(valid, row)) continue;
+            duckdb_string_t *strings = duckdb_vector_get_data(args[i]);
+            values[i] = duckvep_builder_string(strings[row]);
+            if (!values[i]) {
+                duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: invalid argument string or allocation failure");
+                for (idx_t j = 0; j <= i; j++) free(values[j]);
+                return;
+            }
+        }
+        char *option_values[1] = {0};
+        bool options_ok = argc != 9 || duckvep_builder_options(info, args[8], row, options, 1, option_values);
+        if (options_ok && (!values[0] || !values[1]))
+            duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: region and transcript table names are required");
+        if (!options_ok || !values[0] || !values[1]) {
+            for (idx_t i = 0; i < 8; i++) free(values[i]);
+            free(option_values[0]);
+            return;
+        }
+        duckvep_sql_text sql = {0};
+        bool ok = duckvep_sql_append(&sql, "WITH parameters AS MATERIALIZED (SELECT ");
+        for (idx_t i = 0; ok && i < 6; i++) {
+            if (i) ok = duckvep_sql_append(&sql, ", ");
+            if (ok) ok = duckvep_sql_literal(&sql, values[i + 2]);
+            if (ok) ok = duckvep_sql_append(&sql, " AS ");
+            if (ok) ok = duckvep_sql_append(&sql, parameters[i]);
+        }
+        if (ok) ok = duckvep_sql_append(&sql, "), regions AS MATERIALIZED (SELECT * FROM ");
+        if (ok) ok = duckvep_sql_identifier(&sql, values[0]);
+        if (ok) ok = duckvep_sql_append(&sql, "), model AS MATERIALIZED (SELECT * FROM ");
+        if (ok) ok = duckvep_sql_identifier(&sql, values[1]);
+        if (ok) ok = duckvep_sql_append(&sql, "), regulation AS MATERIALIZED (SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM ");
+        if (ok && option_values[0]) ok = duckvep_sql_identifier(&sql, option_values[0]);
+        else if (ok) ok = duckvep_sql_append(&sql, "(SELECT NULL::UINTEGER AS regulation_feature_index, NULL::UINTEGER AS seq_region, NULL::UINTEGER AS feature_start, NULL::UINTEGER AS feature_end, NULL::UTINYINT AS feature_kind WHERE false)");
+        if (ok) ok = duckvep_sql_append(&sql, "), ");
+        for (size_t i = 0; ok && i < sizeof(receipt_body) / sizeof(receipt_body[0]); i++)
+            ok = duckvep_sql_append(&sql, receipt_body[i]);
+        if (!ok) duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: allocation failed");
+        else {
+            duckdb_vector_ensure_validity_writable(output);
+            duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
+            duckdb_vector_assign_string_element(output, row, sql.data);
+        }
+        duckvep_sql_free(&sql);
+        for (idx_t i = 0; i < 8; i++) free(values[i]);
+        free(option_values[0]);
+        if (!ok) return;
+    }
 }
 
 bool
@@ -666,5 +708,6 @@ register_duckvep_ensembl_functions(duckhts_registration_t *registration)
 	return duckvep_register_ensembl_regions(registration) &&
 	    duckvep_register_ensembl_transcripts(registration) &&
 	    duckvep_register_ensembl_regulation_features(registration) &&
-	    duckvep_register_model_receipt(registration);
+	    duckvep_register_builder(registration->connection, "duckvep_model_receipt_sql", 8,
+	        duckvep_model_receipt_sql);
 }

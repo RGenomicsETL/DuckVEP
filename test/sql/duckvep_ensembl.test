@@ -395,13 +395,13 @@ ORDER BY transcript_index, exon.rank;
 
 statement ok
 CREATE TABLE duckvep_prepared_receipt AS
-SELECT * FROM duckvep_model_receipt(
+SELECT * FROM query(duckvep_model_receipt_sql(
   'duckvep_prepared_regions', 'duckvep_prepared_transcripts',
   'Ensembl', '116', 'GRCh38',
   repeat('a', 64), repeat('b', 64),
   'all current transcripts on FASTA-covered assembly regions',
-  regulation_features_table := 'duckvep_prepared_regulation'
-);
+  {regulation_features_table: 'duckvep_prepared_regulation'}
+));
 
 query IIIIIII
 SELECT region_count, transcript_count, gene_count, coding_transcript_count,
@@ -433,25 +433,54 @@ Ensembl	116	GRCh38	all current transcripts on FASTA-covered assembly regions
 
 query I
 SELECT model_sha256 != (
-  SELECT model_sha256 FROM duckvep_model_receipt(
+  SELECT model_sha256 FROM query(duckvep_model_receipt_sql(
     'duckvep_prepared_regions', 'duckvep_prepared_transcripts',
     'Ensembl', '116', 'GRCh38',
     repeat('a', 64), repeat('b', 64),
     'MANE transcripts only',
-    regulation_features_table := 'duckvep_prepared_regulation'
-  )
+    {regulation_features_table: 'duckvep_prepared_regulation'}
+  ))
 ) FROM duckvep_prepared_receipt;
 ----
 1
 
+statement ok
+CREATE TEMP TABLE receipt_temp_regions AS SELECT * FROM duckvep_prepared_regions;
+
+statement ok
+CREATE TEMP TABLE receipt_temp_transcripts AS SELECT * FROM duckvep_prepared_transcripts LIMIT 0;
+
+statement ok
+BEGIN TRANSACTION;
+
+statement ok
+INSERT INTO receipt_temp_transcripts SELECT * FROM duckvep_prepared_transcripts;
+
+statement ok
+DELETE FROM receipt_temp_transcripts WHERE transcript_index = 2;
+
+query II
+SELECT transcript_count, model_sha256 != (SELECT model_sha256 FROM duckvep_prepared_receipt)
+FROM query(duckvep_model_receipt_sql(
+  'receipt_temp_regions', 'receipt_temp_transcripts',
+  'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),
+  'all current transcripts on FASTA-covered assembly regions',
+  {regulation_features_table: 'duckvep_prepared_regulation'}
+));
+----
+2	1
+
+statement ok
+ROLLBACK;
+
 statement error
-SELECT * FROM duckvep_model_receipt(
+SELECT * FROM query(duckvep_model_receipt_sql(
   'duckvep_prepared_regions', 'duckvep_prepared_transcripts',
   'Ensembl', '116', 'GRCh38',
   NULL, repeat('b', 64),
   'all current transcripts on FASTA-covered assembly regions',
-  regulation_features_table := 'duckvep_prepared_regulation'
-);
+  {regulation_features_table: 'duckvep_prepared_regulation'}
+));
 ----
 source and reference SHA-256 values must contain 64 hexadecimal digits
 
@@ -542,11 +571,11 @@ SELECT * FROM duckvep_ensembl_transcripts(
 query III
 SELECT mature_mirna_transcript_count, mature_mirna_segment_count,
        regulation_feature_count
-FROM duckvep_model_receipt(
+FROM query(duckvep_model_receipt_sql(
   'duckvep_prepared_regions', 'duckvep_prepared_mirna',
   'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),
   'VEP 116 core selection on FASTA-covered assembly regions'
-);
+));
 ----
 1	1	0
 
@@ -813,14 +842,14 @@ FROM duckvep_grch38_transcripts;
 
 query III
 SELECT regulation_feature_count, regulatory_region_count, motif_feature_count
-FROM duckvep_model_receipt(
+FROM query(duckvep_model_receipt_sql(
   'duckvep_grch38_regions', 'duckvep_grch38_transcripts',
   'Ensembl', '116', 'GRCh38',
   '34eaee64f47916f2a9d3d864377f911424741c7ead12883e47dcf998f9677703',
   '4fb2dcf3cc1844c54e8105695826d099be075c8cd5b18f74ccd80fb0d38d2cdf',
   'all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH',
-  regulation_features_table := 'duckvep_grch38_regulation'
-);
+  {regulation_features_table: 'duckvep_grch38_regulation'}
+));
 ----
 3	0	3
 
@@ -846,24 +875,24 @@ WHERE mane_select_refseq IS NOT NULL;
 
 statement ok
 CREATE TABLE duckvep_grch38_receipt AS
-SELECT * FROM duckvep_model_receipt(
+SELECT * FROM query(duckvep_model_receipt_sql(
   'duckvep_grch38_regions', 'duckvep_grch38_transcripts',
   'Ensembl', '116', 'GRCh38',
   '34eaee64f47916f2a9d3d864377f911424741c7ead12883e47dcf998f9677703',
   '4fb2dcf3cc1844c54e8105695826d099be075c8cd5b18f74ccd80fb0d38d2cdf',
   'all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH',
-  regulation_features_table := 'duckvep_grch38_regulation'
-);
+  {regulation_features_table: 'duckvep_grch38_regulation'}
+));
 
 statement ok
 CREATE TABLE duckvep_grch37_receipt AS
-SELECT * FROM duckvep_model_receipt(
+SELECT * FROM query(duckvep_model_receipt_sql(
   'duckvep_grch37_regions', 'duckvep_grch37_transcripts',
   'Ensembl', '116', 'GRCh37',
   '768298c5f837c6c386eda3c0d4646b264641cf33dcb577290f480de6b2b91ac4',
   '09de6c8bdf434f9fe29e9803c7403b145452fdeefb5387292af67811f1523d80',
   'all current transcripts on MT and GL000201.1'
-);
+));
 
 query TTT
 SELECT assembly, model_sha256, transcript_filter
