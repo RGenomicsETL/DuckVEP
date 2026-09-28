@@ -4,6 +4,33 @@
 
 require duckvep
 
+statement error
+SELECT duckvep_ensembl_regions_sql('core', 'reference', 'GRCh37', species_id := 2);
+----
+options must be a STRUCT
+
+statement error
+SELECT duckvep_ensembl_regions_sql('core', 'reference', 'GRCh37', {specis_id: 2});
+----
+unknown option 'specis_id'
+
+statement error
+SELECT duckvep_ensembl_transcripts_sql('core', 'reference', 'GRCh37', {species_id: '2'});
+----
+expected INTEGER for option 'species_id'
+
+statement error
+SELECT duckvep_ensembl_regulation_features_sql('funcgen', 'regions', {bogus: 2});
+----
+no options are supported
+
+query TTT
+SELECT contains(duckvep_ensembl_regions_sql('a"b', 'c.d"e', 'G''RCh37'), '"a""b"."seq_region"'),
+       contains(duckvep_ensembl_regions_sql('a"b', 'c.d"e', 'G''RCh37'), '"c"."d""e"'),
+       duckvep_ensembl_regions_sql('a"b', 'c.d"e', 'G''RCh37') = duckvep_ensembl_regions_sql('a"b', 'c.d"e', 'G''RCh37');
+----
+true	true	true
+
 statement ok
 CREATE SCHEMA duckvep_core;
 
@@ -131,9 +158,9 @@ INSERT INTO duckvep_core.translation_attrib VALUES
 
 statement ok
 CREATE TABLE duckvep_prepared_regions AS
-SELECT * FROM duckvep_ensembl_regions(
+SELECT * FROM query(duckvep_ensembl_regions_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-);
+));
 
 # Ensembl regulation is prepared as its own SoA relation. RegulatoryFeature and
 # MotifFeature rows retain distinct feature classes and source IDs; the named
@@ -176,9 +203,9 @@ INSERT INTO duckvep_funcgen.motif_feature VALUES
 
 statement ok
 CREATE TABLE duckvep_prepared_regulation AS
-SELECT * FROM duckvep_ensembl_regulation_features(
+SELECT * FROM query(duckvep_ensembl_regulation_features_sql(
   'duckvep_funcgen', 'duckvep_prepared_regions'
-);
+));
 
 query IITTIITTT
 SELECT regulation_feature_index, feature_kind, feature_class, source_feature_table,
@@ -204,9 +231,9 @@ INSERT INTO duckvep_funcgen.regulatory_feature VALUES
   (82, 999, 10, 0, 20, 22, 'ENSR_TEST_MISSING_TYPE', 1);
 
 statement error
-SELECT * FROM duckvep_ensembl_regulation_features(
+SELECT * FROM query(duckvep_ensembl_regulation_features_sql(
   'duckvep_funcgen', 'duckvep_prepared_regions'
-);
+));
 ----
 regulatory feature type is missing
 
@@ -221,17 +248,17 @@ FROM duckvep_prepared_regions;
 0	1	40	10	chromosome	1
 
 query I
-SELECT source_seq_region_id FROM duckvep_ensembl_regions(
-  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38', species_id := 2
-);
+SELECT source_seq_region_id FROM query(duckvep_ensembl_regions_sql(
+  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38', {species_id: 2}
+));
 ----
 11
 
 statement ok
 CREATE TABLE duckvep_prepared_transcripts AS
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-);
+));
 
 query IITITIITI
 SELECT transcript_index, transcript_flags, CAST(cds_sequence AS VARCHAR),
@@ -289,9 +316,9 @@ statement ok
 ALTER TABLE duckvep_core.translation_attrib_numeric RENAME TO translation_attrib;
 
 query I
-SELECT count(*) FROM duckvep_ensembl_transcripts(
+SELECT count(*) FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-);
+));
 ----
 3
 
@@ -305,9 +332,9 @@ statement ok
 DELETE FROM duckvep_core.seq_region_attrib WHERE seq_region_id = 10;
 
 query I
-SELECT DISTINCT codon_table FROM duckvep_ensembl_transcripts(
+SELECT DISTINCT codon_table FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-) WHERE cds_sequence IS NOT NULL;
+)) WHERE cds_sequence IS NOT NULL;
 ----
 1
 
@@ -315,9 +342,9 @@ statement ok
 INSERT INTO duckvep_core.seq_region_attrib VALUES (10, 66, 2), (10, 66, 1);
 
 statement error
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-);
+));
 ----
 sequence-region codon table is invalid or unsupported
 
@@ -328,9 +355,9 @@ statement ok
 UPDATE duckvep_core.seq_region_attrib SET value = 8 WHERE seq_region_id = 10;
 
 statement error
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-);
+));
 ----
 sequence-region codon table is invalid or unsupported
 
@@ -351,9 +378,9 @@ SET value = '2 3 UU' WHERE translation_id = 50 AND attrib_type_id = 68;
 
 query IT
 SELECT transcript_index, sequence_withheld_reason
-FROM duckvep_ensembl_transcripts(
+FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-) WHERE transcript_index = 0;
+)) WHERE transcript_index = 0;
 ----
 0	unsupported_translation_edit
 
@@ -373,9 +400,9 @@ statement ok
 INSERT INTO duckvep_core.transcript_attrib VALUES (30, 60, 'NM_CONFLICT');
 
 statement error
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-);
+));
 ----
 a MANE attribute must name exactly one RefSeq transcript
 
@@ -513,7 +540,7 @@ source and reference SHA-256 values must contain 64 hexadecimal digits
 query I
 SELECT loaded FROM duckvep_model_load(
   'ensembl-test',
-  'SELECT seq_region, sequence_length FROM duckvep_ensembl_regions(''duckvep_core'', ''duckvep_reference_chunks'', ''GRCh38'') ORDER BY seq_region',
+  'SELECT seq_region, sequence_length FROM query(duckvep_ensembl_regions_sql(''duckvep_core'', ''duckvep_reference_chunks'', ''GRCh38'')) ORDER BY seq_region',
   'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM duckvep_prepared_transcripts ORDER BY seq_region, transcript_start, transcript_index',
   'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
   peptide_edit_query := 'SELECT transcript_index, edit.protein_position, edit.alternate_amino_acid FROM duckvep_prepared_transcripts, LATERAL unnest(peptide_edits) AS u(edit) ORDER BY transcript_index, edit.protein_position',
@@ -590,9 +617,9 @@ INSERT INTO duckvep_core.transcript_attrib VALUES (33, 67, '2-5');
 
 statement ok
 CREATE TABLE duckvep_prepared_mirna AS
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-);
+));
 
 query III
 SELECT mature_mirna_transcript_count, mature_mirna_segment_count,
@@ -672,11 +699,11 @@ SELECT * REPLACE (
 ) FROM duckvep_reference_chunks;
 
 statement error
-SELECT * FROM duckvep_ensembl_regions(
+SELECT * FROM query(duckvep_ensembl_regions_sql(
   'duckvep_core',
   'duckvep_invalid_reference_chunks',
   'GRCh38'
-);
+));
 ----
 reference chunks must cover each contig contiguously from zero
 
@@ -686,9 +713,9 @@ statement ok
 UPDATE duckvep_core.transcript SET stable_id = NULL WHERE transcript_id = 31;
 
 query T
-SELECT transcript_stable_id FROM duckvep_ensembl_transcripts(
+SELECT transcript_stable_id FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-) ORDER BY transcript_index;
+)) ORDER BY transcript_index;
 ----
 ENST_TEST_FORWARD
 ENST_TEST_EDITED
@@ -708,9 +735,9 @@ UPDATE duckvep_core.transcript SET biotype = 'artifact' WHERE transcript_id = 32
 
 query IT
 SELECT transcript_index, transcript_stable_id
-FROM duckvep_ensembl_transcripts(
+FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
-) ORDER BY transcript_index;
+)) ORDER BY transcript_index;
 ----
 0	ENST_TEST_FORWARD
 
@@ -816,33 +843,33 @@ CREATE VIEW duckvep_grch37_reference AS FROM duckvep_fixture_file('grch37', 'ref
 
 statement ok
 CREATE TABLE duckvep_grch38_regions AS
-SELECT * FROM duckvep_ensembl_regions(
+SELECT * FROM query(duckvep_ensembl_regions_sql(
   'duckvep_grch38_core', 'duckvep_grch38_reference', 'GRCh38'
-);
+));
 
 statement ok
 CREATE TABLE duckvep_grch38_transcripts AS
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_grch38_core', 'duckvep_grch38_reference', 'GRCh38'
-);
+));
 
 statement ok
 CREATE TABLE duckvep_grch38_regulation AS
-SELECT * FROM duckvep_ensembl_regulation_features(
+SELECT * FROM query(duckvep_ensembl_regulation_features_sql(
   'duckvep_grch38_funcgen', 'duckvep_grch38_regions'
-);
+));
 
 statement ok
 CREATE TABLE duckvep_grch37_regions AS
-SELECT * FROM duckvep_ensembl_regions(
+SELECT * FROM query(duckvep_ensembl_regions_sql(
   'duckvep_grch37_core', 'duckvep_grch37_reference', 'GRCh37'
-);
+));
 
 statement ok
 CREATE TABLE duckvep_grch37_transcripts AS
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_grch37_core', 'duckvep_grch37_reference', 'GRCh37'
-);
+));
 
 statement ok
 CREATE TABLE duckvep_no_regulation(

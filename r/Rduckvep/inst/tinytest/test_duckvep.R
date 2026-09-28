@@ -225,16 +225,16 @@ local({
     con,
     paste(
       "CREATE TABLE duckvep_r_ensembl_regions AS SELECT * FROM",
-      "duckvep_ensembl_regions(",
-      "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38')"
+      "query(duckvep_ensembl_regions_sql(",
+      "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38'))"
     )
   )
   dbExecute(
     con,
     paste(
       "CREATE TABLE duckvep_r_ensembl_transcripts AS SELECT * FROM",
-      "duckvep_ensembl_transcripts(",
-      "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38')"
+      "query(duckvep_ensembl_transcripts_sql(",
+      "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38'))"
     )
   )
   funcgen_fixture_sql <- c(
@@ -266,8 +266,8 @@ local({
     con,
     paste(
       "CREATE TABLE duckvep_r_ensembl_regulation AS SELECT * FROM",
-      "duckvep_ensembl_regulation_features(",
-      "'duckvep_r_funcgen', 'duckvep_r_ensembl_regions')"
+      "query(duckvep_ensembl_regulation_features_sql(",
+      "'duckvep_r_funcgen', 'duckvep_r_ensembl_regions'))"
     )
   )
   regulation_features <- dbGetQuery(
@@ -381,8 +381,8 @@ local({
   eligible_transcripts <- dbGetQuery(
     con,
     paste(
-      "SELECT transcript_stable_id FROM duckvep_ensembl_transcripts(",
-      "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38')",
+      "SELECT transcript_stable_id FROM query(duckvep_ensembl_transcripts_sql(",
+      "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38'))",
       "ORDER BY transcript_index"
     )
   )
@@ -403,8 +403,8 @@ local({
     con,
     paste(
       "CREATE TABLE duckvep_r_ensembl_rna_edit AS SELECT * FROM",
-      "duckvep_ensembl_transcripts(",
-      "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38')"
+      "query(duckvep_ensembl_transcripts_sql(",
+      "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38'))"
     )
   )
   ensembl_rna_edit <- dbGetQuery(
@@ -3276,13 +3276,13 @@ local({
       paste0(
         "CREATE TABLE ",
         regions,
-        " AS SELECT * FROM duckvep_ensembl_regions(",
+        " AS SELECT * FROM query(duckvep_ensembl_regions_sql(",
         as.character(dbQuoteString(con, schema)),
         ", ",
         as.character(dbQuoteString(con, reference)),
         ", ",
         as.character(dbQuoteString(con, assembly)),
-        ")"
+        "))"
       )
     )
     if (identical(directory, "grch38")) {
@@ -3311,11 +3311,11 @@ local({
         paste0(
           "CREATE TABLE ",
           regulation,
-          " AS SELECT * FROM duckvep_ensembl_regulation_features(",
+          " AS SELECT * FROM query(duckvep_ensembl_regulation_features_sql(",
           as.character(dbQuoteString(con, funcgen_schema)),
           ", ",
           as.character(dbQuoteString(con, regions)),
-          ")"
+          "))"
         )
       )
     } else {
@@ -3335,13 +3335,13 @@ local({
       paste0(
         "CREATE TABLE ",
         transcripts,
-        " AS SELECT * FROM duckvep_ensembl_transcripts(",
+        " AS SELECT * FROM query(duckvep_ensembl_transcripts_sql(",
         as.character(dbQuoteString(con, schema)),
         ", ",
         as.character(dbQuoteString(con, reference)),
         ", ",
         as.character(dbQuoteString(con, assembly)),
-        ")"
+        "))"
       )
     )
     summary <- dbGetQuery(
