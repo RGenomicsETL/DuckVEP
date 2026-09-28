@@ -219,7 +219,7 @@ rows or implement a second importer.
 
 ### Inputs
 
-`duckvep_ensembl_regions(...)` and `duckvep_ensembl_transcripts(...)` read these Ensembl
+`query(duckvep_ensembl_regions_sql(...))` and `query(duckvep_ensembl_transcripts_sql(...))` read these Ensembl
 core relations by name from the supplied schema:
 
 - `coord_system` and `seq_region` identify the requested assembly and its regions;
@@ -228,7 +228,7 @@ core relations by name from the supplied schema:
 - `attrib_type`, `seq_region_attrib`, `transcript_attrib`, and `translation_attrib` supply
   codon tables, consequence-relevant flags, and exceptional sequence edits.
 
-`duckvep_ensembl_regulation_features(...)` reads the release-matched funcgen
+`query(duckvep_ensembl_regulation_features_sql(...))` reads the release-matched funcgen
 `regulatory_feature`, `feature_type`, and `motif_feature` relations. Funcgen uses core
 sequence-region IDs; the generated SQL joins them to the already prepared region relation, rejects
 missing feature types or invalid coordinates, and assigns one dense ordinal space across
@@ -259,7 +259,7 @@ https://www.ensembl.org/info/genome/genebuild/mane.html.
 
 ### Region preparation
 
-`duckvep_ensembl_regions(...)`:
+`query(duckvep_ensembl_regions_sql(...))`:
 
 1. verifies that every reference chunk is non-null, has valid coordinates, and contains
    exactly `end - start` bases;
@@ -274,7 +274,7 @@ The model contract bounds a region coordinate at `UINT32_MAX` and the number of 
 
 ### Transcript and sequence preparation
 
-`duckvep_ensembl_transcripts(...)` applies the VEP-116 core-source filter before assigning
+`query(duckvep_ensembl_transcripts_sql(...))` applies the VEP-116 core-source filter before assigning
 model ordinals: a transcript must be current and have a non-empty stable ID, and neither
 the `artifact` biotype nor a `readthrough_tra` attribute is admitted. This is why a model
 built from the full core dump has the same candidate transcript population as VEP's core
@@ -400,7 +400,7 @@ release-specific differential cases against the pinned upstream VEP target. The 
 must state the supported consequence/HGVS/CSQ subset and every intentional difference;
 passing VEP 116 evidence does not validate another release.
 
-`duckvep_model_receipt(...)` checks dense ordinals, region/transcript agreement, and every
+`query(duckvep_model_receipt_sql(...))` checks dense ordinals, region/transcript agreement, and every
 regulatory/motif interval against its declared region. It
 records the declared source, release, assembly, transcript filter, source-manifest hash,
 reference hash, model counts including CDS, transcript-flank bases, mature-miRNA
@@ -554,27 +554,27 @@ SELECT chrom, start, "end", seq
 FROM fasta_nuc('GRCh38.primary.fa', bin_width := 1048576, include_seq := true);
 
 CREATE TABLE model_regions AS
-SELECT * FROM duckvep_ensembl_regions(
+SELECT * FROM query(duckvep_ensembl_regions_sql(
   'ensembl_core', 'reference_chunks', 'GRCh38'
-);
+));
 
 CREATE TABLE model_transcripts AS
-SELECT * FROM duckvep_ensembl_transcripts(
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'ensembl_core', 'reference_chunks', 'GRCh38'
-);
+));
 
 CREATE TABLE model_regulation AS
-SELECT * FROM duckvep_ensembl_regulation_features(
+SELECT * FROM query(duckvep_ensembl_regulation_features_sql(
   'ensembl_funcgen', 'model_regions'
-);
+));
 
 CREATE TABLE model_receipt AS
-SELECT * FROM duckvep_model_receipt(
+SELECT * FROM query(duckvep_model_receipt_sql(
   'model_regions', 'model_transcripts',
   'Ensembl', '116', 'GRCh38', source_manifest_sha256,
   reference_sha256, 'VEP 116 core transcript selection',
-  regulation_features_table := 'model_regulation'
-);
+  {regulation_features_table: 'model_regulation'}
+));
 ```
 
 The registered `duckvep_ensembl116_model` artifact has one clean-cache producer in

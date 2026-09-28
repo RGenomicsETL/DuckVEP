@@ -1,3 +1,12 @@
+# Rduckvep
+
+- The extension's SQL preparation and annotation entry points are native builders:
+  `query(duckvep_annotate_sql('events', 'model', {hgvs: true}))` replaces
+  direct annotation macro calls. `rduckvep_annotate_sql()` and the other
+  `rduckvep_*_sql()` functions invoke those builders; `rduckvep_annotate()`
+  returns annotated events as a data frame. See the project NEWS.md for the
+  migration table.
+
 # Rduckvep 0.1.0
 
 - First release as a separate package. DuckVEP and its R front end were extracted

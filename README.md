@@ -49,7 +49,7 @@ On the full GIAB HG002 GRCh38 benchmark (4,096,123 ALT alleles, VCF in, uncompre
 
 ## Try it
 
-A model is loaded from ordinary relations: regions, transcripts with their CDS and flanking sequence, and exons. In production these come from an Ensembl core database through `duckvep_ensembl_regions()` and `duckvep_ensembl_transcripts()`; here a [one-transcript fixture](test/data/duckvep/readme.sql) stands in:
+A model is loaded from ordinary relations: regions, transcripts with their CDS and flanking sequence, and exons. In production these come from an Ensembl core database through `query(duckvep_ensembl_regions_sql(...))` and `query(duckvep_ensembl_transcripts_sql(...))`; here a [one-transcript fixture](test/data/duckvep/readme.sql) stands in:
 
 ```sql
 SELECT loaded FROM duckvep_model_load('demo',
@@ -131,6 +131,18 @@ FROM duckvep_haplotypes('SELECT * FROM demo_calls', 'demo');
 #> ├──────────────────┼───────────────┼─────────────────┼──────────────┤
 #> │                0 │             1 │ ok              │            2 │
 #> └──────────────────┴───────────────┴─────────────────┴──────────────┘
+```
+
+## R interface
+
+`Rduckvep` runs the same native builders on the caller’s DuckDB connection. Builder functions return SQL; `rduckvep_annotate()` executes annotation and returns a data frame. The supplied relation names remain visible in that connection, including TEMP tables and uncommitted rows.
+
+```r
+con <- Rduckvep::rduckvep_connect()
+# After loading a model named "demo" and creating "demo_events":
+sql <- Rduckvep::rduckvep_annotate_sql(con, "demo_events", "demo", hgvs = TRUE)
+results <- Rduckvep::rduckvep_annotate(con, "demo_events", "demo", hgvs = TRUE)
+DBI::dbDisconnect(con, shutdown = TRUE)
 ```
 
 ## With the rest of the stack
