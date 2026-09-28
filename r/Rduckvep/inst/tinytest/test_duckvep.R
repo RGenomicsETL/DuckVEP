@@ -637,6 +637,29 @@ local({
       "GROUP BY ALL ORDER BY a.event_index, a.transcript_index"
     )
   )
+  expect_identical(
+    rduckvep_annotate_sql(con, "duckvep_r_public_events", "r-hgvs",
+                          hgvs = TRUE, upstream_distance = 0L, downstream_distance = 0L),
+    dbGetQuery(con, paste0("SELECT duckvep_annotate_sql('duckvep_r_public_events',",
+                           "'r-hgvs', {hgvs: true, upstream_distance: 0,",
+                           " downstream_distance: 0}) AS sql"))$sql[[1L]]
+  )
+  expect_equal(rduckvep_annotate(con, "duckvep_r_public_events", "r-hgvs",
+                                  hgvs = TRUE)$event_index, 1)
+  expect_true(grepl("SELECT", rduckvep_transcript_projection_sql(
+    con, "duckvep_r_public_events", "duckvep_r_public_events",
+    "duckvep_r_ensembl_transcripts"), fixed = TRUE))
+  expect_true(grepl("SELECT", rduckvep_ensembl_regions_sql(
+    con, "duckvep_r_core", "duckvep_r_reference", "GRCh38"), fixed = TRUE))
+  expect_true(grepl("SELECT", rduckvep_ensembl_transcripts_sql(
+    con, "duckvep_r_core", "duckvep_r_reference", "GRCh38"), fixed = TRUE))
+  expect_true(grepl("SELECT", rduckvep_ensembl_regulation_features_sql(
+    con, "duckvep_r_funcgen", "duckvep_r_ensembl_regions"), fixed = TRUE))
+  expect_true(grepl("SELECT", rduckvep_model_receipt_sql(
+    con, "duckvep_r_ensembl_regions", "duckvep_r_ensembl_transcripts",
+    "Ensembl", "116", "GRCh38", paste(rep("a", 64), collapse = ""),
+    paste(rep("b", 64), collapse = ""), "all",
+    regulation_features_table = "duckvep_r_ensembl_regulation"), fixed = TRUE))
   expect_equal(public_annotation$event_index, 1)
   expect_equal(public_annotation$transcript_index, 0)
   expect_identical(
