@@ -43,11 +43,26 @@ CREATE SEQUENCE repeat_capacity_eval START 1;
 query TTI
 WITH evaluated AS MATERIALIZED (
  SELECT duckvep_repeat_alleles([{unit:'A',count:1}],[{unit:'C',count:1}],true,
-  max_allele_bases:=CASE nextval('repeat_capacity_eval') WHEN 1 THEN 1 ELSE 1.5 END) r
+  {max_allele_bases:CASE nextval('repeat_capacity_eval') WHEN 1 THEN 1 ELSE 1.5 END}) r
 )
 SELECT r.reference,r.alternate,currval('repeat_capacity_eval') FROM evaluated;
 ----
 A	C	1
+
+statement error
+SELECT duckvep_repeat_alleles([{unit:'A',count:1}], [{unit:'A',count:1}], true, max_allele_bases := 2);
+----
+options must be a STRUCT
+
+statement error
+SELECT duckvep_repeat_alleles([{unit:'A',count:1}], [{unit:'A',count:2}], true, {max_allele_bases: NULL});
+----
+max_allele_bases must be an integer
+
+statement error
+SELECT duckvep_repeat_alleles([{unit:'A',count:1}], [{unit:'A',count:1}], true, {max_allele_base: 2});
+----
+unknown option 'max_allele_base'
 
 # One exact fact owns both alleles and their signed base-length direction. Ordered
 # components preserve interruptions, case, and ambiguous DNA codes.
@@ -57,7 +72,7 @@ SELECT r.reference,r.alternate,r.reference_length,r.alternate_length,
 FROM (SELECT duckvep_repeat_alleles(
  [{unit:'CAG',count:2},{unit:'CAT',count:1}],
  [{unit:'CAG',count:2},{unit:'CAT',count:1},{unit:'nRy',count:2}],true,
- max_allele_bases:=15) r);
+ {max_allele_bases:15}) r);
 ----
 CAGCAGCAT	CAGCAGCATnRynRy	9	15	6	GAIN	ok
 
@@ -73,7 +88,7 @@ SELECT r.reference,r.alternate,r.reference_length,r.alternate_length,
        r.length_change,r.length_direction,r.status
 FROM (SELECT duckvep_repeat_alleles(
  []::STRUCT(unit VARCHAR,count DOUBLE)[],[{unit:'CAG',count:0}],true,
- max_allele_bases:=0) r);
+ {max_allele_bases:0}) r);
 ----
 (empty)	(empty)	0	0	0	NEUTRAL	ok
 
@@ -84,7 +99,7 @@ SELECT r.reference IS NULL,r.alternate IS NULL,r.reference_length IS NULL,
        r.status='summary_only',r.status
 FROM (SELECT duckvep_repeat_alleles(
  [{unit:'CAG',count:1000000000000000000}],
- [{unit:'CAG',count:1000000000000000001}],false,max_allele_bases:=0) r);
+ [{unit:'CAG',count:1000000000000000001}],false,{max_allele_bases:0}) r);
 ----
 1	1	1	1	1	1	1	summary_only
 
@@ -114,7 +129,7 @@ SELECT count(*),min(r.status) FROM (SELECT duckvep_repeat_alleles(
 # Each complete allele, not each component separately, is capacity checked.
 statement error
 SELECT duckvep_repeat_alleles([{unit:'AC',count:2},{unit:'GT',count:2}],
- [{unit:'A',count:1}],true,max_allele_bases:=7);
+ [{unit:'A',count:1}],true,{max_allele_bases:7});
 ----
 exceeds max_allele_bases=7
 
@@ -126,7 +141,7 @@ exceeds max_allele_bases=5000
 
 statement error
 SELECT duckvep_repeat_alleles([{unit:'A',count:1}],[{unit:'A',count:2}],true,
- max_allele_bases:=1.000000000000000001::DECIMAL(38,18));
+ {max_allele_bases:1.000000000000000001::DECIMAL(38,18)});
 ----
 max_allele_bases must be an integer
 
@@ -156,7 +171,7 @@ sequence_exact is required
 query IIII
 WITH prepared AS (
  SELECT i,duckvep_repeat_alleles([{unit:'CAG',count:i%7}],
- [{unit:'CAG',count:i%13}],i%3<>0,max_allele_bases:=greatest(i%7,i%13)*3) r
+ [{unit:'CAG',count:i%13}],i%3<>0,{max_allele_bases:greatest(i%7,i%13)*3}) r
  FROM range(10000) v(i)
 )
 SELECT count(*),count(*) FILTER (WHERE r.status='summary_only' AND r.reference IS NULL),
@@ -1869,13 +1884,13 @@ SET memory_limit='36MB';
 query IT
 SELECT r.reference IS NULL,r.status FROM (SELECT duckvep_repeat_alleles(
  [{unit:'A',count:64000000}],[{unit:'A',count:NULL}],true,
- max_allele_bases:=64000000) r);
+ {max_allele_bases:64000000}) r);
 ----
 1	incomplete_input
 
 query IT
 SELECT r.alternate IS NULL,r.status FROM (SELECT duckvep_repeat_alleles(
  [{unit:'A',count:1.5}],[{unit:'A',count:64000000}],true,
- max_allele_bases:=64000000) r);
+ {max_allele_bases:64000000}) r);
 ----
 1	nonintegral_count

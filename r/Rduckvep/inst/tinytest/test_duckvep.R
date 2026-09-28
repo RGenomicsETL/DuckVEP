@@ -8,7 +8,7 @@ local({
   repeat_query <- paste("SELECT r.* FROM (SELECT duckvep_repeat_alleles(",
     "[{unit:'CAG',count:2},{unit:'CAT',count:1}],",
     "[{unit:'CAG',count:2},{unit:'CAT',count:1},{unit:'nRy',count:2}],true,",
-    "max_allele_bases:=15) r)")
+    "{max_allele_bases:15}) r)")
   repeat_value <- dbGetQuery(con, repeat_query)
   expect_identical(repeat_value$reference, "CAGCAGCAT")
   expect_identical(repeat_value$alternate, "CAGCAGCATnRynRy")
@@ -31,7 +31,7 @@ local({
   }
   summary <- dbGetQuery(con, paste("SELECT r.* FROM (SELECT duckvep_repeat_alleles(",
     "[{unit:'CAG',count:1e300}],[{unit:'CAG',count:1e300}],false,",
-    "max_allele_bases:=0) r)"))
+    "{max_allele_bases:0}) r)"))
   expect_true(all(vapply(summary[setdiff(names(summary), "status")],
     function(x) all(is.na(x)), logical(1))))
   expect_identical(summary$status, "summary_only")
@@ -42,7 +42,7 @@ local({
   for (limit in c("NULL", "-1", "1.5", "2147483648", "'Infinity'::DOUBLE",
                   "1.000000000000000001::DECIMAL(38,18)"))
     expect_error(dbGetQuery(con, paste0("SELECT duckvep_repeat_alleles([{unit:'A',count:1}],",
-      "[{unit:'A',count:2}],true,max_allele_bases:=", limit, ")")),
+      "[{unit:'A',count:2}],true,{max_allele_bases:", limit, "})")),
       pattern = "max_allele_bases must be an integer")
   for (unit in c("", ".", "AU", "CAG ", "CAG;", "é"))
     expect_error(dbGetQuery(con, paste0("SELECT duckvep_repeat_alleles([{unit:'A',count:1}],",
@@ -50,7 +50,7 @@ local({
       pattern = "repeat units must contain non-empty IUPAC DNA")
   expect_error(dbGetQuery(con, paste("SELECT duckvep_repeat_alleles(",
     "[{unit:'AC',count:2},{unit:'GT',count:2}],[{unit:'A',count:1}],true,",
-    "max_allele_bases:=7)")), pattern = "exceeds max_allele_bases=7")
+    "{max_allele_bases:7})")), pattern = "exceeds max_allele_bases=7")
   expect_error(dbGetQuery(con, paste("SELECT duckvep_repeat_alleles(",
     "[{unit:'A',count:1}],[{unit:'AC',count:1e300}],true)")),
     pattern = "exceeds max_allele_bases=5000")

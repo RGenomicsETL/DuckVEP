@@ -27,7 +27,7 @@ test_phase_preparation <- function() {
   stopifnot(nzchar(partial_path))
   partial <- dbGetQuery(con, paste0(
     "SELECT record_index::INTEGER r,c,duckvep_phase_call(c.alleles,c.phase_before,",
-    "phase_set:=c.phase_set) assignments FROM (SELECT record_index,calls[1] c FROM read_parquet(",
+    "{phase_set:c.phase_set}) assignments FROM (SELECT record_index,calls[1] c FROM read_parquet(",
     dbQuoteString(con, partial_path), ")) ORDER BY r"))
   expect_equal(partial$r, 0:11)
   expected_gt <- list(0:2,0:2,0:2,c(1L,0L,2L),c(1L,0L,2L),c(1L,0L,2L),
@@ -51,8 +51,8 @@ test_phase_preparation <- function() {
   prepared <- function(gt, phase, policy = "strict", ps = "NULL") {
     dbGetQuery(con, paste0("SELECT a.input_slot::INTEGER slot, a.allele_index allele, ",
       "a.haplotype_lane::INTEGER lane, a.phase_set::VARCHAR ps, a.phase_scope, a.status ",
-      "FROM (SELECT unnest(duckvep_phase_call(", gt, ",", phase, ",phase_set := ", ps,
-      ",phase_policy := ", dbQuoteString(con, policy), ")) a) ORDER BY slot"))
+      "FROM (SELECT unnest(duckvep_phase_call(", gt, ",", phase, ",{phase_set: ", ps,
+      ",phase_policy: ", dbQuoteString(con, policy), "})) a) ORDER BY slot"))
   }
   ambiguous <- prepared("[0,1,NULL]", "[true,false,false]", ps = "10")
   expect_equal(ambiguous$allele, c(0L, 1L, NA_integer_))
@@ -90,7 +90,7 @@ test_phase_preparation <- function() {
     "FROM (SELECT i, unnest(duckvep_phase_call(",
     "CASE WHEN i%3=2 THEN [NULL,2,0] ELSE [0,1] END,",
     "CASE WHEN i%3=2 THEN NULL WHEN i%3=0 THEN [true,true] ELSE [false,false] END,",
-    "phase_set := i, phase_policy := CASE WHEN i%3=2 THEN 'vep116_compat' ELSE 'strict' END)) a",
+    "{phase_set: i, phase_policy: CASE WHEN i%3=2 THEN 'vep116_compat' ELSE 'strict' END})) a",
     "FROM range(5000) r(i)) ORDER BY i,slot"))
   expected_many <- do.call(rbind, lapply(0:4999, function(i) {
     if (i %% 3L == 0L) {

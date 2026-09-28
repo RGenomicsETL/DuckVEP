@@ -171,7 +171,7 @@ run <- function() {
       '[]::STRUCT(unit VARCHAR,count DOUBLE)[]) ELSE NULL END,',
       'CASE WHEN c.has_alternate_components THEN coalesce(a.parts,',
       '[]::STRUCT(unit VARCHAR,count DOUBLE)[]) ELSE NULL END,',
-      'c.sequence_exact,max_allele_bases:=c.capacity) result',
+      'c.sequence_exact,{max_allele_bases:c.capacity}) result',
       'FROM repeat_cases c LEFT JOIN refs r USING(scene) LEFT JOIN alts a USING(scene))',
       'SELECT scene,expected_reference,expected_alternate,expected_reference_length,',
       'expected_alternate_length,expected_length_change,expected_length_direction,expected_status,',
