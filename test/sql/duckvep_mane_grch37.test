@@ -1,0 +1,71 @@
+# name: test/sql/duckvep_mane_grch37.test
+# description: Cold GRCh37 transcript authorities and receipt-scoped mapped MANE joins
+# group: [duckvep]
+
+require duckvep
+
+statement ok
+CREATE TABLE grch37_consequences(event_id INTEGER, model_sha256 VARCHAR, transcript_index INTEGER, consequence VARCHAR);
+
+statement ok
+INSERT INTO grch37_consequences VALUES
+  (1, 'model-A', 10, 'missense_variant'),
+  (1, 'model-A', 11, 'intron_variant'),
+  (2, 'model-A', 10, 'synonymous_variant');
+
+statement ok
+CREATE TABLE grch37_native(model_sha256 VARCHAR, transcript_index INTEGER, canonical BOOLEAN,
+  gencode_basic BOOLEAN, gencode_primary BOOLEAN, native_mane BOOLEAN);
+
+statement ok
+INSERT INTO grch37_native VALUES
+  ('model-A', 10, true, false, false, false),
+  ('model-A', 11, false, true, false, false);
+
+statement ok
+CREATE TABLE grch37_mapping(model_sha256 VARCHAR, transcript_index INTEGER, mane_status VARCHAR, mapping_status VARCHAR);
+
+statement ok
+INSERT INTO grch37_mapping VALUES
+  ('model-A', 10, 'MANE Select', 'exact_model_match'),
+  ('model-A', 10, 'MANE Plus Clinical', 'exact_model_match'),
+  ('model-A', 11, 'MANE Select', 'geometry_mismatch'),
+  ('model-B', 11, 'MANE Select', 'exact_model_match');
+
+statement ok
+CREATE VIEW grch37_enriched AS
+WITH exact_mapped AS (
+  SELECT model_sha256, transcript_index, list(mane_status ORDER BY mane_status) AS mapped_mane
+  FROM grch37_mapping WHERE mapping_status = 'exact_model_match'
+  GROUP BY model_sha256, transcript_index
+)
+SELECT c.*, n.canonical, n.gencode_basic, n.gencode_primary, n.native_mane, m.mapped_mane
+FROM grch37_consequences c
+JOIN grch37_native n USING (model_sha256, transcript_index)
+LEFT JOIN exact_mapped m USING (model_sha256, transcript_index);
+
+query I
+SELECT count(*) FROM grch37_enriched;
+----
+3
+
+query III
+SELECT sum(canonical::INTEGER), sum(gencode_basic::INTEGER), sum(mapped_mane IS NOT NULL)::INTEGER
+FROM grch37_enriched;
+----
+2	1	2
+
+query I
+SELECT count(*) FROM grch37_enriched WHERE gencode_primary OR native_mane;
+----
+0
+
+query II rowsort
+SELECT event_id, consequence FROM grch37_enriched
+EXCEPT SELECT event_id, consequence FROM grch37_consequences;
+----
+
+query II rowsort
+SELECT event_id, consequence FROM grch37_consequences
+EXCEPT SELECT event_id, consequence FROM grch37_enriched;
+----

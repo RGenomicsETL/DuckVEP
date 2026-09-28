@@ -421,6 +421,67 @@ model receipts, and exact model counts before writing Parquet. The component man
 hashes are folded into one sorted canonical source-manifest hash. Tests never contact
 Ensembl.
 
+### GRCh37 transcript selection and external MANE mapping
+
+The GRCh37 consequence model uses Ensembl 116 GRCh37 core records without native MANE.
+For caller selection, `scripts/build_mane_grch37.R` writes two cold Parquet relations:
+`grch37_transcript_authorities.parquet` contains the source gene's retained canonical
+transcript state and independent GENCODE-19 Basic flag for every filtered model
+transcript; `mane_grch37_mapping.parquet` audits each row of MANE v1.5 against the
+NCBI GRCh37.p13 annotation. Neither relation changes native consequence masks,
+ordinals, HGVS, or VEP-parity results. There is no GRCh37 GENCODE Primary or
+native MANE flag.
+
+Run `sh scripts/stage_mane_grch37.sh STAGING_DIR` to acquire resumable,
+checksum-pinned inputs, then
+`Rscript scripts/build_mane_grch37.R STAGING_DIR MODEL.duckdb OUTPUT_DIR`.
+The recipe requires `curl`, `samtools`, and R packages `DBI`, `duckdb`,
+`data.table`, `Biostrings`, `Rsamtools`, `GenomicRanges`, and `digest`.
+The script uses R FASTA readers and plain DuckDB SQL; it loads neither DuckHTS
+nor DuckVEP into its DuckDB connections. The staging directory holds the MANE
+v1.5 summary, NCBI GCF_000001405.25
+assembly report/GFF/RNA/protein FASTAs, and Ensembl GRCh37 primary-assembly
+FASTA (compressed and indexed uncompressed copies). The script checks pinned
+SHA-256 digests and the immutable model receipt; it records source URLs and
+hashes in `mane_grch37_receipt.csv`. The model's core tables came from Ensembl's
+public MySQL `ensembldb.ensembl.org:3337/homo_sapiens_core_116_37`, following
+`test/scripts/prepare_duckvep_ensembl_fixture.sql`. Its core source-manifest hash
+is carried from the independently content-verified model receipt because the
+original source dump manifest cannot be recovered from the compiled model. The
+FASTA receipt hash covers the compressed Ensembl FASTA, and the build checks the
+uncompressed indexed FASTA separately. All release inputs and outputs remain
+external; only the recipe, small policy tests, and receipt ledger are committed.
+
+The mapping resolves **exact versioned RefSeq nucleotide accessions** in the NCBI
+GFF before considering the MANE ENST stable root as a candidate. MANE v1.5
+contains 19,367 `NM_` and 70 `NR_` rows; the pinned GRCh37.p13 GFF contains
+19,306 `NM_` and 61 `NR_` accessions. The 61 absent `NM_` and nine absent
+`NR_` rows remain rejected. The initial 19,306 audit counted mRNA accessions;
+the complete audit retains the 61 exact noncoding RNA accessions too. The assembly
+report links the original NCBI accession to the target FASTA region; no implicit
+chromosome alias is evidence of transcript identity. For accessions annotated on
+multiple loci, the model's contig restricts the candidate locus but cannot itself
+establish an association; the complete validation gates still apply. Candidate association requires
+the exon chain in transcript orientation, CDS coordinates and phases, model
+spliced sequence versus target genomic FASTA, and RefSeq RNA translation versus
+its versioned protein. RNA substitutions relative to the target reference are
+reported explicitly; a RefSeq protein inconsistent with its RNA rejects the
+candidate. A row is joinable only at `mapping_status = 'exact_model_match'`;
+other rows retain their reason, target accession, and candidate where available.
+The receipt counts statuses over **all** MANE rows and hashes the canonical
+ordered TSV representation of the full relation, independently of Parquet metadata.
+Validate an exported run with
+`Rscript test/scripts/test_mane_grch37_receipt.R OUTPUT_DIR benchmarks/data/mane_grch37_receipts.csv`.
+
+A caller joins the native cold relation by model SHA-256 and `transcript_index`,
+then joins *only exact* mapped MANE rows by the same two fields **after**
+consequence expansion. If several MANE rows reference one transcript, aggregate
+the mapped statuses into a list before the join rather than duplicating consequences.
+Canonical, GENCODE Basic, and mapped MANE are distinct source-attributed facts;
+selecting a representative is an explicit caller policy, not VEP `--pick`. If a
+RefSeq transcript is valid on GRCh37 but has no exact GENCODE-19 match, leave it
+unmapped or annotate it in a separately receipted RefSeq model.
+
 `duckvep_model_load(...)` reads committed, non-temporary relations through a private
 connection, validates and narrows every value, builds independent transcript and
 regulation/motif seed indexes, and
