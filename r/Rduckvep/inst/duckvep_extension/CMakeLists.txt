@@ -64,7 +64,7 @@ if(NOT APPLE AND NOT DUCKDB_WASM_EXTENSION)
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -s")
 endif()
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    target_compile_options(${EXTENSION_NAME} PRIVATE -Wall -Wextra -Wpedantic -Wformat=2 -Wstrict-prototypes "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=.")
+    target_compile_options(${EXTENSION_NAME} PRIVATE -Wall -Wextra -Wpedantic -Wformat=2 -Wstrict-prototypes "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=." -ffunction-sections -fdata-sections)
     if(NOT EMSCRIPTEN)
         target_compile_options(${EXTENSION_NAME} PRIVATE -Werror)
     endif()
@@ -78,9 +78,13 @@ if(DUCKDB_WASM_EXTENSION)
     include(cmake/wasm_archive.cmake)
 elseif(APPLE)
     target_link_options(${EXTENSION_NAME} PRIVATE
+        "-Wl,-dead_strip"
         "-Wl,-exported_symbols_list,${CMAKE_SOURCE_DIR}/cmake/duckvep.exports")
 elseif(UNIX)
     target_link_options(${EXTENSION_NAME} PRIVATE
+        "-Wl,--gc-sections"
         "-Wl,--exclude-libs,ALL"
         "-Wl,--version-script=${CMAKE_SOURCE_DIR}/cmake/duckvep.map")
+elseif(WIN32)
+    target_link_options(${EXTENSION_NAME} PRIVATE "-Wl,--gc-sections")
 endif()
