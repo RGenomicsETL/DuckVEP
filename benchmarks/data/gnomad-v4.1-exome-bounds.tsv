@@ -1,0 +1,5 @@
+bin	required	source_upper_bound
+cds_snv	1000000	4570755
+cds_indel	500000	415202
+cds_mnv	100000	0
+splice_remainder	400000	4985957
