@@ -54,7 +54,6 @@ ExternalProject_Add(htslib_build
     BUILD_ALWAYS TRUE
     INSTALL_COMMAND ""
     BUILD_BYPRODUCTS "${HTSLIB_SRC_DIR}/libhts.a"
-    LOG_CONFIGURE TRUE
     LOG_BUILD TRUE
 )
 
