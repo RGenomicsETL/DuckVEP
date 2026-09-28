@@ -32,6 +32,12 @@ par <- data.table(accession = "NM_2.1", model_contig = c("X", "Y"), target_ok = 
 stopifnot(nrow(mane_supported_loci(par, "Y")) == 1L,
           mane_supported_loci(par, "Y")$model_contig == "Y",
           nrow(mane_supported_loci(par, "MT")) == 2L)
+# A MANE RefSeq accession with no rna-ID, exon, or CDS row anywhere in the
+# target GFF has no `targets[[refseq]]` entry at all (target is NULL, not an
+# invalid/ambiguous placement): classify() reports target_transcript_absent
+# before any candidate or exon/CDS/sequence gate runs.
+stopifnot(mane_target_status(NULL) == "target_transcript_absent",
+  is.na(mane_target_status(target)))
 wrong_exon <- copy(target); wrong_exon$exons <- "1-8"
 wrong_exon$cds_rows$end <- 8L
 stopifnot(gate(t = wrong_exon)$status == "geometry_mismatch",

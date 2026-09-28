@@ -9,6 +9,13 @@ mane_supported_loci <- function(rows, candidate_contig = NULL) {
   eligible
 }
 
+# A RefSeq accession with no rna-ID, exon, or CDS row anywhere in the target
+# GFF (no `targets[[refseq]]` entry at all) has no placement to resolve
+# against; the caller defers to this status before any candidate or gate runs.
+mane_target_status <- function(target) {
+  if (is.null(target)) "target_transcript_absent" else NA_character_
+}
+
 mane_model_cds_geometry <- function(ex, cds_start, cds_end) {
   if (is.na(cds_start) || is.na(cds_end) || cds_start == 0) return("")
   ex <- ex[order(ex$rank), ]

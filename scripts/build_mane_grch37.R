@@ -216,7 +216,7 @@ classify <- function(row) {
     reference_difference = NA, reference_difference_bases = NA_integer_,
     cds_reference_difference_bases = NA_integer_,
     target_reference_sha256 = NA_character_, refseq_rna_sha256 = NA_character_,
-    refseq_protein_sha256 = NA_character_, mapping_status = "target_transcript_absent",
+    refseq_protein_sha256 = NA_character_, mapping_status = mane_target_status(target),
     mapping_label = NA_character_,
     model_sha256 = model_hash, source_manifest_sha256 = receipt$source_manifest_sha256,
     reference_sha256 = receipt$reference_sha256, mane_sha256 = sha["mane"],

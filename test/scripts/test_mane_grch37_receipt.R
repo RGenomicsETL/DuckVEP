@@ -62,5 +62,53 @@ stopifnot(nrow(relation) == receipt$row_count, nrow(relation) == 19437L,
   all(matched_native$gencode_basic_mapped == matched_native$gencode_basic_native),
   all(c("+", "-") %in% accepted[mane_status == "MANE Select"]$target_strand),
   all(c("+", "-") %in% accepted[mane_status == "MANE Plus Clinical"]$target_strand))
+
+# Named witnesses: specific rows of the real release, so a regression in a
+# known case is caught by name, not only by status counts. Chosen
+# deterministically as the lowest refseq_nuc (plain lexicographic order,
+# identical between DuckDB's default collation and data.table's radix sort)
+# within each category below.
+witness <- function(refseq, status, enst, enst_version, index, strand) {
+  row <- relation[refseq_nuc == refseq]
+  stopifnot(nrow(row) == 1L,
+    identical(row$mapping_status, status),
+    identical(row$candidate_enst, enst),
+    identical(row$candidate_enst_version, enst_version),
+    identical(row$transcript_index, index),
+    identical(row$target_strand, strand))
+}
+
+# MANE Select, exact_model_match, one witness per strand.
+witness("NM_000394.4", "exact_model_match", "ENST00000291554", 2L, 13812L, "+")
+witness("NM_000079.4", "exact_model_match", "ENST00000348749", 5L, 33707L, "-")
+# MANE Select, cds_exact_utr_differs, one witness per strand.
+witness("NM_000015.3", "cds_exact_utr_differs", "ENST00000286479", 3L, 152504L, "+")
+witness("NM_000014.6", "cds_exact_utr_differs", "ENST00000318602", 7L, 122870L, "-")
+# MANE Plus Clinical, accepted in either tier (lowest refseq_nuc across both
+# exact_model_match and cds_exact_utr_differs Plus Clinical rows).
+witness("NM_000248.4", "cds_exact_utr_differs", "ENST00000394351", 3L, 108374L, "+")
+stopifnot(relation[refseq_nuc == "NM_000248.4"]$mane_status == "MANE Plus Clinical")
+# One witness per rejection status (every mapping_status other than the two
+# accepted tiers).
+witness("NM_000451.4", "ambiguous_target_locus", NA_character_, NA_integer_, NA_integer_, "+")
+witness("NM_001004457.2", "cds_phase_mismatch", "ENST00000373688", 2L, NA_integer_, "+")
+witness("NM_000036.3", "geometry_mismatch", "ENST00000520113", 2L, NA_integer_, "-")
+witness("NM_000026.4", "refseq_only_no_gencode19_match", NA_character_, NA_integer_, NA_integer_, "+")
+witness("NR_002728.4", "sequence_mismatch", "ENST00000597346", 1L, NA_integer_, "-")
+witness("NM_001005513.1", "target_reference_unavailable", NA_character_, NA_integer_, NA_integer_, "+")
+witness("NM_000131.5", "target_transcript_absent", "ENST00000375581", 3L, NA_integer_, NA_character_)
+witness("NM_000792.7", "translation_mismatch", "ENST00000361921", 3L, NA_integer_, "+")
+stopifnot(setequal(relation[!mapping_status %in% c("exact_model_match", "cds_exact_utr_differs")]$mapping_status,
+  c("ambiguous_target_locus", "cds_phase_mismatch", "geometry_mismatch",
+    "refseq_only_no_gencode19_match", "sequence_mismatch", "target_reference_unavailable",
+    "target_transcript_absent", "translation_mismatch")))
+
+# MANE v1.5 has no mitochondrial gene records at all (no source row with
+# GRCh38_chr chrMT or a symbol prefixed MT-), so this release has no row
+# placed on the RefSeq mitochondrial contig NC_012920 either. There is no
+# witness row to name for this category; this assertion documents the
+# absence directly from the release output instead.
+stopifnot(sum(grepl("^NC_012920", relation$target_sequence_accession)) == 0L)
+
 cat("MANE GRCh37 full-release receipt and Parquet: passed\n")
 print(counts)
