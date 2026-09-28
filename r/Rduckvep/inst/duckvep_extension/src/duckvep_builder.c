@@ -93,11 +93,13 @@ bool duckvep_builder_option_vectors(duckdb_function_info info, duckdb_vector vec
         bool permitted = at < count && (id == DUCKDB_TYPE_SQLNULL ||
             (kinds[at] == DUCKVEP_OPTION_TEXT && id == DUCKDB_TYPE_VARCHAR) ||
             (kinds[at] == DUCKVEP_OPTION_INTEGER && integer) ||
+            (kinds[at] == DUCKVEP_OPTION_BOOLEAN && id == DUCKDB_TYPE_BOOLEAN) ||
             (kinds[at] == DUCKVEP_OPTION_NUMERIC && numeric));
         if (!permitted) {
             char message[256];
             const char *type_name = at == count ? "" : kinds[at] == DUCKVEP_OPTION_TEXT ?
-                "VARCHAR" : kinds[at] == DUCKVEP_OPTION_INTEGER ? "INTEGER" : "numeric";
+                "VARCHAR" : kinds[at] == DUCKVEP_OPTION_INTEGER ? "INTEGER" :
+                kinds[at] == DUCKVEP_OPTION_BOOLEAN ? "BOOLEAN" : "numeric";
             if (at == count || kinds[at] == DUCKVEP_OPTION_TEXT)
                 snprintf(message, sizeof(message), "DuckVEP builder: %s option '%s'",
                          at == count ? "unknown" : "expected VARCHAR for", key);

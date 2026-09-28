@@ -194,8 +194,8 @@ CREATE TABLE hap_phase_events AS SELECT i+1 AS event_index,i AS seq_region,
  NULL::UINTEGER mate_seq_region,NULL::UBIGINT mate_position FROM range(6) t(i);
 
 statement ok
-CREATE TABLE hap_phase_expected AS SELECT * FROM duckvep_annotate(
- 'hap_phase_events','hap_phase',hgvs:=true,upstream_distance:=0,downstream_distance:=0);
+CREATE TABLE hap_phase_expected AS SELECT * FROM query(duckvep_annotate_sql(
+ 'hap_phase_events','hap_phase', struct_pack(hgvs:=true,upstream_distance:=0,downstream_distance:=0)));
 
 query III
 SELECT count(*),count(*) FILTER (WHERE regexp_replace(h.hgvsp,'[()]','','g')
@@ -458,8 +458,8 @@ query ITT
 SELECT event_index,
  (SELECT string_agg(t.consequence,'&' ORDER BY t.consequence) FROM duckvep_so_terms() t
   WHERE (a.consequence_mask & t.consequence_mask)<>0),protein_hgvs
-FROM duckvep_annotate('hap_n_codon_events',
- 'hap_n_codons',hgvs:=true,upstream_distance:=0,downstream_distance:=0) a ORDER BY event_index;
+FROM query(duckvep_annotate_sql('hap_n_codon_events',
+ 'hap_n_codons', struct_pack(hgvs:=true,upstream_distance:=0,downstream_distance:=0))) a ORDER BY event_index;
 ----
 0	missense_variant	p.Ala2Thr
 1	coding_sequence_variant&missense_variant	p.Ter2Thr
@@ -537,8 +537,8 @@ query ITT
 SELECT event_index,
  (SELECT string_agg(t.consequence,'&' ORDER BY t.consequence) FROM duckvep_so_terms() t
   WHERE (a.consequence_mask & t.consequence_mask)<>0),protein_hgvs
-FROM duckvep_annotate('hap_n_indel_events','hap_n_indels',hgvs:=true,
- upstream_distance:=0,downstream_distance:=0) a ORDER BY event_index;
+FROM query(duckvep_annotate_sql('hap_n_indel_events','hap_n_indels', struct_pack(hgvs:=true,
+ upstream_distance:=0,downstream_distance:=0))) a ORDER BY event_index;
 ----
 0	protein_altering_variant	p.Ala2delinsGlyPro
 1	coding_sequence_variant&inframe_insertion	p.Met1_Ter2insSer
@@ -1573,10 +1573,10 @@ CREATE VIEW hap_repeat_prepared_events AS SELECT event_index,seq_region,position
  NULL::UINTEGER mate_seq_region,NULL::UBIGINT mate_position FROM hap_repeat_prepared;
 
 query III
-WITH expected AS (SELECT * FROM duckvep_annotate('hap_repeat_literal_events','hap_repeat',
- hgvs:=true,upstream_distance:=0,downstream_distance:=0)),
- actual AS (SELECT * FROM duckvep_annotate('hap_repeat_prepared_events','hap_repeat',
- hgvs:=true,upstream_distance:=0,downstream_distance:=0)),
+WITH expected AS (SELECT * FROM query(duckvep_annotate_sql('hap_repeat_literal_events','hap_repeat', struct_pack(
+ hgvs:=true,upstream_distance:=0,downstream_distance:=0)))),
+ actual AS (SELECT * FROM query(duckvep_annotate_sql('hap_repeat_prepared_events','hap_repeat', struct_pack(
+ hgvs:=true,upstream_distance:=0,downstream_distance:=0)))),
  differences AS ((SELECT * FROM actual EXCEPT ALL SELECT * FROM expected)
  UNION ALL (SELECT * FROM expected EXCEPT ALL SELECT * FROM actual))
 SELECT (SELECT count(*) FROM actual),(SELECT count(*) FROM differences),

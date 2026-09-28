@@ -608,7 +608,7 @@ fail-closed stratum is literal SNVs. The release `VE` field retains
 `Consequence|Index|Feature_type|Feature_id`; its zero-based Index maps each consequence to
 the original GVF `Variant_seq` and corresponding VCF ALT, so multiallelic records remain
 unambiguous. It aggregates the published VE consequence set per ALT/transcript,
-runs the public rich `duckvep_annotate(...)` relation against the receipt-matched model, and
+runs the public rich `query(duckvep_annotate_sql(...))` relation against the receipt-matched model, and
 reports exact, missing, extra, and discordant transcript/object pairs without treating
 the release relation as executable VEP. Both transcript distances are zero because the
 variation database dump records overlapping feature consequences, not VEP CLI's optional

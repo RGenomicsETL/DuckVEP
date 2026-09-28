@@ -432,7 +432,7 @@ passes. One-thread runs are pinned to CPU 2; four-thread runs are
 restricted to CPUs 2, 4, 6, and 8. Input VCF decoding, coordinate
 sorting, canonical event-table staging, and model loading are outside
 the timed pass. Each public row times event validation and family
-dispatch through `duckvep_annotate(...)`, native consequence/HGVS work,
+dispatch through `query(duckvep_annotate_sql(...))`, native consequence/HGVS work,
 fixed-schema row expansion, and checksum aggregation. The current
 one-thread/four-thread pair requires the same aggregate checksum for
 each output contract. The current rows do not retain the optional

@@ -291,8 +291,8 @@ codon_native_partition <- function(con, events, expected, partition, indel, fast
     DBI::dbExecute(con, paste('SET threads=', threads))
     label <- paste0('independent_', threads)
     message('Native partition ', partition$model_partition, ' route: ', label)
-    DBI::dbExecute(con, paste0('CREATE TABLE ', label, " AS SELECT * FROM duckvep_annotate('events',",
-      "'codons',hgvs:=true,upstream_distance:=0,downstream_distance:=0)"))
+    DBI::dbExecute(con, paste0('CREATE TABLE ', label, " AS SELECT * FROM query(duckvep_annotate_sql('events',",
+      "'codons', struct_pack(hgvs:=true,upstream_distance:=0,downstream_distance:=0)))"))
     DBI::dbExecute(con, paste('COPY', label, 'TO', q(artifact(label)), '(FORMAT PARQUET)'))
     geometry <- DBI::dbGetQuery(con, paste('SELECT a.event_index,a.transcript_index FROM', label, 'a'))
     stopifnot(!anyNA(geometry$event_index),

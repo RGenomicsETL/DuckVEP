@@ -143,7 +143,7 @@ duckvep_projection_input <- function(con, vcf) {
     NULL::UINTEGER mate_seq_region, NULL::UBIGINT mate_position
     FROM read_bcf(", DBI::dbQuoteString(con, vcf), ") ORDER BY position, ID"))
   DBI::dbExecute(con, "CREATE OR REPLACE TABLE projection_annotations AS
-    SELECT * FROM duckvep_annotate('projection_events', 'projection')")
+    SELECT * FROM query(duckvep_annotate_sql('projection_events', 'projection'))")
   DBI::dbExecute(con, "CREATE OR REPLACE TABLE projection_actual AS
     SELECT p.*, e.ID, n.transcript_id FROM query(duckvep_transcript_projection_sql(
       'projection_events', 'projection_annotations', 'projection_transcripts')) p

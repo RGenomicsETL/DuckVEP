@@ -68,7 +68,7 @@ FROM (VALUES (1,13,'A','G'), (2,13,'AAA','GTT'), (3,12,'G','GAAA'),
 ORDER BY position,event_index;
 
 statement ok
-CREATE TABLE projection_annotations AS SELECT * FROM duckvep_annotate('projection_events', 'projection');
+CREATE TABLE projection_annotations AS SELECT * FROM query(duckvep_annotate_sql('projection_events', 'projection'));
 
 statement ok
 CREATE TABLE projection_result AS SELECT * FROM query(duckvep_transcript_projection_sql(
@@ -197,7 +197,7 @@ SELECT * FROM duckvep_model_load('withheld',
 true
 
 statement ok
-CREATE TABLE projection_withheld_annotations AS SELECT * FROM duckvep_annotate('projection_events', 'withheld');
+CREATE TABLE projection_withheld_annotations AS SELECT * FROM query(duckvep_annotate_sql('projection_events', 'withheld'));
 
 query IIITTTT
 SELECT cds_start, cds_end, protein_start, reference_codons, alternate_codons,
@@ -263,7 +263,7 @@ CREATE TABLE projection_later_event AS SELECT * REPLACE(27::UBIGINT AS position,
   'G' AS reference, 'A' AS alternate) FROM projection_events WHERE event_index=1;
 
 statement ok
-CREATE TABLE projection_later_annotation AS SELECT * FROM duckvep_annotate('projection_later_event', 'later-phase');
+CREATE TABLE projection_later_annotation AS SELECT * FROM query(duckvep_annotate_sql('projection_later_event', 'later-phase'));
 
 query IIIITTTT
 SELECT cdna_start, cds_start, cds_end, protein_start, reference_codons, alternate_codons,
@@ -281,7 +281,7 @@ FROM projection_later_event;
 query IT
 SELECT (consequence_mask=(SELECT sum(consequence_mask)::UBIGINT FROM duckvep_so_terms()
   WHERE consequence IN ('start_lost','splice_region_variant')))::INTEGER, duckvep_status
-FROM duckvep_annotate('projection_start_event', 'later-phase', rich := true);
+FROM query(duckvep_annotate_sql('projection_start_event', 'later-phase', struct_pack(rich := true)));
 ----
 1	supported
 
@@ -294,7 +294,7 @@ CREATE TABLE projection_tail_event AS SELECT * REPLACE(30::UBIGINT AS position,
 query IT
 SELECT (consequence_mask=(SELECT consequence_mask FROM duckvep_so_terms()
   WHERE consequence='synonymous_variant'))::INTEGER, duckvep_status
-FROM duckvep_annotate('projection_tail_event', 'later-phase', rich := true);
+FROM query(duckvep_annotate_sql('projection_tail_event', 'later-phase', struct_pack(rich := true)));
 ----
 1	supported
 
@@ -321,7 +321,7 @@ SELECT * FROM duckvep_model_load('later-phase',
 true
 
 statement ok
-CREATE OR REPLACE TABLE projection_later_annotation AS SELECT * FROM duckvep_annotate('projection_later_event', 'later-phase');
+CREATE OR REPLACE TABLE projection_later_annotation AS SELECT * FROM query(duckvep_annotate_sql('projection_later_event', 'later-phase'));
 
 query IIIITTTT
 SELECT cdna_start, cds_start, cds_end, protein_start, reference_codons, alternate_codons,
@@ -333,14 +333,14 @@ SELECT cdna_start, cds_start, cds_end, protein_start, reference_codons, alternat
 query IT
 SELECT (consequence_mask=(SELECT sum(consequence_mask)::UBIGINT FROM duckvep_so_terms()
   WHERE consequence IN ('start_lost','splice_region_variant')))::INTEGER, duckvep_status
-FROM duckvep_annotate('projection_start_event', 'later-phase', rich := true);
+FROM query(duckvep_annotate_sql('projection_start_event', 'later-phase', struct_pack(rich := true)));
 ----
 1	supported
 
 query IT
 SELECT (consequence_mask=(SELECT consequence_mask FROM duckvep_so_terms()
   WHERE consequence='synonymous_variant'))::INTEGER, duckvep_status
-FROM duckvep_annotate('projection_tail_event', 'later-phase', rich := true);
+FROM query(duckvep_annotate_sql('projection_tail_event', 'later-phase', struct_pack(rich := true)));
 ----
 1	supported
 
@@ -390,7 +390,7 @@ SELECT event_index, duckvep_status, duckvep_reason,
     FROM duckvep_so_terms() WHERE consequence='5_prime_UTR_variant' OR
       consequence=CASE event_index WHEN 1 THEN 'start_lost'
         WHEN 2 THEN 'start_retained_variant' ELSE 'coding_sequence_variant' END))
-FROM duckvep_annotate('projection_mnv_events', 'mnv-start', rich := true)
+FROM query(duckvep_annotate_sql('projection_mnv_events', 'mnv-start', struct_pack(rich := true)))
 GROUP BY ALL ORDER BY event_index;
 ----
 1	supported	NULL	3
@@ -410,7 +410,7 @@ query IITT
 SELECT event_index, transcript_index, duckvep_status,
   (SELECT string_agg(consequence,'&' ORDER BY consequence)
    FROM duckvep_so_terms() t WHERE (a.consequence_mask & t.consequence_mask)<>0)
-FROM duckvep_annotate('projection_coding_mnv_events', 'mnv-start', rich := true) a
+FROM query(duckvep_annotate_sql('projection_coding_mnv_events', 'mnv-start', struct_pack(rich := true))) a
 WHERE event_index<=5 ORDER BY event_index,transcript_index;
 ----
 1	0	supported	start_lost
@@ -432,7 +432,7 @@ WHERE event_index<=5 ORDER BY event_index,transcript_index;
 # The retained G is incorrect physical REF even in the partial-codon model.
 query TTI
 SELECT duckvep_status, duckvep_reason, count(*)
-FROM duckvep_annotate('projection_coding_mnv_events', 'mnv-start', rich := true)
+FROM query(duckvep_annotate_sql('projection_coding_mnv_events', 'mnv-start', struct_pack(rich := true)))
 WHERE event_index=6 GROUP BY ALL;
 ----
 unresolved	reference_mismatch	3
@@ -478,7 +478,7 @@ query ITT
 SELECT event_index, duckvep_status,
   (SELECT string_agg(consequence,'&' ORDER BY consequence)
     FROM duckvep_so_terms() t WHERE (a.consequence_mask & t.consequence_mask)<>0)
-FROM duckvep_annotate('projection_terminal_events', 'terminal-substitution', rich := true) a
+FROM query(duckvep_annotate_sql('projection_terminal_events', 'terminal-substitution', struct_pack(rich := true))) a
 ORDER BY event_index;
 ----
 1	supported	coding_sequence_variant&stop_gained
@@ -511,7 +511,7 @@ query IITT
 SELECT event_index, transcript_index, duckvep_status,
   (SELECT string_agg(consequence,'&' ORDER BY consequence)
    FROM duckvep_so_terms() t WHERE (a.consequence_mask & t.consequence_mask)<>0)
-FROM duckvep_annotate('projection_coding_indel_events', 'mnv-start', rich := true) a
+FROM query(duckvep_annotate_sql('projection_coding_indel_events', 'mnv-start', struct_pack(rich := true))) a
 WHERE event_index<=8 ORDER BY event_index,transcript_index;
 ----
 1	0	supported	frameshift_variant&start_lost
@@ -541,7 +541,7 @@ WHERE event_index<=8 ORDER BY event_index,transcript_index;
 
 query TTI
 SELECT duckvep_status, duckvep_reason, count(*)
-FROM duckvep_annotate('projection_coding_indel_events', 'mnv-start', rich := true)
+FROM query(duckvep_annotate_sql('projection_coding_indel_events', 'mnv-start', struct_pack(rich := true)))
 WHERE event_index>=9 GROUP BY ALL;
 ----
 unresolved	reference_mismatch	6
@@ -560,13 +560,13 @@ true
 
 query TTI
 SELECT duckvep_status, duckvep_reason, count(*)
-FROM duckvep_annotate('projection_mnv_events', 'mnv-start', rich := true) GROUP BY ALL;
+FROM query(duckvep_annotate_sql('projection_mnv_events', 'mnv-start', struct_pack(rich := true))) GROUP BY ALL;
 ----
 unresolved	missing_transcript_flank	9
 
 query TTI
 SELECT duckvep_status, duckvep_reason, count(*)
-FROM duckvep_annotate('projection_coding_indel_events', 'mnv-start', rich := true)
+FROM query(duckvep_annotate_sql('projection_coding_indel_events', 'mnv-start', struct_pack(rich := true)))
 WHERE event_index=8 GROUP BY ALL;
 ----
 unresolved	missing_transcript_flank	3

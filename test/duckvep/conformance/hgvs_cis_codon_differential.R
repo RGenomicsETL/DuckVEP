@@ -293,8 +293,8 @@ cis_codon_main <- function() {
   for (threads in c(1L, 4L)) {
     dbExecute(con, paste('SET threads=', threads))
     independent <- paste0('independent_', threads)
-    dbExecute(con, paste('CREATE TABLE', independent, 'AS SELECT * FROM duckvep_annotate(',
-      "'independent_input','cis',hgvs:=true,upstream_distance:=0,downstream_distance:=0)"))
+    dbExecute(con, paste('CREATE TABLE', independent, 'AS SELECT * FROM query(duckvep_annotate_sql(',
+      "'independent_input','cis', struct_pack(hgvs:=true,upstream_distance:=0,downstream_distance:=0)))"))
     actual <- dbGetQuery(con, paste('SELECT event_index,transcript_index,protein_hgvs,',
       'protein_hgvs_status,status_code FROM', independent,
       'ORDER BY event_index'))

@@ -62,8 +62,8 @@ query ITTT
 SELECT event_index, protein_hgvs, protein_hgvs_status,
   (SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)
    FROM duckvep_so_terms() t WHERE (a.consequence_mask & t.consequence_mask) <> 0)
-FROM duckvep_annotate('hgvs_table_events', 'hgvs-alternate-table',
-  hgvs := true, upstream_distance := 0, downstream_distance := 0) a
+FROM query(duckvep_annotate_sql('hgvs_table_events', 'hgvs-alternate-table', struct_pack(
+  hgvs := true, upstream_distance := 0, downstream_distance := 0))) a
 ORDER BY event_index;
 ----
 4	p.Lys2Ter	supported	frameshift_variant
@@ -144,8 +144,8 @@ query ITT
 SELECT event_index, protein_hgvs,
   (SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)
    FROM duckvep_so_terms() t WHERE (a.consequence_mask & t.consequence_mask) <> 0)
-FROM duckvep_annotate('hgvs_padding_events', 'hgvs-padding',
-  hgvs := true, upstream_distance := 0, downstream_distance := 0) a
+FROM query(duckvep_annotate_sql('hgvs_padding_events', 'hgvs-padding', struct_pack(
+  hgvs := true, upstream_distance := 0, downstream_distance := 0))) a
 ORDER BY event_index;
 ----
 1	p.Thr2IlefsTer?	frameshift_variant
@@ -226,8 +226,8 @@ query ITT
 SELECT event_index, protein_hgvs,
   (SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)
    FROM duckvep_so_terms() t WHERE (a.consequence_mask & t.consequence_mask) <> 0)
-FROM duckvep_annotate('hgvs_removed_ref_events', 'hgvs-removed-ref',
-  hgvs := true, upstream_distance := 0, downstream_distance := 0) a
+FROM query(duckvep_annotate_sql('hgvs_removed_ref_events', 'hgvs-removed-ref', struct_pack(
+  hgvs := true, upstream_distance := 0, downstream_distance := 0))) a
 ORDER BY event_index;
 ----
 110244	p.Ala3ProfsTer?	frameshift_variant
@@ -303,8 +303,8 @@ query ITTT
 SELECT event_index, protein_hgvs, protein_hgvs_status,
   (SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)
    FROM duckvep_so_terms() t WHERE (a.consequence_mask & t.consequence_mask) <> 0)
-FROM duckvep_annotate('hgvs_residual_events', 'hgvs-residual',
-  hgvs := true, upstream_distance := 0, downstream_distance := 0) a
+FROM query(duckvep_annotate_sql('hgvs_residual_events', 'hgvs-residual', struct_pack(
+  hgvs := true, upstream_distance := 0, downstream_distance := 0))) a
 ORDER BY event_index;
 ----
 4052	p.Ter2delinsCysGln	supported	stop_lost
@@ -663,10 +663,10 @@ SELECT * FROM (VALUES
 query IITT
 SELECT event_index, transcript_index, transcript_hgvs,
        coalesce(protein_hgvs, '-')
-FROM duckvep_annotate(
-  'duckvep_hgvs_public_events', 'hgvs-reference',
+FROM query(duckvep_annotate_sql(
+  'duckvep_hgvs_public_events', 'hgvs-reference', struct_pack(
   hgvs := true, upstream_distance := 0, downstream_distance := 0
-)
+)))
 ORDER BY transcript_index;
 ----
 1	0	c.5T>C	p.Val2Ala
@@ -677,11 +677,11 @@ ORDER BY transcript_index;
 query IITTTT
 SELECT event_index, transcript_index, consequence, impact,
        transcript_hgvs, coalesce(protein_hgvs, '-')
-FROM duckvep_annotate(
-  'duckvep_hgvs_public_events', 'hgvs-reference',
+FROM query(duckvep_annotate_sql(
+  'duckvep_hgvs_public_events', 'hgvs-reference', struct_pack(
   hgvs := TRUE, upstream_distance := 0, downstream_distance := 0,
   rich := TRUE
-)
+)))
 ORDER BY transcript_index;
 ----
 1	0	missense_variant	MODERATE	c.5T>C	p.Val2Ala
@@ -810,18 +810,18 @@ SELECT * FROM (VALUES
 
 query ITTTTTI
 WITH annotations AS (
-  SELECT * FROM duckvep_annotate(
-    'duckvep_hgvs_partial_events', 'hgvs-terminal-partial',
+  SELECT * FROM query(duckvep_annotate_sql(
+    'duckvep_hgvs_partial_events', 'hgvs-terminal-partial', struct_pack(
     hgvs := TRUE, rich := TRUE,
     upstream_distance := 0, downstream_distance := 0
-  )
+  )))
   UNION ALL BY NAME
-  SELECT * FROM duckvep_annotate(
+  SELECT * FROM query(duckvep_annotate_sql(
     'duckvep_hgvs_clinvar_partial_events',
-    'hgvs-clinvar-terminal-partial',
+    'hgvs-clinvar-terminal-partial', struct_pack(
     hgvs := TRUE, rich := TRUE,
     upstream_distance := 0, downstream_distance := 0
-  )
+  )))
 )
 SELECT event_index, consequence, transcript_hgvs, protein_hgvs,
        transcript_hgvs_status, protein_hgvs_status, hgvs_shift

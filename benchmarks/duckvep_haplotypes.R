@@ -225,8 +225,8 @@ sql <- function(job, input) {
         seq_region,position,reference,alternate,NULL::UBIGINT end_position,
         NULL::VARCHAR structural_type,NULL::VARCHAR copy_change,NULL::UINTEGER mate_seq_region,
         NULL::UBIGINT mate_position FROM calls")
-      DBI::dbExecute(con, "CREATE TABLE independent AS SELECT * FROM duckvep_annotate(
-        'independent_events','bench',hgvs:=true,upstream_distance:=0,downstream_distance:=0)")
+      DBI::dbExecute(con, "CREATE TABLE independent AS SELECT * FROM query(duckvep_annotate_sql(
+        'independent_events','bench', struct_pack(hgvs:=true,upstream_distance:=0,downstream_distance:=0)))")
       stopifnot(DBI::dbGetQuery(con, "SELECT count(*) n FROM independent")$n == job$transcripts * 4)
       # The independent renderer omits prediction parentheses. Compare every
       # event/transcript key and exact suffix; this is an internal path check,

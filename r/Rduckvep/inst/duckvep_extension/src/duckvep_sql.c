@@ -4,6 +4,7 @@ DUCKDB_EXTENSION_EXTERN
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -126,202 +127,124 @@ duckvep_register_so_terms(duckdb_connection connection)
 	return state == DuckDBSuccess;
 }
 
+static bool duckvep_projection_table(duckvep_sql_text *sql, const char *name);
+
+/* Annotation SQL keeps the event relation in the caller's transaction. */
+#include "duckvep_annotate_template.h"
+
+static bool
+duckvep_annotate_number(duckdb_vector vector, idx_t row, duckvep_sql_text *sql)
+{
+    uint64_t *validity = duckdb_vector_get_validity(vector);
+    duckdb_logical_type type = duckdb_vector_get_column_type(vector);
+    duckdb_type id = duckdb_get_type_id(type);
+    duckdb_destroy_logical_type(&type);
+    if (id == DUCKDB_TYPE_SQLNULL || (validity && !duckdb_validity_row_is_valid(validity, row)))
+        return duckvep_sql_append(sql, "NULL");
+    const void *data = duckdb_vector_get_data(vector);
+    int64_t signed_value = 0;
+    uint64_t unsigned_value = 0;
+    bool is_unsigned = false;
+    switch (id) {
+    case DUCKDB_TYPE_TINYINT: signed_value = ((const int8_t *)data)[row]; break;
+    case DUCKDB_TYPE_SMALLINT: signed_value = ((const int16_t *)data)[row]; break;
+    case DUCKDB_TYPE_INTEGER: signed_value = ((const int32_t *)data)[row]; break;
+    case DUCKDB_TYPE_BIGINT: signed_value = ((const int64_t *)data)[row]; break;
+    case DUCKDB_TYPE_UTINYINT: unsigned_value = ((const uint8_t *)data)[row]; is_unsigned = true; break;
+    case DUCKDB_TYPE_USMALLINT: unsigned_value = ((const uint16_t *)data)[row]; is_unsigned = true; break;
+    case DUCKDB_TYPE_UINTEGER: unsigned_value = ((const uint32_t *)data)[row]; is_unsigned = true; break;
+    case DUCKDB_TYPE_UBIGINT: unsigned_value = ((const uint64_t *)data)[row]; is_unsigned = true; break;
+    default: return false;
+    }
+    char buffer[32];
+    if (is_unsigned) snprintf(buffer, sizeof(buffer), "%" PRIu64, unsigned_value);
+    else snprintf(buffer, sizeof(buffer), "%" PRId64, signed_value);
+    return duckvep_sql_append(sql, buffer);
+}
+
+static bool
+duckvep_annotate_boolean(duckdb_vector vector, idx_t row, duckvep_sql_text *sql)
+{
+    uint64_t *validity = duckdb_vector_get_validity(vector);
+    duckdb_logical_type type = duckdb_vector_get_column_type(vector);
+    duckdb_type id = duckdb_get_type_id(type);
+    duckdb_destroy_logical_type(&type);
+    if (id == DUCKDB_TYPE_SQLNULL || (validity && !duckdb_validity_row_is_valid(validity, row)))
+        return duckvep_sql_append(sql, "NULL");
+    return duckvep_sql_append(sql, ((const uint8_t *)duckdb_vector_get_data(vector))[row] ? "true" : "false");
+}
+
+static void
+duckvep_annotate_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output)
+{
+    const char *const keys[] = {"hgvs", "upstream_distance", "downstream_distance", "rich"};
+    const duckvep_option_kind kinds[] = {DUCKVEP_OPTION_BOOLEAN, DUCKVEP_OPTION_INTEGER,
+        DUCKVEP_OPTION_INTEGER, DUCKVEP_OPTION_BOOLEAN};
+    const char *const tokens[] = {"__DUCKVEP_EVENTS__", "__DUCKVEP_MODEL__", "__DUCKVEP_HGVS__",
+        "__DUCKVEP_UPSTREAM__", "__DUCKVEP_DOWNSTREAM__", "__DUCKVEP_RICH__"};
+    idx_t argc = duckdb_data_chunk_get_column_count(input);
+    duckdb_vector args[3];
+    for (idx_t i = 0; i < argc; i++) args[i] = duckdb_data_chunk_get_vector(input, i);
+    for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
+        char *names[2] = {0};
+        bool ok = true;
+        for (idx_t i = 0; i < 2; i++) {
+            uint64_t *validity = duckdb_vector_get_validity(args[i]);
+            if (validity && !duckdb_validity_row_is_valid(validity, row)) { ok = false; break; }
+            names[i] = duckvep_builder_string(((duckdb_string_t *)duckdb_vector_get_data(args[i]))[row]);
+            if (!names[i]) { ok = false; break; }
+        }
+        duckdb_vector fields[4] = {0};
+        if (ok && argc == 3) {
+            ok = duckvep_builder_option_vectors(info, args[2], row, keys, kinds, 4, fields);
+            if (!ok) { for (idx_t i = 0; i < 2; i++) free(names[i]); return; }
+        }
+        duckvep_sql_text values[6] = {{0}};
+        if (ok) ok = duckvep_projection_table(&values[0], names[0]) &&
+            duckvep_sql_literal(&values[1], names[1]) &&
+            duckvep_sql_append(&values[2], "false") &&
+            duckvep_sql_append(&values[3], "5000") &&
+            duckvep_sql_append(&values[4], "5000") &&
+            duckvep_sql_append(&values[5], "false");
+        for (size_t i = 0; ok && i < 4; i++) {
+            if (!fields[i]) continue;
+            size_t dest = i == 3 ? 5 : i + 2;
+            duckvep_sql_free(&values[dest]);
+            ok = i == 0 || i == 3 ? duckvep_annotate_boolean(fields[i], row, &values[dest]) :
+                duckvep_annotate_number(fields[i], row, &values[dest]);
+        }
+        duckvep_sql_text sql = {0};
+        for (size_t i = 0; ok && i < sizeof(duckvep_annotate_parts) / sizeof(*duckvep_annotate_parts); i++) {
+            const char *part = duckvep_annotate_parts[i];
+            while (ok && *part) {
+                const char *mark = strstr(part, "__DUCKVEP_");
+                if (!mark) { ok = duckvep_sql_append(&sql, part); break; }
+                size_t length = (size_t)(mark - part);
+                char *prefix = malloc(length + 1);
+                if (!prefix) { ok = false; break; }
+                memcpy(prefix, part, length); prefix[length] = 0;
+                ok = duckvep_sql_append(&sql, prefix); free(prefix);
+                size_t index = 0;
+                while (index < 6 && strncmp(mark, tokens[index], strlen(tokens[index])) != 0) index++;
+                if (index == 6) { ok = false; break; }
+                if (ok) ok = duckvep_sql_append(&sql, values[index].data);
+                part = mark + strlen(tokens[index]);
+            }
+        }
+        if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
+        else duckdb_scalar_function_set_error(info, "duckvep_annotate_sql: invalid input or allocation failure");
+        duckvep_sql_free(&sql);
+        for (size_t i = 0; i < 6; i++) duckvep_sql_free(&values[i]);
+        for (idx_t i = 0; i < 2; i++) free(names[i]);
+        if (!ok) return;
+    }
+}
+
 static bool
 duckvep_register_annotate_relation(duckhts_registration_t *registration)
 {
-	static const char *const sql[] = {
-		"CREATE OR REPLACE MACRO duckvep_annotate(events_table, model_name, ",
-		"hgvs := false, upstream_distance := 5000, downstream_distance := 5000, ",
-		"rich := false) AS TABLE ",
-		"WITH parameters AS MATERIALIZED (SELECT CAST(model_name AS VARCHAR) AS model_name, ",
-		"coalesce(CAST(hgvs AS BOOLEAN), false) AS include_hgvs, ",
-		"coalesce(CAST(rich AS BOOLEAN), false) AS include_rich, ",
-		"CAST(upstream_distance AS UBIGINT) AS upstream_distance, ",
-		"CAST(downstream_distance AS UBIGINT) AS downstream_distance), ",
-		"source AS (SELECT CAST(e.event_index AS UBIGINT) AS __duckvep_event_index, ",
-		"CAST(e.seq_region AS UINTEGER) AS __duckvep_seq_region, ",
-		"CAST(e.position AS UBIGINT) AS __duckvep_position, ",
-		"CAST(e.reference AS VARCHAR) AS __duckvep_reference, ",
-		"CAST(e.alternate AS VARCHAR) AS __duckvep_alternate, ",
-		"CAST(e.end_position AS UBIGINT) AS __duckvep_end_position, ",
-		"upper(CAST(e.structural_type AS VARCHAR)) AS __duckvep_explicit_structural_type, ",
-		"upper(CAST(e.copy_change AS VARCHAR)) AS __duckvep_explicit_copy_change, ",
-		"CAST(e.mate_seq_region AS UINTEGER) AS __duckvep_mate_seq_region, ",
-		"CAST(e.mate_position AS UBIGINT) AS __duckvep_mate_position ",
-		"FROM query_table(events_table) e), ",
-		"typed_base AS MATERIALIZED (SELECT *, ",
-		"CASE __duckvep_alternate ",
-		"WHEN '<DEL>' THEN 'DEL' WHEN '<DUP>' THEN 'DUP' ",
-		"WHEN '<TDUP>' THEN 'TDUP' WHEN '<STR>' THEN 'STR' ",
-		"WHEN '<INV>' THEN 'INV' WHEN '<INS>' THEN 'INS' ",
-		"WHEN '<CNV>' THEN 'CNV' WHEN '<UNKNOWN>' THEN 'UNKNOWN' ",
-		"ELSE NULL END AS __duckvep_symbolic_structural_type, ",
-		"__duckvep_alternate = '<*>' AS __duckvep_unspecified_alt, ",
-		"__duckvep_alternate IN ('<NON_REF>', '*', '.') ",
-		"AS __duckvep_non_variant FROM source), ",
-		"typed AS MATERIALIZED (SELECT *, ",
-		"coalesce(__duckvep_explicit_structural_type, ",
-		"__duckvep_symbolic_structural_type) AS __duckvep_structural_type ",
-		"FROM typed_base), ",
-		"classified AS MATERIALIZED (SELECT *, CASE ",
-		"WHEN __duckvep_non_variant THEN 'non_variant' ",
-		"WHEN __duckvep_unspecified_alt THEN 'small_variant' ",
-		"WHEN __duckvep_mate_seq_region IS NOT NULL OR __duckvep_mate_position IS NOT NULL ",
-		"THEN 'breakend' WHEN __duckvep_explicit_structural_type IS NOT NULL ",
-		"OR __duckvep_explicit_copy_change IS NOT NULL ",
-		"OR (__duckvep_alternate IS NOT NULL AND ",
-		"(starts_with(__duckvep_alternate, '<') OR contains(__duckvep_alternate, '[') ",
-		"OR contains(__duckvep_alternate, ']'))) ",
-		"OR (__duckvep_end_position IS NOT NULL AND ",
-		"(__duckvep_reference IS NULL OR __duckvep_alternate IS NULL)) ",
-		"THEN 'structural_variant' ",
-		"ELSE 'small_variant' END AS __duckvep_event_kind, ",
-		"coalesce(__duckvep_explicit_copy_change, CASE __duckvep_structural_type ",
-		"WHEN 'DEL' THEN 'LOSS' WHEN 'DUP' THEN 'GAIN' WHEN 'TDUP' THEN 'GAIN' ",
-		"ELSE 'UNKNOWN' END) AS __duckvep_copy_change FROM typed), ",
-		"validation AS MATERIALIZED (SELECT CASE ",
-		"WHEN (SELECT model_name IS NULL OR model_name = '' FROM parameters) ",
-		"THEN error('duckvep_annotate: model_name must be non-empty') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_event_index IS NULL) ",
-		"THEN error('duckvep_annotate: event_index is required') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_seq_region IS NULL ",
-		"OR __duckvep_position IS NULL OR __duckvep_position = 0) ",
-		"THEN error('duckvep_annotate: seq_region and positive one-based position are required') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_event_kind = 'non_variant' ",
-		"AND (__duckvep_explicit_structural_type IS NOT NULL ",
-		"OR __duckvep_explicit_copy_change IS NOT NULL ",
-		"OR __duckvep_mate_seq_region IS NOT NULL ",
-		"OR __duckvep_mate_position IS NOT NULL)) ",
-		"THEN error('duckvep_annotate: a non-variant gVCF allele cannot carry structural or breakend fields') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_unspecified_alt ",
-		"AND (__duckvep_explicit_structural_type IS NOT NULL ",
-		"OR __duckvep_explicit_copy_change IS NOT NULL ",
-		"OR __duckvep_mate_seq_region IS NOT NULL ",
-		"OR __duckvep_mate_position IS NOT NULL)) ",
-		"THEN error('duckvep_annotate: <*> cannot carry structural or breakend fields') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE ",
-		"(__duckvep_mate_seq_region IS NULL) != (__duckvep_mate_position IS NULL)) ",
-		"THEN error('duckvep_annotate: a breakend requires both mate_seq_region and mate_position') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_event_kind = 'breakend' AND ",
-		"(__duckvep_end_position IS NOT NULL OR __duckvep_explicit_structural_type IS NOT NULL ",
-		"OR __duckvep_explicit_copy_change IS NOT NULL)) ",
-		"THEN error('duckvep_annotate: breakend mate coordinates cannot be mixed with single-locus structural fields') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_event_kind = 'breakend' ",
-		"AND __duckvep_mate_position = 0) ",
-		"THEN error('duckvep_annotate: mate_position must be positive and one-based') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_event_kind = 'small_variant' ",
-		"AND (__duckvep_reference IS NULL OR __duckvep_reference = '' ",
-		"OR __duckvep_alternate IS NULL OR __duckvep_alternate = '')) ",
-		"THEN error('duckvep_annotate: literal small variants require reference and alternate') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE ",
-		"__duckvep_explicit_structural_type IS NOT NULL ",
-		"AND __duckvep_symbolic_structural_type IS NOT NULL ",
-		"AND __duckvep_explicit_structural_type <> __duckvep_symbolic_structural_type) ",
-		"THEN error('duckvep_annotate: symbolic alternate and structural_type disagree') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_event_kind = 'structural_variant' ",
-		"AND (__duckvep_structural_type IS NULL OR __duckvep_end_position IS NULL)) ",
-		"THEN error('duckvep_annotate: a structural event requires end_position and a supported structural_type') ",
-		"WHEN EXISTS (SELECT 1 FROM classified WHERE __duckvep_event_kind = 'structural_variant' ",
-		"AND __duckvep_structural_type NOT IN ('DEL','DUP','TDUP','STR','INV','INS','CNV','UNKNOWN')) ",
-		"THEN error('duckvep_annotate: unsupported structural_type') ",
-		"ELSE true END AS valid), ",
-		"validated AS (SELECT classified.* FROM classified CROSS JOIN validation ",
-		"WHERE validation.valid), ",
-		"small_events AS (SELECT * FROM validated ",
-		"WHERE __duckvep_event_kind = 'small_variant'), ",
-		"structural_events AS (SELECT * FROM validated ",
-		"WHERE __duckvep_event_kind = 'structural_variant'), ",
-		"breakend_events AS (SELECT * FROM validated ",
-		"WHERE __duckvep_event_kind = 'breakend'), ",
-		"small_compact_raw AS (SELECT e.*, ",
-		"unnest(_duckvep_annotate_small_compact(p.model_name, __duckvep_seq_region, ",
-		"__duckvep_position, __duckvep_reference, __duckvep_alternate, ",
-		"p.upstream_distance, p.downstream_distance)) AS annotation ",
-		"FROM small_events e CROSS JOIN parameters p ",
-		"WHERE (NOT p.include_hgvs OR __duckvep_unspecified_alt) ",
-		"AND NOT p.include_rich), ",
-		"small_hgvs_raw AS (SELECT e.*, ",
-		"unnest(_duckvep_annotate_small_hgvs(p.model_name, __duckvep_seq_region, ",
-		"__duckvep_position, __duckvep_reference, __duckvep_alternate, ",
-		"p.upstream_distance, p.downstream_distance)) AS annotation ",
-		"FROM small_events e CROSS JOIN parameters p ",
-		"WHERE p.include_hgvs AND NOT __duckvep_unspecified_alt ",
-		"AND NOT p.include_rich), ",
-		"small_rich_raw AS (SELECT e.*, ",
-		"unnest(_duckvep_annotate_small_rich(p.model_name, __duckvep_seq_region, ",
-		"__duckvep_position, __duckvep_reference, __duckvep_alternate, ",
-		"p.upstream_distance, p.downstream_distance)) AS annotation ",
-		"FROM small_events e CROSS JOIN parameters p ",
-		"WHERE (NOT p.include_hgvs OR __duckvep_unspecified_alt) ",
-		"AND p.include_rich), ",
-		"small_rich_hgvs_raw AS (SELECT e.*, ",
-		"unnest(_duckvep_annotate_small_rich_hgvs(p.model_name, __duckvep_seq_region, ",
-		"__duckvep_position, __duckvep_reference, __duckvep_alternate, ",
-		"p.upstream_distance, p.downstream_distance)) AS annotation ",
-		"FROM small_events e CROSS JOIN parameters p ",
-		"WHERE p.include_hgvs AND NOT __duckvep_unspecified_alt ",
-		"AND p.include_rich), ",
-		"structural_compact_raw AS (SELECT e.*, ",
-		"unnest(_duckvep_annotate_structural_compact(p.model_name, __duckvep_seq_region, ",
-		"__duckvep_position, __duckvep_end_position, __duckvep_structural_type, ",
-		"__duckvep_copy_change, p.upstream_distance, p.downstream_distance)) AS annotation ",
-		"FROM structural_events e CROSS JOIN parameters p WHERE NOT p.include_rich), ",
-		"structural_rich_raw AS (SELECT e.*, ",
-		"unnest(_duckvep_annotate_structural_rich(p.model_name, __duckvep_seq_region, ",
-		"__duckvep_position, __duckvep_end_position, __duckvep_structural_type, ",
-		"__duckvep_copy_change, p.upstream_distance, p.downstream_distance)) AS annotation ",
-		"FROM structural_events e CROSS JOIN parameters p WHERE p.include_rich), ",
-		"breakend_compact_raw AS (SELECT e.*, ",
-		"unnest(_duckvep_annotate_breakend_compact(p.model_name, __duckvep_seq_region, ",
-		"__duckvep_position, __duckvep_mate_seq_region, __duckvep_mate_position, ",
-		"p.upstream_distance, p.downstream_distance)) AS annotation ",
-		"FROM breakend_events e CROSS JOIN parameters p WHERE NOT p.include_rich), ",
-		"breakend_rich_raw AS (SELECT e.*, ",
-		"unnest(_duckvep_annotate_breakend_rich(p.model_name, __duckvep_seq_region, ",
-		"__duckvep_position, __duckvep_mate_seq_region, __duckvep_mate_position, ",
-		"p.upstream_distance, p.downstream_distance)) AS annotation ",
-		"FROM breakend_events e CROSS JOIN parameters p WHERE p.include_rich), ",
-		"small_compact AS (SELECT __duckvep_event_index AS event_index, ",
-		"__duckvep_event_kind AS duckvep_event_kind, annotation.* ",
-		"FROM small_compact_raw), ",
-		"small_hgvs AS (SELECT __duckvep_event_index AS event_index, ",
-		"__duckvep_event_kind AS duckvep_event_kind, annotation.* FROM small_hgvs_raw), ",
-		"small_rich AS (SELECT __duckvep_event_index AS event_index, ",
-		"__duckvep_event_kind AS duckvep_event_kind, ",
-		"annotation.* EXCLUDE (status, reason), annotation.status AS duckvep_status, ",
-		"annotation.reason AS duckvep_reason FROM small_rich_raw), ",
-		"small_rich_hgvs AS (SELECT __duckvep_event_index AS event_index, ",
-		"__duckvep_event_kind AS duckvep_event_kind, ",
-		"annotation.* EXCLUDE (status, reason), annotation.status AS duckvep_status, ",
-		"annotation.reason AS duckvep_reason ",
-		"FROM small_rich_hgvs_raw), ",
-		"structural_compact AS (SELECT __duckvep_event_index AS event_index, ",
-		"__duckvep_event_kind AS duckvep_event_kind, annotation.* ",
-		"FROM structural_compact_raw), ",
-		"structural_rich AS (SELECT __duckvep_event_index AS event_index, ",
-		"__duckvep_event_kind AS duckvep_event_kind, ",
-		"annotation.* EXCLUDE (status, reason), annotation.status AS duckvep_status, ",
-		"annotation.reason AS duckvep_reason ",
-		"FROM structural_rich_raw), ",
-		"breakend_compact AS (SELECT __duckvep_event_index AS event_index, ",
-		"__duckvep_event_kind AS duckvep_event_kind, annotation.* ",
-		"FROM breakend_compact_raw), ",
-		"breakend_rich AS (SELECT __duckvep_event_index AS event_index, ",
-		"__duckvep_event_kind AS duckvep_event_kind, ",
-		"annotation.* EXCLUDE (status, reason), annotation.status AS duckvep_status, ",
-		"annotation.reason AS duckvep_reason ",
-		"FROM breakend_rich_raw) ",
-		"SELECT * FROM small_compact UNION ALL BY NAME SELECT * FROM small_hgvs ",
-		"UNION ALL BY NAME SELECT * FROM small_rich ",
-		"UNION ALL BY NAME SELECT * FROM small_rich_hgvs ",
-		"UNION ALL BY NAME SELECT * FROM structural_compact ",
-		"UNION ALL BY NAME SELECT * FROM structural_rich ",
-		"UNION ALL BY NAME SELECT * FROM breakend_compact ",
-		"UNION ALL BY NAME SELECT * FROM breakend_rich"
-	};
-
-	return duckhts_register_sql_parts(registration, sql,
-	    sizeof(sql) / sizeof(sql[0]));
+    return duckvep_register_builder(registration->connection, "duckvep_annotate_sql", 2,
+        duckvep_annotate_builder);
 }
 
 /* SQL presentation uses the kernel's immutable genetic-code authority. The

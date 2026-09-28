@@ -109,7 +109,7 @@ FROM (VALUES (110, 'C', 'T'), (124, 'T', 'C'), (125, 'A', 'G'), (130, 'C', 'CA')
 
 SELECT e.position, e.reference || '>' || e.alternate AS change,
        a.consequence, a.impact, a.transcript_hgvs, a.protein_hgvs, a.nmd_prediction
-FROM duckvep_annotate('demo_events', 'demo', rich := true, hgvs := true) a
+FROM query(duckvep_annotate_sql('demo_events', 'demo', struct_pack(rich := true, hgvs := true))) a
 JOIN demo_events e USING (event_index)
 ORDER BY e.position;
 ```
@@ -118,7 +118,7 @@ The frameshift and the stop-gain escape nonsense-mediated decay because they fal
 
 ```{sql unresolved, eval=TRUE}
 SELECT e.position, a.transcript_hgvs_status, a.transcript_hgvs_reason
-FROM duckvep_annotate('demo_events', 'demo', hgvs := true) a
+FROM query(duckvep_annotate_sql('demo_events', 'demo', struct_pack(hgvs := true))) a
 JOIN demo_events e USING (event_index)
 WHERE a.transcript_hgvs IS NULL
 ORDER BY e.position;
@@ -155,7 +155,7 @@ JOIN grch38_regions r ON r.seq_region_name = v.CHROM;
 -- High-impact consequences next to their arbitrated ClinVar decision
 SELECT r.seq_region_name AS contig, e.position, e.reference, e.alternate,
        a.consequence, a.protein_hgvs, d.policy_classification, d.gold_stars
-FROM duckvep_annotate('alleles', 'human_116_grch38', rich := true, hgvs := true) a
+FROM query(duckvep_annotate_sql('alleles', 'human_116_grch38', struct_pack(rich := true, hgvs := true))) a
 JOIN alleles e USING (event_index)
 JOIN grch38_regions r USING (seq_region)
 LEFT JOIN clinvar_vcf v                              -- DuckClinVarbitration
