@@ -1003,6 +1003,50 @@ local({
   expect_identical(compressed_annotation$transcript_hgvs, "n.25A>G")
   expect_identical(compressed_annotation$transcript_hgvs_status, "supported")
 
+  reference_queries <- c(
+    "SELECT * FROM duckvep_r_hgvs_regions ORDER BY seq_region",
+    paste("SELECT * FROM duckvep_r_hgvs_transcripts",
+          "ORDER BY seq_region, transcript_start, transcript_index"),
+    paste("SELECT * FROM duckvep_r_hgvs_exons",
+          "ORDER BY transcript_index, exon_cdna_start")
+  )
+  # Compare reference-dependent outcomes at the contig edge, inside the
+  # transcript and outside its bounds on both indexed FASTA formats.
+  for (position in c(1L, 100L, 124L, 150L, 49999L, 50000L, 50001L)) {
+    annotation <- function(model) dbGetQuery(con, sprintf(
+      paste("SELECT a.transcript_hgvs, a.transcript_hgvs_status,",
+            "a.transcript_hgvs_reason FROM unnest(_duckvep_annotate_small_hgvs(",
+            "'%s', 1::UINTEGER, %d::UBIGINT, 'A', 'G', 0::UBIGINT)) u(a)"),
+      model, position
+    ))
+    if (position > 50000L) {
+      expect_error(annotation("r-hgvs-bgzf"),
+                   pattern = "variant span exceeds sequence-region length")
+      expect_error(annotation("r-hgvs"),
+                   pattern = "variant span exceeds sequence-region length")
+    } else {
+      expect_identical(annotation("r-hgvs-bgzf"), annotation("r-hgvs"))
+    }
+  }
+  for (path in c(hgvs_reference, compressed_reference)) {
+    missing_contig <- reference_queries
+    missing_contig[[1L]] <- paste(
+      "SELECT seq_region, sequence_length, 'absent' AS seq_region_name",
+      "FROM duckvep_r_hgvs_regions"
+    )
+    expect_error(load_model(paste0("r-absent-", basename(path)),
+                            missing_contig, reference_fasta = path),
+                 pattern = "absent or has the wrong length")
+    wrong_length <- reference_queries
+    wrong_length[[1L]] <- paste(
+      "SELECT seq_region, sequence_length + 1 AS sequence_length,",
+      "seq_region_name FROM duckvep_r_hgvs_regions"
+    )
+    expect_error(load_model(paste0("r-overrun-", basename(path)),
+                            wrong_length, reference_fasta = path),
+                 pattern = "absent or has the wrong length")
+  }
+
   # A named model pins the reference files validated at load. Worker-local faidx
   # handles must not silently reopen replacement content.
   identity_reference <- tempfile("duckvep-reference-", fileext = ".fa")
