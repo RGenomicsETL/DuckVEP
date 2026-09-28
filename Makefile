@@ -57,6 +57,10 @@ test-extension-symbols:
 readme: release
 	Rscript scripts/render-readme.R
 
+.PHONY: check-rduckvep-bundle
+check-rduckvep-bundle:
+	scripts/check-rduckvep-bundle.sh
+
 .PHONY: site site-check
 site:
 	Rscript scripts/build-site.R
