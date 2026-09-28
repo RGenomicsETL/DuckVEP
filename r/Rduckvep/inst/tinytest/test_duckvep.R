@@ -2096,8 +2096,8 @@ local({
     "duckvep_annotate('duckvep_r_projection_events', 'r-test')"
   ))
   projected <- dbGetQuery(con, paste(
-    "SELECT * FROM duckvep_transcript_projection('duckvep_r_projection_events',",
-    "'duckvep_r_projection_annotations', 'duckvep_r_projection_model') ORDER BY event_index"
+    "SELECT * FROM query(duckvep_transcript_projection_sql('duckvep_r_projection_events',",
+    "'duckvep_r_projection_annotations', 'duckvep_r_projection_model')) ORDER BY event_index"
   ))
   expect_equal(projected$event_index, 1:4)
   expect_identical(projected$output_allele, c("C", "AAA", "AAA", "-"))
@@ -2116,16 +2116,16 @@ local({
     "FROM duckvep_r_projection_model"
   ))
   expect_equal(dbGetQuery(con, paste(
-    "SELECT * FROM duckvep_transcript_projection('duckvep_r_projection_events',",
-    "'duckvep_r_projection_annotations', 'duckvep_r_projection_unused') ORDER BY event_index"
+    "SELECT * FROM query(duckvep_transcript_projection_sql('duckvep_r_projection_events',",
+    "'duckvep_r_projection_annotations', 'duckvep_r_projection_unused')) ORDER BY event_index"
   )), projected)
   dbExecute(con, paste(
     "CREATE TABLE duckvep_r_projection_missing AS SELECT * FROM",
     "duckvep_r_projection_events WHERE event_index != 1"
   ))
   expect_error(dbGetQuery(con, paste(
-    "SELECT * FROM duckvep_transcript_projection('duckvep_r_projection_missing',",
-    "'duckvep_r_projection_annotations', 'duckvep_r_projection_model')"
+    "SELECT * FROM query(duckvep_transcript_projection_sql('duckvep_r_projection_missing',",
+    "'duckvep_r_projection_annotations', 'duckvep_r_projection_model'))"
   )), pattern = "annotation needs a source event")
   expect_equal(dbGetQuery(con, "SELECT 42 AS value")$value, 42L)
   # A later coding exon pads the sequence; VEP's displayed coordinates still
@@ -2161,9 +2161,9 @@ local({
       "duckvep_annotate('duckvep_r_projection_phase_events', 'r-projection-phase')"
     ))
     phase_result <- dbGetQuery(con, paste(
-      "SELECT cdna_start, cds_start, cds_end, protein_start FROM duckvep_transcript_projection(",
+      "SELECT cdna_start, cds_start, cds_end, protein_start FROM query(duckvep_transcript_projection_sql(",
       "'duckvep_r_projection_phase_events', 'duckvep_r_projection_phase_annotations',",
-      "'duckvep_r_projection_phase_model')"
+      "'duckvep_r_projection_phase_model'))"
     ))
     expect_equal(phase_result, data.frame(cdna_start=54, cds_start=3, cds_end=3, protein_start=1))
     dbExecute(con, paste(
@@ -2211,8 +2211,8 @@ local({
   ))
   withheld <- dbGetQuery(con, paste(
     "SELECT cds_start, cds_end, reference_codons, alternate_codons, reference_amino_acids,",
-    "alternate_amino_acids FROM duckvep_transcript_projection('duckvep_r_projection_events',",
-    "'duckvep_r_projection_withheld_annotations', 'duckvep_r_projection_withheld') ORDER BY event_index"
+    "alternate_amino_acids FROM query(duckvep_transcript_projection_sql('duckvep_r_projection_events',",
+    "'duckvep_r_projection_withheld_annotations', 'duckvep_r_projection_withheld')) ORDER BY event_index"
   ))
   expect_equal(withheld$cds_start, projected$cds_start)
   expect_equal(withheld$cds_end, projected$cds_end)
@@ -3635,8 +3635,8 @@ local({
     "count(*) FILTER (WHERE cds_start=4 AND cds_end=4 AND protein_start=2 AND protein_end=2",
     "AND reference_codons='Aaa' AND alternate_codons='Gaa'",
     "AND reference_amino_acids='K' AND alternate_amino_acids='E') AS exact_rows",
-    "FROM duckvep_transcript_projection('projection_resource_events',",
-    "'projection_resource_annotations', 'projection_resource_transcript')"
+    "FROM query(duckvep_transcript_projection_sql('projection_resource_events',",
+    "'projection_resource_annotations', 'projection_resource_transcript'))"
   ))
   expect_equal(observed, data.frame(output_rows = 32768, identities = 32768,
     first_id = 1, last_id = 32768, exact_rows = 32768))

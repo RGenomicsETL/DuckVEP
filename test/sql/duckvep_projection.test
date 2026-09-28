@@ -4,6 +4,19 @@
 
 require duckvep
 
+query I
+SELECT count(*) FROM duckdb_functions()
+WHERE function_type = 'macro' AND
+  (function_name = 'duckvep_transcript_projection' OR function_name LIKE '__duckvep_projection_%');
+----
+0
+
+statement error
+SELECT duckvep_transcript_projection_sql('events', 'annotations', 'transcripts',
+  struct_pack(other := 'x'));
+----
+unknown option
+
 query TTTT
 SELECT _duckvep_revcomp('AéC') = 'GéT',
   _duckvep_revcomp('ACGTRYSWKMBDHVNacgtryswkmbdhvn!') =
@@ -58,8 +71,8 @@ statement ok
 CREATE TABLE projection_annotations AS SELECT * FROM duckvep_annotate('projection_events', 'projection');
 
 statement ok
-CREATE TABLE projection_result AS SELECT * FROM duckvep_transcript_projection(
-  'projection_events', 'projection_annotations', 'projection_transcripts');
+CREATE TABLE projection_result AS SELECT * FROM query(duckvep_transcript_projection_sql(
+  'projection_events', 'projection_annotations', 'projection_transcripts'));
 
 # Codon/peptide fields remain separate typed strings, including empty codons,
 # frame-changing partial peptides and an edit spanning an intron.
@@ -113,7 +126,7 @@ CREATE TABLE projection_edited AS SELECT * REPLACE(
 
 query IITT
 SELECT cds_start_nf::INTEGER, cds_end_nf::INTEGER, reference_amino_acids, alternate_amino_acids
-FROM duckvep_transcript_projection('projection_events', 'projection_annotations', 'projection_edited')
+FROM query(duckvep_transcript_projection_sql('projection_events', 'projection_annotations', 'projection_edited'))
 WHERE event_index = 1;
 ----
 1	1	U	E
@@ -129,7 +142,7 @@ query III
 SELECT count(*), count(*) FILTER (WHERE event_index = 1),
   count(*) FILTER (WHERE transcript_index IS NULL AND cdna_start IS NULL
     AND exon_total IS NULL AND intron_total IS NULL AND cds_start_nf IS NULL)
-FROM duckvep_transcript_projection('projection_events', 'projection_repeated', 'projection_transcripts');
+FROM query(duckvep_transcript_projection_sql('projection_events', 'projection_repeated', 'projection_transcripts'));
 ----
 10	2	1
 
@@ -146,7 +159,7 @@ CREATE TABLE projection_reverse AS SELECT * REPLACE(-1::TINYINT AS strand,
 query TIIIIITTTT
 SELECT output_allele, cdna_start, cdna_end, cds_start, protein_start, exon_first,
   reference_amino_acids, alternate_amino_acids, reference_codons, alternate_codons
-FROM duckvep_transcript_projection('projection_events', 'projection_annotations', 'projection_reverse')
+FROM query(duckvep_transcript_projection_sql('projection_events', 'projection_annotations', 'projection_reverse'))
 WHERE event_index=1;
 ----
 G	12	12	12	4	2	F	F	ttT	ttC
@@ -161,7 +174,7 @@ CREATE TABLE projection_noncoding AS SELECT * REPLACE(0::UBIGINT AS transcript_f
 
 query IIIITT
 SELECT cdna_start, cdna_end, cds_start, protein_start, reference_amino_acids, reference_codons
-FROM duckvep_transcript_projection('projection_events', 'projection_annotations', 'projection_noncoding')
+FROM query(duckvep_transcript_projection_sql('projection_events', 'projection_annotations', 'projection_noncoding'))
 WHERE event_index=1;
 ----
 4	4	NULL	NULL	NULL	NULL
@@ -188,8 +201,8 @@ CREATE TABLE projection_withheld_annotations AS SELECT * FROM duckvep_annotate('
 
 query IIITTTT
 SELECT cds_start, cds_end, protein_start, reference_codons, alternate_codons,
-  reference_amino_acids, alternate_amino_acids FROM duckvep_transcript_projection(
-    'projection_events', 'projection_withheld_annotations', 'projection_withheld') WHERE event_index=1;
+  reference_amino_acids, alternate_amino_acids FROM query(duckvep_transcript_projection_sql(
+    'projection_events', 'projection_withheld_annotations', 'projection_withheld')) WHERE event_index=1;
 ----
 4	4	2	NULL	NULL	NULL	NULL
 
@@ -202,7 +215,7 @@ statement ok
 CREATE TABLE projection_empty AS SELECT * FROM projection_annotations WHERE false;
 
 query I
-SELECT count(*) FROM duckvep_transcript_projection('projection_events', 'projection_empty', 'projection_transcripts');
+SELECT count(*) FROM query(duckvep_transcript_projection_sql('projection_events', 'projection_empty', 'projection_transcripts'));
 ----
 0
 
@@ -220,7 +233,7 @@ CREATE TABLE projection_one_annotation AS SELECT * FROM projection_annotations W
 
 query TTTT
 SELECT reference_amino_acids, alternate_amino_acids, reference_codons, alternate_codons
-FROM duckvep_transcript_projection('projection_mito_event', 'projection_one_annotation', 'projection_mito')
+FROM query(duckvep_transcript_projection_sql('projection_mito_event', 'projection_one_annotation', 'projection_mito'))
 WHERE event_index=1;
 ----
 W	*	tGa	tAa
@@ -254,8 +267,8 @@ CREATE TABLE projection_later_annotation AS SELECT * FROM duckvep_annotate('proj
 
 query IIIITTTT
 SELECT cdna_start, cds_start, cds_end, protein_start, reference_codons, alternate_codons,
-  reference_amino_acids, alternate_amino_acids FROM duckvep_transcript_projection(
-    'projection_later_event', 'projection_later_annotation', 'projection_later_phase');
+  reference_amino_acids, alternate_amino_acids FROM query(duckvep_transcript_projection_sql(
+    'projection_later_event', 'projection_later_annotation', 'projection_later_phase'));
 ----
 12	3	3	1	ngG	ngA	X	X
 
@@ -312,8 +325,8 @@ CREATE OR REPLACE TABLE projection_later_annotation AS SELECT * FROM duckvep_ann
 
 query IIIITTTT
 SELECT cdna_start, cds_start, cds_end, protein_start, reference_codons, alternate_codons,
-  reference_amino_acids, alternate_amino_acids FROM duckvep_transcript_projection(
-    'projection_later_event', 'projection_later_annotation', 'projection_later_phase');
+  reference_amino_acids, alternate_amino_acids FROM query(duckvep_transcript_projection_sql(
+    'projection_later_event', 'projection_later_annotation', 'projection_later_phase'));
 ----
 12	3	3	1	nnG	nnA	X	X
 
@@ -597,8 +610,8 @@ CREATE TABLE projection_gap_event AS SELECT * REPLACE(18::UBIGINT AS position,
 
 query IIIIIITT
 SELECT cdna_start, cdna_end, cds_start, cds_end, protein_start, protein_end,
-  reference_amino_acids, reference_codons FROM duckvep_transcript_projection(
-    'projection_gap_event', 'projection_one_annotation', 'projection_transcripts');
+  reference_amino_acids, reference_codons FROM query(duckvep_transcript_projection_sql(
+    'projection_gap_event', 'projection_one_annotation', 'projection_transcripts'));
 ----
 9	NULL	9	NULL	3	NULL	NULL	NULL
 
@@ -617,8 +630,8 @@ CREATE TABLE projection_long_event AS SELECT * REPLACE(17::UBIGINT AS position,
 
 query IIIIIIII
 SELECT cdna_start, cdna_end, exon_first, exon_last, exon_total,
-  intron_first, intron_last, intron_total FROM duckvep_transcript_projection(
-    'projection_long_event', 'projection_one_annotation', 'projection_three');
+  intron_first, intron_last, intron_total FROM query(duckvep_transcript_projection_sql(
+    'projection_long_event', 'projection_one_annotation', 'projection_three'));
 ----
 8	14	1	3	3	1	2	2
 
@@ -634,8 +647,8 @@ CREATE TABLE projection_cds_end_event AS SELECT * REPLACE(29::UBIGINT AS positio
 
 query IIIIIIT
 SELECT cdna_start, cdna_end, cds_start, cds_end, protein_start, cds_end_nf::INTEGER,
-  reference_codons FROM duckvep_transcript_projection(
-    'projection_cds_end_event', 'projection_one_annotation', 'projection_partial');
+  reference_codons FROM query(duckvep_transcript_projection_sql(
+    'projection_cds_end_event', 'projection_one_annotation', 'projection_partial'));
 ----
 14	15	NULL	NULL	NULL	1	NULL
 
@@ -715,7 +728,7 @@ CREATE TABLE projection_invalid_code AS SELECT * REPLACE(255::UTINYINT AS codon_
 FROM projection_transcripts;
 
 statement error
-SELECT * FROM duckvep_transcript_projection('projection_events', 'projection_annotations', 'projection_invalid_code');
+SELECT * FROM query(duckvep_transcript_projection_sql('projection_events', 'projection_annotations', 'projection_invalid_code'));
 ----
 unsupported genetic code
 
@@ -728,8 +741,8 @@ UNION ALL SELECT * REPLACE(1::UINTEGER AS transcript_index,
 FROM projection_transcripts;
 
 query I
-WITH actual AS (SELECT * FROM duckvep_transcript_projection(
-  'projection_events', 'projection_annotations', 'projection_unused_invalid'))
+WITH actual AS (SELECT * FROM query(duckvep_transcript_projection_sql(
+  'projection_events', 'projection_annotations', 'projection_unused_invalid')))
 SELECT count(*) FROM ((SELECT * FROM actual EXCEPT ALL SELECT * FROM projection_result)
   UNION ALL (SELECT * FROM projection_result EXCEPT ALL SELECT * FROM actual));
 ----
@@ -761,7 +774,51 @@ WITH codes AS (SELECT unnest([1,2,3,4,5,6,9,10,11,12,13,14,16,21,22,23,24,25,26,
     UNION ALL SELECT unnest([NULL, '', 'A', 'AA', '?AA', 'AAA?']))
 SELECT count(*), count(*) FILTER (WHERE projection_reference_peptide(dna,
   __duckvep_projection_code(code)) IS DISTINCT FROM
-  __duckvep_projection_peptide(dna, __duckvep_projection_code(code)))
+  ((CASE WHEN ((dna)) IS NULL THEN NULL ELSE
+    coalesce(nullif((coalesce(array_to_string(
+    list_transform(range(length((dna)) // 3), lambda i: coalesce(CASE WHEN
+      (CASE WHEN regexp_full_match((substring(upper((dna)), 3*i+1, 3)), '[ACGT]{3}') THEN
+    substring(((__duckvep_projection_code(code))), (strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[1])-1)*16 +
+      (strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[2])-1)*4 + strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[3]), 1)
+  ELSE list_reduce(list_transform(list_filter(range(64), lambda j:
+    ((substring(upper((dna)), 3*i+1, 3))[1] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[1] = 'TCAG'[j // 16 + 1]) AND
+    ((substring(upper((dna)), 3*i+1, 3))[2] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[2] = 'TCAG'[(j // 4) % 4 + 1]) AND
+    ((substring(upper((dna)), 3*i+1, 3))[3] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[3] = 'TCAG'[j % 4 + 1])),
+    lambda j: substring(((__duckvep_projection_code(code))), j+1, 1)),
+    lambda consensus, aa: CASE WHEN consensus = '' THEN aa
+      WHEN consensus = aa THEN consensus ELSE 'X' END, '') END) = ''
+      THEN NULL ELSE (CASE WHEN regexp_full_match((substring(upper((dna)), 3*i+1, 3)), '[ACGT]{3}') THEN
+    substring(((__duckvep_projection_code(code))), (strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[1])-1)*16 +
+      (strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[2])-1)*4 + strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[3]), 1)
+  ELSE list_reduce(list_transform(list_filter(range(64), lambda j:
+    ((substring(upper((dna)), 3*i+1, 3))[1] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[1] = 'TCAG'[j // 16 + 1]) AND
+    ((substring(upper((dna)), 3*i+1, 3))[2] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[2] = 'TCAG'[(j // 4) % 4 + 1]) AND
+    ((substring(upper((dna)), 3*i+1, 3))[3] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[3] = 'TCAG'[j % 4 + 1])),
+    lambda j: substring(((__duckvep_projection_code(code))), j+1, 1)),
+    lambda consensus, aa: CASE WHEN consensus = '' THEN aa
+      WHEN consensus = aa THEN consensus ELSE 'X' END, '') END) END, 'X')), ''), '')) || CASE WHEN length(((dna))) % 3 != 0 AND (coalesce(array_to_string(
+    list_transform(range(length((dna)) // 3), lambda i: coalesce(CASE WHEN
+      (CASE WHEN regexp_full_match((substring(upper((dna)), 3*i+1, 3)), '[ACGT]{3}') THEN
+    substring(((__duckvep_projection_code(code))), (strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[1])-1)*16 +
+      (strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[2])-1)*4 + strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[3]), 1)
+  ELSE list_reduce(list_transform(list_filter(range(64), lambda j:
+    ((substring(upper((dna)), 3*i+1, 3))[1] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[1] = 'TCAG'[j // 16 + 1]) AND
+    ((substring(upper((dna)), 3*i+1, 3))[2] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[2] = 'TCAG'[(j // 4) % 4 + 1]) AND
+    ((substring(upper((dna)), 3*i+1, 3))[3] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[3] = 'TCAG'[j % 4 + 1])),
+    lambda j: substring(((__duckvep_projection_code(code))), j+1, 1)),
+    lambda consensus, aa: CASE WHEN consensus = '' THEN aa
+      WHEN consensus = aa THEN consensus ELSE 'X' END, '') END) = ''
+      THEN NULL ELSE (CASE WHEN regexp_full_match((substring(upper((dna)), 3*i+1, 3)), '[ACGT]{3}') THEN
+    substring(((__duckvep_projection_code(code))), (strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[1])-1)*16 +
+      (strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[2])-1)*4 + strpos('TCAG', (substring(upper((dna)), 3*i+1, 3))[3]), 1)
+  ELSE list_reduce(list_transform(list_filter(range(64), lambda j:
+    ((substring(upper((dna)), 3*i+1, 3))[1] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[1] = 'TCAG'[j // 16 + 1]) AND
+    ((substring(upper((dna)), 3*i+1, 3))[2] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[2] = 'TCAG'[(j // 4) % 4 + 1]) AND
+    ((substring(upper((dna)), 3*i+1, 3))[3] = 'N' OR (substring(upper((dna)), 3*i+1, 3))[3] = 'TCAG'[j % 4 + 1])),
+    lambda j: substring(((__duckvep_projection_code(code))), j+1, 1)),
+    lambda consensus, aa: CASE WHEN consensus = '' THEN aa
+      WHEN consensus = aa THEN consensus ELSE 'X' END, '') END) END, 'X')), ''), '')) != '*'
+      THEN 'X' ELSE '' END, ''), '-') END)))
 FROM codes, sequences;
 ----
 15144	0
@@ -782,11 +839,18 @@ WITH sequences AS (SELECT substring('ACGTACGTACGT',1,n) AS cds FROM range(13) r(
     FROM edits), comparison AS (
     SELECT substring(whole,start0+1,width) AS expected,
       CASE WHEN alternate_length>=3 THEN
-        __duckvep_projection_span(cds,1,prefix_length,0,start0,width) ||
-        __duckvep_projection_span(alt,1,len(alt),prefix_length,start0,width) ||
-        __duckvep_projection_span(cds,last1+1,suffix_length,prefix_length+len(alt),start0,width)
-      ELSE '' END || __duckvep_projection_span(coalesce(post,''),1,len(coalesce(post,'')),
-        CASE WHEN alternate_length>=3 THEN alternate_length ELSE 0 END,start0,width) AS observed
+        (substring((cds), (1) + greatest((start0) - (0), 0),
+    greatest(least((start0) + (width), (0) + (prefix_length)) -
+      greatest((start0), (0)), 0))) ||
+        (substring((alt), (1) + greatest((start0) - (prefix_length), 0),
+    greatest(least((start0) + (width), (prefix_length) + (len(alt))) -
+      greatest((start0), (prefix_length)), 0))) ||
+        (substring((cds), (last1+1) + greatest((start0) - (prefix_length+len(alt)), 0),
+    greatest(least((start0) + (width), (prefix_length+len(alt)) + (suffix_length)) -
+      greatest((start0), (prefix_length+len(alt))), 0)))
+      ELSE '' END || (substring((coalesce(post,'')), (1) + greatest((start0) - (CASE WHEN alternate_length>=3 THEN alternate_length ELSE 0 END), 0),
+    greatest(least((start0) + (width), (CASE WHEN alternate_length>=3 THEN alternate_length ELSE 0 END) + (len(coalesce(post,'')))) -
+      greatest((start0), (CASE WHEN alternate_length>=3 THEN alternate_length ELSE 0 END)), 0))) AS observed
     FROM windows, range(0,20) a(start0), range(0,10) b(width))
 SELECT count(*), count(*) FILTER (WHERE expected IS DISTINCT FROM observed) FROM comparison;
 ----
@@ -822,7 +886,7 @@ statement ok
 CREATE TABLE projection_bad_events AS SELECT * FROM projection_events UNION ALL SELECT * FROM projection_events;
 
 statement error
-SELECT * FROM duckvep_transcript_projection('projection_bad_events', 'projection_annotations', 'projection_transcripts');
+SELECT * FROM query(duckvep_transcript_projection_sql('projection_bad_events', 'projection_annotations', 'projection_transcripts'));
 ----
 event_index must be unique
 
@@ -830,7 +894,7 @@ statement ok
 CREATE OR REPLACE TABLE projection_bad_events AS SELECT * FROM projection_events WHERE event_index != 1;
 
 statement error
-SELECT * FROM duckvep_transcript_projection('projection_bad_events', 'projection_annotations', 'projection_transcripts');
+SELECT * FROM query(duckvep_transcript_projection_sql('projection_bad_events', 'projection_annotations', 'projection_transcripts'));
 ----
 annotation needs a source event
 
@@ -838,7 +902,7 @@ statement ok
 CREATE OR REPLACE TABLE projection_bad_events AS SELECT * REPLACE(2::UINTEGER AS seq_region) FROM projection_events;
 
 statement error
-SELECT * FROM duckvep_transcript_projection('projection_bad_events', 'projection_annotations', 'projection_transcripts');
+SELECT * FROM query(duckvep_transcript_projection_sql('projection_bad_events', 'projection_annotations', 'projection_transcripts'));
 ----
 source region must match the model
 
@@ -846,7 +910,7 @@ statement ok
 CREATE TABLE projection_bad_model AS SELECT * REPLACE(1::UINTEGER AS transcript_index) FROM projection_transcripts;
 
 statement error
-SELECT * FROM duckvep_transcript_projection('projection_events', 'projection_annotations', 'projection_bad_model');
+SELECT * FROM query(duckvep_transcript_projection_sql('projection_events', 'projection_annotations', 'projection_bad_model'));
 ----
 annotation transcript and source region must match the model
 
@@ -854,7 +918,7 @@ statement ok
 CREATE OR REPLACE TABLE projection_bad_model AS SELECT * FROM projection_transcripts UNION ALL SELECT * FROM projection_transcripts;
 
 statement error
-SELECT * FROM duckvep_transcript_projection('projection_events', 'projection_annotations', 'projection_bad_model');
+SELECT * FROM query(duckvep_transcript_projection_sql('projection_events', 'projection_annotations', 'projection_bad_model'));
 ----
 transcript_index must be non-null and unique
 
@@ -871,8 +935,8 @@ statement ok
 SET threads=1;
 
 statement ok
-CREATE TABLE projection_one_thread AS SELECT * FROM duckvep_transcript_projection(
-  'projection_many_events', 'projection_many_annotations', 'projection_transcripts');
+CREATE TABLE projection_one_thread AS SELECT * FROM query(duckvep_transcript_projection_sql(
+  'projection_many_events', 'projection_many_annotations', 'projection_transcripts'));
 
 statement ok
 SET threads=4;
@@ -880,7 +944,7 @@ SET threads=4;
 query III
 WITH expected AS (SELECT p.* REPLACE((event_index+8*i)::UBIGINT AS event_index)
   FROM projection_result p, range(600) r(i)), actual AS (
-  SELECT * FROM duckvep_transcript_projection('projection_many_events', 'projection_many_annotations', 'projection_transcripts'))
+  SELECT * FROM query(duckvep_transcript_projection_sql('projection_many_events', 'projection_many_annotations', 'projection_transcripts')))
 SELECT (SELECT count(*) FROM actual),
   (SELECT count(*) FROM ((SELECT * FROM actual EXCEPT ALL SELECT * FROM expected)
     UNION ALL (SELECT * FROM expected EXCEPT ALL SELECT * FROM actual))),
@@ -932,8 +996,8 @@ SELECT count(*), count(DISTINCT event_index), min(event_index), max(event_index)
   count(*) FILTER (WHERE cds_start=4 AND cds_end=4 AND protein_start=2 AND protein_end=2),
   count(*) FILTER (WHERE reference_codons='Aaa' AND alternate_codons='Gaa'
     AND reference_amino_acids='K' AND alternate_amino_acids='E')
-FROM duckvep_transcript_projection('projection_resource_events',
-  'projection_resource_annotations', 'projection_resource_transcript');
+FROM query(duckvep_transcript_projection_sql('projection_resource_events',
+  'projection_resource_annotations', 'projection_resource_transcript'));
 ----
 32768	32768	1	32768	32768	32768
 

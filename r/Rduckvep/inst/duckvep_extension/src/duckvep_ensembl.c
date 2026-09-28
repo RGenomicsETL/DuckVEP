@@ -9,13 +9,9 @@ DUCKDB_EXTENSION_EXTERN
 #include <string.h>
 
 #include "duckvep_sql.h"
+#include "duckvep_builder.h"
 
-static bool
-duckvep_register_ensembl_regions(duckhts_registration_t *registration)
-{
-	static const char *const sql[] = {
-		"CREATE OR REPLACE MACRO duckvep_ensembl_regions(",
-		"core_schema, reference_chunks_table, assembly, species_id := 1) AS TABLE ",
+static const char *const regions_sql[] = {
 		"WITH parameters AS MATERIALIZED (",
 		"SELECT CAST(assembly AS VARCHAR) AS requested_assembly, ",
 		"CAST(species_id AS BIGINT) AS requested_species_id",
@@ -70,16 +66,7 @@ duckvep_register_ensembl_regions(duckhts_registration_t *registration)
 		"ORDER BY seq_region"
 	};
 
-	return duckhts_register_sql_parts(registration, sql,
-	    sizeof(sql) / sizeof(sql[0]));
-}
-
-static bool
-duckvep_register_ensembl_transcripts(duckhts_registration_t *registration)
-{
-	static const char *const sql[] = {
-		"CREATE OR REPLACE MACRO duckvep_ensembl_transcripts(",
-		"core_schema, reference_chunks_table, assembly, species_id := 1) AS TABLE ",
+static const char *const transcripts_sql[] = {
 		"WITH regions AS MATERIALIZED (",
 		"SELECT * FROM duckvep_ensembl_regions(core_schema, reference_chunks_table, assembly, species_id)",
 		"), eligible_transcripts AS MATERIALIZED (",
@@ -442,20 +429,11 @@ duckvep_register_ensembl_transcripts(duckhts_registration_t *registration)
 		"WHERE validation.valid ORDER BY p.transcript_index"
 	};
 
-	return duckhts_register_sql_parts(registration, sql,
-	    sizeof(sql) / sizeof(sql[0]));
-}
-
-static bool
-duckvep_register_ensembl_regulation_features(duckhts_registration_t *registration)
-{
-	/* VEP 116 Database/RegFeat drops epigenetically_modified_region rows
-	 * before constructing overlap objects. The prepared resident relation must
-	 * make the same source selection; filtering only at output would still
-	 * waste interval-index and sweep capacity on objects VEP cannot emit. */
-	static const char *const sql[] = {
-		"CREATE OR REPLACE MACRO duckvep_ensembl_regulation_features(",
-		"funcgen_schema, regions_table) AS TABLE ",
+/* VEP 116 Database/RegFeat drops epigenetically_modified_region rows
+ * before constructing overlap objects. The prepared resident relation must
+ * make the same source selection; filtering only at output would still
+ * waste interval-index and sweep capacity on objects VEP cannot emit. */
+static const char *const regulation_sql[] = {
 		"WITH regions AS MATERIALIZED (",
 		"SELECT CAST(seq_region AS UINTEGER) AS seq_region, ",
 		"CAST(sequence_length AS UBIGINT) AS sequence_length, ",
@@ -521,27 +499,188 @@ duckvep_register_ensembl_regulation_features(duckhts_registration_t *registratio
 		"ORDER BY regulation_feature_index"
 	};
 
-	return duckhts_register_sql_parts(registration, sql,
-	    sizeof(sql) / sizeof(sql[0]));
+/* The preparation SQL is shared verbatim by the nested region projection. */
+static bool ensembl_template(duckvep_sql_text *out, const char *const *parts, size_t count,
+                             const char *core, const char *reference, const char *assembly,
+                             const char *species, const char *funcgen, const char *regions);
+
+static char *ensembl_slice(const char *text, size_t length) {
+    char *copy = malloc(length + 1);
+    if (copy) {
+        memcpy(copy, text, length);
+        copy[length] = '\0';
+    }
+    return copy;
 }
 
-static bool
-duckvep_register_model_receipt(duckhts_registration_t *registration)
-{
-	static const char *const sql[] = {
-		"CREATE OR REPLACE MACRO duckvep_model_receipt(regions_table, transcripts_table, source_name, source_version, ",
-		"assembly, source_manifest_sha256, reference_sha256, transcript_filter, ",
-		"regulation_features_table := NULL) AS TABLE ",
-		"WITH regions AS MATERIALIZED (SELECT * FROM query_table(regions_table)), ",
-		"model AS MATERIALIZED (SELECT * FROM query_table(transcripts_table)), ",
-		"regulation AS MATERIALIZED (SELECT regulation_feature_index, seq_region, ",
-		"feature_start, feature_end, feature_kind FROM query(CASE WHEN ",
-		"regulation_features_table IS NULL THEN 'SELECT NULL::UINTEGER AS ",
-		"regulation_feature_index, NULL::UINTEGER AS seq_region, NULL::UINTEGER AS ",
-		"feature_start, NULL::UINTEGER AS feature_end, NULL::UTINYINT AS ",
-		"feature_kind WHERE false' ELSE 'SELECT regulation_feature_index, seq_region, ",
-		"feature_start, feature_end, feature_kind FROM query_table(''' || ",
-		"replace(regulation_features_table, '''', '''''') || ''')' END)), ",
+static bool ensembl_table(duckvep_sql_text *out, const char *table) {
+    if (!table || !*table) return false;
+    const char *dot = strchr(table, '.');
+    if (!dot) return duckvep_sql_identifier(out, table);
+    if (dot == table || !dot[1]) return false;
+    char *schema = ensembl_slice(table, (size_t)(dot - table));
+    if (!schema) return false;
+    bool ok = duckvep_sql_identifier(out, schema) && duckvep_sql_append(out, ".") &&
+        duckvep_sql_identifier(out, dot + 1);
+    free(schema);
+    return ok;
+}
+
+static bool ensembl_piece(duckvep_sql_text *out, const char *piece, const char *core,
+                          const char *reference, const char *assembly, const char *species,
+                          const char *funcgen, const char *regions) {
+    if (!strcmp(piece, "SELECT CAST(assembly AS VARCHAR) AS requested_assembly, "))
+        return duckvep_sql_append(out, "SELECT CAST(") && duckvep_sql_literal(out, assembly) &&
+            duckvep_sql_append(out, " AS VARCHAR) AS requested_assembly, ");
+    if (!strcmp(piece, "CAST(species_id AS BIGINT) AS requested_species_id"))
+        return duckvep_sql_append(out, "CAST(") && duckvep_sql_append(out, species) &&
+            duckvep_sql_append(out, " AS BIGINT) AS requested_species_id");
+    const char *needle = "query_table(";
+    const char *nested = "duckvep_ensembl_regions(core_schema, reference_chunks_table, assembly, species_id)";
+    while (*piece) {
+        const char *table_call = strstr(piece, needle);
+        const char *region_call = strstr(piece, nested);
+        const char *at = table_call;
+        if (region_call && (!at || region_call < at)) at = region_call;
+        if (!at) return duckvep_sql_append(out, piece);
+        char *prefix = ensembl_slice(piece, (size_t)(at - piece));
+        if (!prefix) return false;
+        bool ok = duckvep_sql_append(out, prefix);
+        free(prefix);
+        if (!ok) return false;
+        if (at == region_call) {
+            if (!duckvep_sql_append(out, "(") ||
+                !ensembl_template(out, regions_sql, sizeof(regions_sql) / sizeof(*regions_sql),
+                                  core, reference, assembly, species, funcgen, regions) ||
+                !duckvep_sql_append(out, ")")) return false;
+            piece = at + strlen(nested);
+            continue;
+        }
+        const char *end = strchr(at, ')');
+        if (!end) return false;
+        const char *name = NULL;
+        const char *table = NULL;
+        if (!strncmp(at, "query_table(core_schema || '.", strlen("query_table(core_schema || '."))) {
+            name = core;
+            table = at + strlen("query_table(core_schema || '.");
+        } else if (!strncmp(at, "query_table(funcgen_schema || '.", strlen("query_table(funcgen_schema || '."))) {
+            name = funcgen;
+            table = at + strlen("query_table(funcgen_schema || '.");
+        } else if (!strncmp(at, "query_table(reference_chunks_table)", strlen("query_table(reference_chunks_table)"))) {
+            name = reference;
+        } else if (!strncmp(at, "query_table(regions_table)", strlen("query_table(regions_table)"))) {
+            name = regions;
+        } else return false;
+        if (table) {
+            const char *quote = strchr(table, '\'');
+            if (!name || !quote || quote > end) return false;
+            char *suffix = ensembl_slice(table, (size_t)(quote - table));
+            if (!suffix) return false;
+            ok = duckvep_sql_identifier(out, name) && duckvep_sql_append(out, ".") &&
+                duckvep_sql_identifier(out, suffix);
+            free(suffix);
+        } else ok = ensembl_table(out, name);
+        if (!ok) return false;
+        piece = end + 1;
+    }
+    return true;
+}
+
+static bool ensembl_template(duckvep_sql_text *out, const char *const *parts, size_t count,
+                             const char *core, const char *reference, const char *assembly,
+                             const char *species, const char *funcgen, const char *regions) {
+    for (size_t i = 0; i < count; i++)
+        if (!ensembl_piece(out, parts[i], core, reference, assembly, species, funcgen, regions))
+            return false;
+    return true;
+}
+
+static void ensembl_builder(duckdb_function_info info, duckdb_data_chunk input,
+                            duckdb_vector output, const char *const *parts, size_t count,
+                            const char *label, idx_t required) {
+    static const char *const keys[] = {"species_id"};
+    static const duckvep_option_kind kinds[] = {DUCKVEP_OPTION_INTEGER};
+    idx_t argc = duckdb_data_chunk_get_column_count(input);
+    duckdb_vector args[4];
+    for (idx_t i = 0; i < argc; i++) args[i] = duckdb_data_chunk_get_vector(input, i);
+    for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
+        char *values[3] = {0};
+        for (idx_t i = 0; i < required; i++) {
+            uint64_t *valid = duckdb_vector_get_validity(args[i]);
+            if (valid && !duckdb_validity_row_is_valid(valid, row)) break;
+            values[i] = duckvep_builder_string(((duckdb_string_t *)duckdb_vector_get_data(args[i]))[row]);
+            if (!values[i]) break;
+        }
+        bool ok = true;
+        for (idx_t i = 0; i < required; i++) if (!values[i] || !*values[i]) ok = false;
+        if (!ok) duckdb_scalar_function_set_error(info, "DuckVEP builder: required table, schema, and assembly names must be nonempty");
+        duckdb_vector species_field = NULL;
+        if (ok && argc > required) {
+            if (required == 3) ok = duckvep_builder_option_vectors(info, args[required], row, keys, kinds, 1, &species_field);
+            else {
+                duckdb_scalar_function_set_error(info, "duckvep_ensembl_regulation_features_sql: no options are supported");
+                ok = false;
+            }
+        }
+        char species[40] = "1";
+        if (ok && species_field) {
+            duckdb_logical_type type = duckdb_vector_get_column_type(species_field);
+            duckdb_type id = duckdb_get_type_id(type);
+            void *data = duckdb_vector_get_data(species_field);
+            uint64_t *validity = duckdb_vector_get_validity(species_field);
+            int64_t number = 0;
+            if (id == DUCKDB_TYPE_SQLNULL || (validity && !duckdb_validity_row_is_valid(validity, row)))
+                snprintf(species, sizeof(species), "NULL");
+            else switch (id) {
+            case DUCKDB_TYPE_TINYINT: number = ((int8_t *)data)[row]; break;
+            case DUCKDB_TYPE_SMALLINT: number = ((int16_t *)data)[row]; break;
+            case DUCKDB_TYPE_INTEGER: number = ((int32_t *)data)[row]; break;
+            case DUCKDB_TYPE_BIGINT: number = ((int64_t *)data)[row]; break;
+            case DUCKDB_TYPE_UTINYINT: number = ((uint8_t *)data)[row]; break;
+            case DUCKDB_TYPE_USMALLINT: number = ((uint16_t *)data)[row]; break;
+            case DUCKDB_TYPE_UINTEGER: number = ((uint32_t *)data)[row]; break;
+            case DUCKDB_TYPE_UBIGINT: {
+                uint64_t unsigned_number = ((uint64_t *)data)[row];
+                if (unsigned_number > INT64_MAX) ok = false;
+                else number = (int64_t)unsigned_number;
+                break;
+            }
+            default: ok = false; break;
+            }
+            if (ok && strcmp(species, "NULL")) snprintf(species, sizeof(species), "%lld", (long long)number);
+            else if (!ok) duckdb_scalar_function_set_error(info, "DuckVEP builder: species_id exceeds BIGINT range");
+            duckdb_destroy_logical_type(&type);
+        }
+        duckvep_sql_text sql = {0};
+        bool building = ok;
+        if (ok) ok = ensembl_template(&sql, parts, count, values[0],
+            required == 3 ? values[1] : NULL, required == 3 ? values[2] : NULL,
+            species, required == 2 ? values[0] : NULL, required == 2 ? values[1] : NULL);
+        if (ok) {
+            duckdb_vector_ensure_validity_writable(output);
+            duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
+            duckdb_vector_assign_string_element(output, row, sql.data);
+        } else if (building) duckdb_scalar_function_set_error(info, label);
+        duckvep_sql_free(&sql);
+        for (idx_t i = 0; i < required; i++) free(values[i]);
+        if (!ok) return;
+    }
+}
+
+static void regions_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+    ensembl_builder(info, input, output, regions_sql, sizeof(regions_sql) / sizeof(*regions_sql),
+                    "duckvep_ensembl_regions_sql: SQL construction failed", 3);
+}
+static void transcripts_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+    ensembl_builder(info, input, output, transcripts_sql, sizeof(transcripts_sql) / sizeof(*transcripts_sql),
+                    "duckvep_ensembl_transcripts_sql: SQL construction failed", 3);
+}
+static void regulation_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+    ensembl_builder(info, input, output, regulation_sql, sizeof(regulation_sql) / sizeof(*regulation_sql),
+                    "duckvep_ensembl_regulation_features_sql: SQL construction failed", 2);
+}
+
+static const char *const receipt_body[] = {
 		"validation AS MATERIALIZED (SELECT CASE ",
 		"WHEN source_name IS NULL OR source_name = '' OR source_version IS NULL OR source_version = '' ",
 		"OR assembly IS NULL OR assembly = '' OR transcript_filter IS NULL OR transcript_filter = '' THEN ",
@@ -578,7 +717,7 @@ duckvep_register_model_receipt(duckhts_registration_t *registration)
 		"f.feature_end < f.feature_start OR f.feature_end > r.sequence_length OR ",
 		"f.feature_kind NOT IN (1, 2)) THEN ",
 		"error('duckvep_model_receipt: regulation-feature geometry, region, or kind is invalid') ",
-		"ELSE true END AS valid), ",
+		"ELSE true END AS valid FROM parameters), ",
 		"region_fingerprint AS MATERIALIZED (SELECT sha256(string_agg(sha256(CAST(struct_pack(",
 		"seq_region := seq_region, seq_region_name := seq_region_name, sequence_length := sequence_length, ",
 		"source_seq_region_id := source_seq_region_id, source_coord_system_id := source_coord_system_id, ",
@@ -620,7 +759,7 @@ duckvep_register_model_receipt(duckhts_registration_t *registration)
 		"source_name := source_name, source_version := source_version, assembly := assembly, ",
 		"source_manifest_sha256 := lower(source_manifest_sha256), ",
 		"reference_sha256 := lower(reference_sha256), transcript_filter := transcript_filter) ",
-		"AS VARCHAR)) AS provenance_sha256), ",
+		"AS VARCHAR)) AS provenance_sha256 FROM parameters), ",
 		"fingerprint AS MATERIALIZED (SELECT sha256(provenance_sha256 || region_sha256 || ",
 		"transcript_sha256 || regulation_sha256) AS model_sha256 FROM provenance_fingerprint ",
 		"CROSS JOIN region_fingerprint CROSS JOIN transcript_fingerprint ",
@@ -652,19 +791,77 @@ duckvep_register_model_receipt(duckhts_registration_t *registration)
 		"summary.peptide_edit_count, summary.transcript_flank_base_count, ",
 		"regulation_summary.regulation_feature_count, ",
 		"regulation_summary.regulatory_region_count, regulation_summary.motif_feature_count ",
-		"FROM summary CROSS JOIN regulation_summary CROSS JOIN fingerprint ",
+		"FROM parameters CROSS JOIN summary CROSS JOIN regulation_summary CROSS JOIN fingerprint ",
 		"CROSS JOIN validation WHERE validation.valid"
 	};
 
-	return duckhts_register_sql_parts(registration, sql,
-	    sizeof(sql) / sizeof(sql[0]));
+static void duckvep_model_receipt_sql(duckdb_function_info info,
+                                     duckdb_data_chunk input, duckdb_vector output) {
+    static const char *const parameters[] = {"source_name", "source_version", "assembly",
+        "source_manifest_sha256", "reference_sha256", "transcript_filter"};
+    static const char *const options[] = {"regulation_features_table"};
+    idx_t argc = duckdb_data_chunk_get_column_count(input);
+    duckdb_vector args[9];
+    for (idx_t i = 0; i < argc; i++) args[i] = duckdb_data_chunk_get_vector(input, i);
+    for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
+        char *values[8] = {0};
+        for (idx_t i = 0; i < 8; i++) {
+            uint64_t *valid = duckdb_vector_get_validity(args[i]);
+            if (valid && !duckdb_validity_row_is_valid(valid, row)) continue;
+            duckdb_string_t *strings = duckdb_vector_get_data(args[i]);
+            values[i] = duckvep_builder_string(strings[row]);
+            if (!values[i]) {
+                duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: invalid argument string or allocation failure");
+                for (idx_t j = 0; j <= i; j++) free(values[j]);
+                return;
+            }
+        }
+        char *option_values[1] = {0};
+        bool options_ok = argc != 9 || duckvep_builder_options(info, args[8], row, options, 1, option_values);
+        if (options_ok && (!values[0] || !values[1]))
+            duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: region and transcript table names are required");
+        if (!options_ok || !values[0] || !values[1]) {
+            for (idx_t i = 0; i < 8; i++) free(values[i]);
+            free(option_values[0]);
+            return;
+        }
+        duckvep_sql_text sql = {0};
+        bool ok = duckvep_sql_append(&sql, "WITH parameters AS MATERIALIZED (SELECT ");
+        for (idx_t i = 0; ok && i < 6; i++) {
+            if (i) ok = duckvep_sql_append(&sql, ", ");
+            if (ok) ok = duckvep_sql_literal(&sql, values[i + 2]);
+            if (ok) ok = duckvep_sql_append(&sql, " AS ");
+            if (ok) ok = duckvep_sql_append(&sql, parameters[i]);
+        }
+        if (ok) ok = duckvep_sql_append(&sql, "), regions AS MATERIALIZED (SELECT * FROM ");
+        if (ok) ok = duckvep_sql_identifier(&sql, values[0]);
+        if (ok) ok = duckvep_sql_append(&sql, "), model AS MATERIALIZED (SELECT * FROM ");
+        if (ok) ok = duckvep_sql_identifier(&sql, values[1]);
+        if (ok) ok = duckvep_sql_append(&sql, "), regulation AS MATERIALIZED (SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM ");
+        if (ok && option_values[0]) ok = duckvep_sql_identifier(&sql, option_values[0]);
+        else if (ok) ok = duckvep_sql_append(&sql, "(SELECT NULL::UINTEGER AS regulation_feature_index, NULL::UINTEGER AS seq_region, NULL::UINTEGER AS feature_start, NULL::UINTEGER AS feature_end, NULL::UTINYINT AS feature_kind WHERE false)");
+        if (ok) ok = duckvep_sql_append(&sql, "), ");
+        for (size_t i = 0; ok && i < sizeof(receipt_body) / sizeof(receipt_body[0]); i++)
+            ok = duckvep_sql_append(&sql, receipt_body[i]);
+        if (!ok) duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: allocation failed");
+        else {
+            duckdb_vector_ensure_validity_writable(output);
+            duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
+            duckdb_vector_assign_string_element(output, row, sql.data);
+        }
+        duckvep_sql_free(&sql);
+        for (idx_t i = 0; i < 8; i++) free(values[i]);
+        free(option_values[0]);
+        if (!ok) return;
+    }
 }
 
 bool
 register_duckvep_ensembl_functions(duckhts_registration_t *registration)
 {
-	return duckvep_register_ensembl_regions(registration) &&
-	    duckvep_register_ensembl_transcripts(registration) &&
-	    duckvep_register_ensembl_regulation_features(registration) &&
-	    duckvep_register_model_receipt(registration);
+	return duckvep_register_builder(registration->connection, "duckvep_ensembl_regions_sql", 3, regions_builder) &&
+	    duckvep_register_builder(registration->connection, "duckvep_ensembl_transcripts_sql", 3, transcripts_builder) &&
+	    duckvep_register_builder(registration->connection, "duckvep_ensembl_regulation_features_sql", 2, regulation_builder) &&
+	    duckvep_register_builder(registration->connection, "duckvep_model_receipt_sql", 8,
+	        duckvep_model_receipt_sql);
 }

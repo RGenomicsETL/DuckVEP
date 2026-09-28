@@ -46,8 +46,8 @@ benchmark_duckvep_projection <- function(root, extension, output, extension_rece
         SELECT * FROM duckvep_annotate('projection_events', 'projection')")
       expanded <- DBI::dbGetQuery(con, "SELECT count(*) n FROM projection_annotations")$n
       materialize <- "CREATE OR REPLACE TEMP TABLE measured AS SELECT *
-        FROM duckvep_transcript_projection('projection_events',
-          'projection_annotations', 'projection_transcripts')"
+        FROM query(duckvep_transcript_projection_sql('projection_events',
+          'projection_annotations', 'projection_transcripts'))"
       times <- numeric(iterations)
       fingerprint <- NULL
       for (pass in 0:iterations) {
