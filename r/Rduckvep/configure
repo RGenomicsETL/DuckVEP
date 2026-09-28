@@ -26,9 +26,24 @@ build="$(mktemp -d)"
 trap 'rm -rf "$build"' EXIT HUP INT TERM
 cp -R "$extension" "$build/source"
 mv "$build/source/third_party/htslib/Makefile.hts" "$build/source/third_party/htslib/Makefile"
+if [ "$(uname -s)" = Darwin ]; then
+  # Use the compiler and deployment flags of the R binary that loads DuckDB.
+  cc=$("${R_HOME}/bin/R" CMD config CC)
+  cc=${cc%% *}
+  cflags=$("${R_HOME}/bin/R" CMD config CFLAGS)
+  cppflags=$("${R_HOME}/bin/R" CMD config CPPFLAGS)
+  picflags=$("${R_HOME}/bin/R" CMD config CPICFLAGS)
+  ldflags=$("${R_HOME}/bin/R" CMD config LDFLAGS)
+  set -- "-DCMAKE_C_COMPILER=$cc" \
+    "-DCMAKE_C_FLAGS=$cppflags $cflags $picflags" \
+    "-DCMAKE_EXE_LINKER_FLAGS=$ldflags" \
+    "-DCMAKE_SHARED_LINKER_FLAGS=$ldflags"
+else
+  set --
+fi
 cmake -S "$build/source" -B "$build/build" -DEXTENSION_NAME=duckvep \
   -DTARGET_DUCKDB_VERSION_MAJOR="${version%%.*}" \
-  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_BUILD_TYPE=Release "$@"
 cmake --build "$build/build" --parallel 2
 case "$(uname -s)" in
   Darwin) library="$build/build/libduckvep.dylib" ;;
