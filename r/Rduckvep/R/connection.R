@@ -2,6 +2,7 @@
 #' @param con An open DuckDB connection with unsigned extension loading enabled.
 #' @param extension_path Optional extension artifact for this DuckDB version.
 #' @return Invisibly, the connection.
+#' @importFrom DBI dbConnect dbDisconnect dbExecute dbGetQuery dbQuoteIdentifier dbQuoteString dbExistsTable
 #' @export
 rduckvep_load <- function(con, extension_path = NULL) {
   if (is.null(extension_path)) {
