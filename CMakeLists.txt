@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5...3.29)
 option(DUCKDB_WASM_EXTENSION "Build for DuckDB-Wasm" OFF)
+option(DUCKVEP_WEBR_EXTENSION "Build a webR Emscripten side module" OFF)
 
 if(NOT DEFINED EXTENSION_NAME)
     message(FATAL_ERROR "DuckDB extension name is required")
@@ -35,6 +36,10 @@ if(DEFINED DUCKDB_EXTENSION_API_VERSION_UNSTABLE)
 endif()
 
 project(${EXTENSION_NAME} LANGUAGES C)
+if(DUCKVEP_WEBR_EXTENSION)
+    # Emscripten side modules are loadable shared libraries in webR.
+    set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
+endif()
 file(GLOB KERNEL_SOURCES CONFIGURE_DEPENDS src/kernel/src/*.c)
 set(EXTENSION_SOURCES
     src/duckvep.c
@@ -51,13 +56,14 @@ set(EXTENSION_SOURCES
     third_party/cgranges/cgranges.c
     ${KERNEL_SOURCES}
 )
-if(DUCKDB_WASM_EXTENSION)
+if(DUCKDB_WASM_EXTENSION AND NOT DUCKVEP_WEBR_EXTENSION)
     add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fwasm-exceptions")
-    target_compile_definitions(${EXTENSION_NAME} PRIVATE DUCKVEP_WASM_DUCKDB_RUNTIME=1)
-    target_compile_options(${EXTENSION_NAME} PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/wasm_socket_compat.h)
 else()
     add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
+endif()
+if(DUCKDB_WASM_EXTENSION)
+    target_compile_definitions(${EXTENSION_NAME} PRIVATE DUCKVEP_WASM_DUCKDB_RUNTIME=1)
+    target_compile_options(${EXTENSION_NAME} PRIVATE -fwasm-exceptions -include ${CMAKE_SOURCE_DIR}/src/include/wasm_socket_compat.h)
 endif()
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -76,7 +82,9 @@ target_include_directories(${EXTENSION_NAME} PRIVATE src/include src src/kernel/
 target_include_directories(${EXTENSION_NAME} SYSTEM PRIVATE duckdb_capi)
 include(cmake/htslib.cmake)
 target_link_libraries(${EXTENSION_NAME} PRIVATE ${HTSLIB_LINK_LIBS})
-if(DUCKDB_WASM_EXTENSION)
+if(DUCKVEP_WEBR_EXTENSION)
+    target_link_options(${EXTENSION_NAME} PRIVATE -fwasm-exceptions -sSIDE_MODULE=1 -Wl,--export=duckvep_init_c_api)
+elseif(DUCKDB_WASM_EXTENSION)
     include(cmake/wasm_archive.cmake)
 elseif(APPLE)
     target_link_options(${EXTENSION_NAME} PRIVATE
