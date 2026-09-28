@@ -11,18 +11,28 @@ if [ ! -f "$extension/CMakeLists.txt" ]; then
   exit 1
 fi
 version="$("${R_HOME}/bin/Rscript" -e 'cat(as.character(utils::packageVersion("duckdb")))')"
-# R's duckdb on Windows is built with Rtools (MinGW), so it loads only
-# *_mingw extensions. DUCKDB_PLATFORM overrides the target when needed.
-platform="${DUCKDB_PLATFORM:-}"
-if [ -z "$platform" ]; then
-  case "$(uname -m)" in
-    x86_64) platform=windows_amd64_mingw ;;
-    *) echo "Set DUCKDB_PLATFORM for Windows $(uname -m) builds" >&2; exit 1 ;;
-  esac
-fi
 # R CMD config selects the Rtools compiler and its platform-specific flags.
 cc=$("${R_HOME}/bin/R" CMD config CC)
 cc=${cc%% *}
+# The shell may be x86_64 even when R and its compiler target arm64.
+r_target=$("${R_HOME}/bin/Rscript" -e 'cat(R.Version()[["platform"]])')
+cc_target=$($cc -dumpmachine)
+case "$r_target" in
+  x86_64-*) r_arch=amd64 ;;
+  aarch64-*|arm64-*) r_arch=arm64 ;;
+  *) echo "Unsupported Windows R target: $r_target" >&2; exit 1 ;;
+esac
+case "$cc_target" in
+  x86_64-*) cc_arch=amd64 ;;
+  aarch64-*|arm64-*) cc_arch=arm64 ;;
+  *) echo "Unsupported Windows compiler target: $cc_target" >&2; exit 1 ;;
+esac
+if [ "$r_arch" != "$cc_arch" ]; then
+  echo "R/compiler target mismatch: R=$r_target compiler=$cc_target" >&2
+  exit 1
+fi
+# R's duckdb on Windows uses MinGW. Preserve explicit cross-build overrides.
+platform="${DUCKDB_PLATFORM:-windows_${r_arch}_mingw}"
 cflags=$("${R_HOME}/bin/R" CMD config CFLAGS)
 cppflags=$("${R_HOME}/bin/R" CMD config CPPFLAGS)
 picflags=$("${R_HOME}/bin/R" CMD config CPICFLAGS)
