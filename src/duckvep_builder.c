@@ -85,7 +85,8 @@ bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
         duckdb_logical_type field_type = duckdb_struct_type_child_type(type, i);
         size_t at = 0;
         while (at < count && strcmp(key, names[at]) != 0) at++;
-        if (at == count || duckdb_get_type_id(field_type) != DUCKDB_TYPE_VARCHAR) {
+        duckdb_type id = duckdb_get_type_id(field_type);
+        if (at == count || (id != DUCKDB_TYPE_VARCHAR && id != DUCKDB_TYPE_SQLNULL)) {
             char message[256];
             snprintf(message, sizeof(message), "DuckVEP builder: %s option '%s'",
                      at == count ? "unknown" : "expected VARCHAR for", key);
@@ -97,7 +98,7 @@ bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
         }
         duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
         uint64_t *child_validity = duckdb_vector_get_validity(child);
-        if (!child_validity || duckdb_validity_row_is_valid(child_validity, row)) {
+        if (id == DUCKDB_TYPE_VARCHAR && (!child_validity || duckdb_validity_row_is_valid(child_validity, row))) {
             duckdb_string_t *strings = duckdb_vector_get_data(child);
             values[at] = duckvep_builder_string(strings[row]);
             if (!values[at]) {

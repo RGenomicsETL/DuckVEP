@@ -1,0 +1,23 @@
+require duckvep
+
+query T
+SELECT duckvep_repeat_alleles([NULL], [{unit:'A',count:1}], true).status;
+----
+incomplete_input
+
+query TTT
+SELECT r.reference, r.alternate, r.status
+FROM (SELECT duckvep_repeat_alleles([{count:1,unit:'A'}], [{unit:'G',count:2}], true) r);
+----
+A	GG	ok
+
+query II
+SELECT a[1].allele_index, a[2].allele_index
+FROM (SELECT duckvep_phase_call([1.0,2.0], [true,true]) a);
+----
+1	2
+
+query I
+SELECT duckvep_phase_call([NULL,NULL], [true,true])[2].allele_index IS NULL;
+----
+1

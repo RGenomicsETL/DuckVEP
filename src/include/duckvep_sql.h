@@ -4,6 +4,6 @@
 #include "duckvep_registration.h"
 
 bool duckvep_register_phase_kernels(duckdb_connection connection);
-bool duckvep_register_phase_call(duckhts_registration_t *registration);
+bool duckvep_register_repeat_alleles(duckdb_connection connection);
 
 #endif
