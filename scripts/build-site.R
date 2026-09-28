@@ -46,12 +46,13 @@ documents <- c(
   haplotypes = "benchmarks/duckvep_haplotypes.md",
   `haplotypes-indel` = "benchmarks/duckvep_haplotypes_indel.md",
   projection = "benchmarks/benchmark_duckvep_projection.md",
-  `corpus-workflow` = "design/duckvep_corpus_workflow.md"
+  `corpus-workflow` = "design/duckvep_corpus_workflow.md",
+  `mane-grch37` = "design/duckvep_mane_grch37.md"
 )
 titles <- c(errata = "Compatibility and errata", design = "Design and implementation contract", conformance = "Conformance against Ensembl VEP",
   throughput = "Throughput", fastvep = "DuckVEP and FastVEP", haplotypes = "Haplotypes",
   `haplotypes-indel` = "Haplotypes with indels", projection = "Transcript projection",
-  `corpus-workflow` = "Corpus workflow")
+  `corpus-workflow` = "Corpus workflow", `mane-grch37` = "MANE v1.5 mapped to GRCh37")
 
 revision <- system2("git", c("rev-parse", "HEAD"), stdout = TRUE)
 stopifnot(length(revision) == 1L, grepl("^[0-9a-f]{40}$", revision))
