@@ -27,7 +27,8 @@ build="$(mktemp -d)"
 trap 'rm -rf "$build"' EXIT HUP INT TERM
 cp -R "$extension" "$build/source"
 mv "$build/source/third_party/htslib/Makefile.hts" "$build/source/third_party/htslib/Makefile"
-cmake -S "$build/source" -B "$build/build" -DEXTENSION_NAME=duckvep \
+cmake -G 'MSYS Makefiles' -S "$build/source" -B "$build/build" \
+  -DEXTENSION_NAME=duckvep \
   -DCMAKE_BUILD_TYPE=Release "-DCMAKE_C_COMPILER=$cc" \
   "-DCMAKE_C_FLAGS=$cppflags $cflags $picflags" \
   "-DCMAKE_SHARED_LINKER_FLAGS=$ldflags"
