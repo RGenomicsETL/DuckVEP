@@ -182,6 +182,8 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
     const char *const keys[] = {"hgvs", "upstream_distance", "downstream_distance", "rich"};
     const duckvep_option_kind kinds[] = {DUCKVEP_OPTION_BOOLEAN, DUCKVEP_OPTION_INTEGER,
         DUCKVEP_OPTION_INTEGER, DUCKVEP_OPTION_BOOLEAN};
+    const char *const projected_keys[] = {"upstream_distance", "downstream_distance"};
+    const duckvep_option_kind projected_kinds[] = {DUCKVEP_OPTION_INTEGER, DUCKVEP_OPTION_INTEGER};
     const char *const tokens[] = {"__DUCKVEP_EVENTS__", "__DUCKVEP_MODEL__", "__DUCKVEP_HGVS__",
         "__DUCKVEP_UPSTREAM__", "__DUCKVEP_DOWNSTREAM__", "__DUCKVEP_RICH__"};
     idx_t argc = duckdb_data_chunk_get_column_count(input);
@@ -198,7 +200,9 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
         }
         duckdb_vector fields[4] = {0};
         if (ok && argc == 3) {
-            ok = duckvep_builder_option_vectors(info, args[2], row, keys, kinds, 4, fields);
+            ok = projected ? duckvep_builder_option_vectors(info, args[2], row,
+                projected_keys, projected_kinds, 2, fields) :
+                duckvep_builder_option_vectors(info, args[2], row, keys, kinds, 4, fields);
             if (!ok) { for (idx_t i = 0; i < 2; i++) free(names[i]); return; }
         }
         duckvep_sql_text values[6] = {{0}};
@@ -208,11 +212,12 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
             duckvep_sql_append(&values[3], "5000") &&
             duckvep_sql_append(&values[4], "5000") &&
             duckvep_sql_append(&values[5], "false");
-        for (size_t i = 0; ok && i < 4; i++) {
+        for (size_t i = 0; ok && i < (projected ? 2 : 4); i++) {
             if (!fields[i]) continue;
-            size_t dest = i == 3 ? 5 : i + 2;
+            size_t dest = projected ? i + 3 : (i == 3 ? 5 : i + 2);
             duckvep_sql_free(&values[dest]);
-            ok = i == 0 || i == 3 ? duckvep_annotate_boolean(fields[i], row, &values[dest]) :
+            ok = !projected && (i == 0 || i == 3) ?
+                duckvep_annotate_boolean(fields[i], row, &values[dest]) :
                 duckvep_annotate_number(fields[i], row, &values[dest]);
         }
         duckvep_sql_text sql = {0};

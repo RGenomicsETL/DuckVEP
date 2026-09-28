@@ -115,6 +115,17 @@ complete_fields <- c("event_index", "record_index", "alt_index", duckvep_fastvep
 complete <- duckvep_fastvep_field_query(con, "native_tab17", include_identity = TRUE,
   model_name = "grch38")
 complete <- sub("SELECT p.record_index", "SELECT p.event_index, p.record_index", complete, fixed = TRUE)
+count_text <- function(text, needle) lengths(regmatches(text, gregexpr(needle, text, fixed = TRUE)))
+built <- get("SELECT duckvep_annotate_projected_sql('fastvep_ordered_events', 'grch38') AS sql")$sql
+unsupported <- try(get("SELECT duckvep_annotate_projected_sql('fastvep_ordered_events', 'grch38', {hgvs: true})"), silent = TRUE)
+if (!inherits(unsupported, "try-error")) stop("projected builder accepted an unsupported option")
+if (count_text(built, "_duckvep_annotate_small_projected(") != 1L ||
+    count_text(built, "_duckvep_annotate_small_projected_hgvs(") != 0L ||
+    grepl("rich_result", built, fixed = TRUE)) stop("projected builder has a second projection pass")
+plan <- get(paste("EXPLAIN (FORMAT JSON)", complete))$explain_value
+if (count_text(plan, '"name": "UNNEST"') != 1L ||
+    count_text(plan, '"Join Type": "LEFT"') != 1L ||
+    count_text(plan, '"CTE Name": "rich_result"') != 0L) stop("complete query plan must unnest once and join one dimension")
 receipts <- list(receipt("compact", compact, compact_fields),
   receipt("complete17", complete, complete_fields))
 run("SELECT duckvep_model_drop('grch38')")
