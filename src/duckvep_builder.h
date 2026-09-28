@@ -20,7 +20,8 @@ void duckvep_sql_free(duckvep_sql_text *text);
 /* NULL options use defaults; every supplied field must have its declared type. */
 bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
                              idx_t row, const char *const *names, size_t count,
-                             const char **values);
+                             char **values);
+char *duckvep_builder_string(duckdb_string_t string);
 bool duckvep_register_builder(duckdb_connection connection, const char *name,
                               idx_t required, duckdb_scalar_function_t callback);
 

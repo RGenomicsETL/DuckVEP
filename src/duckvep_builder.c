@@ -56,9 +56,21 @@ void duckvep_sql_free(duckvep_sql_text *text) {
     *text = (duckvep_sql_text){0};
 }
 
+char *duckvep_builder_string(duckdb_string_t string) {
+    size_t length = duckdb_string_t_length(string);
+    const char *data = duckdb_string_t_data(&string);
+    if (memchr(data, 0, length)) return NULL;
+    char *copy = malloc(length + 1);
+    if (copy) {
+        memcpy(copy, data, length);
+        copy[length] = '\0';
+    }
+    return copy;
+}
+
 bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
                              idx_t row, const char *const *names, size_t count,
-                             const char **values) {
+                             char **values) {
     uint64_t *validity = duckdb_vector_get_validity(vector);
     if (validity && !duckdb_validity_row_is_valid(validity, row)) return true;
     duckdb_logical_type type = duckdb_vector_get_column_type(vector);
@@ -87,15 +99,14 @@ bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
         uint64_t *child_validity = duckdb_vector_get_validity(child);
         if (!child_validity || duckdb_validity_row_is_valid(child_validity, row)) {
             duckdb_string_t *strings = duckdb_vector_get_data(child);
-            const char *str = duckdb_string_t_data(&strings[row]);
-            if (memchr(str, 0, duckdb_string_t_length(strings[row]))) {
-                duckdb_scalar_function_set_error(info, "DuckVEP builder: NUL in option");
+            values[at] = duckvep_builder_string(strings[row]);
+            if (!values[at]) {
+                duckdb_scalar_function_set_error(info, "DuckVEP builder: invalid option string or allocation failure");
                 duckdb_free(key);
                 duckdb_destroy_logical_type(&field_type);
                 duckdb_destroy_logical_type(&type);
                 return false;
             }
-            values[at] = str;
         }
         duckdb_free(key);
         duckdb_destroy_logical_type(&field_type);
