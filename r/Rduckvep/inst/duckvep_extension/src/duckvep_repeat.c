@@ -206,8 +206,10 @@ static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, du
             idx_t bad = required[0] > cap ? 0 : required[1] > cap ? 1 : 2;
             if (bad != 2) {
                 char error[240];
-                snprintf(error, sizeof(error), "duckvep_repeat_alleles: %s requires %.6Le bases which exceeds max_allele_bases=%.0Lf",
-                    bad ? "alternate" : "reference", required[bad], cap);
+                /* Print as double: MinGW's 80-bit long double does not match the
+                 * Windows C runtime's printf, which reads long double as double. */
+                snprintf(error, sizeof(error), "duckvep_repeat_alleles: %s requires %.6e bases which exceeds max_allele_bases=%.0f",
+                    bad ? "alternate" : "reference", (double)required[bad], (double)cap);
                 set_error(info, error);
                 break;
             }
