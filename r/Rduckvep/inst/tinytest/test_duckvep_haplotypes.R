@@ -320,7 +320,7 @@ local({
     "duckvep_repeat_alleles([{unit:'CAG',count:10}],",
     "CASE event_index WHEN 1 THEN [{unit:'CAG',count:11}]",
     "ELSE [{unit:'CAG',count:5},{unit:'CAT',count:1},{unit:'CAG',count:5}] END,true,",
-    "max_allele_bases:=33) repeat_fact FROM calls)",
+    "{max_allele_bases:33}) repeat_fact FROM calls)",
     "SELECT * EXCLUDE(repeat_fact) REPLACE('G'||repeat_fact.reference AS reference,",
     "'G'||repeat_fact.alternate AS alternate) FROM prepared")
   expect_identical(dbGetQuery(con, prepared), exact)

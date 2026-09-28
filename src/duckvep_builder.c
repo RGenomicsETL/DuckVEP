@@ -68,9 +68,10 @@ char *duckvep_builder_string(duckdb_string_t string) {
     return copy;
 }
 
-bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
-                             idx_t row, const char *const *names, size_t count,
-                             char **values) {
+bool duckvep_builder_option_vectors(duckdb_function_info info, duckdb_vector vector,
+                                    idx_t row, const char *const *names,
+                                    const duckvep_option_kind *kinds, size_t count,
+                                    duckdb_vector *values) {
     uint64_t *validity = duckdb_vector_get_validity(vector);
     if (validity && !duckdb_validity_row_is_valid(validity, row)) return true;
     duckdb_logical_type type = duckdb_vector_get_column_type(vector);
@@ -86,10 +87,22 @@ bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
         size_t at = 0;
         while (at < count && strcmp(key, names[at]) != 0) at++;
         duckdb_type id = duckdb_get_type_id(field_type);
-        if (at == count || (id != DUCKDB_TYPE_VARCHAR && id != DUCKDB_TYPE_SQLNULL)) {
+        bool integer = id >= DUCKDB_TYPE_TINYINT && id <= DUCKDB_TYPE_UBIGINT;
+        bool numeric = integer || id == DUCKDB_TYPE_HUGEINT || id == DUCKDB_TYPE_DECIMAL ||
+            id == DUCKDB_TYPE_FLOAT || id == DUCKDB_TYPE_DOUBLE;
+        bool permitted = at < count && (id == DUCKDB_TYPE_SQLNULL ||
+            (kinds[at] == DUCKVEP_OPTION_TEXT && id == DUCKDB_TYPE_VARCHAR) ||
+            (kinds[at] == DUCKVEP_OPTION_INTEGER && integer) ||
+            (kinds[at] == DUCKVEP_OPTION_NUMERIC && numeric));
+        if (!permitted) {
             char message[256];
-            snprintf(message, sizeof(message), "DuckVEP builder: %s option '%s'",
-                     at == count ? "unknown" : "expected VARCHAR for", key);
+            const char *type_name = at == count ? "" : kinds[at] == DUCKVEP_OPTION_TEXT ?
+                "VARCHAR" : kinds[at] == DUCKVEP_OPTION_INTEGER ? "INTEGER" : "numeric";
+            if (at == count || kinds[at] == DUCKVEP_OPTION_TEXT)
+                snprintf(message, sizeof(message), "DuckVEP builder: %s option '%s'",
+                         at == count ? "unknown" : "expected VARCHAR for", key);
+            else snprintf(message, sizeof(message), "DuckVEP builder: expected %s for option '%s'",
+                          type_name, key);
             duckdb_scalar_function_set_error(info, message);
             duckdb_free(key);
             duckdb_destroy_logical_type(&field_type);
@@ -97,23 +110,42 @@ bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
             return false;
         }
         duckdb_vector child = duckdb_struct_vector_get_child(vector, i);
-        uint64_t *child_validity = duckdb_vector_get_validity(child);
-        if (id == DUCKDB_TYPE_VARCHAR && (!child_validity || duckdb_validity_row_is_valid(child_validity, row))) {
-            duckdb_string_t *strings = duckdb_vector_get_data(child);
-            values[at] = duckvep_builder_string(strings[row]);
-            if (!values[at]) {
-                duckdb_scalar_function_set_error(info, "DuckVEP builder: invalid option string or allocation failure");
-                duckdb_free(key);
-                duckdb_destroy_logical_type(&field_type);
-                duckdb_destroy_logical_type(&type);
-                return false;
-            }
-        }
+        values[at] = child;
         duckdb_free(key);
         duckdb_destroy_logical_type(&field_type);
     }
     duckdb_destroy_logical_type(&type);
     return true;
+}
+
+bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
+                             idx_t row, const char *const *names, size_t count,
+                             char **values) {
+    duckvep_option_kind *kinds = malloc(count * sizeof(*kinds));
+    duckdb_vector *fields = calloc(count, sizeof(*fields));
+    if (!kinds || !fields) {
+        free(kinds); free(fields);
+        duckdb_scalar_function_set_error(info, "DuckVEP builder: allocation failed");
+        return false;
+    }
+    for (size_t i = 0; i < count; i++) kinds[i] = DUCKVEP_OPTION_TEXT;
+    bool ok = duckvep_builder_option_vectors(info, vector, row, names, kinds, count, fields);
+    for (size_t i = 0; ok && i < count; i++) {
+        if (!fields[i]) continue;
+        uint64_t *validity = duckdb_vector_get_validity(fields[i]);
+        if (validity && !duckdb_validity_row_is_valid(validity, row)) continue;
+        duckdb_logical_type type = duckdb_vector_get_column_type(fields[i]);
+        bool string_field = duckdb_get_type_id(type) == DUCKDB_TYPE_VARCHAR;
+        duckdb_destroy_logical_type(&type);
+        if (!string_field) continue;
+        values[i] = duckvep_builder_string(((duckdb_string_t *)duckdb_vector_get_data(fields[i]))[row]);
+        if (!values[i]) {
+            duckdb_scalar_function_set_error(info, "DuckVEP builder: invalid option string or allocation failure");
+            ok = false;
+        }
+    }
+    free(kinds); free(fields);
+    return ok;
 }
 
 bool duckvep_register_builder(duckdb_connection connection, const char *name,

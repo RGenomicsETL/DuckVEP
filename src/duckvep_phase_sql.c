@@ -4,6 +4,7 @@ DUCKDB_EXTENSION_EXTERN
 
 #include "duckvep_phase.h"
 #include "duckvep_sql.h"
+#include "duckvep_builder.h"
 #include "kernel/src/duckvep_haplotype_stream.h"
 
 #include <stdbool.h>
@@ -94,17 +95,9 @@ static void phase_scalar(duckdb_function_info info, duckdb_data_chunk input,
     duckdb_vector alleles = duckdb_data_chunk_get_vector(input, 0);
     duckdb_vector phases = duckdb_data_chunk_get_vector(input, 1);
     idx_t arity = duckdb_data_chunk_get_column_count(input);
-    duckdb_vector third = arity >= 3 ? duckdb_data_chunk_get_vector(input, 2) : NULL;
-    duckdb_vector ps = third;
-    duckdb_vector policies = arity == 4 ? duckdb_data_chunk_get_vector(input, 3) : NULL;
-    if (arity == 3) {
-        duckdb_logical_type type = duckdb_vector_get_column_type(third);
-        if (duckdb_get_type_id(type) == DUCKDB_TYPE_VARCHAR) {
-            policies = third;
-            ps = NULL;
-        }
-        duckdb_destroy_logical_type(&type);
-    }
+    duckdb_vector options = arity == 3 ? duckdb_data_chunk_get_vector(input, 2) : NULL;
+    const char *const keys[] = {"phase_set", "phase_policy"};
+    const duckvep_option_kind kinds[] = {DUCKVEP_OPTION_INTEGER, DUCKVEP_OPTION_TEXT};
     duckdb_logical_type allele_type = duckdb_vector_get_column_type(alleles);
     duckdb_logical_type phase_type = duckdb_vector_get_column_type(phases);
     bool allele_list = duckdb_get_type_id(allele_type) == DUCKDB_TYPE_LIST;
@@ -125,8 +118,6 @@ static void phase_scalar(duckdb_function_info info, duckdb_data_chunk input,
     if (phase_child_type) duckdb_destroy_logical_type(&phase_child_type);
     duckdb_destroy_logical_type(&allele_type);
     duckdb_destroy_logical_type(&phase_type);
-    int64_t *sets = ps ? duckdb_vector_get_data(ps) : NULL;
-    duckdb_string_t *policy_names = policies ? duckdb_vector_get_data(policies) : NULL;
     idx_t rows = duckdb_data_chunk_get_size(input), total = 0u;
 
     for (idx_t row = 0u; row < rows; row++) {
@@ -158,8 +149,50 @@ static void phase_scalar(duckdb_function_info info, duckdb_data_chunk input,
     }
     idx_t at = 0u;
     for (idx_t row = 0u; row < rows; row++) {
+        duckdb_vector fields_option[2] = {NULL, NULL};
+        if (options && !duckvep_builder_option_vectors(info, options, row, keys, kinds, 2, fields_option)) return;
+        duckdb_vector ps = fields_option[0] && phase_valid(fields_option[0], row) ? fields_option[0] : NULL;
+        duckdb_vector policies = fields_option[1] && phase_valid(fields_option[1], row) ? fields_option[1] : NULL;
+        if (ps) {
+            duckdb_logical_type type = duckdb_vector_get_column_type(ps);
+            if (duckdb_get_type_id(type) == DUCKDB_TYPE_SQLNULL) ps = NULL;
+            duckdb_destroy_logical_type(&type);
+        }
+        if (policies) {
+            duckdb_logical_type type = duckdb_vector_get_column_type(policies);
+            if (duckdb_get_type_id(type) == DUCKDB_TYPE_SQLNULL) policies = NULL;
+            duckdb_destroy_logical_type(&type);
+        }
+        int64_t phase_set = 0;
+        if (ps) {
+            duckdb_logical_type set_type = duckdb_vector_get_column_type(ps);
+            duckdb_type id = duckdb_get_type_id(set_type);
+            void *data = duckdb_vector_get_data(ps);
+            switch (id) {
+            case DUCKDB_TYPE_TINYINT: phase_set = ((int8_t *)data)[row]; break;
+            case DUCKDB_TYPE_SMALLINT: phase_set = ((int16_t *)data)[row]; break;
+            case DUCKDB_TYPE_INTEGER: phase_set = ((int32_t *)data)[row]; break;
+            case DUCKDB_TYPE_BIGINT: phase_set = ((int64_t *)data)[row]; break;
+            case DUCKDB_TYPE_UTINYINT: phase_set = ((uint8_t *)data)[row]; break;
+            case DUCKDB_TYPE_USMALLINT: phase_set = ((uint16_t *)data)[row]; break;
+            case DUCKDB_TYPE_UINTEGER: phase_set = ((uint32_t *)data)[row]; break;
+            case DUCKDB_TYPE_UBIGINT: {
+                uint64_t value = ((uint64_t *)data)[row];
+                if (value > INT64_MAX) {
+                    duckdb_scalar_function_set_error(info, "duckvep_phase_call: phase_set exceeds BIGINT range");
+                    duckdb_destroy_logical_type(&set_type);
+                    return;
+                }
+                phase_set = (int64_t)value;
+                break;
+            }
+            default: break;
+            }
+            duckdb_destroy_logical_type(&set_type);
+        }
+        duckdb_string_t *policy_names = policies ? duckdb_vector_get_data(policies) : NULL;
         duckvep_phase_policy_t policy = DUCKVEP_PHASE_STRICT;
-        if (policies && phase_valid(policies, row)) {
+        if (policies) {
             const char *name = duckdb_string_t_data(&policy_names[row]);
             uint32_t length = duckdb_string_t_length(policy_names[row]);
             if (length == 13u && !memcmp(name, "vep116_compat", 13u)) {
@@ -228,8 +261,8 @@ static void phase_scalar(duckdb_function_info info, duckdb_data_chunk input,
             ((uint16_t *)duckdb_vector_get_data(fields[2]))[at] = assignment.lane;
             if (!assignment.lane) duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[2]), at);
             ((uint16_t *)duckdb_vector_get_data(fields[3]))[at] = summary.ploidy;
-            if (assignment.scope == DUCKVEP_PHASE_SET && ps && phase_valid(ps, row)) {
-                ((int64_t *)duckdb_vector_get_data(fields[4]))[at] = sets[row];
+            if (assignment.scope == DUCKVEP_PHASE_SET && ps) {
+                ((int64_t *)duckdb_vector_get_data(fields[4]))[at] = phase_set;
             } else {
                 duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[4]), at);
             }
@@ -345,22 +378,17 @@ bool duckvep_register_phase_kernels(duckdb_connection connection) {
     duckdb_logical_type result = duckdb_create_list_type(record);
     duckdb_logical_type any = duckdb_create_logical_type(DUCKDB_TYPE_ANY);
     duckdb_scalar_function_set overloads = duckdb_create_scalar_function_set("duckvep_phase_call");
-    for (idx_t arity = 2; arity <= 4; arity++) {
-        idx_t alternatives = arity == 3 ? 2 : 1;
-        for (idx_t alternative = 0; alternative < alternatives; alternative++) {
+    for (idx_t arity = 2; arity <= 3; arity++) {
             duckdb_scalar_function function = duckdb_create_scalar_function();
             duckdb_scalar_function_set_name(function, "duckvep_phase_call");
             duckdb_scalar_function_add_parameter(function, any);
             duckdb_scalar_function_add_parameter(function, any);
-            if (arity >= 3) duckdb_scalar_function_add_parameter(function,
-                alternative ? varchar : bigint);
-            if (arity == 4) duckdb_scalar_function_add_parameter(function, varchar);
+            if (arity == 3) duckdb_scalar_function_add_parameter(function, any);
             duckdb_scalar_function_set_return_type(function, result);
             duckdb_scalar_function_set_special_handling(function);
             duckdb_scalar_function_set_function(function, phase_scalar);
             duckdb_add_scalar_function_to_set(overloads, function);
             duckdb_destroy_scalar_function(&function);
-        }
     }
     duckdb_state state = duckdb_register_scalar_function_set(connection, overloads);
     duckdb_destroy_scalar_function_set(&overloads);
@@ -368,8 +396,8 @@ bool duckvep_register_phase_kernels(duckdb_connection connection) {
     duckdb_destroy_logical_type(&result);
     duckdb_destroy_logical_type(&record);
     duckdb_destroy_logical_type(&varchar);
-    duckdb_destroy_logical_type(&bigint);
     duckdb_destroy_logical_type(&ushort);
+    duckdb_destroy_logical_type(&bigint);
     duckdb_destroy_logical_type(&integer);
     return state == DuckDBSuccess;
 }

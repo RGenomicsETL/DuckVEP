@@ -1,4 +1,5 @@
 #include "duckdb_extension.h"
+#include "duckvep_builder.h"
 DUCKDB_EXTENSION_EXTERN
 
 #include <math.h>
@@ -152,16 +153,22 @@ static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, du
         duckdb_vector_ensure_validity_writable(fields[i]);
     }
     bool *exact = duckdb_vector_get_data(args[2]);
-    duckdb_logical_type cap_type = argc == 4 ? duckdb_vector_get_column_type(args[3]) : NULL;
+    const char *const keys[] = {"max_allele_bases"};
+    const duckvep_option_kind kinds[] = {DUCKVEP_OPTION_NUMERIC};
     for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
+        duckdb_vector cap_vector = NULL;
+        if (argc == 4 && !duckvep_builder_option_vectors(info, args[3], row, keys, kinds, 1, &cap_vector)) break;
+        duckdb_logical_type cap_type = cap_vector ? duckdb_vector_get_column_type(cap_vector) : NULL;
         if (!valid(args[2], row)) {
             set_error(info, "duckvep_repeat_alleles: sequence_exact is required");
             break;
         }
         long double cap = 5000;
         bool cap_frac = false;
-        if (argc == 4 && (!numeric(args[3], cap_type, row, &cap, &cap_frac) ||
-            !isfinite(cap) || cap < 0 || cap > INT32_MAX || cap_frac)) {
+        bool cap_ok = !cap_vector || (numeric(cap_vector, cap_type, row, &cap, &cap_frac) &&
+            isfinite(cap) && cap >= 0 && cap <= INT32_MAX && !cap_frac);
+        if (cap_type) duckdb_destroy_logical_type(&cap_type);
+        if (!cap_ok) {
             set_error(info, "duckvep_repeat_alleles: max_allele_bases must be an integer from 0 through 2147483647");
             break;
         }
@@ -247,7 +254,6 @@ static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, du
         duckdb_vector_assign_string_element(fields[5], row, required[1] > required[0] ? "GAIN" :
             required[1] < required[0] ? "LOSS" : "NEUTRAL");
     }
-    if (cap_type) duckdb_destroy_logical_type(&cap_type);
     axis_destroy(&axes[0]); axis_destroy(&axes[1]);
 }
 
