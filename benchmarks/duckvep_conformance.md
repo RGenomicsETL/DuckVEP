@@ -95,7 +95,7 @@ the audited run.
 | 22803a40 | GRCh38 ClinVar coding             | final-coding               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 287836 | 287836/287836 |          0 |                      0 | 0.00%                                 |
 | 22803a40 | GRCh38 ClinVar cross-chromosome   | final-clinvar              | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 316397 | 316397/316397 |          0 |                      0 | 0.00%                                 |
 | 7dd90ce8 | GRCh37                            | final-grch37               | GRCh37         | homo_sapiens          | cache         | VEP 116.0 | 486464 | 486464/486464 |          0 |                      0 | 0.00%                                 |
-| 7dd90ce8 | P. falciparum                     | plasmodium-falciparum-63   | GCA000002765v3 | plasmodium_falciparum | cache         | VEP 116.0 |  40732 | 40732/40732   |          0 |                      0 | 0.01%                                 |
+| e9a7d6b  | P. falciparum model-derived seed11663 | plasmodium-falciparum-63 | GCA000002765v3 | plasmodium_falciparum | cache | VEP 116.0 | 32131 | 32131/32131 | 0 | 0 | 0.01% |
 | 360619ed | GRCh38 paired BND                 | grch38_breakend_multichrom | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  91428 | 91428/91428   |          0 |                      0 | 0.00%                                 |
 | 96b4cd45 | GRCh38 GIAB + core regulation     | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  14955 | 14955/14955   |          0 |                      0 | 0.02%                                 |
 | 96b4cd45 | GRCh38 exact SV + core regulation | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 120224 | 120224/120224 |          0 |                      0 | 0.00%                                 |
@@ -218,21 +218,20 @@ candidate traversal.
 |:---------|:----------------------|:--------|:---------------|:--------|:------------|:--------------|:----------|:----------------------|:--------------|:-------------------|:---------------|:-----------------|:-------------|
 | 96b4cd45 | homo_sapiens          | 116     | GRCh38         | 194     | 644,427     | 369,631       | 5,068,416 | 2,806                 | 389           | 380,818            | 1,002,762      | 1:369618;2:13    | 296bc9063356 |
 | 8498b92a | homo_sapiens          | 116     | GRCh37         | 84      | 195,379     | 94,610        | 1,186,433 | 3,788                 | 129           | 0                  | 0              | 1:94597;2:13     | 25459e62e50d |
-| 8498b92a | plasmodium_falciparum | 63/116  | GCA000002765v3 | 16      | 5,791       | 5,389         | 15,097    | 0                     | 4             | 0                  | 0              | 1:5356;4:3;11:30 | c011cdd4deab |
+| 4faca0dd | plasmodium_falciparum | 63/116  | GCA000002765v3 | 16      | 5,791       | 5,389         | 15,097    | 0                     | 4             | 0                  | 0              | 1:5356;4:3;11:30 | d9c705682375 |
 
 These are complete model-build receipts, not counts inferred from a
 differential. The ledger retains the full source-manifest, reference,
 and model SHA-256 values, the exact VEP transcript filter, every count
-above, CDS/flank base totals, and the external artifact name. The Plasmodium row records Ensembl Genomes release-63 source data paired
-with VEP/core-116 executable libraries. Its July hash `c011cdd4deab…`
-cannot be reproduced from the public `plasmodium_falciparum_core_63_116_2`
-core (the only release-63 core available at mysql-eg-publicsql.ebi.ac.uk:4157).
-A rebuild with the pinned FASTA reproduces every count and the codon-table
-distribution, but its July-definition hash is `eae6106d…`; the current
+above, CDS/flank base totals, and the external artifact name. The
+Plasmodium row uses Ensembl Genomes release-63 source data, the
+GCA000002765v3 FASTA and VEP/core-116 executable libraries. The current
 receipt definition gives `d9c7056823755f83d5b189b9e59fdd1129ebe3e342095453e0d2208f3081d81b`.
-The July model and input VCF are not retained. The July differential does
-not establish equivalence for this rebuild; a current row requires a new
-transcript-pair differential on a traceable input corpus.
+The July row in the ledger has hash `c011cdd4deab…`, which cannot be
+reproduced from the public `plasmodium_falciparum_core_63_116_2` core at
+mysql-eg-publicsql.ebi.ac.uk:4157. The July model and input VCF are not
+retained; its 40,732-pair differential is historical, not the evidence for
+the current model.
 
 ### Protist Docker oracle environment
 
@@ -242,13 +241,21 @@ transcript-pair differential on a traceable input corpus.
 
 Cache URL: `https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-63/protists/variation/indexed_vep_cache/plasmodium_falciparum_vep_63_GCA000002765v3.tar.gz`.
 `scripts/run_plasmodium_vep116_docker.sh` mounts the extracted cache and
-indexed FASTA read-only and disables networking. A one-variant smoke run
-(`Pf3D7_01_v3:30000:C>A`) returned `PF3D7_0100100.1` as a missense variant;
-this is an oracle check, not a DuckVEP differential. The July input VCF
-for `plasmodium-falciparum-vep63-seed11663` is not declared by
-`scripts/stage_duckvep_conformance_corpora.sh` or
-`pipelines/duckvep/campaigns.tsv`, and no copy survives in the repository.
-The 40,732-pair July result remains historical evidence for the July model.
+indexed FASTA read-only and disables networking. The seed-11663
+model-derived VCF has 5,366 reference-checked variants, SHA-256 `0cf5cd410b76fbb72318ffdee4862ffd2150ee0a20cb2a8ccbe7ac6ecd0a24a2`.
+The oracle JSON has SHA-256 `69e0bb4a7a8eca7da9f871fe7561a4acaeea80d265ffc6ebc54f8ff560634c3a`.
+The full-outer-join differential has 32,131 exact transcript pairs, no
+unresolved pairs and no discordant consequence sets. See
+`benchmarks/data/plasmodium_seed11663_corpus.md` for the generator and
+`benchmarks/data/plasmodium_seed11663_differential.md` for the code-table,
+contig, biotype, strand, allele-shape, SO-term and codon-witness breakdowns.
+Table 4 TGG→TGA witnesses are synonymous (W→W), whereas table 1 witnesses
+are stop gained (W→stop). Table 11 ATG→GTG witnesses are classified
+start lost by both tools, so they do not establish alternative-start retention.
+This run compares transcript consequence sets, not impact classes or HGVS.
+The registry stage entry point delegates to `r/duckhtsbench`, which is not
+present in this checkout; the model-derived generator and full-outer-join
+comparator are reproducible directly from the recorded commands.
 
 ## History
 
@@ -334,6 +341,7 @@ The 40,732-pair July result remains historical evidence for the July model.
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_16180339                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_27182818                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_31415927                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-09-28 | e9a7d6b         | plasmodium_model_seed11663                                | plasmodium-falciparum-63   |   32131 |       32131 |          0 |      32131 |                   0 | 100.00%    | 0.01%                                 |
 
 ## Randomized executable-VEP state exploration
 
@@ -1304,7 +1312,7 @@ carry several terms.
 | GRCh38 ClinVar coding             |             27 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 ClinVar cross-chromosome   |             28 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh37                            |             26 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
-| P. falciparum                     |             20 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
+| P. falciparum model-derived seed11663 |             21 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 paired BND                 |             14 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 GIAB + core regulation     |             15 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 exact SV + core regulation |             27 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
@@ -1334,7 +1342,6 @@ counted once within each corpus.
 | GRCh38 dbSNP                      | HIGH     |    118 |         118 |          0 |        118 |                   0 | 100.00%    | 3.08%                                 |
 | GRCh38 GIAB                       | HIGH     |      4 |           4 |          0 |          4 |                   0 | 100.00%    | 60.24%                                |
 | GRCh37                            | HIGH     |  46645 |       46645 |          0 |      46645 |                   0 | 100.00%    | 0.01%                                 |
-| P. falciparum                     | HIGH     |   4309 |        4309 |          0 |       4309 |                   0 | 100.00%    | 0.09%                                 |
 | GRCh38 GIAB + core regulation     | HIGH     |      3 |           3 |          0 |          3 |                   0 | 100.00%    | 70.76%                                |
 | GRCh38 exact SV + core regulation | HIGH     |  40135 |       40135 |          0 |      40135 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 ClinVar coding             | LOW      |   5952 |        5952 |          0 |       5952 |                   0 | 100.00%    | 0.06%                                 |
@@ -1342,7 +1349,6 @@ counted once within each corpus.
 | GRCh38 dbSNP                      | LOW      |    349 |         349 |          0 |        349 |                   0 | 100.00%    | 1.05%                                 |
 | GRCh38 GIAB                       | LOW      |    260 |         260 |          0 |        260 |                   0 | 100.00%    | 1.41%                                 |
 | GRCh37                            | LOW      |  23354 |       23354 |          0 |      23354 |                   0 | 100.00%    | 0.02%                                 |
-| P. falciparum                     | LOW      |    210 |         210 |          0 |        210 |                   0 | 100.00%    | 1.74%                                 |
 | GRCh38 GIAB + core regulation     | LOW      |     98 |          98 |          0 |         98 |                   0 | 100.00%    | 3.69%                                 |
 | GRCh38 exact SV + core regulation | LOW      |    821 |         821 |          0 |        821 |                   0 | 100.00%    | 0.45%                                 |
 | GRCh38 ClinVar coding             | MODERATE |  59108 |       59108 |          0 |      59108 |                   0 | 100.00%    | 0.01%                                 |
@@ -1350,7 +1356,6 @@ counted once within each corpus.
 | GRCh38 dbSNP                      | MODERATE |    125 |         125 |          0 |        125 |                   0 | 100.00%    | 2.91%                                 |
 | GRCh38 GIAB                       | MODERATE |     31 |          31 |          0 |         31 |                   0 | 100.00%    | 11.22%                                |
 | GRCh37                            | MODERATE |  23319 |       23319 |          0 |      23319 |                   0 | 100.00%    | 0.02%                                 |
-| P. falciparum                     | MODERATE |   1937 |        1937 |          0 |       1937 |                   0 | 100.00%    | 0.19%                                 |
 | GRCh38 GIAB + core regulation     | MODERATE |     41 |          41 |          0 |         41 |                   0 | 100.00%    | 8.60%                                 |
 | GRCh38 exact SV + core regulation | MODERATE |    766 |         766 |          0 |        766 |                   0 | 100.00%    | 0.48%                                 |
 | GRCh38 paired BND                 | MODIFIER |  21774 |       21774 |          0 |      21774 |                   0 | 100.00%    | 0.02%                                 |
@@ -1359,7 +1364,6 @@ counted once within each corpus.
 | GRCh38 dbSNP                      | MODIFIER |  73028 |       73028 |          0 |      73028 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 GIAB                       | MODIFIER |  54610 |       54610 |          0 |      54610 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh37                            | MODIFIER | 393146 |      393146 |          0 |     393146 |                   0 | 100.00%    | 0.00%                                 |
-| P. falciparum                     | MODIFIER |  34276 |       34276 |          0 |      34276 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 GIAB + core regulation     | MODIFIER |  14813 |       14813 |          0 |      14813 |                   0 | 100.00%    | 0.02%                                 |
 | GRCh38 exact SV + core regulation | MODIFIER |  78502 |       78502 |          0 |      78502 |                   0 | 100.00%    | 0.00%                                 |
 
