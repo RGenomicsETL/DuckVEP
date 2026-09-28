@@ -19,7 +19,7 @@ local({
   expect_identical(repeat_value$status, "ok")
   cases <- c("[]::STRUCT(unit VARCHAR,count DOUBLE)[]", "[{unit:'CAG',count:0}]",
     "NULL::STRUCT(unit VARCHAR,count DOUBLE)[]", "[NULL]::STRUCT(unit VARCHAR,count DOUBLE)[]",
-    "[{unit:NULL,count:1}]", "[{unit:'CAG',count:NULL}]", "[{unit:'CAG',count:1.5}]",
+    "[{unit:NULL::VARCHAR,count:1}]", "[{unit:'CAG',count:NULL}]", "[{unit:'CAG',count:1.5}]",
     "[{unit:'A',count:1.000000000000000001::DECIMAL(38,18)}]")
   wanted <- c("ok", "ok", rep("incomplete_input", 4L), rep("nonintegral_count", 2L))
   for (i in seq_along(cases)) {
@@ -325,11 +325,11 @@ local({
   ensembl_receipt <- dbGetQuery(
     con,
     paste(
-      "SELECT * FROM duckvep_model_receipt(",
+      "SELECT * FROM query(duckvep_model_receipt_sql(",
       "'duckvep_r_ensembl_regions', 'duckvep_r_ensembl_transcripts',",
       "'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),",
       "'all current transcripts on FASTA-covered assembly regions',",
-      "regulation_features_table := 'duckvep_r_ensembl_regulation')"
+      "{regulation_features_table: 'duckvep_r_ensembl_regulation'}))"
     )
   )
   expect_equal(ensembl_receipt$region_count, 1)
