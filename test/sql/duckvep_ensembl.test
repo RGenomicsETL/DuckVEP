@@ -483,6 +483,16 @@ BEGIN TRANSACTION;
 statement ok
 INSERT INTO receipt_temp_transcripts SELECT * FROM duckvep_prepared_transcripts;
 
+query I
+SELECT transcript_count FROM query(duckvep_model_receipt_sql(
+  'receipt_temp_regions', 'receipt_temp_transcripts',
+  'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),
+  'all current transcripts on FASTA-covered assembly regions',
+  {regulation_features_table: 'duckvep_prepared_regulation'}
+));
+----
+3
+
 statement ok
 DELETE FROM receipt_temp_transcripts WHERE transcript_index = 2;
 

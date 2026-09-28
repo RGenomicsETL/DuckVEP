@@ -1,0 +1,36 @@
+# name: test/sql/duckvep_checkpoint_load.test
+# description: Loading leaves no persistent DuckVEP catalog objects
+# group: [duckvep]
+
+require duckvep
+
+statement ok
+ATTACH '__TEST_DIR__/duckvep_checkpoint.duckdb' AS gate;
+
+statement ok
+CREATE TABLE gate.caller_data AS SELECT 42 AS value;
+
+statement ok
+CHECKPOINT gate;
+
+statement ok
+DETACH gate;
+
+load __TEST_DIR__/duckvep_checkpoint.duckdb readonly
+
+query I
+SELECT value FROM caller_data;
+----
+42
+
+query I
+SELECT count(*) FROM duckdb_functions()
+WHERE database_name = 'main' AND function_name LIKE 'duckvep_%';
+----
+0
+
+query I
+SELECT count(*) FROM information_schema.tables
+WHERE table_schema = 'main' AND table_name LIKE 'duckvep_%';
+----
+0

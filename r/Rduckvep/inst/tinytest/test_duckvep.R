@@ -361,6 +361,21 @@ local({
     "all current transcripts on FASTA-covered assembly regions"
   )
 
+  dbExecute(con, "CREATE TEMP TABLE receipt_caller_rows AS SELECT * FROM duckvep_r_ensembl_transcripts")
+  receipt_sql <- rduckvep_model_receipt_sql(
+    con, "duckvep_r_ensembl_regions", "receipt_caller_rows", "Ensembl", "116",
+    "GRCh38", paste(rep("a", 64), collapse = ""),
+    paste(rep("b", 64), collapse = ""),
+    "all current transcripts on FASTA-covered assembly regions"
+  )
+  dbExecute(con, "BEGIN TRANSACTION")
+  dbExecute(con, "DELETE FROM receipt_caller_rows WHERE transcript_index = 1")
+  expect_equal(dbGetQuery(con, receipt_sql)$transcript_count, 1)
+  dbExecute(con, paste("INSERT INTO receipt_caller_rows SELECT * FROM",
+                       "duckvep_r_ensembl_transcripts WHERE transcript_index = 1"))
+  expect_equal(dbGetQuery(con, receipt_sql)$transcript_count, 2)
+  dbExecute(con, "ROLLBACK")
+
   dbExecute(
     con,
     paste(

@@ -1,0 +1,39 @@
+# name: test/sql/duckvep_readonly_load.test
+# description: Load the extension with a read-only main database
+# group: [duckvep]
+
+statement ok
+ATTACH '__TEST_DIR__/duckvep_readonly.duckdb' AS gate;
+
+statement ok
+CREATE TABLE gate.caller_data AS SELECT 42 AS value;
+
+statement ok
+CREATE MACRO gate.duckvep_annotate(x) AS x || ':caller';
+
+statement ok
+DETACH gate;
+
+load __TEST_DIR__/duckvep_readonly.duckdb readonly
+
+require duckvep
+
+query T
+SELECT duckvep_annotate('kept');
+----
+kept:caller
+
+query I
+SELECT value FROM caller_data;
+----
+42
+
+query I
+SELECT contains(duckvep_annotate_sql('caller_data', 'model'), 'caller_data');
+----
+1
+
+statement error
+CREATE TABLE cannot_write AS SELECT 1;
+----
+read-only
