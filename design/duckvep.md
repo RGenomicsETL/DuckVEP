@@ -20,7 +20,7 @@ edge projections, not the internal representation. Prepared-event and CDS-edit f
 the shared consequence/HGVS authorities; an HGVS-facing transcript-edit carrier adds
 VEP's clipped transcript-slice state without changing those semantic edits. Allocation-free
 `c.`/`n.`/`p.` fact/render kernels, a worker-owned indexed-FASTA provider, and the
-`duckvep_annotate(..., hgvs := true)` relation path are implemented for independent literal
+`query(duckvep_annotate_sql(..., struct_pack(hgvs := true)))` relation path are implemented for independent literal
 small variants. Strict executable-VEP evidence covers the fixed position-one/right-anchor cases
 and 56,998 chromosome-21 ClinVar transcript pairs with zero HGVSc/HGVSp differences.
 Genomic HGVS, transcript models whose sequence differs from the genomic exon sequence,
@@ -213,8 +213,9 @@ reference FASTA ─────────┘                 │
 This separation is deliberate. DuckDB performs the large joins, sequence assembly, and
 provenance work once. Annotation workers reuse compact immutable arrays and do not carry a
 Perl object graph, stable-ID strings, or source-table metadata through the hot loop.
-The four preparation/receipt functions are DuckDB table macros registered through the stable C API;
-the C registration file does not iterate transcript rows or implement a second importer.
+Preparation and receipt SQL is emitted by stable-C-API scalar builders and evaluated through
+`query()` in the caller's connection. The C registration file does not iterate transcript
+rows or implement a second importer.
 
 ### Inputs
 
@@ -229,7 +230,7 @@ core relations by name from the supplied schema:
 
 `duckvep_ensembl_regulation_features(...)` reads the release-matched funcgen
 `regulatory_feature`, `feature_type`, and `motif_feature` relations. Funcgen uses core
-sequence-region IDs; the macro joins them to the already prepared region relation, rejects
+sequence-region IDs; the generated SQL joins them to the already prepared region relation, rejects
 missing feature types or invalid coordinates, and assigns one dense ordinal space across
 RegulatoryFeature and MotifFeature rows. It also reproduces VEP 116's source selection by
 discarding `epigenetically_modified_region` (EMAR) RegulatoryFeature rows before ordinals
@@ -385,7 +386,7 @@ putting that selection in the receipt and validation evidence.
 | `duckvep_ensembl_regulation_features` | `funcgen_schema.regulatory_feature`, `feature_type`, and `motif_feature`, plus the canonical region relation |
 
 The extension validates the columns it reads and rejects inconsistent values; the exact
-source-column projections are executable in the builder macros and acceptance fixtures.
+source-column projections are executable in the SQL builders and acceptance fixtures.
 A future release adapter may add source handling, but it must still produce the same
 canonical region, transcript, and regulation relations. The loader accepts an 11-column
 CDS-only projection or a 13-column complete-flank projection. These express different
@@ -583,7 +584,7 @@ matching primary-assembly FASTA. The producer verifies each dump against its Ens
 manifest, verifies release 116, species `homo_sapiens`, species ID 1, and assembly GRCh38
 from the imported `meta` and `coord_system` relations, and preserves the required source
 table names under `ensembl_core` and `ensembl_funcgen`. It then invokes the same public
-DuckVEP preparation and receipt macros described above. The artifact records the source
+DuckVEP preparation and receipt SQL builders described above. The artifact records the source
 manifest, reference-sequence, and model hashes without a timestamp; a reused model must
 reproduce its stored receipt before provider exports are allowed.
 
@@ -636,11 +637,11 @@ coverage is tracked at https://github.com/RGenomicsETL/duckhts/issues/119.
 
 ## Independent-variant execution
 
-`duckvep_annotate(events_table, model_name, hgvs := false, upstream_distance := 5000,
-downstream_distance := 5000)` is the public relation surface. `events_table` names a narrow,
+`query(duckvep_annotate_sql(events_table, model_name, struct_pack(hgvs := false, upstream_distance := 5000,
+downstream_distance := 5000)))` is the public relation surface. `events_table` names a narrow,
 globally coordinate-ordered relation with one row per ALT allele: event identity, model-local
 region ordinal, one-based position, literal REF/ALT, nullable single-locus structural span
-and type/copy direction, and nullable mate coordinates. The macro validates that geometry,
+and type/copy direction, and nullable mate coordinates. The relation validates that geometry,
 derives small, exact structural, or paired-breakend family, and dispatches to private native
 lanes with one fixed compact output schema. It never hides an `ORDER BY`; invalid input order
 is rejected by the native sorted-stream checks. Callers retain genotype, confidence interval,
@@ -1305,7 +1306,7 @@ The implemented internal layer makes that ownership explicit:
   unchanged reference spans plus the edit payload rather than materializing the full
   alternate CDS.
 
-`duckvep_annotate(..., hgvs := true)` exposes those mechanics without changing the public
+`query(duckvep_annotate_sql(..., struct_pack(hgvs := true)))` exposes those mechanics without changing the public
 schema: the first 16 fields are the compact consequence row, followed by nullable
 transcript/protein suffixes, transcript-direction shift, and separate structured
 status/reason fields. Structural and breakend rows currently leave those HGVS fields NULL.

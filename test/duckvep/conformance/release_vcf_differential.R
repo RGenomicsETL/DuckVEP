@@ -381,11 +381,11 @@ annotation_time <- system.time({
               a.consequence,
               a.duckvep_status,
               a.duckvep_reason
-         FROM duckvep_annotate(
-                'release_event_input', {sql_q(model_name)},
+         FROM query(duckvep_annotate_sql(
+                'release_event_input', {sql_q(model_name)}, struct_pack(
                 upstream_distance := 0, downstream_distance := 0,
                 rich := TRUE
-              ) AS a
+              ))) AS a
          LEFT JOIN model_transcripts AS t USING (transcript_index)"
     )
   )

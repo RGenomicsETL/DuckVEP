@@ -192,8 +192,8 @@ run <- function() {
     'position,reference,alternate,NULL::UBIGINT end_position,NULL::VARCHAR structural_type,',
     'NULL::VARCHAR copy_change,NULL::UINTEGER mate_seq_region,NULL::UBIGINT mate_position',
     'FROM events ORDER BY seq_region,position,event_index'))
-  dbExecute(con,paste("CREATE TABLE independent AS SELECT * FROM duckvep_annotate(",
-    "'independent_events','anchor',hgvs:=true,upstream_distance:=0,downstream_distance:=0)"))
+  dbExecute(con,paste("CREATE TABLE independent AS SELECT * FROM query(duckvep_annotate_sql(",
+    "'independent_events','anchor', struct_pack(hgvs:=true,upstream_distance:=0,downstream_distance:=0)))"))
   independent <- dbGetQuery(con,'SELECT event_index,protein_hgvs FROM independent ORDER BY event_index')
   ids <- order(records$event_index)
   stopifnot(nrow(independent)==nrow(records),

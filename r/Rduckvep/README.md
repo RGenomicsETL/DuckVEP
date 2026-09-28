@@ -7,7 +7,7 @@ The package bundles the DuckVEP extension sources and builds them for the instal
 - `rduckvep_connect()` and `rduckvep_load()`: a DuckDB connection with the extension loaded;
 - `rduckvep_haplotypes()`: whole-haplotype consequences from phased calls.
 
-Everything else is SQL: `duckvep_model_load()`, `duckvep_annotate()` and the other `duckvep_*` functions are called through DBI on that connection. See the [project page](https://rgenomicsetl.github.io/DuckVEP/) for the evidence, the documented differences from VEP and worked examples.
+Everything else is SQL: `duckvep_model_load()`, `query(duckvep_annotate_sql(...))` and the other `duckvep_*` functions are called through DBI on that connection. See the [project page](https://rgenomicsetl.github.io/DuckVEP/) for the evidence, the documented differences from VEP and worked examples.
 
 ```r
 con <- Rduckvep::rduckvep_connect()

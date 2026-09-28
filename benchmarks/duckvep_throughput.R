@@ -993,13 +993,13 @@ annotation_cte <- function(n, output_mode) {
            a.event_index AS input_variant_index,
            a.duckvep_event_kind,
            struct_pack({struct_fields}) AS annotation
-         FROM duckvep_annotate(
-           {sql_q(event_table)}, {sql_q(model_name)},
+         FROM query(duckvep_annotate_sql(
+           {sql_q(event_table)}, {sql_q(model_name)}, struct_pack(
            hgvs := {if (output_mode %in% c('hgvs', 'rich_hgvs')) 'TRUE' else 'FALSE'},
            upstream_distance := {distance_sql}::UBIGINT,
            downstream_distance := {distance_sql}::UBIGINT,
            rich := {if (output_mode %in% c('rich', 'rich_hgvs')) 'TRUE' else 'FALSE'}
-         ) AS a
+         ))) AS a
        )"
     ))
   }

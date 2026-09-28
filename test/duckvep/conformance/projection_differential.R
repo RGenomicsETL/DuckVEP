@@ -191,7 +191,7 @@ main <- function() {
           FROM duckvep_so_terms() s
           WHERE (a.consequence_mask & s.consequence_mask) != 0), '') consequence_terms,
         a.duckvep_status status, a.duckvep_reason reason
-        FROM duckvep_annotate('projection_events', 'projection', rich := true) a
+        FROM query(duckvep_annotate_sql('projection_events', 'projection', struct_pack(rich := true))) a
         JOIN projection_events e USING(event_index)
         LEFT JOIN duckvep_transcript_names n USING(transcript_index)")
       so_mismatch <- duckvep_projection_compare(actual_so, expected_so)

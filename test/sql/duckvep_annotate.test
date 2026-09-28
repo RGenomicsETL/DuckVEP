@@ -4,6 +4,24 @@
 
 require duckvep
 
+query I
+SELECT count(*) FROM duckdb_functions()
+WHERE function_type = 'macro' AND
+  (function_name LIKE 'duckvep_%' OR function_name LIKE '__duckvep_projection_%');
+----
+0
+
+query I
+SELECT contains(duckvep_annotate_sql('ab"cd', 'm''n'), '"ab""cd"') AND
+       contains(duckvep_annotate_sql('ab"cd', 'm''n'), '''m''''n''');
+----
+1
+
+statement error
+SELECT duckvep_annotate_sql('events', 'model', struct_pack(hgvs := 1));
+----
+expected BOOLEAN for option 'hgvs'
+
 query T
 SELECT typeof(duckvep_repeat_alleles(
  [{unit:'CAG',count:2}],[{unit:'CAG',count:3}],true));
@@ -1013,10 +1031,10 @@ SELECT * FROM (VALUES
 query ITII
 SELECT event_index, duckvep_event_kind, consequence_mask,
        transcript_hgvs IS NULL
-FROM duckvep_annotate(
-  'duckvep_mixed_events', 'structural',
+FROM query(duckvep_annotate_sql(
+  'duckvep_mixed_events', 'structural', struct_pack(
   upstream_distance := 0, downstream_distance := 0
-)
+)))
 ORDER BY event_index;
 ----
 1	structural_variant	67108864	1
@@ -1055,10 +1073,10 @@ SELECT * FROM (VALUES
 
 query IT
 SELECT event_index, duckvep_event_kind
-FROM duckvep_annotate(
-  'duckvep_gvcf_events', 'structural',
+FROM query(duckvep_annotate_sql(
+  'duckvep_gvcf_events', 'structural', struct_pack(
   upstream_distance := 0, downstream_distance := 0
-)
+)))
 ORDER BY event_index;
 ----
 1	small_variant
@@ -1070,11 +1088,11 @@ ORDER BY event_index;
 query ITTTI
 SELECT event_index, duckvep_event_kind, consequence, duckvep_status,
        transcript_hgvs IS NULL
-FROM duckvep_annotate(
-  'duckvep_gvcf_events', 'structural',
+FROM query(duckvep_annotate_sql(
+  'duckvep_gvcf_events', 'structural', struct_pack(
   hgvs := TRUE, upstream_distance := 0, downstream_distance := 0,
   rich := TRUE
-)
+)))
 ORDER BY event_index;
 ----
 1	small_variant	coding_sequence_variant	unresolved	1
@@ -1108,10 +1126,10 @@ ORDER BY regulation_feature_index;
 query ITII
 SELECT event_index, duckvep_event_kind, consequence_mask,
        transcript_hgvs IS NULL
-FROM duckvep_annotate(
-  'duckvep_mixed_events', 'structural', hgvs := NULL,
+FROM query(duckvep_annotate_sql(
+  'duckvep_mixed_events', 'structural', struct_pack(hgvs := NULL,
   upstream_distance := 0, downstream_distance := 0
-)
+)))
 ORDER BY event_index;
 ----
 1	structural_variant	67108864	1
@@ -1125,10 +1143,10 @@ query ITTTTII
 SELECT event_index, consequence, impact, duckvep_status,
        coalesce(duckvep_reason, '-'), protein_position IS NULL,
        nmd_prediction IS NULL
-FROM duckvep_annotate(
-  'duckvep_mixed_events', 'structural',
+FROM query(duckvep_annotate_sql(
+  'duckvep_mixed_events', 'structural', struct_pack(
   upstream_distance := 0, downstream_distance := 0, rich := TRUE
-)
+)))
 ORDER BY event_index;
 ----
 1	transcript_amplification	HIGH	supported	-	1	1
@@ -1140,17 +1158,17 @@ query I
 WITH compact AS (
   SELECT event_index, consequence_mask, region_mask, impact_code,
          status_code, reason_code, overlap_object_code
-  FROM duckvep_annotate(
-    'duckvep_mixed_events', 'structural',
+  FROM query(duckvep_annotate_sql(
+    'duckvep_mixed_events', 'structural', struct_pack(
     upstream_distance := 0, downstream_distance := 0
-  )
+  )))
 ), rich AS (
   SELECT event_index, consequence_mask, region_mask, impact_code,
          status_code, reason_code, overlap_object_code
-  FROM duckvep_annotate(
-    'duckvep_mixed_events', 'structural',
+  FROM query(duckvep_annotate_sql(
+    'duckvep_mixed_events', 'structural', struct_pack(
     upstream_distance := 0, downstream_distance := 0, rich := TRUE
-  )
+  )))
 )
 SELECT count(*) = 3 AND bool_and(
   compact.consequence_mask = rich.consequence_mask AND
@@ -1167,10 +1185,10 @@ FROM compact JOIN rich USING (event_index);
 # NULL follows the compact default just as the HGVS selector does.
 query III
 SELECT event_index, consequence IS NULL, duckvep_status IS NULL
-FROM duckvep_annotate(
-  'duckvep_mixed_events', 'structural',
+FROM query(duckvep_annotate_sql(
+  'duckvep_mixed_events', 'structural', struct_pack(
   upstream_distance := 0, downstream_distance := 0, rich := NULL
-)
+)))
 ORDER BY event_index;
 ----
 1	1	1
@@ -1188,7 +1206,7 @@ SELECT * FROM (VALUES
     structural_type, copy_change, mate_seq_region, mate_position);
 
 statement error
-SELECT * FROM duckvep_annotate('duckvep_contradictory_event', 'structural');
+SELECT * FROM query(duckvep_annotate_sql('duckvep_contradictory_event', 'structural'));
 ----
 symbolic alternate and structural_type disagree
 
@@ -1203,7 +1221,7 @@ SELECT * FROM (VALUES
     structural_type, copy_change, mate_seq_region, mate_position);
 
 statement error
-SELECT * FROM duckvep_annotate('duckvep_invalid_event', 'structural');
+SELECT * FROM query(duckvep_annotate_sql('duckvep_invalid_event', 'structural'));
 ----
 a structural event requires end_position and a supported structural_type
 

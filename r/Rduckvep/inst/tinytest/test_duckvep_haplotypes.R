@@ -207,8 +207,8 @@ local({
     "CASE WHEN i<3 THEN 'A' ELSE 'T' END AS alternate,NULL::UBIGINT end_position,",
     "NULL::VARCHAR structural_type,NULL::VARCHAR copy_change,NULL::UINTEGER mate_seq_region,",
     "NULL::UBIGINT mate_position FROM range(6) t(i)"))
-  expected <- dbGetQuery(con, paste("SELECT event_index,protein_hgvs FROM duckvep_annotate(",
-    "'phase_events','phase',hgvs:=true,upstream_distance:=0,downstream_distance:=0) ORDER BY event_index"))
+  expected <- dbGetQuery(con, paste("SELECT event_index,protein_hgvs FROM query(duckvep_annotate_sql(",
+    "'phase_events','phase', struct_pack(hgvs:=true,upstream_distance:=0,downstream_distance:=0))) ORDER BY event_index"))
   expect_equal(nrow(expected), 6L)
   expect_true(any(!is.na(expected$protein_hgvs)))
   for (threads in c(1L, 4L)) for (mode in c("alt_events", "source_records")) {
@@ -329,8 +329,8 @@ local({
       "seq_region,position,reference,alternate,NULL::UBIGINT end_position,",
       "NULL::VARCHAR structural_type,NULL::VARCHAR copy_change,NULL::UINTEGER mate_seq_region,",
       "NULL::UBIGINT mate_position FROM (", query, ")"))
-    dbGetQuery(con, paste("SELECT * FROM duckvep_annotate('repeat_events','repeat',",
-      "hgvs:=true,upstream_distance:=0,downstream_distance:=0) ORDER BY event_index"))
+    dbGetQuery(con, paste("SELECT * FROM query(duckvep_annotate_sql('repeat_events','repeat',",
+      "struct_pack(hgvs:=true,upstream_distance:=0,downstream_distance:=0))) ORDER BY event_index"))
   })
   expect_equal(nrow(annotations$prepared), 2L)
   expect_identical(annotations$prepared, annotations$literal)
@@ -967,8 +967,8 @@ local({
   n_codon_independent <- dbGetQuery(con, paste("SELECT event_index,",
     "(SELECT string_agg(t.consequence,'&' ORDER BY t.consequence) FROM duckvep_so_terms() t",
     "WHERE (a.consequence_mask & t.consequence_mask)<>0) consequences,protein_hgvs",
-    "FROM duckvep_annotate('n_codon_events','n_codon_witnesses',hgvs:=true,",
-    "upstream_distance:=0,downstream_distance:=0) a ORDER BY event_index"))
+    "FROM query(duckvep_annotate_sql('n_codon_events','n_codon_witnesses', struct_pack(hgvs:=true,",
+    "upstream_distance:=0,downstream_distance:=0))) a ORDER BY event_index"))
   expect_equal(n_codon_independent$event_index, n_codon_source$i)
   expect_identical(n_codon_independent$consequences, n_codon_expected_so)
   expect_identical(n_codon_independent$protein_hgvs, n_codon_expected_independent)
@@ -1027,8 +1027,8 @@ local({
   independent <- dbGetQuery(con, paste("SELECT event_index,",
     "(SELECT string_agg(t.consequence,'&' ORDER BY t.consequence) FROM duckvep_so_terms() t",
     "WHERE (a.consequence_mask & t.consequence_mask)<>0) consequences,protein_hgvs",
-    "FROM duckvep_annotate('n_indel_events','n_indel_witnesses',hgvs:=true,",
-    "upstream_distance:=0,downstream_distance:=0) a ORDER BY event_index"))
+    "FROM query(duckvep_annotate_sql('n_indel_events','n_indel_witnesses', struct_pack(hgvs:=true,",
+    "upstream_distance:=0,downstream_distance:=0))) a ORDER BY event_index"))
   expect_equal(independent$event_index, n_indel_source$i)
   expect_identical(independent$consequences, n_indel_expected_so)
   expect_identical(independent$protein_hgvs, n_indel_expected_hgvs)

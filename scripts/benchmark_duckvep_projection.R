@@ -43,7 +43,7 @@ benchmark_duckvep_projection <- function(root, extension, output, extension_rece
         SELECT e.* REPLACE((event_index + %d*i)::UBIGINT AS event_index)
         FROM projection_events e, range(%d) r(i) ORDER BY position, event_index", original, copies))
       DBI::dbExecute(con, "CREATE OR REPLACE TABLE projection_annotations AS
-        SELECT * FROM duckvep_annotate('projection_events', 'projection')")
+        SELECT * FROM query(duckvep_annotate_sql('projection_events', 'projection'))")
       expanded <- DBI::dbGetQuery(con, "SELECT count(*) n FROM projection_annotations")$n
       materialize <- "CREATE OR REPLACE TEMP TABLE measured AS SELECT *
         FROM query(duckvep_transcript_projection_sql('projection_events',

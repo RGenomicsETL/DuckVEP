@@ -630,8 +630,8 @@ local({
       "SELECT a.event_index, a.transcript_index,",
       "string_agg(t.consequence, '&' ORDER BY t.severity_rank) consequence,",
       "a.transcript_hgvs, a.protein_hgvs",
-      "FROM duckvep_annotate('duckvep_r_public_events', 'r-hgvs',",
-      "hgvs := true, upstream_distance := 0, downstream_distance := 0) a",
+      "FROM query(duckvep_annotate_sql('duckvep_r_public_events', 'r-hgvs',",
+      "struct_pack(hgvs := true, upstream_distance := 0, downstream_distance := 0))) a",
       "JOIN duckvep_so_terms() t",
       "ON (a.consequence_mask & t.consequence_mask) <> 0",
       "GROUP BY ALL ORDER BY a.event_index, a.transcript_index"
@@ -652,9 +652,9 @@ local({
       "SELECT a.event_index, a.transcript_index, a.consequence, a.impact,",
       "a.protein_position, a.nmd_prediction, a.duckvep_status,",
       "a.transcript_hgvs, a.protein_hgvs",
-      "FROM duckvep_annotate('duckvep_r_public_events', 'r-hgvs',",
-      "hgvs := TRUE, upstream_distance := 0, downstream_distance := 0,",
-      "rich := TRUE) a ORDER BY a.event_index, a.transcript_index"
+      "FROM query(duckvep_annotate_sql('duckvep_r_public_events', 'r-hgvs',",
+      "struct_pack(hgvs := TRUE, upstream_distance := 0, downstream_distance := 0,",
+      "rich := TRUE))) a ORDER BY a.event_index, a.transcript_index"
     )
   )
   expect_equal(public_rich_annotation$event_index, 1)
@@ -700,9 +700,9 @@ local({
     con,
     paste(
       "SELECT event_index, duckvep_event_kind, consequence, transcript_hgvs",
-      "FROM duckvep_annotate('duckvep_r_gvcf_events', 'r-hgvs',",
-      "hgvs := TRUE, upstream_distance := 0, downstream_distance := 0,",
-      "rich := TRUE) ORDER BY event_index"
+      "FROM query(duckvep_annotate_sql('duckvep_r_gvcf_events', 'r-hgvs',",
+      "struct_pack(hgvs := TRUE, upstream_distance := 0, downstream_distance := 0,",
+      "rich := TRUE))) ORDER BY event_index"
     )
   )
   expect_equal(gvcf_annotation$event_index, c(1, 3))
@@ -874,13 +874,13 @@ local({
     con,
     paste(
       "WITH annotations AS (",
-      "SELECT * FROM duckvep_annotate('duckvep_r_public_partial_events',",
-      "'r-public-terminal-partial', hgvs := TRUE, rich := TRUE,",
-      "upstream_distance := 0, downstream_distance := 0)",
+      "SELECT * FROM query(duckvep_annotate_sql('duckvep_r_public_partial_events',",
+      "'r-public-terminal-partial', struct_pack(hgvs := TRUE, rich := TRUE,",
+      "upstream_distance := 0, downstream_distance := 0)))",
       "UNION ALL BY NAME",
-      "SELECT * FROM duckvep_annotate('duckvep_r_clinvar_partial_events',",
-      "'r-clinvar-terminal-partial', hgvs := TRUE, rich := TRUE,",
-      "upstream_distance := 0, downstream_distance := 0))",
+      "SELECT * FROM query(duckvep_annotate_sql('duckvep_r_clinvar_partial_events',",
+      "'r-clinvar-terminal-partial', struct_pack(hgvs := TRUE, rich := TRUE,",
+      "upstream_distance := 0, downstream_distance := 0))))",
       "SELECT event_index, consequence, transcript_hgvs, protein_hgvs,",
       "transcript_hgvs_status, protein_hgvs_status, hgvs_shift",
       "FROM annotations",
@@ -922,8 +922,8 @@ local({
     con,
     paste(
       "SELECT a.event_index, a.transcript_hgvs IS NULL AS hgvs_is_null",
-      "FROM duckvep_annotate('duckvep_r_public_events', 'r-hgvs',",
-      "hgvs := NULL, upstream_distance := 0, downstream_distance := 0) a"
+      "FROM query(duckvep_annotate_sql('duckvep_r_public_events', 'r-hgvs',",
+      "struct_pack(hgvs := NULL, upstream_distance := 0, downstream_distance := 0))) a"
     )
   )
   expect_equal(public_annotation_without_hgvs$event_index, 1)
@@ -943,7 +943,7 @@ local({
   expect_error(
     dbGetQuery(
       con,
-      "SELECT * FROM duckvep_annotate('duckvep_r_contradictory_event', 'r-hgvs')"
+      "SELECT * FROM query(duckvep_annotate_sql('duckvep_r_contradictory_event', 'r-hgvs'))"
     ),
     pattern = "symbolic alternate and structural_type disagree"
   )
@@ -1267,8 +1267,8 @@ local({
     "(SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)",
     "FROM duckvep_so_terms() t",
     "WHERE (a.consequence_mask & t.consequence_mask) <> 0) consequences",
-    "FROM duckvep_annotate('hgvs_table_events', 'r-hgvs-alternate-table',",
-    "hgvs := true, upstream_distance := 0, downstream_distance := 0) a",
+    "FROM query(duckvep_annotate_sql('hgvs_table_events', 'r-hgvs-alternate-table',",
+    "struct_pack(hgvs := true, upstream_distance := 0, downstream_distance := 0))) a",
     "ORDER BY event_index"
   ))
   expect_equal(hgvs_tables$event_index, hgvs_table_sources$event_index)
@@ -1351,8 +1351,8 @@ local({
     "(SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)",
     "FROM duckvep_so_terms() t",
     "WHERE (a.consequence_mask & t.consequence_mask) <> 0) consequences",
-    "FROM duckvep_annotate('hgvs_padding_events', 'r-hgvs-padding',",
-    "hgvs := true, upstream_distance := 0, downstream_distance := 0) a ORDER BY event_index"
+    "FROM query(duckvep_annotate_sql('hgvs_padding_events', 'r-hgvs-padding',",
+    "struct_pack(hgvs := true, upstream_distance := 0, downstream_distance := 0))) a ORDER BY event_index"
   ))
   expect_equal(hgvs_padding$event_index, hgvs_padding_sources$event_index)
   expect_identical(hgvs_padding$protein_hgvs, c(
@@ -1431,8 +1431,8 @@ local({
     "(SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)",
     "FROM duckvep_so_terms() t",
     "WHERE (a.consequence_mask & t.consequence_mask) <> 0) consequences",
-    "FROM duckvep_annotate('hgvs_removed_ref_events', 'r-hgvs-removed-ref',",
-    "hgvs := true, upstream_distance := 0, downstream_distance := 0) a",
+    "FROM query(duckvep_annotate_sql('hgvs_removed_ref_events', 'r-hgvs-removed-ref',",
+    "struct_pack(hgvs := true, upstream_distance := 0, downstream_distance := 0))) a",
     "ORDER BY event_index"
   ))
   expect_equal(hgvs_removed_ref$event_index, hgvs_removed_ref_sources$event_index)
@@ -1508,8 +1508,8 @@ local({
     "(SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)",
     "FROM duckvep_so_terms() t",
     "WHERE (a.consequence_mask & t.consequence_mask) <> 0) consequences",
-    "FROM duckvep_annotate('hgvs_residual_events', 'r-hgvs-residual',",
-    "hgvs := true, upstream_distance := 0, downstream_distance := 0) a ORDER BY event_index"
+    "FROM query(duckvep_annotate_sql('hgvs_residual_events', 'r-hgvs-residual',",
+    "struct_pack(hgvs := true, upstream_distance := 0, downstream_distance := 0))) a ORDER BY event_index"
   ))
   expect_equal(residual$event_index, hgvs_residual_sources$event_index)
   expect_identical(residual$protein_hgvs, hgvs_residual_expected)
@@ -2093,7 +2093,7 @@ local({
   ))
   dbExecute(con, paste(
     "CREATE TABLE duckvep_r_projection_annotations AS SELECT * FROM",
-    "duckvep_annotate('duckvep_r_projection_events', 'r-test')"
+    "query(duckvep_annotate_sql('duckvep_r_projection_events', 'r-test'))"
   ))
   projected <- dbGetQuery(con, paste(
     "SELECT * FROM query(duckvep_transcript_projection_sql('duckvep_r_projection_events',",
@@ -2158,7 +2158,7 @@ local({
     ))
     dbExecute(con, paste(
       "CREATE OR REPLACE TABLE duckvep_r_projection_phase_annotations AS SELECT * FROM",
-      "duckvep_annotate('duckvep_r_projection_phase_events', 'r-projection-phase')"
+      "query(duckvep_annotate_sql('duckvep_r_projection_phase_events', 'r-projection-phase'))"
     ))
     phase_result <- dbGetQuery(con, paste(
       "SELECT cdna_start, cds_start, cds_end, protein_start FROM query(duckvep_transcript_projection_sql(",
@@ -2175,7 +2175,7 @@ local({
     start_result <- dbGetQuery(con, paste(
       "SELECT consequence_mask=(SELECT sum(consequence_mask)::UBIGINT FROM duckvep_so_terms()",
       "WHERE consequence IN ('start_lost','splice_region_variant')) start_lost, duckvep_status status FROM",
-      "duckvep_annotate('duckvep_r_phase_start_events', 'r-projection-phase', rich := true)"
+      "query(duckvep_annotate_sql('duckvep_r_phase_start_events', 'r-projection-phase', struct_pack(rich := true)))"
     ))
     expect_identical(start_result, data.frame(start_lost=TRUE, status="supported"))
     dbExecute(con, paste(
@@ -2186,7 +2186,7 @@ local({
     ))
     tail_result <- dbGetQuery(con, paste(
       "SELECT a.event_index, t.consequence, a.duckvep_status FROM",
-      "duckvep_annotate('duckvep_r_phase_tail_events', 'r-projection-phase', rich := true) a",
+      "query(duckvep_annotate_sql('duckvep_r_phase_tail_events', 'r-projection-phase', struct_pack(rich := true))) a",
       "LEFT JOIN duckvep_so_terms() t ON a.consequence_mask=t.consequence_mask",
       "ORDER BY a.event_index"
     ))
@@ -2207,7 +2207,7 @@ local({
   expect_true(load_model("r-projection-withheld", withheld_queries)$loaded)
   dbExecute(con, paste(
     "CREATE TABLE duckvep_r_projection_withheld_annotations AS SELECT * FROM",
-    "duckvep_annotate('duckvep_r_projection_events', 'r-projection-withheld')"
+    "query(duckvep_annotate_sql('duckvep_r_projection_events', 'r-projection-withheld'))"
   ))
   withheld <- dbGetQuery(con, paste(
     "SELECT cds_start, cds_end, reference_codons, alternate_codons, reference_amino_acids,",
