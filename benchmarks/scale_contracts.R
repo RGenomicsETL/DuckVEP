@@ -60,11 +60,10 @@ receipt <- function(name, query, fields, partitions = 16L) {
 
 model_sha <- sha256(model)
 metadata_sha <- sha256(metadata)
-source_tree <- system2("git", c("rev-parse", "HEAD:src"), stdout = TRUE)
-if (length(source_tree) != 1L || !grepl("^[[:xdigit:]]{40}$", source_tree)) {
-  stop("cannot resolve native source tree")
-}
-fields_sha <- sha256("benchmarks/benchmark_duckvep_fastvep_fields.R")
+baseline_inputs <- read.delim(file.path(output, "inputs.tsv"), colClasses = "character")
+source_tree <- baseline_inputs$value[baseline_inputs$object == "native_source_tree"]
+fields_sha <- baseline_inputs$value[baseline_inputs$object == "field_contract_source"]
+if (length(source_tree) != 1L || length(fields_sha) != 1L) stop("missing baseline provenance")
 literal_gate <- "seq_region IS NOT NULL AND
  regexp_full_match(reference, '[ACGTNacgtn]+') AND
  regexp_full_match(alternate, '[ACGTNacgtn]+') AND
@@ -111,11 +110,11 @@ compact_fields <- c("event_index", "transcript_index", "gene_index", "consequenc
   "protein_position", "reference_amino_acid_code", "alternate_amino_acid_code",
   "nmd_prediction_code", "nmd_escape_reasons", "regulation_feature_index", "overlap_object_code")
 compact <- paste0("SELECT ", paste(compact_fields, collapse = ", "),
-  " FROM duckvep_annotate('ordered_events', 'grch38')")
+  " FROM query(duckvep_annotate_sql('ordered_events', 'grch38'))")
 complete_fields <- c("event_index", "record_index", "alt_index", duckvep_fastvep_fields("native_tab17"))
-complete <- duckvep_fastvep_field_query(con, "native_tab17", include_identity = TRUE)
+complete <- duckvep_fastvep_field_query(con, "native_tab17", include_identity = TRUE,
+  model_name = "grch38")
 complete <- sub("SELECT p.record_index", "SELECT p.event_index, p.record_index", complete, fixed = TRUE)
-complete <- sub("'fastvep_comparison'", "'grch38'", complete, fixed = TRUE)
 receipts <- list(receipt("compact", compact, compact_fields),
   receipt("complete17", complete, complete_fields))
 run("SELECT duckvep_model_drop('grch38')")
