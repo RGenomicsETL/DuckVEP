@@ -420,11 +420,74 @@ single exons use the reference tail followed by its head; regulation and motif
 features retain their original endpoints. The model loader accepts a four-column
 region query (`seq_region`, `sequence_length`, `seq_region_name`, `circular`)
 and validates wrapped coordinates, exon lengths and rank continuity against
-topology. A model containing wrapped spans is a resident data contract; annotation
-cannot pin it until circular interval projection is implemented. Ordinary
-linear models retain their validated kernel and query behavior. A bounded
-survey of two other public Ensembl-116 core databases is recorded in
-`benchmarks/data/circular_source_survey.md`.
+topology. Ordinary linear models retain their validated kernel and query behavior.
+
+**Circular-coordinate execution (lifted intervals).** This is the circular-topology
+feature; it is unrelated to the mitochondrial codon table, which only selects a
+translation rule. The consequence kernel stays linear: coordinates are unsigned 32-bit
+positions and `start > end` there means an insertion, never a wrap. A circular region that
+carries at least one wrapped object (a transcript, exon, regulatory feature or motif feature
+with `start > end`) is therefore executed on a second, fully linear model built once when
+the model is loaded (`src/kernel/src/duckvep_lift.c`):
+
+- source position `p` of a lifted region of length `L` executes at `p + B`, where `B` is a
+  multiple of `L` no smaller than the widest reference window (the 1000-base HGVS shift limit,
+  two maximal alleles and slack), so a window around any event lies inside the lifted interval;
+- every object of the region is admitted at the images `p + B + k*L` for `k` in {-1, 0, +1},
+  which cover every relative placement of two spans shorter than `L`; a wrapped span `[s, e]`
+  becomes `[s, e + L]`, and the CDS and mature-miRNA endpoints of a wrapped transcript move by
+  `L` exactly when they lie before the transcript start. Exon rank order, cDNA coordinates,
+  phases, peptide edits and the CDS and flank sequence pools are copied or shared unchanged, so
+  continuity comes from exon rank on both strands, never from sorting genomic starts;
+- the lifted model is opened by the ordinary kernel. Candidate discovery, splice, CDS and cDNA
+  projection, sequence edits and translation, NMD, HGVS and regulation and motif overlap all
+  read that one set of lifted coordinates; no predicate has a second, circular implementation;
+- events execute at `p + B`. A reference allele that runs past `L` wraps onto base 1 (it must be
+  shorter than `L`). A lifted reference window `[a, b]` is fetched as `[start, L]`, whole laps,
+  and `[1, end]` into the worker's existing scratch through its existing `faidx_t`; no second
+  handle or buffer exists;
+- kernel rows carry lifted object indices until `duckvep_lift_resolve` maps them to the source
+  ordinals and keeps **one row per event/object pair**. The image with the smallest gap to
+  the event wins; ties go to the larger overlap, then to the image lying after the event, then to
+  the unshifted image. Only relative geometry decides, so the choice does not depend on where
+  the origin is. Output contains no genomic coordinate other than ordinals, so nothing else
+  needs to be mapped back to source coordinates.
+
+A region is lifted only when it is circular and holds a wrapped object. A circular region
+without one, such as human Ensembl-116 MT, runs on the unchanged linear kernel and its output
+is byte-identical to the pre-lift extension (`test/sql/duckvep_circular_mt.test` pins a
+fingerprint recorded before the change); in particular it reports no upstream or downstream
+consequence across the origin, exactly as VEP does. Lifting is a property of the model contents,
+not of the flag alone. The registry no longer refuses wrapped models; structural, breakend and
+phased edit-set entry points still do, with an explicit error, because their lifted semantics
+are not built. `2B + 3L` must stay below `2^31 - 1`. HGVS 3' normalization on a circle shorter than
+about 2 kb sees the sequence repeat, because the 1000-base shift window on each side wraps onto
+itself; VEP defines no behavior there.
+
+Validation: `make test_properties` (and `test_properties_sanitized`) run native properties over
+random circular worlds: rotating reference, model and events by random offsets leaves every
+consequence, projected position, peptide, NMD prediction and escape reason unchanged, one row per
+event/object holds, and away from the origin the lifted result equals the linear kernel.
+`test/sql/duckvep_circular_lifted.test` does the same through SQL with HGVS and projected edits for
+five rotations, both insertion interbase orientations, CDS starts and ends, exon-intron junctions
+on both strands at the origin, MNVs, long alleles, four worker threads and several DuckDB
+vectors, and compares every object, wrapped or not, with an ordinary linear model in which a
+rotation puts that object mid-sequence. `benchmarks/duckvep_circular_origin.py` records throughput,
+output equality and peak memory on an origin-focused workload.
+
+**Evidence status.** Public origin-crossing transcripts exist and were compared with executable VEP, but VEP is not
+an oracle for them. Ensembl release 116 has none (only fly and yeast MT carry `circular_seq`, with no inverted
+transcript); Ensembl Genomes 63 has 19 inverted transcripts on circular regions, 18 in bacterial and archaeal
+collections and one trans-spliced plastid rps12, three of whose genomes have a VEP cache. On those genomes
+(`benchmarks/data/circular_vep_differential/`) DuckVEP equals VEP on every SO term of the other 152, 937 and 553
+transcripts, except flank rows that exist only through the origin, and HGVS 3' shifts within 1,100 bases of it,
+where VEP clips its window at the sequence end; and it equals an extension built before lifting existed
+everywhere except those origin-reaching rows. VEP models the crossing transcript itself as an interval with reversed
+bounds (no row for most events inside it, or an `intergenic_variant` transcript consequence) and aborts `--hgvs` on
+some events in its translation. That is a difference in what is modelled, not agreement or refutation. Circular-coordinate
+support for a crossing object is therefore **property-proved and linear-model-proved, not oracle-proved**:
+rotation equivariance, equality with an ordinary linear model per object, and the native properties. The survey,
+the differential and every disagreement are in `benchmarks/data/circular_source_survey.md` and `ERRATA.md`.
 
 `query(duckvep_model_receipt_sql(...))` checks dense ordinals, region/transcript agreement, and every
 regulatory/motif interval against its declared region. It
