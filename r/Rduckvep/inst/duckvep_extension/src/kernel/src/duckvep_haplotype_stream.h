@@ -73,7 +73,56 @@ typedef struct {
     uint32_t allele_index;
     uint8_t source_record;
     uint64_t replay_order; /* Unique positive planned source rank; all-zero uses caller order. */
+    /* Original ALT ordinal supplied by the caller (0 = REF, UINT32_MAX = undefined
+     * file slot). Provenance only: it never affects ordering or identity. */
+    uint32_t alt_ordinal;
 } duckvep_haplotype_source_t;
+
+/* Versioned coding-v1 eligibility of one completed leaf. No consequence, IMPACT or
+ * NMD is predicted here; ELIGIBLE means the leaf is inside the supported domain and
+ * awaits the classifiers. Failures keep every contributor. */
+typedef enum {
+    DUCKVEP_PREDICTION_ELIGIBLE = 0,
+    DUCKVEP_PREDICTION_INCOMPLETE_INPUT,
+    DUCKVEP_PREDICTION_EDIT_CONFLICT,
+    DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP,
+    DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT
+} duckvep_prediction_status_t;
+
+typedef enum {
+    DUCKVEP_REASON_SUPPORTED_DOMAIN = 0,
+    DUCKVEP_REASON_MISSING_CALL,
+    DUCKVEP_REASON_UNPHASED_HETEROZYGOUS,
+    DUCKVEP_REASON_CROSS_PS_UNRESOLVED,
+    DUCKVEP_REASON_CONTRADICTORY_EDITS,
+    DUCKVEP_REASON_OVERLAPPING_EDITS,
+    DUCKVEP_REASON_DUPLICATE_EDITS,
+    DUCKVEP_REASON_SAME_GAP_INSERTIONS,
+    DUCKVEP_REASON_NON_STRICT_PHASE_POLICY,
+    DUCKVEP_REASON_NON_DIPLOID_CALL,
+    DUCKVEP_REASON_PROJECTION, /* leaf.prediction_projection names the preserved projection status */
+    DUCKVEP_REASON_REFERENCE_MISMATCH,
+    DUCKVEP_REASON_INVALID_BASE,
+    DUCKVEP_REASON_INVALID_SEQUENCE,
+    DUCKVEP_REASON_TRANSCRIPT_NOT_CODING,
+    DUCKVEP_REASON_NON_STANDARD_CODON_TABLE,
+    DUCKVEP_REASON_CURATED_TRANSCRIPT,
+    DUCKVEP_REASON_INCOMPLETE_CDS,
+    DUCKVEP_REASON_NONCANONICAL_START,
+    DUCKVEP_REASON_NONCANONICAL_STOP,
+    DUCKVEP_REASON_INTERNAL_STOP,
+    DUCKVEP_REASON_NON_LITERAL_ALLELE,
+    DUCKVEP_REASON_ALLELE_OVER_50
+} duckvep_prediction_reason_t;
+
+/* Contributor role in the completed leaf. Every contributor is retained. */
+typedef enum {
+    DUCKVEP_ROLE_OMITTED = 0, /* No projected sequence edit (outside CDS, no called allele, no net change). */
+    DUCKVEP_ROLE_SHADOWED,    /* Selected away by another source at the same locus. */
+    DUCKVEP_ROLE_UNAPPLIED,   /* Projected edits exist, but the leaf has no rebuilt sequence. */
+    DUCKVEP_ROLE_APPLIED,
+    DUCKVEP_ROLE_POST_STOP    /* Applied only after the first stop of the rebuilt protein. */
+} duckvep_haplotype_role_t;
 
 typedef struct {
     duckvep_haplotype_source_t source;
@@ -102,6 +151,9 @@ typedef struct {
     const duckvep_event_t *prepared; /* Borrowed source geometry for this transcript drain. */
     const duckvep_haplotype_edit_t *projected; /* Successful physical projection, or NULL. */
     uint8_t source_replaced; /* Ordered replay changed the then-current sequence. */
+    uint8_t role;            /* duckvep_haplotype_role_t. */
+    uint32_t edit_count;     /* Differing edit islands contributed by this source. */
+    uint32_t post_stop_edits; /* Of those, islands after the first stop of the rebuilt protein. */
 } duckvep_haplotype_contributor_t;
 
 typedef struct {
@@ -175,7 +227,25 @@ typedef struct {
      * INPUT_INCOMPLETE has no sequence. Projection failures override both. */
     duckvep_cds_edit_status_t projection_status;
     duckvep_haplotype_status_t sequence_status;
+    /* Coding-v1 eligibility; see duckvep_prediction_status_t. The path fields depend only
+     * on the shared edit path. The row summary is ELIGIBLE only when every carrier is;
+     * otherwise it is the first ineligible carrier's result. Phase-domain completeness
+     * and ploidy belong to each sample/phase/lane key: use
+     * duckvep_haplotype_carrier_prediction for the keyed result. */
+    duckvep_prediction_status_t prediction_status, path_status;
+    duckvep_prediction_reason_t prediction_reason, path_reason;
+    duckvep_cds_edit_status_t prediction_projection; /* Valid for DUCKVEP_REASON_PROJECTION. */
+    /* Ascending-CDS edit islands with source IDs, in stream buffers edits/edit_event_ids.
+     * Listed for known sequences and for failed decoded-call leaves, so conflicts and
+     * omitted or post-stop sources stay attributable. */
+    size_t listed_edit_count;
 } duckvep_haplotype_leaf_t;
+
+/* Keyed coding-v1 result of one carrier of a completed leaf: unresolved cross-PS phase
+ * and non-diploid calls are properties of the sample/phase/lane, not of the shared path. */
+void duckvep_haplotype_carrier_prediction(const duckvep_haplotype_leaf_t *leaf,
+    const duckvep_carrier_call_t *call, duckvep_prediction_status_t *status,
+    duckvep_prediction_reason_t *reason);
 
 typedef struct {
     duckvep_carriers_t carriers;
@@ -195,6 +265,9 @@ typedef struct {
     size_t reference_protein_length;
     duckvep_translation_t reference_coding_translation;
     uint8_t have_reference_protein, reference_protein_known;
+    uint8_t have_domain;
+    uint32_t domain_transcript;
+    duckvep_prediction_reason_t domain_reason;
     duckvep_haplotype_stream_status_t error;
     duckvep_carriers_status_t carrier_error;
     uint64_t input_events, projected_events, completed_leaves, translated_bases;

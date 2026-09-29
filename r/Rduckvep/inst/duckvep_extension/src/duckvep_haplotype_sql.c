@@ -22,9 +22,16 @@ enum { LIMIT_EVENTS, LIMIT_TRANSCRIPTS, LIMIT_CARRIERS, LIMIT_PREFIXES, LIMIT_PR
     LIMIT_ALLELES, LIMIT_LEAF_EVENTS, LIMIT_LEAF_EDITS, LIMIT_SEQUENCE, LIMIT_PLOIDY,
     LIMIT_PHASE_SETS, LIMIT_ALIGNMENT, LIMIT_DIFFERENCES, LIMIT_HGVS_OPERATIONS,
     LIMIT_HGVS_BYTES, LIMIT_HGVS_REFERENCE, LIMIT_WORKSPACE, LIMIT_COUNT };
+/* The last existing column stays last: nominal_length_diff is documented and tested as the
+ * final field, so slice-2 columns are inserted before it. */
 enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
     HAPLOTYPE_HGVSP_COLUMN = 15, HAPLOTYPE_HGVSP_STATUS_COLUMN = 16,
-    HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 17, HAPLOTYPE_OUTPUT_COLUMNS = 18 };
+    HAPLOTYPE_POLICY_COLUMN = 17, HAPLOTYPE_STATUS_COLUMN = 18, HAPLOTYPE_REASON_COLUMN = 19,
+    HAPLOTYPE_PROVENANCE_COLUMN = 20, HAPLOTYPE_EDITS_COLUMN = 21,
+    HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 22, HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 23,
+    HAPLOTYPE_OUTPUT_COLUMNS = 24 };
+enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 5 };
+#define HAPLOTYPE_POLICY_VERSION "duckvep-coding-v1"
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10 };
 static const char *const limit_names[] = {"max_active_events", "max_active_transcripts",
     "max_active_carriers", "max_active_prefixes", "max_active_projections", "max_allele_bytes",
@@ -194,6 +201,30 @@ static void haplotype_bind(duckdb_bind_info info) {
     duckdb_bind_add_result_column(info, "hgvsp", string_type);
     duckdb_bind_add_result_column(info, "hgvsp_status", string_type);
     duckdb_destroy_logical_type(&string_type);
+    /* Slice 2 of the coding-v1 contract: eligibility and provenance only. */
+    string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
+    duckdb_bind_add_result_column(info, "prediction_policy", string_type);
+    duckdb_bind_add_result_column(info, "prediction_status", string_type);
+    duckdb_bind_add_result_column(info, "prediction_reason", string_type);
+    duckdb_destroy_logical_type(&string_type);
+    const char *const provenance_names[] = {"event_index", "alt_index", "seq_region", "position",
+        "reference", "alternate", "evidence_flags", "projection_status", "role", "edit_count"};
+    const duckdb_type provenance_ids[] = {DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_UINTEGER,
+        DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR,
+        DUCKDB_TYPE_UTINYINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_UINTEGER};
+    const char *const edit_names[] = {"edit_index", "event_index", "block_index", "cds_start",
+        "reference", "alternate", "variant_strand"};
+    const duckdb_type edit_ids[] = {DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_UBIGINT,
+        DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_TINYINT};
+    bind_record_list(info, "contributor_provenance", provenance_names, provenance_ids,
+        HAPLOTYPE_PROVENANCE_FIELDS, 0);
+    bind_record_list(info, "normalized_edits", edit_names, edit_ids, HAPLOTYPE_EDIT_FIELDS, 0);
+    const char *const carrier_prediction_names[] = {"sample_index", "phase_set", "haplotype_lane",
+        "prediction_status", "prediction_reason"};
+    const duckdb_type carrier_prediction_ids[] = {DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_BIGINT,
+        DUCKDB_TYPE_USMALLINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR};
+    bind_record_list(info, "carrier_predictions", carrier_prediction_names, carrier_prediction_ids,
+        HAPLOTYPE_CARRIER_PREDICTION_FIELDS, 0);
     duckdb_logical_type length_type = duckdb_create_logical_type(DUCKDB_TYPE_BIGINT);
     duckdb_bind_add_result_column(info, "nominal_length_diff", length_type);
     duckdb_destroy_logical_type(&length_type);
@@ -835,6 +866,133 @@ static int append_hgvsp(duckdb_vector text, duckdb_vector status_vector, idx_t r
     return 1;
 }
 
+static const char *status_name(duckvep_prediction_status_t status) {
+    switch (status) {
+    case DUCKVEP_PREDICTION_ELIGIBLE: return "eligible_classifier_pending";
+    case DUCKVEP_PREDICTION_INCOMPLETE_INPUT: return "incomplete_input";
+    case DUCKVEP_PREDICTION_EDIT_CONFLICT: return "edit_conflict";
+    case DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP: return "unsupported_overlap";
+    default: return "unsupported_context";
+    }
+}
+
+static const char *reason_name(duckvep_prediction_reason_t reason, duckvep_cds_edit_status_t projection) {
+    switch (reason) {
+    case DUCKVEP_REASON_SUPPORTED_DOMAIN: return "supported_domain";
+    case DUCKVEP_REASON_MISSING_CALL: return "missing_call";
+    case DUCKVEP_REASON_UNPHASED_HETEROZYGOUS: return "unphased_heterozygous";
+    case DUCKVEP_REASON_CROSS_PS_UNRESOLVED: return "unresolved_cross_ps_phase";
+    case DUCKVEP_REASON_CONTRADICTORY_EDITS: return "contradictory_edits";
+    case DUCKVEP_REASON_OVERLAPPING_EDITS: return "overlapping_edits";
+    case DUCKVEP_REASON_DUPLICATE_EDITS: return "duplicate_edits";
+    case DUCKVEP_REASON_SAME_GAP_INSERTIONS: return "ambiguous_same_gap_insertions";
+    case DUCKVEP_REASON_NON_STRICT_PHASE_POLICY: return "non_strict_phase_policy";
+    case DUCKVEP_REASON_NON_DIPLOID_CALL: return "non_diploid_call";
+    case DUCKVEP_REASON_PROJECTION: return projection_name(projection);
+    case DUCKVEP_REASON_REFERENCE_MISMATCH: return "reference_mismatch";
+    case DUCKVEP_REASON_INVALID_BASE: return "invalid_base";
+    case DUCKVEP_REASON_TRANSCRIPT_NOT_CODING: return "transcript_not_coding";
+    case DUCKVEP_REASON_NON_STANDARD_CODON_TABLE: return "non_standard_codon_table";
+    case DUCKVEP_REASON_CURATED_TRANSCRIPT: return "curated_transcript";
+    case DUCKVEP_REASON_INCOMPLETE_CDS: return "incomplete_cds";
+    case DUCKVEP_REASON_NONCANONICAL_START: return "noncanonical_start";
+    case DUCKVEP_REASON_NONCANONICAL_STOP: return "noncanonical_stop";
+    case DUCKVEP_REASON_INTERNAL_STOP: return "internal_stop";
+    case DUCKVEP_REASON_NON_LITERAL_ALLELE: return "non_literal_allele";
+    case DUCKVEP_REASON_ALLELE_OVER_50: return "allele_over_50_bases";
+    default: return "invalid_sequence";
+    }
+}
+
+static const char *role_name(uint8_t role) {
+    switch (role) {
+    case DUCKVEP_ROLE_SHADOWED: return "shadowed";
+    case DUCKVEP_ROLE_UNAPPLIED: return "unapplied";
+    case DUCKVEP_ROLE_APPLIED: return "applied";
+    case DUCKVEP_ROLE_POST_STOP: return "post_stop";
+    default: return "omitted";
+    }
+}
+
+/* Versioned coding-v1 status/reason plus complete contributor and normalized-edit
+ * provenance. Every contributor of the leaf is listed, whatever its role. */
+static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_state_t *s,
+    const haplotype_bind_t *bind, const duckvep_haplotype_leaf_t *leaf) {
+    duckdb_vector v[HAPLOTYPE_OUTPUT_COLUMNS];
+    for (unsigned i = HAPLOTYPE_POLICY_COLUMN; i <= HAPLOTYPE_CARRIER_PREDICTION_COLUMN; i++) {
+        v[i] = duckdb_data_chunk_get_vector(output, i);
+        duckdb_validity_set_row_valid(duckdb_vector_get_validity(v[i]), row);
+    }
+    duckdb_vector_assign_string_element(v[HAPLOTYPE_POLICY_COLUMN], row, HAPLOTYPE_POLICY_VERSION);
+    duckdb_vector_assign_string_element(v[HAPLOTYPE_STATUS_COLUMN], row, status_name(leaf->prediction_status));
+    duckdb_vector_assign_string_element(v[HAPLOTYPE_REASON_COLUMN], row, reason_name(leaf->prediction_reason, leaf->prediction_projection));
+    const size_t counts[] = {leaf->contributor_count, leaf->listed_edit_count, leaf->carriers.call_count};
+    const unsigned field_counts[] = {HAPLOTYPE_PROVENANCE_FIELDS, HAPLOTYPE_EDIT_FIELDS,
+        HAPLOTYPE_CARRIER_PREDICTION_FIELDS};
+    uint32_t call_id = leaf->carriers.first_call;
+    for (unsigned list = 0u; list < 3u; list++) {
+        duckdb_vector vector = v[HAPLOTYPE_PROVENANCE_COLUMN + list];
+        duckdb_list_entry entry;
+        if (!duckvep_list_extend(vector, counts[list], &entry)) return 0;
+        ((duckdb_list_entry *)duckdb_vector_get_data(vector))[row] = entry;
+        duckdb_vector records = duckdb_list_vector_get_child(vector), fields[HAPLOTYPE_PROVENANCE_FIELDS];
+        duckdb_vector_ensure_validity_writable(records);
+        for (unsigned j = 0u; j < field_counts[list]; j++) {
+            fields[j] = duckdb_struct_vector_get_child(records, j);
+            duckdb_vector_ensure_validity_writable(fields[j]);
+        }
+        size_t block = 0u;
+        for (size_t i = 0u; i < counts[list]; i++) {
+            idx_t at = entry.offset + i;
+            duckdb_validity_set_row_valid(duckdb_vector_get_validity(records), at);
+            for (unsigned j = 0u; j < field_counts[list]; j++)
+                duckdb_validity_set_row_valid(duckdb_vector_get_validity(fields[j]), at);
+            if (!list) {
+                const duckvep_haplotype_contributor_t *c = &leaf->contributors[i];
+                ((uint64_t *)duckdb_vector_get_data(fields[0]))[at] = c->source.event_id;
+                if (c->source.alt_ordinal == UINT32_MAX) null_cell(fields[1], at);
+                else ((uint32_t *)duckdb_vector_get_data(fields[1]))[at] = c->source.alt_ordinal;
+                ((uint32_t *)duckdb_vector_get_data(fields[2]))[at] = c->source.chrom_id;
+                ((uint64_t *)duckdb_vector_get_data(fields[3]))[at] = c->source.pos1;
+                duckdb_vector_assign_string_element_len(fields[4], at, (const char *)c->source.ref, c->source.ref_len);
+                duckdb_vector_assign_string_element_len(fields[5], at, (const char *)c->source.alt, c->source.alt_len);
+                ((uint8_t *)duckdb_vector_get_data(fields[6]))[at] = c->evidence_flags;
+                duckdb_vector_assign_string_element(fields[7], at, projection_name(c->projection_status));
+                duckdb_vector_assign_string_element(fields[8], at, role_name(c->role));
+                ((uint32_t *)duckdb_vector_get_data(fields[9]))[at] = c->edit_count;
+            } else if (list == 2u) {
+                const duckvep_carrier_call_t *call = duckvep_carriers_call(&s->stream.carriers, call_id);
+                if (!call) return 0;
+                duckvep_prediction_status_t cs;
+                duckvep_prediction_reason_t cr;
+                duckvep_haplotype_carrier_prediction(leaf, call, &cs, &cr);
+                ((uint32_t *)duckdb_vector_get_data(fields[0]))[at] = call->key.sample_index;
+                ((int64_t *)duckdb_vector_get_data(fields[1]))[at] = call->key.phase_set;
+                if (!call->key.phase_set_present) null_cell(fields[1], at);
+                ((uint16_t *)duckdb_vector_get_data(fields[2]))[at] = call->key.lane;
+                duckdb_vector_assign_string_element(fields[3], at, status_name(cs));
+                duckdb_vector_assign_string_element(fields[4], at, reason_name(cr, leaf->prediction_projection));
+                call_id = call->next_leaf;
+            } else {
+                const duckvep_haplotype_edit_t *e = &s->buffers.edits[i];
+                ((uint64_t *)duckdb_vector_get_data(fields[0]))[at] = i;
+                ((uint64_t *)duckdb_vector_get_data(fields[1]))[at] = s->buffers.edit_event_ids[i];
+                while (leaf->cds && block < leaf->block_count &&
+                       i >= leaf->blocks[block].edit_begin + leaf->blocks[block].edit_count) block++;
+                if (leaf->cds && block < leaf->block_count && i >= leaf->blocks[block].edit_begin)
+                    ((uint64_t *)duckdb_vector_get_data(fields[2]))[at] = block;
+                else null_cell(fields[2], at);
+                ((uint32_t *)duckdb_vector_get_data(fields[3]))[at] = e->cds_start;
+                duckdb_vector_assign_string_element_len(fields[4], at, e->ref_len ? (const char *)e->ref : "", e->ref_len);
+                duckdb_vector_assign_string_element_len(fields[5], at, e->alt_len ? (const char *)e->alt : "", e->alt_len);
+                ((int8_t *)duckdb_vector_get_data(fields[6]))[at] = e->variant_strand;
+            }
+        }
+    }
+    (void)bind;
+    return 1;
+}
+
 static int append_leaf(duckdb_data_chunk output, idx_t row, haplotype_state_t *s,
     const haplotype_bind_t *bind, const duckvep_haplotype_leaf_t *leaf,
     char *error, size_t error_size) {
@@ -982,6 +1140,7 @@ static int append_leaf(duckdb_data_chunk output, idx_t row, haplotype_state_t *s
             }
         }
     }
+    if (!append_prediction(output, row, s, bind, leaf)) return 0;
     return append_sequence_differences(v[12], row, s, bind, leaf, 0, error, error_size) &&
         append_sequence_differences(v[13], row, s, bind, leaf, 1, error, error_size) &&
         append_hgvsp(v[HAPLOTYPE_HGVSP_COLUMN], v[HAPLOTYPE_HGVSP_STATUS_COLUMN], row,
@@ -1020,7 +1179,7 @@ static duckvep_haplotype_stream_status_t consume_call(haplotype_state_t *s,
         (const uint8_t *)duckdb_string_t_data(&ref), (const uint8_t *)duckdb_string_t_data(&alt),
         (uint32_t)pos, (uint16_t)chrom, (uint16_t)ref_len, (uint16_t)alt_len,
         bind->source_records ? allele_index : 0u, (uint8_t)bind->source_records,
-        bind->source_records ? ((uint64_t *)duckdb_vector_get_data(v[15]))[row] : 0u};
+        bind->source_records ? ((uint64_t *)duckdb_vector_get_data(v[15]))[row] : 0u, allele_index};
     uint32_t tx = ((uint32_t *)duckdb_vector_get_data(v[6]))[row];
     duckvep_haplotype_stream_status_t status;
     int new_event = !s->stream.have_input || source.event_id != s->stream.last_event_id ||
@@ -1102,6 +1261,10 @@ static void haplotype_scan(duckdb_function_info info, duckdb_data_chunk output) 
     for (unsigned i = 0u; i < HAPLOTYPE_OUTPUT_COLUMNS; i++)
         duckdb_vector_ensure_validity_writable(duckdb_data_chunk_get_vector(output, i));
     for (unsigned i = HAPLOTYPE_LIST_COLUMN; i < HAPLOTYPE_STOP_COLUMN; i++)
+        if (duckdb_list_vector_set_size(duckdb_data_chunk_get_vector(output, i), 0u) != DuckDBSuccess) {
+            duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset output list"); return;
+        }
+    for (unsigned i = HAPLOTYPE_PROVENANCE_COLUMN; i <= HAPLOTYPE_CARRIER_PREDICTION_COLUMN; i++)
         if (duckdb_list_vector_set_size(duckdb_data_chunk_get_vector(output, i), 0u) != DuckDBSuccess) {
             duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset output list"); return;
         }
