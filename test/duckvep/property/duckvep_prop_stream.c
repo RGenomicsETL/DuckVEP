@@ -3078,3 +3078,588 @@ TEST haplotype_stream_matches_dense_models_across_batches(void) {
     ASSERT_EQ(THEFT_RUN_PASS, theft_run(&cfg));
     PASS();
 }
+
+/* ---- NMD attribution, rule ejc50-v1 (coding-v1 slice 6) ------------------------------------------------------
+ * One transcript is laid out on either strand with a random UTR and 1 to 4 exons (a UTR-only exon is allowed) around a
+ * random CDS. The oracle edits the spliced mRNA in transcript orientation, following every base's exon through the
+ * edits, translates the edited CDS with an independent standard-code table and applies the rule; it shares nothing
+ * with the kernel's exon walk. Records are written in genome orientation and VCF form, so the stream projects,
+ * differences and orders them itself. Edits stay off the start and terminator codons (start_lost and terminator
+ * windows are covered elsewhere), a margin from exon boundaries (an indel next to a boundary belongs to neither exon)
+ * and away from one-step placement shifts (a normalized island must not move). */
+#define NM_CDS_MAX 240u
+#define NM_FLANK 8u
+#define NM_INTRON 12u
+#define NM_GENOME_MAX (NM_CDS_MAX + 2u * 40u + 4u * NM_INTRON + 2u * NM_FLANK + 64u)
+
+enum { NM_SUB, NM_INS, NM_DEL };
+struct nm_edit { int kind; unsigned p, n; char bases[4]; }; /* tx orientation; INS after base p; DEL bases p+1..p+n; p is a CDS position */
+struct nm_case {
+    unsigned reverse, cache, u5, u3, cds_len, exons, edit_count;
+    unsigned ends[4]; /* cumulative exon ends in mRNA coordinates; the last is the mRNA length */
+    char cds[NM_CDS_MAX + 1u];
+    struct nm_edit edits[3];
+};
+struct nm_expect {
+    unsigned premature, stop_valid, junction_valid, applied[3];
+    int nmd; uint64_t stop, junction;
+};
+
+struct nmd_scene {
+    duckvep_transcript_model_t model;
+    duckvep_exon_model_t exons;
+    duckvep_sequence_pool_t sequences;
+    uint16_t chrom[1], exon_count[1];
+    uint32_t tstart[1], tend[1], cstart[1], cend[1], exon_offset[1], cds_cdna_start[1], cds_cdna_end[1], length[1];
+    uint32_t ex_start[4], ex_end[4], ex_cdna_start[4], ex_cdna_end[4];
+    uint64_t sequence_offset[1];
+    int8_t strand[1];
+    uint8_t genome[NM_GENOME_MAX], reference[NM_CDS_MAX];
+    unsigned genome_length;
+    struct carrier_test_pool carrier_pool;
+    duckvep_haplotype_stored_event_t events[8];
+    duckvep_haplotype_projection_t projections[16];
+    duckvep_haplotype_contributor_t contributors[8];
+    duckvep_haplotype_edit_t edits[8];
+    uint64_t edit_event_ids[9];
+    duckvep_haplotype_block_t blocks[8];
+    duckvep_carrier_event_t leaf_events[8];
+    uint8_t alleles[128], cds[NM_CDS_MAX + 64u], protein[NM_CDS_MAX + 64u];
+    uint8_t reference_protein[NM_CDS_MAX + 64u], reference_coding_protein[NM_CDS_MAX + 64u];
+    duckvep_haplotype_stream_buffers_t buffers;
+    duckvep_haplotype_stream_t stream;
+};
+
+static unsigned nm_exon_of(const struct nm_case *c, unsigned t) { /* mRNA position t (1-based) -> exon 1..n */
+    unsigned k = 0u;
+    while (k + 1u < c->exons && t > c->ends[k]) k++;
+    return k + 1u;
+}
+static unsigned nm_index(const struct nm_case *c, unsigned t) { /* transcript-orientation genome index of mRNA base t */
+    return NM_FLANK + t + (nm_exon_of(c, t) - 1u) * NM_INTRON;
+}
+static unsigned nm_genomic(const struct nm_case *c, struct nmd_scene *f, unsigned t) {
+    return c->reverse ? f->genome_length + 1u - nm_index(c, t) : nm_index(c, t);
+}
+static char nm_comp(char b) { return haplo_class_complement(b); }
+
+/* Deterministic filler so an intron or flank never matches the transcript by accident. */
+static char nm_filler(unsigned i) { return "GTCAAGCT"[(i * 5u + 3u) & 7u]; }
+
+static void nm_scene_prepare(struct nmd_scene *f, const struct nm_case *c) {
+    memset(f, 0, sizeof(*f));
+    unsigned mrna = c->ends[c->exons - 1u];
+    char tx[NM_GENOME_MAX];
+    unsigned n = 0u;
+    for (unsigned i = 0u; i < NM_FLANK; i++) tx[n++] = nm_filler(i);
+    for (unsigned t = 1u; t <= mrna; t++) {
+        if (t > 1u && nm_exon_of(c, t) != nm_exon_of(c, t - 1u))
+            for (unsigned i = 0u; i < NM_INTRON; i++) tx[n++] = nm_filler(100u + t + i);
+        tx[n++] = t <= c->u5 || t > c->u5 + c->cds_len ? nm_filler(200u + t) : c->cds[t - c->u5 - 1u];
+    }
+    for (unsigned i = 0u; i < NM_FLANK; i++) tx[n++] = nm_filler(300u + i);
+    f->genome_length = n;
+    for (unsigned i = 0u; i < n; i++) f->genome[i] = (uint8_t)(c->reverse ? nm_comp(tx[n - 1u - i]) : tx[i]);
+    memcpy(f->reference, c->cds, c->cds_len);
+    f->strand[0] = c->reverse ? -1 : 1;
+    f->exon_count[0] = (uint16_t)c->exons;
+    unsigned lo = nm_genomic(c, f, 1u), hi = nm_genomic(c, f, mrna);
+    f->tstart[0] = lo < hi ? lo : hi; f->tend[0] = lo < hi ? hi : lo;
+    lo = nm_genomic(c, f, c->u5 + 1u); hi = nm_genomic(c, f, c->u5 + c->cds_len);
+    f->cstart[0] = lo < hi ? lo : hi; f->cend[0] = lo < hi ? hi : lo;
+    for (unsigned k = 0u; k < c->exons; k++) {
+        unsigned first = k ? c->ends[k - 1u] + 1u : 1u, last = c->ends[k];
+        unsigned a = nm_genomic(c, f, first), b = nm_genomic(c, f, last);
+        f->ex_start[k] = a < b ? a : b; f->ex_end[k] = a < b ? b : a;
+        f->ex_cdna_start[k] = first; f->ex_cdna_end[k] = last;
+    }
+    f->length[0] = c->cds_len;
+    f->cds_cdna_start[0] = c->u5 + 1u; f->cds_cdna_end[0] = c->u5 + c->cds_len;
+    f->model.transcript_count = 1u; f->model.chrom_id = f->chrom;
+    f->model.start1 = f->tstart; f->model.end1 = f->tend; f->model.cds_start1 = f->cstart; f->model.cds_end1 = f->cend;
+    f->model.strand = f->strand; f->model.exon_offset = f->exon_offset; f->model.exon_count = f->exon_count;
+    if (c->cache) { f->model.cds_cdna_start1 = f->cds_cdna_start; f->model.cds_cdna_end1 = f->cds_cdna_end; }
+    f->exons.exon_count = c->exons; f->exons.start1 = f->ex_start; f->exons.end1 = f->ex_end;
+    f->exons.cdna_start1 = f->ex_cdna_start; f->exons.cdna_end1 = f->ex_cdna_end;
+    f->sequences.transcript_count = 1u; f->sequences.cds_bytes = f->reference; f->sequences.cds_bytes_len = c->cds_len;
+    f->sequences.cds_offset = f->sequence_offset; f->sequences.cds_length = f->length;
+    f->buffers = (duckvep_haplotype_stream_buffers_t){
+        .carriers = carrier_test_buffers(&f->carrier_pool),
+        .events = f->events, .projections = f->projections, .alleles = f->alleles,
+        .event_capacity = 8u, .projection_capacity = 16u, .allele_capacity = sizeof(f->alleles),
+        .leaf_events = f->leaf_events, .contributors = f->contributors, .edits = f->edits,
+        .blocks = f->blocks, .edit_event_ids = f->edit_event_ids,
+        .leaf_capacity = 8u, .edit_capacity = 8u, .cds = f->cds, .protein = f->protein,
+        .cds_capacity = sizeof(f->cds), .protein_capacity = sizeof(f->protein),
+        .reference_protein = f->reference_protein, .reference_coding_protein = f->reference_coding_protein,
+        .reference_protein_capacity = sizeof(f->reference_protein)};
+}
+
+/* Genome-orientation VCF record of an edit (the same forms the R generator writes). */
+struct nm_record { unsigned pos, ref_len, alt_len; char ref[8], alt[8]; unsigned edit; };
+static void nm_record_of(const struct nm_case *c, struct nmd_scene *f, const struct nm_edit *e, struct nm_record *r) {
+    unsigned p = c->u5 + e->p; /* mRNA coordinate of CDS base p */
+    memset(r, 0, sizeof(*r));
+    if (e->kind == NM_SUB) {
+        unsigned g = nm_genomic(c, f, p);
+        r->pos = g; r->ref_len = r->alt_len = 1u;
+        r->ref[0] = (char)f->genome[g - 1u]; r->alt[0] = c->reverse ? nm_comp(e->bases[0]) : e->bases[0];
+    } else if (e->kind == NM_DEL) {
+        unsigned first = nm_genomic(c, f, p + 1u), last = nm_genomic(c, f, p + e->n);
+        unsigned low = c->reverse ? last : first, high = c->reverse ? first : last;
+        r->pos = c->reverse ? low - 1u : nm_genomic(c, f, p);
+        unsigned from = r->pos, to = high; /* ref = anchor + deleted bases */
+        r->ref_len = to - from + 1u; r->alt_len = 1u;
+        for (unsigned i = 0u; i < r->ref_len; i++) r->ref[i] = (char)f->genome[from - 1u + i];
+        r->alt[0] = r->ref[0];
+    } else { /* insertion after CDS base p */
+        unsigned g = c->reverse ? nm_genomic(c, f, p + 1u) : nm_genomic(c, f, p);
+        r->pos = g; r->ref_len = 1u; r->ref[0] = (char)f->genome[g - 1u];
+        if (!c->reverse) { r->alt[0] = r->ref[0]; for (unsigned i = 0u; i < e->n; i++) r->alt[1u + i] = e->bases[i]; }
+        else { r->alt[0] = r->ref[0]; for (unsigned i = 0u; i < e->n; i++) r->alt[1u + i] = nm_comp(e->bases[e->n - 1u - i]); }
+        r->alt_len = 1u + e->n;
+    }
+}
+
+static unsigned nm_edit_start(const struct nm_case *c, const struct nm_edit *e) { /* reference mRNA coordinate of the first base or insertion point */
+    return c->u5 + e->p + (e->kind == NM_SUB ? 0u : 1u);
+}
+static int nm_edit_change(const struct nm_edit *e) { return e->kind == NM_SUB ? 0 : e->kind == NM_INS ? (int)e->n : -(int)e->n; }
+
+/* Independent oracle: edit the mRNA in transcript orientation, keep each base's exon and reference-CDS origin. */
+static void nm_oracle(const struct nm_case *c, struct nm_expect *x, unsigned *first_stop_codon, int post[3]) {
+    memset(x, 0, sizeof(*x));
+    unsigned mrna = c->ends[c->exons - 1u], out_n = 0u, at = 1u;
+    char base[NM_GENOME_MAX], out[NM_GENOME_MAX];
+    unsigned lab[NM_GENOME_MAX], out_lab[NM_GENOME_MAX], origin[NM_GENOME_MAX], out_origin[NM_GENOME_MAX], start0[3];
+    for (unsigned t = 1u; t <= mrna; t++) {
+        base[t - 1u] = t <= c->u5 || t > c->u5 + c->cds_len ? 'N' : c->cds[t - c->u5 - 1u];
+        lab[t - 1u] = nm_exon_of(c, t);
+        origin[t - 1u] = t > c->u5 && t <= c->u5 + c->cds_len ? t - c->u5 - 1u : UINT32_MAX;
+    }
+    for (unsigned k = 0u; k < c->edit_count; k++) { /* edits are ascending by construction */
+        const struct nm_edit *e = &c->edits[k];
+        unsigned s = nm_edit_start(c, e), rl = e->kind == NM_INS ? 0u : e->kind == NM_SUB ? 1u : e->n;
+        for (; at < s; at++) { out[out_n] = base[at - 1u]; out_lab[out_n] = lab[at - 1u]; out_origin[out_n++] = origin[at - 1u]; }
+        start0[k] = out_n;
+        if (e->kind != NM_DEL) {
+            unsigned m = e->kind == NM_SUB ? 1u : e->n;
+            for (unsigned i = 0u; i < m; i++) { out[out_n] = e->bases[i]; out_lab[out_n] = lab[s - 1u]; out_origin[out_n++] = UINT32_MAX; }
+        }
+        at = s + rl;
+    }
+    for (; at <= mrna; at++) { out[out_n] = base[at - 1u]; out_lab[out_n] = lab[at - 1u]; out_origin[out_n++] = origin[at - 1u]; }
+    unsigned cds_n = out_n - c->u5 - c->u3, first = 0u;
+    const char *edited = out + c->u5;
+    for (unsigned codon = 0u; 3u * codon + 3u <= cds_n && !first; codon++)
+        if (haplo_class_amino(edited + 3u * codon) == '*') first = codon + 1u;
+    *first_stop_codon = first;
+    for (unsigned k = 0u; k < c->edit_count; k++) post[k] = first && start0[k] - c->u5 >= 3u * first;
+    if (cds_n < 3u || memcmp(edited, "ATG", 3u) || !first) { x->nmd = DUCKVEP_HAPLOTYPE_NMD_UNKNOWN; return; }
+    unsigned term_start = cds_n;
+    for (unsigned i = 0u; i < cds_n; i++)
+        if (out_origin[c->u5 + i] != UINT32_MAX && out_origin[c->u5 + i] >= c->cds_len - 3u) { term_start = i; break; }
+    bool same = first == c->cds_len / 3u;
+    for (unsigned codon = 0u; same && codon + 1u < first; codon++)
+        same = haplo_class_amino(edited + 3u * codon) == haplo_class_amino(c->cds + 3u * codon);
+    x->premature = 3u * first - 3u < term_start && !same;
+    if (!x->premature) { x->nmd = DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE; return; }
+    x->stop_valid = 1u; x->stop = c->u5 + 3u * first;
+    if (c->exons == 1u) { x->nmd = DUCKVEP_HAPLOTYPE_NMD_ESCAPE; return; }
+    unsigned junction = 0u;
+    for (unsigned i = 0u; i < out_n; i++) if (out_lab[i] == c->exons - 1u) junction = i + 1u;
+    x->junction_valid = 1u; x->junction = junction;
+    x->nmd = (int64_t)junction - (int64_t)x->stop > 50 ? DUCKVEP_HAPLOTYPE_NMD_TRIGGER : DUCKVEP_HAPLOTYPE_NMD_ESCAPE;
+}
+
+static int nm_compare_records(const void *a, const void *b) {
+    const struct nm_record *x = a, *y = b;
+    return x->pos < y->pos ? -1 : x->pos > y->pos;
+}
+
+static duckvep_haplotype_stream_status_t nm_run(const struct nm_case *c, struct nmd_scene *f, duckvep_haplotype_leaf_t *leaf) {
+    nm_scene_prepare(f, c);
+    duckvep_haplotype_stream_t *s = &f->stream;
+    duckvep_haplotype_stream_status_t status = duckvep_haplotype_stream_init(s, &f->model, &f->exons, &f->sequences, &f->buffers);
+    if (status != DUCKVEP_HAPLOTYPE_STREAM_OK) return status;
+    struct nm_record records[3];
+    for (unsigned k = 0u; k < c->edit_count; k++) { nm_record_of(c, f, &c->edits[k], &records[k]); records[k].edit = k; }
+    qsort(records, c->edit_count, sizeof(records[0]), nm_compare_records);
+    duckvep_carrier_key_t key = {0u, 10, 1u, 2u, 1u, 0u};
+    uint32_t tx = 0u;
+    for (unsigned k = 0u; k < c->edit_count; k++) {
+        duckvep_haplotype_source_t source = {records[k].edit + 1u, (const uint8_t *)records[k].ref, (const uint8_t *)records[k].alt,
+            records[k].pos, 0u, (uint16_t)records[k].ref_len, (uint16_t)records[k].alt_len, 0u, 0u, 0u, 1u};
+        status = haplotype_test_begin_candidates(s, &source, &tx, 1u);
+        if (status == DUCKVEP_HAPLOTYPE_STREAM_OK) status = haplotype_test_push_called(s, &key);
+        if (status != DUCKVEP_HAPLOTYPE_STREAM_OK) return status;
+    }
+    status = duckvep_haplotype_stream_finish(s);
+    if (status != DUCKVEP_HAPLOTYPE_STREAM_TRANSCRIPT_READY) return status;
+    return duckvep_haplotype_stream_next(s, leaf);
+}
+
+static const char *const nm_sense[] = {"TTT","TTC","TTA","TTG","TCT","TCC","TCA","TCG","TAT","TAC","TGT","TGC","TGG","CTT","CTC","CTA","CTG",
+    "CCT","CCC","CCA","CCG","CAT","CAC","CAA","CAG","CGT","CGC","CGA","CGG","ATT","ATC","ATA","ATG","ACT","ACC","ACA","ACG","AAT","AAC","AAA",
+    "AAG","AGT","AGC","AGA","AGG","GTT","GTC","GTA","GTG","GCT","GCC","GCA","GCG","GAT","GAC","GAA","GAG","GGT","GGC","GGA","GGG"};
+
+/* ATG, sense codons with no run of three equal bases, and a stop: the domain of the v1 classifier. */
+static void nm_random_cds(struct theft *t, unsigned codons, char *cds) {
+    memcpy(cds, "ATG", 3u);
+    for (unsigned i = 1u; i + 1u < codons; i++) {
+        for (unsigned attempt = 0u;; attempt++) {
+            const char *codon = nm_sense[kprop_bounded(t, sizeof(nm_sense) / sizeof(nm_sense[0]))];
+            char *at = cds + 3u * i;
+            memcpy(at, codon, 3u);
+            bool run = (at[-1] == at[0] && at[-2] == at[-1]) || (at[-1] == at[0] && at[0] == at[1]) || (at[0] == at[1] && at[1] == at[2]);
+            if (!run || attempt > 20u) break;
+        }
+    }
+    memcpy(cds + 3u * (codons - 1u), (const char *[]){"TAA", "TAG", "TGA"}[kprop_bounded(t, 3u)], 3u);
+    cds[3u * codons] = 0;
+}
+
+/* One indel is unambiguous when neither one-step shift of its placement gives the same edited sequence. */
+static bool nm_unambiguous(const struct nm_case *c, const struct nm_edit *e) {
+    if (e->kind == NM_SUB) return true;
+    const char *s = c->cds; unsigned p = e->p; /* CDS base p is s[p - 1] */
+    if (e->kind == NM_INS) return e->bases[0] != s[p] && e->bases[e->n - 1u] != s[p - 1u];
+    return s[p - 1u] != s[p + e->n - 1u] && s[p] != s[p + e->n];
+}
+/* An indel keeps three mRNA bases of margin from every exon boundary, so it cannot belong to either exon. */
+static bool nm_inside_one_exon(const struct nm_case *c, const struct nm_edit *e) {
+    unsigned lo = c->u5 + e->p - 2u, hi = c->u5 + e->p + (e->kind == NM_SUB ? 0u : e->n) + 3u;
+    return nm_exon_of(c, lo) == nm_exon_of(c, hi);
+}
+
+/* Draws one edit into e after CDS base `after` (the previous edit's last base), or fails when none fits. */
+static bool nm_random_edit(struct theft *t, struct nm_case *c, unsigned after, unsigned limit, unsigned stop_bias, struct nm_edit *e) {
+    unsigned lo = after + 6u;
+    if (lo + 2u > limit) return false;
+    unsigned kind = (unsigned)kprop_bounded(t, 4u);
+    memset(e, 0, sizeof(*e));
+    e->p = lo + (unsigned)kprop_bounded(t, limit - lo);
+    if (kind <= 1u) {
+        e->kind = NM_SUB; e->n = 1u;
+        char ref = c->cds[e->p - 1u];
+        if (kind == 0u || stop_bias) { /* try for a stop codon: move to a codon where one substitution makes TAA/TAG/TGA */
+            for (unsigned tries = 0u; tries < 30u; tries++) {
+                unsigned codon = (e->p - 1u) / 3u, at = 3u * codon;
+                if (codon < 1u || at + 6u > c->cds_len) break;
+                static const char *const stops[3] = {"TAA", "TAG", "TGA"};
+                bool found = false;
+                for (unsigned s = 0u; s < 3u && !found; s++) {
+                    unsigned diff = 0u, where = 0u;
+                    for (unsigned k = 0u; k < 3u; k++) if (c->cds[at + k] != stops[s][k]) { diff++; where = k; }
+                    if (diff == 1u) { e->p = at + where + 1u; e->bases[0] = stops[s][where]; found = true; }
+                }
+                if (found) { ref = c->cds[e->p - 1u]; break; }
+                e->p = lo + (unsigned)kprop_bounded(t, limit - lo);
+            }
+        }
+        if (!e->bases[0] || e->bases[0] == ref) { e->bases[0] = "ACGT"[kprop_bounded(t, 4u)]; if (e->bases[0] == c->cds[e->p - 1u]) e->bases[0] = c->cds[e->p - 1u] == 'A' ? 'C' : 'A'; }
+        return e->p >= lo && e->p <= limit && e->p > 3u;
+    }
+    if (kind == 2u) {
+        e->kind = NM_INS; e->n = 1u + (unsigned)kprop_bounded(t, 3u);
+        for (unsigned i = 0u; i < e->n; i++) e->bases[i] = "ACGT"[kprop_bounded(t, 4u)];
+    } else {
+        e->kind = NM_DEL; e->n = kprop_bounded(t, 2u) ? 3u : 1u + (unsigned)kprop_bounded(t, 3u);
+        if (e->p + e->n + 3u > limit) return false;
+    }
+    return e->p > 4u && e->p <= limit && nm_unambiguous(c, e) && nm_inside_one_exon(c, e);
+}
+
+static unsigned nm_seen[16];
+enum { NM_SEEN_TRIGGER, NM_SEEN_ESCAPE, NM_SEEN_UNKNOWN, NM_SEEN_NA, NM_SEEN_INTRONLESS, NM_SEEN_REVERSE, NM_SEEN_UTR, NM_SEEN_INDEL_SHIFT,
+       NM_SEEN_POST, NM_SEEN_FLIP, NM_SEEN_EXONS4, NM_SEEN_RUN };
+
+/* Fills the mRNA/exon layout of a case: UTR lengths, cuts with at least eight bases per exon. */
+static bool nm_random_layout(struct theft *t, struct nm_case *c, unsigned codons) {
+    c->reverse = (unsigned)kprop_bounded(t, 2u); c->cache = (unsigned)kprop_bounded(t, 2u);
+    c->cds_len = 3u * codons;
+    c->u5 = kprop_bounded(t, 3u) ? (unsigned)kprop_bounded(t, 22u) : 0u;
+    c->u3 = kprop_bounded(t, 3u) ? (unsigned)kprop_bounded(t, 22u) : 0u;
+    c->exons = 1u + (unsigned)kprop_bounded(t, 4u);
+    unsigned mrna = c->u5 + c->cds_len + c->u3, previous = 0u;
+    for (unsigned k = 0u; k + 1u < c->exons; k++) {
+        unsigned lo = previous + 8u, hi = mrna - 8u * (c->exons - 1u - k) - 1u;
+        if (lo > hi) return false;
+        c->ends[k] = lo + (unsigned)kprop_bounded(t, hi - lo + 1u);
+        previous = c->ends[k];
+    }
+    c->ends[c->exons - 1u] = mrna;
+    return true;
+}
+
+static enum theft_alloc_res nm_case_alloc(struct theft *t, void *env, void **instance) {
+    (void)env;
+    struct nm_case *c = calloc(1u, sizeof(*c));
+    if (!c) return THEFT_ALLOC_ERROR;
+    unsigned codons = 14u + (unsigned)kprop_bounded(t, 54u);
+    if (!nm_random_layout(t, c, codons)) { c->cds_len = 0u; *instance = c; return THEFT_ALLOC_OK; }
+    nm_random_cds(t, codons, c->cds);
+    unsigned count = 1u + (unsigned)kprop_bounded(t, 3u), after = 3u, limit = c->cds_len - 12u;
+    for (unsigned k = 0u; k < count; k++) {
+        struct nm_edit e;
+        unsigned bias = !k && kprop_bounded(t, 2u);
+        bool ok = false;
+        for (unsigned tries = 0u; tries < 20u && !ok; tries++) ok = nm_random_edit(t, c, after, limit, bias, &e);
+        if (!ok) break;
+        c->edits[c->edit_count++] = e;
+        after = e.p + (e.kind == NM_DEL ? e.n : 1u);
+    }
+    *instance = c;
+    return THEFT_ALLOC_OK;
+}
+static void nm_case_free(void *instance, void *env) { (void)env; free(instance); }
+
+static enum theft_trial_res prop_nmd_matches_edited_geometry_oracle(struct theft *t, void *arg) {
+    (void)t;
+    const struct nm_case *c = arg;
+    if (!c->cds_len || !c->edit_count) return THEFT_TRIAL_SKIP;
+    struct nmd_scene *f = malloc(sizeof(*f));
+    if (!f) return THEFT_TRIAL_ERROR;
+    duckvep_haplotype_leaf_t leaf;
+    struct nm_expect x;
+    unsigned first;
+    int post[3];
+    nm_oracle(c, &x, &first, post);
+    enum theft_trial_res result = THEFT_TRIAL_FAIL;
+    if (nm_run(c, f, &leaf) != DUCKVEP_HAPLOTYPE_STREAM_OK || leaf.path_status != DUCKVEP_PREDICTION_PREDICTED ||
+        leaf.contributor_count != c->edit_count || (int)leaf.nmd != x.nmd ||
+        leaf.nmd_stop_valid != x.stop_valid || leaf.nmd_junction_valid != x.junction_valid ||
+        (x.stop_valid && leaf.nmd_stop_position1 != x.stop) || (x.junction_valid && leaf.nmd_junction_position1 != x.junction) ||
+        ((leaf.haplotype_so_mask & DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED)) != 0u) != (x.premature != 0u)) goto done;
+    for (unsigned k = 0u; k < c->edit_count; k++) {
+        bool found = false;
+        for (size_t j = 0u; j < leaf.contributor_count; j++) if (leaf.contributors[j].source.event_id == k + 1u) {
+            found = true;
+            if (leaf.contributors[j].role != (post[k] ? DUCKVEP_ROLE_POST_STOP : DUCKVEP_ROLE_APPLIED)) goto done;
+        }
+        if (!found) goto done;
+    }
+    nm_seen[x.nmd == DUCKVEP_HAPLOTYPE_NMD_TRIGGER ? NM_SEEN_TRIGGER : x.nmd == DUCKVEP_HAPLOTYPE_NMD_ESCAPE ? NM_SEEN_ESCAPE :
+            x.nmd == DUCKVEP_HAPLOTYPE_NMD_UNKNOWN ? NM_SEEN_UNKNOWN : NM_SEEN_NA]++;
+    nm_seen[NM_SEEN_INTRONLESS] += c->exons == 1u && x.stop_valid;
+    nm_seen[NM_SEEN_REVERSE] += c->reverse; nm_seen[NM_SEEN_UTR] += c->u5 && c->u3; nm_seen[NM_SEEN_EXONS4] += c->exons == 4u && x.junction_valid;
+    for (unsigned k = 0u; k < c->edit_count; k++) {
+        nm_seen[NM_SEEN_POST] += post[k];
+        if (x.junction_valid && c->exons > 1u && nm_edit_start(c, &c->edits[k]) <= c->ends[c->exons - 2u] && nm_edit_change(&c->edits[k]))
+            nm_seen[NM_SEEN_INDEL_SHIFT]++;
+    }
+    result = THEFT_TRIAL_PASS;
+done:
+    free(f);
+    return result;
+}
+
+TEST haplotype_nmd_matches_independent_edited_transcript_geometry(void) {
+    /* Random layouts (either strand, UTR or none, 1 to 4 exons, UTR-only exons) and 1 to 3 edits (substitutions biased to
+     * stops, and indels of 1 to 6 bases) recompute S and J from the edited sequence and exon geometry by an independent
+     * oracle: the same prediction, S, J, the stop_gained agreement and the applied/post_stop role of every edit. */
+    memset(nm_seen, 0, sizeof(nm_seen));
+    struct theft_type_info type = {.alloc = nm_case_alloc, .free = nm_case_free};
+    struct theft_run_config cfg = {0};
+    cfg.name = "ejc50-v1 == edited-transcript oracle";
+    cfg.prop1 = prop_nmd_matches_edited_geometry_oracle;
+    cfg.type_info[0] = &type;
+    cfg.trials = kprop_env_u64("DUCKVEP_PROP_TRIALS", KPROP_DEFAULT_TRIALS);
+    cfg.seed = (theft_seed)kprop_env_u64("DUCKVEP_PROP_SEED", KPROP_DEFAULT_SEED);
+    ASSERT_EQ(THEFT_RUN_PASS, theft_run(&cfg));
+    fprintf(stderr, "[nmd oracle coverage] trigger=%u escape=%u unknown=%u not_applicable=%u intronless=%u reverse=%u utr=%u four_exon=%u "
+        "indel_before_junction=%u post_stop_edits=%u\n", nm_seen[NM_SEEN_TRIGGER], nm_seen[NM_SEEN_ESCAPE], nm_seen[NM_SEEN_UNKNOWN],
+        nm_seen[NM_SEEN_NA], nm_seen[NM_SEEN_INTRONLESS], nm_seen[NM_SEEN_REVERSE], nm_seen[NM_SEEN_UTR], nm_seen[NM_SEEN_EXONS4],
+        nm_seen[NM_SEEN_INDEL_SHIFT], nm_seen[NM_SEEN_POST]);
+    if (cfg.trials >= KPROP_DEFAULT_TRIALS)
+        ASSERT(nm_seen[NM_SEEN_TRIGGER] > 20u && nm_seen[NM_SEEN_ESCAPE] > 20u && nm_seen[NM_SEEN_UNKNOWN] > 5u &&
+               nm_seen[NM_SEEN_NA] > 5u && nm_seen[NM_SEEN_INTRONLESS] > 5u && nm_seen[NM_SEEN_INDEL_SHIFT] > 20u &&
+               nm_seen[NM_SEEN_UTR] > 20u && nm_seen[NM_SEEN_EXONS4] > 5u && nm_seen[NM_SEEN_POST] > 10u &&
+               nm_seen[NM_SEEN_REVERSE] > 100u);
+    PASS();
+}
+
+/* 240-base CDS: ATG AGC (CAA)x77 TAA, so a stop codon at CDS 49-51 (S = u5 + 51) leaves room for any junction distance. */
+static void nm_caa_cds(char *cds) {
+    memcpy(cds, "ATGAGC", 6u);
+    for (unsigned i = 0u; i < 77u; i++) memcpy(cds + 6u + 3u * i, "CAA", 3u);
+    memcpy(cds + 237u, "TAA", 3u);
+    cds[240] = 0;
+}
+
+TEST haplotype_nmd_threshold_boundary_is_exactly_fifty(void) {
+    /* J - S from -5 to 80 for a stop codon at CDS 17, on both strands, with and without a UTR and with and without the
+     * model's cDNA origin cache: 50 escapes, 51 triggers, and S and J are the reported edited coordinates. A single
+     * exon escapes at every distance and reports no junction. */
+    unsigned checked = 0u;
+    for (unsigned reverse = 0u; reverse < 2u; reverse++) for (unsigned cache = 0u; cache < 2u; cache++)
+        for (unsigned utr = 0u; utr < 2u; utr++) for (int d = -5; d <= 80; d++) for (unsigned exons = 1u; exons <= 2u; exons++) {
+            struct nm_case *c = calloc(1u, sizeof(*c));
+            struct nmd_scene *f = malloc(sizeof(*f));
+            ASSERT(c && f);
+            c->reverse = reverse; c->cache = cache; c->u5 = utr ? 9u : 0u; c->u3 = utr ? 5u : 0u; c->cds_len = 240u; c->exons = exons;
+            nm_caa_cds(c->cds);
+            unsigned stop = c->u5 + 51u;
+            c->ends[exons - 1u] = c->u5 + 240u + c->u3;
+            if (exons == 2u) c->ends[0] = (unsigned)((int)stop + d);
+            c->edits[0] = (struct nm_edit){NM_SUB, 49u, 1u, "T"};
+            c->edit_count = 1u;
+            duckvep_haplotype_leaf_t leaf;
+            ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, nm_run(c, f, &leaf));
+            ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.path_status);
+            ASSERT(leaf.haplotype_so_mask & DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED));
+            ASSERT_EQ(1u, leaf.nmd_stop_valid);
+            ASSERT_EQ(stop, leaf.nmd_stop_position1);
+            if (exons == 1u) {
+                ASSERT_EQ((int)DUCKVEP_HAPLOTYPE_NMD_ESCAPE, (int)leaf.nmd);
+                ASSERT_EQ(0u, leaf.nmd_junction_valid);
+            } else {
+                ASSERT_EQ(1u, leaf.nmd_junction_valid);
+                ASSERT_EQ((unsigned)((int)stop + d), leaf.nmd_junction_position1);
+                ASSERT_EQ((int)(d > 50 ? DUCKVEP_HAPLOTYPE_NMD_TRIGGER : DUCKVEP_HAPLOTYPE_NMD_ESCAPE), (int)leaf.nmd);
+            }
+            free(c); free(f);
+            checked++;
+        }
+    ASSERT_EQ(2u * 2u * 2u * 86u * 2u, checked);
+    PASS();
+}
+
+struct nm_post_case { struct nm_case base; struct nm_edit extra; unsigned valid; };
+
+static enum theft_alloc_res nm_post_alloc(struct theft *t, void *env, void **instance) {
+    (void)env;
+    struct nm_post_case *p = calloc(1u, sizeof(*p));
+    if (!p) return THEFT_ALLOC_ERROR;
+    struct nm_case *c = &p->base;
+    unsigned codons = 40u + (unsigned)kprop_bounded(t, 30u);
+    c->reverse = (unsigned)kprop_bounded(t, 2u); c->cache = (unsigned)kprop_bounded(t, 2u);
+    c->cds_len = 3u * codons;
+    c->u5 = kprop_bounded(t, 2u) ? (unsigned)kprop_bounded(t, 16u) : 0u; c->u3 = kprop_bounded(t, 2u) ? (unsigned)kprop_bounded(t, 16u) : 0u;
+    c->exons = 2u + (unsigned)kprop_bounded(t, 2u);
+    nm_random_cds(t, codons, c->cds);
+    /* One stop-creating substitution early enough that the junction can sit 47 to 53 bases after it. */
+    struct nm_edit stop = {0};
+    for (unsigned tries = 0u; tries < 40u && !stop.n; tries++) {
+        unsigned codon = 2u + (unsigned)kprop_bounded(t, 12u), at = 3u * codon;
+        static const char *const stops[3] = {"TAA", "TAG", "TGA"};
+        for (unsigned s = 0u; s < 3u && !stop.n; s++) {
+            unsigned diff = 0u, where = 0u;
+            for (unsigned k = 0u; k < 3u; k++) if (c->cds[at + k] != stops[s][k]) { diff++; where = k; }
+            if (diff == 1u) stop = (struct nm_edit){NM_SUB, at + where + 1u, 1u, {stops[s][where]}};
+        }
+    }
+    if (!stop.n) { *instance = p; return THEFT_ALLOC_OK; }
+    c->edits[0] = stop; c->edit_count = 1u;
+    unsigned s_cds = 3u * ((stop.p - 1u) / 3u + 1u), s_mrna = c->u5 + s_cds; /* S as an mRNA coordinate */
+    unsigned mrna = c->u5 + c->cds_len + c->u3, junction = s_mrna + 47u + (unsigned)kprop_bounded(t, 7u);
+    if (junction + 30u > mrna) { *instance = p; return THEFT_ALLOC_OK; }
+    if (c->exons == 2u) c->ends[0] = junction;
+    else {
+        unsigned cut = 10u + (unsigned)kprop_bounded(t, junction > 30u ? junction - 30u : 1u);
+        if (cut + 8u > junction) { *instance = p; return THEFT_ALLOC_OK; }
+        c->ends[0] = cut; c->ends[1] = junction;
+    }
+    c->ends[c->exons - 1u] = mrna;
+    /* The post-stop edit: after the stop with margin, before the last 12 CDS bases, anywhere in the penultimate or last exon. */
+    unsigned from = s_cds + 6u, limit = c->cds_len - 12u;
+    if (from + 8u > limit) { *instance = p; return THEFT_ALLOC_OK; }
+    struct nm_edit e = {0};
+    unsigned kind = (unsigned)kprop_bounded(t, 3u);
+    e.p = from + (unsigned)kprop_bounded(t, limit - from);
+    if (kind == 0u) { e.kind = NM_SUB; e.n = 1u; e.bases[0] = c->cds[e.p - 1u] == 'A' ? 'G' : 'A'; }
+    else if (kind == 1u) { e.kind = NM_INS; e.n = 1u + (unsigned)kprop_bounded(t, 3u); for (unsigned i = 0u; i < e.n; i++) e.bases[i] = "ACGT"[kprop_bounded(t, 4u)]; }
+    else { e.kind = NM_DEL; e.n = 1u + (unsigned)kprop_bounded(t, 3u); }
+    if (e.p + e.n + 3u > limit || !nm_unambiguous(c, &e) || !nm_inside_one_exon(c, &e)) { *instance = p; return THEFT_ALLOC_OK; }
+    p->extra = e; p->valid = 1u;
+    *instance = p;
+    return THEFT_ALLOC_OK;
+}
+
+static enum theft_trial_res prop_nmd_ignores_post_stop_edits_except_through_junction(struct theft *t, void *arg) {
+    (void)t;
+    const struct nm_post_case *p = arg;
+    if (!p->valid) return THEFT_TRIAL_SKIP;
+    struct nm_case with = p->base;
+    with.edits[1] = p->extra; with.edit_count = 2u;
+    struct nmd_scene *f = malloc(sizeof(*f)), *g = malloc(sizeof(*g));
+    if (!f || !g) { free(f); free(g); return THEFT_TRIAL_ERROR; }
+    duckvep_haplotype_leaf_t before, after;
+    enum theft_trial_res result = THEFT_TRIAL_FAIL;
+    if (nm_run(&p->base, f, &before) != DUCKVEP_HAPLOTYPE_STREAM_OK || nm_run(&with, g, &after) != DUCKVEP_HAPLOTYPE_STREAM_OK ||
+        before.path_status != DUCKVEP_PREDICTION_PREDICTED || after.path_status != DUCKVEP_PREDICTION_PREDICTED ||
+        !before.nmd_stop_valid || !after.nmd_stop_valid || !before.nmd_junction_valid || !after.nmd_junction_valid) goto done;
+    /* The stop, its attribution and the extra edit's role never depend on an edit after the stop. */
+    if (before.nmd_stop_position1 != after.nmd_stop_position1 || after.contributor_count != 2u) goto done;
+    for (size_t j = 0u; j < after.contributor_count; j++) {
+        uint64_t id = after.contributors[j].source.event_id;
+        if (id == 1u && after.contributors[j].role != DUCKVEP_ROLE_APPLIED) goto done;
+        if (id == 2u && after.contributors[j].role != DUCKVEP_ROLE_POST_STOP) goto done;
+    }
+    /* J moves by exactly the extra edit's length change when it starts at or before the penultimate exon's last base. */
+    bool moves = nm_edit_start(&with, &p->extra) <= p->base.ends[p->base.exons - 2u];
+    int64_t expect = (int64_t)before.nmd_junction_position1 + (moves ? nm_edit_change(&p->extra) : 0);
+    if ((int64_t)after.nmd_junction_position1 != expect) goto done;
+    int64_t distance = (int64_t)after.nmd_junction_position1 - (int64_t)after.nmd_stop_position1;
+    if ((int)after.nmd != (int)(distance > 50 ? DUCKVEP_HAPLOTYPE_NMD_TRIGGER : DUCKVEP_HAPLOTYPE_NMD_ESCAPE)) goto done;
+    /* An edit that leaves the distance alone leaves the whole prediction alone. */
+    if (!moves || !nm_edit_change(&p->extra)) {
+        if (after.nmd != before.nmd || after.nmd_junction_position1 != before.nmd_junction_position1) goto done;
+    }
+    nm_seen[NM_SEEN_POST]++;
+    if (moves && nm_edit_change(&p->extra)) { nm_seen[NM_SEEN_INDEL_SHIFT]++; nm_seen[NM_SEEN_FLIP] += after.nmd != before.nmd; }
+    else nm_seen[NM_SEEN_RUN]++;
+    result = THEFT_TRIAL_PASS;
+done:
+    free(f); free(g);
+    return result;
+}
+
+TEST haplotype_nmd_is_invariant_to_post_stop_edits_that_leave_the_junction_distance(void) {
+    /* A stop-creating substitution with the junction 47 to 53 bases after it, then one more edit after the stop codon.
+     * S, the applied set and the prediction never depend on it, except through the edited junction: a substitution or
+     * an indel in the last exon leaves the prediction and J untouched, while an indel up to the penultimate exon's last
+     * base moves J by exactly its length change (and can flip the prediction across the threshold). */
+    memset(nm_seen, 0, sizeof(nm_seen));
+    struct theft_type_info type = {.alloc = nm_post_alloc, .free = nm_case_free};
+    struct theft_run_config cfg = {0};
+    cfg.name = "post-stop edits move J only";
+    cfg.prop1 = prop_nmd_ignores_post_stop_edits_except_through_junction;
+    cfg.type_info[0] = &type;
+    cfg.trials = kprop_env_u64("DUCKVEP_PROP_TRIALS", KPROP_DEFAULT_TRIALS);
+    cfg.seed = (theft_seed)kprop_env_u64("DUCKVEP_PROP_SEED", KPROP_DEFAULT_SEED);
+    ASSERT_EQ(THEFT_RUN_PASS, theft_run(&cfg));
+    fprintf(stderr, "[nmd post-stop coverage] checked=%u junction_shifts=%u flips=%u unchanged=%u\n", nm_seen[NM_SEEN_POST],
+        nm_seen[NM_SEEN_INDEL_SHIFT], nm_seen[NM_SEEN_FLIP], nm_seen[NM_SEEN_RUN]);
+    if (cfg.trials >= KPROP_DEFAULT_TRIALS)
+        ASSERT(nm_seen[NM_SEEN_INDEL_SHIFT] > 30u && nm_seen[NM_SEEN_FLIP] > 5u && nm_seen[NM_SEEN_RUN] > 30u);
+    PASS();
+}
+
+TEST haplotype_nmd_no_op_alt_is_rejected_so_no_reference_lane_leaf_exists(void) {
+    /* Reference-only lanes are not_applicable (a path with no edit has no termination change; the kernel labels such a
+     * leaf so), but no such leaf can be built from records: an ALT equal to REF is rejected before any leaf exists, and
+     * an ALT-free lane of a strict decoded call has no carrier. The one-substitution control is decided by the rule. */
+    struct nm_case *c = calloc(1u, sizeof(*c));
+    struct nmd_scene *f = malloc(sizeof(*f));
+    ASSERT(c && f);
+    c->cds_len = 240u; c->exons = 2u; c->u5 = 3u; c->u3 = 4u; c->ends[0] = 90u; c->ends[1] = 247u;
+    nm_caa_cds(c->cds);
+    c->edits[0] = (struct nm_edit){NM_SUB, 49u, 1u, "T"}; c->edit_count = 1u;
+    duckvep_haplotype_leaf_t leaf;
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, nm_run(c, f, &leaf));
+    ASSERT_EQ((int)DUCKVEP_HAPLOTYPE_NMD_ESCAPE, (int)leaf.nmd); /* J - S = 90 - 54 = 36 */
+    ASSERT_EQ(54u, (unsigned)leaf.nmd_stop_position1);
+    ASSERT_EQ(90u, (unsigned)leaf.nmd_junction_position1);
+    nm_scene_prepare(f, c);
+    duckvep_haplotype_stream_t *s = &f->stream;
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, duckvep_haplotype_stream_init(s, &f->model, &f->exons, &f->sequences, &f->buffers));
+    struct nm_record r;
+    nm_record_of(c, f, &c->edits[0], &r);
+    char same_alt[2] = {r.ref[0], 0};
+    duckvep_haplotype_source_t source = {1u, (const uint8_t *)r.ref, (const uint8_t *)same_alt, r.pos, 0u, 1u, 1u, 0u, 0u, 0u, 1u};
+    uint32_t tx = 0u;
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG, haplotype_test_begin_candidates(s, &source, &tx, 1u));
+    free(c); free(f);
+    PASS();
+}
