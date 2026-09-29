@@ -1510,7 +1510,45 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 	{
 		uint8_t *cds, *flanks;
 		size_t i, cds_offset = 0u, flank_offset = 0u;
+		int in_order = 1;
 
+		/* Rows normally arrive in transcript_index order, so the pools are already laid out in index order. Then
+		 * only a shrink to the exact length is needed; reordering would copy every sequence byte a second time
+		 * and hold both copies at once (the load high-water mark). */
+		for (i = 0; i < expected && in_order; i++) {
+			in_order = model->cds_sequence_offsets[i] == cds_offset &&
+			    model->pre_cds_sequence_offsets[i] == flank_offset &&
+			    model->post_cds_sequence_offsets[i] == flank_offset +
+			    model->pre_cds_sequence_lengths[i];
+			cds_offset += model->cds_sequence_lengths[i];
+			flank_offset += (size_t)model->pre_cds_sequence_lengths[i] +
+			    model->post_cds_sequence_lengths[i];
+		}
+		if (in_order && cds_offset == model->cds_sequence_length &&
+		    flank_offset == model->flank_sequence_length) {
+			size_t cds_exact = model->cds_sequence_length == 0 ? 1u : model->cds_sequence_length;
+			size_t flank_exact = model->flank_sequence_length == 0 ? 1u : model->flank_sequence_length;
+
+			cds = model->cds_sequence_capacity == cds_exact ? model->cds_sequence_bytes :
+			    duckvep_budget_realloc(DUCKVEP_OWNER_MODEL, model->cds_sequence_bytes, cds_exact);
+			if (cds != NULL)
+				model->cds_sequence_bytes = cds;
+			flanks = model->flank_sequence_capacity == flank_exact ? model->flank_sequence_bytes :
+			    duckvep_budget_realloc(DUCKVEP_OWNER_MODEL, model->flank_sequence_bytes, flank_exact);
+			if (flanks != NULL)
+				model->flank_sequence_bytes = flanks;
+			if (cds == NULL || flanks == NULL) {
+				duckvep_sql_set_error(error, error_size,
+				    "out of memory ordering transcript sequences");
+				goto done;
+			}
+			model->cds_sequence_capacity = model->cds_sequence_length;
+			model->flank_sequence_capacity = model->flank_sequence_length;
+			ok = 1;
+			goto done;
+		}
+		cds_offset = 0u;
+		flank_offset = 0u;
 		cds = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, model->cds_sequence_length == 0 ? 1u :
 		    model->cds_sequence_length);
 		flanks = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, model->flank_sequence_length == 0 ? 1u :
