@@ -4,21 +4,6 @@
 #include <string.h>
 DUCKDB_EXTENSION_EXTERN
 
-/* A qualified name has exactly one schema separator; each component is quoted. */
-static bool relation(duckvep_sql_text *sql, const char *name) {
-    const char *dot = strchr(name, '.');
-    if (!*name || (dot && (!dot[1] || dot == name || strchr(dot + 1, '.')))) return false;
-    if (!dot) return duckvep_sql_identifier(sql, name);
-    size_t size = (size_t)(dot - name);
-    char *schema = malloc(size + 1);
-    if (!schema) return false;
-    memcpy(schema, name, size); schema[size] = 0;
-    bool ok = duckvep_sql_identifier(sql, schema) && duckvep_sql_append(sql, ".") &&
-        duckvep_sql_identifier(sql, dot + 1);
-    free(schema);
-    return ok;
-}
-
 static const char sv_sql[] =
 "), parts AS (SELECT *, string_split(info, ';') AS tokens, "
 "try_cast(pos AS BIGINT) + length(ref) AS nominal_start, "
@@ -68,7 +53,7 @@ static void prepare_sv(duckdb_function_info info, duckdb_data_chunk input, duckd
             duckvep_builder_string(((duckdb_string_t *)duckdb_vector_get_data(name_vector))[row]);
         duckvep_sql_text sql = {0};
         bool ok = name && duckvep_sql_append(&sql, "WITH source AS (SELECT event_index, pos, ref, alt, info FROM ") &&
-            relation(&sql, name) && duckvep_sql_append(&sql, sv_sql);
+            duckvep_sql_relation(&sql, name) && duckvep_sql_append(&sql, sv_sql);
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
         else duckdb_scalar_function_set_error(info, "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure");
         duckvep_sql_free(&sql);
@@ -168,8 +153,8 @@ static void prepare_str(duckdb_function_info info, duckdb_data_chunk input, duck
         }
         duckvep_sql_text sql = {0};
         if (ok) ok = duckvep_sql_append(&sql, "WITH source AS (SELECT event_index, info, format, \"sample\", ref, alt, alt_index FROM ") &&
-            relation(&sql, tables[0]) && duckvep_sql_append(&sql, str_sql) &&
-            relation(&sql, tables[1]) && duckvep_sql_append(&sql, str_tail) &&
+            duckvep_sql_relation(&sql, tables[0]) && duckvep_sql_append(&sql, str_sql) &&
+            duckvep_sql_relation(&sql, tables[1]) && duckvep_sql_append(&sql, str_tail) &&
             duckvep_sql_append(&sql, str_tail2);
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
         else duckdb_scalar_function_set_error(info, "duckvep_prepare_expansionhunter_sql: invalid relation name or allocation failure");

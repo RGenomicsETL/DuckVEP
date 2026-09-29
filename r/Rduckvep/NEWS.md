@@ -1,5 +1,8 @@
 # Rduckvep
 
+- `rduckvep_prepare_breakend_pairs()`, `rduckvep_prepare_breakend_fusion()` and
+  `rduckvep_prepare_structural_hgvs()` wrap the native BND identity, endpoint-gene
+  and structural HGVS builders. No parsing or HGVS logic lives in R.
 - The extension's SQL preparation and annotation entry points are native builders:
   `query(duckvep_annotate_sql('events', 'model', {hgvs: true}))` replaces
   direct annotation macro calls. `rduckvep_annotate_sql()` and the other
