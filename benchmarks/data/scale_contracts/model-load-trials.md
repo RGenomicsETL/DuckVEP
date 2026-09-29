@@ -19,3 +19,15 @@ Same setup (fresh R process, one thread, 8 GB limit, immutable binary copies, a 
 | scatter-unordered | 3.299 | 5,232,852 / 5,232,888 / 5,233,200 |
 
 Load time improved by 0.139 s (4.0%); peak RSS fell by about 52,500 KiB (1.0%, 51 MiB). The peak is not materially reduced: the stable v1 C API has no streaming result (`duckdb_execute_prepared_streaming` is unstable-only), so every query result is still fully materialized by DuckDB before rows are scanned; only the sort buffers are gone. This is consistent with the earlier 2.8 GiB pre-array figure being result materialization and the attached model buffer cache rather than the sort; that attribution is inferred, not separately measured.
+
+## Scatter loader rebased onto circular-topology main
+
+Same setup as above (fresh R process, one thread, 8 GB limit, immutable binary copies, copy of the read-only model). `main` is origin/main including the #19 circular validations (binary `f7a19dfca143e936b755fccc36a54ac4451b2a8c50e0eda538049c389d904101`, ordered queries). `scatter` is the rebased branch (binary `4907665be5961850d2e70c1f18c035a3a20bab38b70c9b61762d5ce87b42f813`) loading the same tables without ORDER BY. For reference, the rebased binary was also run on the ordered queries.
+
+| Build | Load times (s), 3 runs | Median load (s) | Peak RSS (KiB), 3 runs |
+|---|---|---:|---:|
+| main (ordered) | 3.509 / 3.532 / 3.493 | 3.509 | 5,285,640 / 5,284,912 / 5,285,212 |
+| scatter (unordered) | 3.312 / 3.377 / 3.364 | 3.364 | 5,233,072 / 5,233,328 / 5,232,960 |
+| scatter (ordered queries, reference) | 3.969 / 3.966 / 3.955 | 3.966 | 6,433,940 / 6,433,404 / 6,433,416 |
+
+The ordered-query row only shows the cost of DuckDB sorting inside the query (about 1.2 GB extra RSS); it is not a loader comparison.
