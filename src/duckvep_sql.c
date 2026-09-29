@@ -198,6 +198,11 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
             names[i] = duckvep_builder_string(((duckdb_string_t *)duckdb_vector_get_data(args[i]))[row]);
             if (!names[i]) { ok = false; break; }
         }
+        if (ok && projected && names[1][0] == '\0') {
+            duckdb_scalar_function_set_error(info, "duckvep_annotate_projected: model_name must be non-empty");
+            for (idx_t i = 0; i < 2; i++) free(names[i]);
+            return;
+        }
         duckdb_vector fields[4] = {0};
         if (ok && argc == 3) {
             ok = projected ? duckvep_builder_option_vectors(info, args[2], row,

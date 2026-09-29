@@ -24,3 +24,28 @@ statement error
 SELECT duckvep_model_receipt_sql('r', 't', 's', 'v', 'a', repeat('a', 64), repeat('b', 64), 'all', {regulation_features_table: 1});
 ----
 expected VARCHAR for option 'regulation_features_table'
+
+statement ok
+CREATE TEMP TABLE projected_invalid_events(event_index UBIGINT, seq_region UINTEGER,
+    position UBIGINT, reference VARCHAR, alternate VARCHAR);
+
+statement ok
+INSERT INTO projected_invalid_events VALUES (1, 1, 42, 'A', '<*>');
+
+statement error
+SELECT count(*) FROM query(duckvep_annotate_projected_sql('projected_invalid_events', 'missing'));
+----
+expected literal small-variant events
+
+statement ok
+UPDATE projected_invalid_events SET alternate = '<DEL>';
+
+statement error
+SELECT count(*) FROM query(duckvep_annotate_projected_sql('projected_invalid_events', 'missing'));
+----
+REF/ALT must be unequal A/C/G/T/N alleles
+
+statement error
+SELECT duckvep_annotate_projected_sql('projected_invalid_events', '');
+----
+model_name must be non-empty
