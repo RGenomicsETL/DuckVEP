@@ -159,7 +159,8 @@ remain the source authorities, not biological simplifications of their term name
   can mix mate coordinates without
   a chromosome key, making a record's transcript set depend on other buffered records.
   BND differentials use `buffer_size=1` to state an isolated-event oracle contract;
-  this is not conformance to arbitrary batched output. The
+  this is not conformance to arbitrary batched output. In the species pooled files (both mates of a pair in one run) `buffer_size=1` did not isolate three records;
+  they agree with DuckVEP when re-run alone ([species evidence](benchmarks/data/sv_species_evidence.md)). The
   [multichromosome BND report](benchmarks/duckvep_conformance.md#paired-breakend-differential)
   records that scope.
 - **Symbolic and repeat alleles:** VEP accepts a finite symbolic vocabulary, not arbitrary
