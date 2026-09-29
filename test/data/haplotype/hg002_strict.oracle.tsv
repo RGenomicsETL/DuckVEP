@@ -1,0 +1,16 @@
+field	value
+bcftools_commit	6dbd8fef51e529755a4a81544075dc6a43ff3cd3
+htslib_commit	c1f35d67dd5ff1e226d94abe7b850f28c60f5910
+bcftools_version	1.23.1-70-g6dbd8fef+htslib-1.22.1
+htslib_version	1.22.1
+phase_mode	s
+ncsq	1024
+input_name	HG002 GIAB v4.2.1 GRCh38 hifiasm phasetransfer; malformed MHC FORMAT records removed; Ensembl contig names
+input_sha256	54e5d09d3d6524a5daeaba8bfa911a8c760d1f50c81b51830404281c7b9ebf9e
+reference_name	Homo_sapiens.GRCh38.dna.primary_assembly.fa
+reference_sha256	1e74081a49ceb9739cc14c812fbb8b3db978eb80ba8e5350beb80d8ad8dfef3b
+gff3_name	Homo_sapiens.GRCh38.116.gff3.gz
+gff3_sha256	08e881d96ab6385a2c31f063a018be4b2c36860b323f2724be07022deeef21ce
+output_format	BCF
+output_sha256	e2c89f0d35c9fc1f1fd9eb9bac539c65e59071aa790f0f86a5f21213099ac396
+input_records	4023088
