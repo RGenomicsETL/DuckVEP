@@ -33,9 +33,10 @@ rduckvep_prepare_expansionhunter <- function(info, format, sample, ref, alt,
   if (!all(vapply(source[seq_len(6L)], scalar, logical(1))))
     return(result("incomplete", "missing_field"))
   alts <- strsplit(alt, ",", fixed = TRUE)[[1L]]
-  if (length(alt_index) != 1L || is.na(alt_index) ||
-      !is.numeric(alt_index) || alt_index != as.integer(alt_index) ||
-      alt_index < 1L || alt_index > length(alts))
+  if (length(alt_index) != 1L || !is.numeric(alt_index) ||
+      is.na(alt_index) || !is.finite(alt_index) ||
+      alt_index < 1L || alt_index > length(alts) ||
+      alt_index != floor(alt_index))
     return(result("invalid", "alt_index"))
   selected <- alts[[alt_index]]
   if (!grepl("^[ACGT]$", ref) || !grepl("^[ACGT]+$", reference_sequence))
@@ -57,6 +58,8 @@ rduckvep_prepare_expansionhunter <- function(info, format, sample, ref, alt,
   if (!grepl("^[ACGT]+$", unit) || !is.finite(reference_count) ||
       !is.finite(reference_length) || !is.finite(number(values[["END"]])))
     return(result("invalid", "metadata_syntax"))
+  if (reference_length > 5000)
+    return(result("summary_only", "allele_capacity"))
   if (reference_count * nchar(unit) != reference_length ||
       reference_length != nchar(reference_sequence) ||
       !identical(strrep(unit, reference_count), reference_sequence))
