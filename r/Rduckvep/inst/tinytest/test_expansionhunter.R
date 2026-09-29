@@ -34,3 +34,8 @@ expect_identical(rduckvep_prepare_expansionhunter(als,
   paste0(als_format, ":REPCN:REPCI"), paste0(als_sample, ":2/349:2-2/323-376"),
   "C", "<STR2>,<STR349>", strrep("GGCCCC", 3L))$reason,
   "ambiguous_count_fields")
+expect_identical(als_call(1e20)$reason, "alt_index")
+expect_identical(rduckvep_prepare_expansionhunter(
+  "END=6000;REF=6000;RL=6000;RU=A", "GT:SO:CN:CI",
+  "1:SPANNING:2:2-2", "A", "<STR2>", strrep("A", 6000L))$reason,
+  "allele_capacity")
