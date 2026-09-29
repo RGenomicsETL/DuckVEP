@@ -1,0 +1,507 @@
+##fileformat=VCFv4.2
+##contig=<ID=plus_1exon__frame_open_early_stop,length=140>
+##contig=<ID=plus_1exon__frame_open_runs_off,length=140>
+##contig=<ID=plus_1exon__frame_open_late_stop,length=140>
+##contig=<ID=plus_1exon__frame_open_plus2_runs_off,length=140>
+##contig=<ID=plus_1exon__frame_open_minus2_late_stop,length=140>
+##contig=<ID=plus_1exon__frame_open_before_terminal,length=140>
+##contig=<ID=plus_1exon__restored_rescued,length=140>
+##contig=<ID=plus_1exon__restored_early_stop,length=140>
+##contig=<ID=plus_1exon__restored_rescued_wide,length=140>
+##contig=<ID=plus_1exon__restored_early_stop_wide,length=140>
+##contig=<ID=plus_1exon__restored_near_introns,length=140>
+##contig=<ID=plus_1exon__restored_minus_plus,length=140>
+##contig=<ID=plus_1exon__restored_plus2_minus2,length=140>
+##contig=<ID=plus_1exon__restored_minus2_plus2,length=140>
+##contig=<ID=plus_1exon__restoring_insertion_creates_stop,length=140>
+##contig=<ID=plus_1exon__restored_identical_peptide_early,length=140>
+##contig=<ID=plus_1exon__restored_identical_peptide_late,length=140>
+##contig=<ID=plus_1exon__restored_two_pairs,length=140>
+##contig=<ID=plus_1exon__restored_three_insertions,length=140>
+##contig=<ID=plus_1exon__restored_ins1_ins2,length=140>
+##contig=<ID=plus_1exon__restored_del1_del2,length=140>
+##contig=<ID=plus_1exon__stop_gained_snv,length=140>
+##contig=<ID=plus_1exon__stop_gained_cis_pair,length=140>
+##contig=<ID=plus_1exon__stop_gained_inframe_insertion,length=140>
+##contig=<ID=plus_1exon__stop_gained_post_stop_frame,length=140>
+##contig=<ID=plus_1exon__stop_gained_after_restoration,length=140>
+##contig=<ID=plus_1exon__early_stop_then_missense,length=140>
+##contig=<ID=plus_1exon__trans_control_of_pair,length=140>
+##contig=<ID=plus_1exon__hom_alt_frame_open,length=140>
+##contig=<ID=plus_1exon__start_codon_insertion,length=140>
+##contig=<ID=plus_2exon__frame_open_early_stop,length=180>
+##contig=<ID=plus_2exon__frame_open_runs_off,length=180>
+##contig=<ID=plus_2exon__frame_open_late_stop,length=180>
+##contig=<ID=plus_2exon__frame_open_plus2_runs_off,length=180>
+##contig=<ID=plus_2exon__frame_open_minus2_late_stop,length=180>
+##contig=<ID=plus_2exon__frame_open_before_terminal,length=180>
+##contig=<ID=plus_2exon__restored_rescued,length=180>
+##contig=<ID=plus_2exon__restored_early_stop,length=180>
+##contig=<ID=plus_2exon__restored_rescued_wide,length=180>
+##contig=<ID=plus_2exon__restored_early_stop_wide,length=180>
+##contig=<ID=plus_2exon__restored_near_introns,length=180>
+##contig=<ID=plus_2exon__restored_minus_plus,length=180>
+##contig=<ID=plus_2exon__restored_plus2_minus2,length=180>
+##contig=<ID=plus_2exon__restored_minus2_plus2,length=180>
+##contig=<ID=plus_2exon__restoring_insertion_creates_stop,length=180>
+##contig=<ID=plus_2exon__restored_identical_peptide_early,length=180>
+##contig=<ID=plus_2exon__restored_identical_peptide_late,length=180>
+##contig=<ID=plus_2exon__restored_two_pairs,length=180>
+##contig=<ID=plus_2exon__restored_three_insertions,length=180>
+##contig=<ID=plus_2exon__restored_ins1_ins2,length=180>
+##contig=<ID=plus_2exon__restored_del1_del2,length=180>
+##contig=<ID=plus_2exon__stop_gained_snv,length=180>
+##contig=<ID=plus_2exon__stop_gained_cis_pair,length=180>
+##contig=<ID=plus_2exon__stop_gained_inframe_insertion,length=180>
+##contig=<ID=plus_2exon__stop_gained_post_stop_frame,length=180>
+##contig=<ID=plus_2exon__stop_gained_after_restoration,length=180>
+##contig=<ID=plus_2exon__early_stop_then_missense,length=180>
+##contig=<ID=plus_2exon__trans_control_of_pair,length=180>
+##contig=<ID=plus_2exon__hom_alt_frame_open,length=180>
+##contig=<ID=plus_2exon__start_codon_insertion,length=180>
+##contig=<ID=plus_3exon__frame_open_early_stop,length=220>
+##contig=<ID=plus_3exon__frame_open_runs_off,length=220>
+##contig=<ID=plus_3exon__frame_open_late_stop,length=220>
+##contig=<ID=plus_3exon__frame_open_plus2_runs_off,length=220>
+##contig=<ID=plus_3exon__frame_open_minus2_late_stop,length=220>
+##contig=<ID=plus_3exon__frame_open_before_terminal,length=220>
+##contig=<ID=plus_3exon__restored_rescued,length=220>
+##contig=<ID=plus_3exon__restored_early_stop,length=220>
+##contig=<ID=plus_3exon__restored_rescued_wide,length=220>
+##contig=<ID=plus_3exon__restored_early_stop_wide,length=220>
+##contig=<ID=plus_3exon__restored_near_introns,length=220>
+##contig=<ID=plus_3exon__restored_minus_plus,length=220>
+##contig=<ID=plus_3exon__restored_plus2_minus2,length=220>
+##contig=<ID=plus_3exon__restored_minus2_plus2,length=220>
+##contig=<ID=plus_3exon__restoring_insertion_creates_stop,length=220>
+##contig=<ID=plus_3exon__restored_identical_peptide_early,length=220>
+##contig=<ID=plus_3exon__restored_identical_peptide_late,length=220>
+##contig=<ID=plus_3exon__restored_two_pairs,length=220>
+##contig=<ID=plus_3exon__restored_three_insertions,length=220>
+##contig=<ID=plus_3exon__restored_ins1_ins2,length=220>
+##contig=<ID=plus_3exon__restored_del1_del2,length=220>
+##contig=<ID=plus_3exon__stop_gained_snv,length=220>
+##contig=<ID=plus_3exon__stop_gained_cis_pair,length=220>
+##contig=<ID=plus_3exon__stop_gained_inframe_insertion,length=220>
+##contig=<ID=plus_3exon__stop_gained_post_stop_frame,length=220>
+##contig=<ID=plus_3exon__stop_gained_after_restoration,length=220>
+##contig=<ID=plus_3exon__early_stop_then_missense,length=220>
+##contig=<ID=plus_3exon__trans_control_of_pair,length=220>
+##contig=<ID=plus_3exon__hom_alt_frame_open,length=220>
+##contig=<ID=plus_3exon__start_codon_insertion,length=220>
+##contig=<ID=minus_1exon__frame_open_early_stop,length=140>
+##contig=<ID=minus_1exon__frame_open_runs_off,length=140>
+##contig=<ID=minus_1exon__frame_open_late_stop,length=140>
+##contig=<ID=minus_1exon__frame_open_plus2_runs_off,length=140>
+##contig=<ID=minus_1exon__frame_open_minus2_late_stop,length=140>
+##contig=<ID=minus_1exon__frame_open_before_terminal,length=140>
+##contig=<ID=minus_1exon__restored_rescued,length=140>
+##contig=<ID=minus_1exon__restored_early_stop,length=140>
+##contig=<ID=minus_1exon__restored_rescued_wide,length=140>
+##contig=<ID=minus_1exon__restored_early_stop_wide,length=140>
+##contig=<ID=minus_1exon__restored_near_introns,length=140>
+##contig=<ID=minus_1exon__restored_minus_plus,length=140>
+##contig=<ID=minus_1exon__restored_plus2_minus2,length=140>
+##contig=<ID=minus_1exon__restored_minus2_plus2,length=140>
+##contig=<ID=minus_1exon__restoring_insertion_creates_stop,length=140>
+##contig=<ID=minus_1exon__restored_identical_peptide_early,length=140>
+##contig=<ID=minus_1exon__restored_identical_peptide_late,length=140>
+##contig=<ID=minus_1exon__restored_two_pairs,length=140>
+##contig=<ID=minus_1exon__restored_three_insertions,length=140>
+##contig=<ID=minus_1exon__restored_ins1_ins2,length=140>
+##contig=<ID=minus_1exon__restored_del1_del2,length=140>
+##contig=<ID=minus_1exon__stop_gained_snv,length=140>
+##contig=<ID=minus_1exon__stop_gained_cis_pair,length=140>
+##contig=<ID=minus_1exon__stop_gained_inframe_insertion,length=140>
+##contig=<ID=minus_1exon__stop_gained_post_stop_frame,length=140>
+##contig=<ID=minus_1exon__stop_gained_after_restoration,length=140>
+##contig=<ID=minus_1exon__early_stop_then_missense,length=140>
+##contig=<ID=minus_1exon__trans_control_of_pair,length=140>
+##contig=<ID=minus_1exon__hom_alt_frame_open,length=140>
+##contig=<ID=minus_1exon__start_codon_insertion,length=140>
+##contig=<ID=minus_2exon__frame_open_early_stop,length=180>
+##contig=<ID=minus_2exon__frame_open_runs_off,length=180>
+##contig=<ID=minus_2exon__frame_open_late_stop,length=180>
+##contig=<ID=minus_2exon__frame_open_plus2_runs_off,length=180>
+##contig=<ID=minus_2exon__frame_open_minus2_late_stop,length=180>
+##contig=<ID=minus_2exon__frame_open_before_terminal,length=180>
+##contig=<ID=minus_2exon__restored_rescued,length=180>
+##contig=<ID=minus_2exon__restored_early_stop,length=180>
+##contig=<ID=minus_2exon__restored_rescued_wide,length=180>
+##contig=<ID=minus_2exon__restored_early_stop_wide,length=180>
+##contig=<ID=minus_2exon__restored_near_introns,length=180>
+##contig=<ID=minus_2exon__restored_minus_plus,length=180>
+##contig=<ID=minus_2exon__restored_plus2_minus2,length=180>
+##contig=<ID=minus_2exon__restored_minus2_plus2,length=180>
+##contig=<ID=minus_2exon__restoring_insertion_creates_stop,length=180>
+##contig=<ID=minus_2exon__restored_identical_peptide_early,length=180>
+##contig=<ID=minus_2exon__restored_identical_peptide_late,length=180>
+##contig=<ID=minus_2exon__restored_two_pairs,length=180>
+##contig=<ID=minus_2exon__restored_three_insertions,length=180>
+##contig=<ID=minus_2exon__restored_ins1_ins2,length=180>
+##contig=<ID=minus_2exon__restored_del1_del2,length=180>
+##contig=<ID=minus_2exon__stop_gained_snv,length=180>
+##contig=<ID=minus_2exon__stop_gained_cis_pair,length=180>
+##contig=<ID=minus_2exon__stop_gained_inframe_insertion,length=180>
+##contig=<ID=minus_2exon__stop_gained_post_stop_frame,length=180>
+##contig=<ID=minus_2exon__stop_gained_after_restoration,length=180>
+##contig=<ID=minus_2exon__early_stop_then_missense,length=180>
+##contig=<ID=minus_2exon__trans_control_of_pair,length=180>
+##contig=<ID=minus_2exon__hom_alt_frame_open,length=180>
+##contig=<ID=minus_2exon__start_codon_insertion,length=180>
+##contig=<ID=minus_3exon__frame_open_early_stop,length=220>
+##contig=<ID=minus_3exon__frame_open_runs_off,length=220>
+##contig=<ID=minus_3exon__frame_open_late_stop,length=220>
+##contig=<ID=minus_3exon__frame_open_plus2_runs_off,length=220>
+##contig=<ID=minus_3exon__frame_open_minus2_late_stop,length=220>
+##contig=<ID=minus_3exon__frame_open_before_terminal,length=220>
+##contig=<ID=minus_3exon__restored_rescued,length=220>
+##contig=<ID=minus_3exon__restored_early_stop,length=220>
+##contig=<ID=minus_3exon__restored_rescued_wide,length=220>
+##contig=<ID=minus_3exon__restored_early_stop_wide,length=220>
+##contig=<ID=minus_3exon__restored_near_introns,length=220>
+##contig=<ID=minus_3exon__restored_minus_plus,length=220>
+##contig=<ID=minus_3exon__restored_plus2_minus2,length=220>
+##contig=<ID=minus_3exon__restored_minus2_plus2,length=220>
+##contig=<ID=minus_3exon__restoring_insertion_creates_stop,length=220>
+##contig=<ID=minus_3exon__restored_identical_peptide_early,length=220>
+##contig=<ID=minus_3exon__restored_identical_peptide_late,length=220>
+##contig=<ID=minus_3exon__restored_two_pairs,length=220>
+##contig=<ID=minus_3exon__restored_three_insertions,length=220>
+##contig=<ID=minus_3exon__restored_ins1_ins2,length=220>
+##contig=<ID=minus_3exon__restored_del1_del2,length=220>
+##contig=<ID=minus_3exon__stop_gained_snv,length=220>
+##contig=<ID=minus_3exon__stop_gained_cis_pair,length=220>
+##contig=<ID=minus_3exon__stop_gained_inframe_insertion,length=220>
+##contig=<ID=minus_3exon__stop_gained_post_stop_frame,length=220>
+##contig=<ID=minus_3exon__stop_gained_after_restoration,length=220>
+##contig=<ID=minus_3exon__early_stop_then_missense,length=220>
+##contig=<ID=minus_3exon__trans_control_of_pair,length=220>
+##contig=<ID=minus_3exon__hom_alt_frame_open,length=220>
+##contig=<ID=minus_3exon__start_codon_insertion,length=220>
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S
+plus_1exon__frame_open_early_stop	26	.	A	AG	.	PASS	.	GT	1|0
+plus_1exon__frame_open_runs_off	66	.	TC	T	.	PASS	.	GT	1|0
+plus_1exon__frame_open_late_stop	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__frame_open_plus2_runs_off	56	.	C	CAC	.	PASS	.	GT	1|0
+plus_1exon__frame_open_minus2_late_stop	56	.	CAA	C	.	PASS	.	GT	1|0
+plus_1exon__frame_open_before_terminal	119	.	A	AG	.	PASS	.	GT	1|0
+plus_1exon__restored_rescued	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__restored_rescued	76	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__restored_early_stop	26	.	A	AG	.	PASS	.	GT	1|0
+plus_1exon__restored_early_stop	76	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__restored_rescued_wide	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__restored_rescued_wide	106	.	TG	T	.	PASS	.	GT	1|0
+plus_1exon__restored_early_stop_wide	26	.	A	AG	.	PASS	.	GT	1|0
+plus_1exon__restored_early_stop_wide	106	.	TG	T	.	PASS	.	GT	1|0
+plus_1exon__restored_near_introns	50	.	G	GT	.	PASS	.	GT	1|0
+plus_1exon__restored_near_introns	69	.	CG	C	.	PASS	.	GT	1|0
+plus_1exon__restored_minus_plus	36	.	TC	T	.	PASS	.	GT	1|0
+plus_1exon__restored_minus_plus	86	.	A	AC	.	PASS	.	GT	1|0
+plus_1exon__restored_plus2_minus2	47	.	T	TAC	.	PASS	.	GT	1|0
+plus_1exon__restored_plus2_minus2	71	.	GGC	G	.	PASS	.	GT	1|0
+plus_1exon__restored_minus2_plus2	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_1exon__restored_minus2_plus2	76	.	T	TCG	.	PASS	.	GT	1|0
+plus_1exon__restoring_insertion_creates_stop	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_1exon__restoring_insertion_creates_stop	76	.	T	TGA	.	PASS	.	GT	1|0
+plus_1exon__restored_identical_peptide_early	33	.	AC	A	.	PASS	.	GT	1|0
+plus_1exon__restored_identical_peptide_early	36	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__restored_identical_peptide_late	98	.	TC	T	.	PASS	.	GT	1|0
+plus_1exon__restored_identical_peptide_late	102	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__restored_two_pairs	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__restored_two_pairs	61	.	AC	A	.	PASS	.	GT	1|0
+plus_1exon__restored_two_pairs	76	.	T	TA	.	PASS	.	GT	1|0
+plus_1exon__restored_two_pairs	94	.	CC	C	.	PASS	.	GT	1|0
+plus_1exon__restored_three_insertions	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__restored_three_insertions	66	.	T	TA	.	PASS	.	GT	1|0
+plus_1exon__restored_three_insertions	86	.	A	AC	.	PASS	.	GT	1|0
+plus_1exon__restored_ins1_ins2	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__restored_ins1_ins2	76	.	T	TAC	.	PASS	.	GT	1|0
+plus_1exon__restored_del1_del2	46	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__restored_del1_del2	76	.	TTG	T	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_snv	56	.	C	T	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_cis_pair	107	.	G	T	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_cis_pair	109	.	C	A	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_inframe_insertion	76	.	T	TTAA	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_post_stop_frame	56	.	C	T	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_post_stop_frame	96	.	T	TG	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_after_restoration	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_after_restoration	76	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_after_restoration	114	.	T	A	.	PASS	.	GT	1|0
+plus_1exon__early_stop_then_missense	26	.	A	AG	.	PASS	.	GT	1|0
+plus_1exon__early_stop_then_missense	80	.	G	T	.	PASS	.	GT	1|0
+plus_1exon__trans_control_of_pair	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__trans_control_of_pair	76	.	TT	T	.	PASS	.	GT	0|1
+plus_1exon__hom_alt_frame_open	46	.	T	TT	.	PASS	.	GT	1|1
+plus_1exon__start_codon_insertion	18	.	T	TC	.	PASS	.	GT	1|0
+plus_2exon__frame_open_early_stop	26	.	A	AG	.	PASS	.	GT	1|0
+plus_2exon__frame_open_runs_off	66	.	TC	T	.	PASS	.	GT	1|0
+plus_2exon__frame_open_late_stop	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__frame_open_plus2_runs_off	56	.	C	CAC	.	PASS	.	GT	1|0
+plus_2exon__frame_open_minus2_late_stop	56	.	CAA	C	.	PASS	.	GT	1|0
+plus_2exon__frame_open_before_terminal	159	.	A	AG	.	PASS	.	GT	1|0
+plus_2exon__restored_rescued	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__restored_rescued	116	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__restored_early_stop	26	.	A	AG	.	PASS	.	GT	1|0
+plus_2exon__restored_early_stop	116	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__restored_rescued_wide	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__restored_rescued_wide	146	.	TG	T	.	PASS	.	GT	1|0
+plus_2exon__restored_early_stop_wide	26	.	A	AG	.	PASS	.	GT	1|0
+plus_2exon__restored_early_stop_wide	146	.	TG	T	.	PASS	.	GT	1|0
+plus_2exon__restored_near_introns	50	.	G	GT	.	PASS	.	GT	1|0
+plus_2exon__restored_near_introns	109	.	CG	C	.	PASS	.	GT	1|0
+plus_2exon__restored_minus_plus	36	.	TC	T	.	PASS	.	GT	1|0
+plus_2exon__restored_minus_plus	126	.	A	AC	.	PASS	.	GT	1|0
+plus_2exon__restored_plus2_minus2	47	.	T	TAC	.	PASS	.	GT	1|0
+plus_2exon__restored_plus2_minus2	111	.	GGC	G	.	PASS	.	GT	1|0
+plus_2exon__restored_minus2_plus2	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_2exon__restored_minus2_plus2	116	.	T	TCG	.	PASS	.	GT	1|0
+plus_2exon__restoring_insertion_creates_stop	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_2exon__restoring_insertion_creates_stop	116	.	T	TGA	.	PASS	.	GT	1|0
+plus_2exon__restored_identical_peptide_early	33	.	AC	A	.	PASS	.	GT	1|0
+plus_2exon__restored_identical_peptide_early	36	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__restored_identical_peptide_late	138	.	TC	T	.	PASS	.	GT	1|0
+plus_2exon__restored_identical_peptide_late	142	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__restored_two_pairs	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__restored_two_pairs	61	.	AC	A	.	PASS	.	GT	1|0
+plus_2exon__restored_two_pairs	116	.	T	TA	.	PASS	.	GT	1|0
+plus_2exon__restored_two_pairs	134	.	CC	C	.	PASS	.	GT	1|0
+plus_2exon__restored_three_insertions	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__restored_three_insertions	66	.	T	TA	.	PASS	.	GT	1|0
+plus_2exon__restored_three_insertions	126	.	A	AC	.	PASS	.	GT	1|0
+plus_2exon__restored_ins1_ins2	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__restored_ins1_ins2	116	.	T	TAC	.	PASS	.	GT	1|0
+plus_2exon__restored_del1_del2	46	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__restored_del1_del2	116	.	TTG	T	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_snv	56	.	C	T	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_cis_pair	147	.	G	T	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_cis_pair	149	.	C	A	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_inframe_insertion	116	.	T	TTAA	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_post_stop_frame	56	.	C	T	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_post_stop_frame	136	.	T	TG	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_after_restoration	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_after_restoration	116	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_after_restoration	154	.	T	A	.	PASS	.	GT	1|0
+plus_2exon__early_stop_then_missense	26	.	A	AG	.	PASS	.	GT	1|0
+plus_2exon__early_stop_then_missense	120	.	G	T	.	PASS	.	GT	1|0
+plus_2exon__trans_control_of_pair	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__trans_control_of_pair	116	.	TT	T	.	PASS	.	GT	0|1
+plus_2exon__hom_alt_frame_open	46	.	T	TT	.	PASS	.	GT	1|1
+plus_2exon__start_codon_insertion	18	.	T	TC	.	PASS	.	GT	1|0
+plus_3exon__frame_open_early_stop	26	.	A	AG	.	PASS	.	GT	1|0
+plus_3exon__frame_open_runs_off	106	.	TC	T	.	PASS	.	GT	1|0
+plus_3exon__frame_open_late_stop	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__frame_open_plus2_runs_off	96	.	C	CAC	.	PASS	.	GT	1|0
+plus_3exon__frame_open_minus2_late_stop	96	.	CAA	C	.	PASS	.	GT	1|0
+plus_3exon__frame_open_before_terminal	199	.	A	AG	.	PASS	.	GT	1|0
+plus_3exon__restored_rescued	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__restored_rescued	116	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__restored_early_stop	26	.	A	AG	.	PASS	.	GT	1|0
+plus_3exon__restored_early_stop	116	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__restored_rescued_wide	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__restored_rescued_wide	186	.	TG	T	.	PASS	.	GT	1|0
+plus_3exon__restored_early_stop_wide	26	.	A	AG	.	PASS	.	GT	1|0
+plus_3exon__restored_early_stop_wide	186	.	TG	T	.	PASS	.	GT	1|0
+plus_3exon__restored_near_introns	50	.	G	GT	.	PASS	.	GT	1|0
+plus_3exon__restored_near_introns	109	.	CG	C	.	PASS	.	GT	1|0
+plus_3exon__restored_minus_plus	36	.	TC	T	.	PASS	.	GT	1|0
+plus_3exon__restored_minus_plus	126	.	A	AC	.	PASS	.	GT	1|0
+plus_3exon__restored_plus2_minus2	47	.	T	TAC	.	PASS	.	GT	1|0
+plus_3exon__restored_plus2_minus2	111	.	GGC	G	.	PASS	.	GT	1|0
+plus_3exon__restored_minus2_plus2	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_3exon__restored_minus2_plus2	116	.	T	TCG	.	PASS	.	GT	1|0
+plus_3exon__restoring_insertion_creates_stop	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_3exon__restoring_insertion_creates_stop	116	.	T	TGA	.	PASS	.	GT	1|0
+plus_3exon__restored_identical_peptide_early	33	.	AC	A	.	PASS	.	GT	1|0
+plus_3exon__restored_identical_peptide_early	36	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__restored_identical_peptide_late	178	.	TC	T	.	PASS	.	GT	1|0
+plus_3exon__restored_identical_peptide_late	182	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__restored_two_pairs	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__restored_two_pairs	101	.	AC	A	.	PASS	.	GT	1|0
+plus_3exon__restored_two_pairs	116	.	T	TA	.	PASS	.	GT	1|0
+plus_3exon__restored_two_pairs	174	.	CC	C	.	PASS	.	GT	1|0
+plus_3exon__restored_three_insertions	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__restored_three_insertions	106	.	T	TA	.	PASS	.	GT	1|0
+plus_3exon__restored_three_insertions	126	.	A	AC	.	PASS	.	GT	1|0
+plus_3exon__restored_ins1_ins2	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__restored_ins1_ins2	116	.	T	TAC	.	PASS	.	GT	1|0
+plus_3exon__restored_del1_del2	46	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__restored_del1_del2	116	.	TTG	T	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_snv	96	.	C	T	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_cis_pair	187	.	G	T	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_cis_pair	189	.	C	A	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_inframe_insertion	116	.	T	TTAA	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_post_stop_frame	96	.	C	T	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_post_stop_frame	176	.	T	TG	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_after_restoration	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_after_restoration	116	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_after_restoration	194	.	T	A	.	PASS	.	GT	1|0
+plus_3exon__early_stop_then_missense	26	.	A	AG	.	PASS	.	GT	1|0
+plus_3exon__early_stop_then_missense	120	.	G	T	.	PASS	.	GT	1|0
+plus_3exon__trans_control_of_pair	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__trans_control_of_pair	116	.	TT	T	.	PASS	.	GT	0|1
+plus_3exon__hom_alt_frame_open	46	.	T	TT	.	PASS	.	GT	1|1
+plus_3exon__start_codon_insertion	18	.	T	TC	.	PASS	.	GT	1|0
+minus_1exon__frame_open_early_stop	114	.	A	AC	.	PASS	.	GT	1|0
+minus_1exon__frame_open_runs_off	73	.	AG	A	.	PASS	.	GT	1|0
+minus_1exon__frame_open_late_stop	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__frame_open_plus2_runs_off	84	.	T	TGT	.	PASS	.	GT	1|0
+minus_1exon__frame_open_minus2_late_stop	82	.	TTT	T	.	PASS	.	GT	1|0
+minus_1exon__frame_open_before_terminal	21	.	T	TC	.	PASS	.	GT	1|0
+minus_1exon__restored_rescued	63	.	CA	C	.	PASS	.	GT	1|0
+minus_1exon__restored_rescued	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__restored_early_stop	63	.	CA	C	.	PASS	.	GT	1|0
+minus_1exon__restored_early_stop	114	.	A	AC	.	PASS	.	GT	1|0
+minus_1exon__restored_rescued_wide	33	.	CC	C	.	PASS	.	GT	1|0
+minus_1exon__restored_rescued_wide	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__restored_early_stop_wide	33	.	CC	C	.	PASS	.	GT	1|0
+minus_1exon__restored_early_stop_wide	114	.	A	AC	.	PASS	.	GT	1|0
+minus_1exon__restored_near_introns	70	.	CC	C	.	PASS	.	GT	1|0
+minus_1exon__restored_near_introns	90	.	T	TA	.	PASS	.	GT	1|0
+minus_1exon__restored_minus_plus	54	.	T	TG	.	PASS	.	GT	1|0
+minus_1exon__restored_minus_plus	103	.	GG	G	.	PASS	.	GT	1|0
+minus_1exon__restored_plus2_minus2	67	.	GGC	G	.	PASS	.	GT	1|0
+minus_1exon__restored_plus2_minus2	93	.	G	GGT	.	PASS	.	GT	1|0
+minus_1exon__restored_minus2_plus2	64	.	A	ACG	.	PASS	.	GT	1|0
+minus_1exon__restored_minus2_plus2	92	.	CGA	C	.	PASS	.	GT	1|0
+minus_1exon__restoring_insertion_creates_stop	64	.	A	ATC	.	PASS	.	GT	1|0
+minus_1exon__restoring_insertion_creates_stop	92	.	CGA	C	.	PASS	.	GT	1|0
+minus_1exon__restored_identical_peptide_early	104	.	G	GA	.	PASS	.	GT	1|0
+minus_1exon__restored_identical_peptide_early	106	.	AG	A	.	PASS	.	GT	1|0
+minus_1exon__restored_identical_peptide_late	38	.	T	TA	.	PASS	.	GT	1|0
+minus_1exon__restored_identical_peptide_late	41	.	GG	G	.	PASS	.	GT	1|0
+minus_1exon__restored_two_pairs	45	.	AG	A	.	PASS	.	GT	1|0
+minus_1exon__restored_two_pairs	64	.	A	AT	.	PASS	.	GT	1|0
+minus_1exon__restored_two_pairs	78	.	TG	T	.	PASS	.	GT	1|0
+minus_1exon__restored_two_pairs	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__restored_three_insertions	54	.	T	TG	.	PASS	.	GT	1|0
+minus_1exon__restored_three_insertions	74	.	G	GT	.	PASS	.	GT	1|0
+minus_1exon__restored_three_insertions	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__restored_ins1_ins2	64	.	A	AGT	.	PASS	.	GT	1|0
+minus_1exon__restored_ins1_ins2	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__restored_del1_del2	62	.	GCA	G	.	PASS	.	GT	1|0
+minus_1exon__restored_del1_del2	93	.	GA	G	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_snv	85	.	G	A	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_cis_pair	32	.	G	T	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_cis_pair	34	.	C	A	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_inframe_insertion	64	.	A	ATTA	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_post_stop_frame	44	.	G	GC	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_post_stop_frame	85	.	G	A	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_after_restoration	27	.	A	T	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_after_restoration	63	.	CA	C	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_after_restoration	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__early_stop_then_missense	61	.	C	A	.	PASS	.	GT	1|0
+minus_1exon__early_stop_then_missense	114	.	A	AC	.	PASS	.	GT	1|0
+minus_1exon__trans_control_of_pair	63	.	CA	C	.	PASS	.	GT	0|1
+minus_1exon__trans_control_of_pair	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__hom_alt_frame_open	94	.	A	AA	.	PASS	.	GT	1|1
+minus_1exon__start_codon_insertion	122	.	C	CG	.	PASS	.	GT	1|0
+minus_2exon__frame_open_early_stop	154	.	A	AC	.	PASS	.	GT	1|0
+minus_2exon__frame_open_runs_off	113	.	AG	A	.	PASS	.	GT	1|0
+minus_2exon__frame_open_late_stop	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__frame_open_plus2_runs_off	124	.	T	TGT	.	PASS	.	GT	1|0
+minus_2exon__frame_open_minus2_late_stop	122	.	TTT	T	.	PASS	.	GT	1|0
+minus_2exon__frame_open_before_terminal	21	.	T	TC	.	PASS	.	GT	1|0
+minus_2exon__restored_rescued	63	.	CA	C	.	PASS	.	GT	1|0
+minus_2exon__restored_rescued	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__restored_early_stop	63	.	CA	C	.	PASS	.	GT	1|0
+minus_2exon__restored_early_stop	154	.	A	AC	.	PASS	.	GT	1|0
+minus_2exon__restored_rescued_wide	33	.	CC	C	.	PASS	.	GT	1|0
+minus_2exon__restored_rescued_wide	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__restored_early_stop_wide	33	.	CC	C	.	PASS	.	GT	1|0
+minus_2exon__restored_early_stop_wide	154	.	A	AC	.	PASS	.	GT	1|0
+minus_2exon__restored_near_introns	70	.	CC	C	.	PASS	.	GT	1|0
+minus_2exon__restored_near_introns	130	.	T	TA	.	PASS	.	GT	1|0
+minus_2exon__restored_minus_plus	54	.	T	TG	.	PASS	.	GT	1|0
+minus_2exon__restored_minus_plus	143	.	GG	G	.	PASS	.	GT	1|0
+minus_2exon__restored_plus2_minus2	67	.	GGC	G	.	PASS	.	GT	1|0
+minus_2exon__restored_plus2_minus2	133	.	G	GGT	.	PASS	.	GT	1|0
+minus_2exon__restored_minus2_plus2	64	.	A	ACG	.	PASS	.	GT	1|0
+minus_2exon__restored_minus2_plus2	132	.	CGA	C	.	PASS	.	GT	1|0
+minus_2exon__restoring_insertion_creates_stop	64	.	A	ATC	.	PASS	.	GT	1|0
+minus_2exon__restoring_insertion_creates_stop	132	.	CGA	C	.	PASS	.	GT	1|0
+minus_2exon__restored_identical_peptide_early	144	.	G	GA	.	PASS	.	GT	1|0
+minus_2exon__restored_identical_peptide_early	146	.	AG	A	.	PASS	.	GT	1|0
+minus_2exon__restored_identical_peptide_late	38	.	T	TA	.	PASS	.	GT	1|0
+minus_2exon__restored_identical_peptide_late	41	.	GG	G	.	PASS	.	GT	1|0
+minus_2exon__restored_two_pairs	45	.	AG	A	.	PASS	.	GT	1|0
+minus_2exon__restored_two_pairs	64	.	A	AT	.	PASS	.	GT	1|0
+minus_2exon__restored_two_pairs	118	.	TG	T	.	PASS	.	GT	1|0
+minus_2exon__restored_two_pairs	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__restored_three_insertions	54	.	T	TG	.	PASS	.	GT	1|0
+minus_2exon__restored_three_insertions	114	.	G	GT	.	PASS	.	GT	1|0
+minus_2exon__restored_three_insertions	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__restored_ins1_ins2	64	.	A	AGT	.	PASS	.	GT	1|0
+minus_2exon__restored_ins1_ins2	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__restored_del1_del2	62	.	GCA	G	.	PASS	.	GT	1|0
+minus_2exon__restored_del1_del2	133	.	GA	G	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_snv	125	.	G	A	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_cis_pair	32	.	G	T	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_cis_pair	34	.	C	A	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_inframe_insertion	64	.	A	ATTA	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_post_stop_frame	44	.	G	GC	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_post_stop_frame	125	.	G	A	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_after_restoration	27	.	A	T	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_after_restoration	63	.	CA	C	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_after_restoration	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__early_stop_then_missense	61	.	C	A	.	PASS	.	GT	1|0
+minus_2exon__early_stop_then_missense	154	.	A	AC	.	PASS	.	GT	1|0
+minus_2exon__trans_control_of_pair	63	.	CA	C	.	PASS	.	GT	0|1
+minus_2exon__trans_control_of_pair	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__hom_alt_frame_open	134	.	A	AA	.	PASS	.	GT	1|1
+minus_2exon__start_codon_insertion	162	.	C	CG	.	PASS	.	GT	1|0
+minus_3exon__frame_open_early_stop	194	.	A	AC	.	PASS	.	GT	1|0
+minus_3exon__frame_open_runs_off	113	.	AG	A	.	PASS	.	GT	1|0
+minus_3exon__frame_open_late_stop	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__frame_open_plus2_runs_off	124	.	T	TGT	.	PASS	.	GT	1|0
+minus_3exon__frame_open_minus2_late_stop	122	.	TTT	T	.	PASS	.	GT	1|0
+minus_3exon__frame_open_before_terminal	21	.	T	TC	.	PASS	.	GT	1|0
+minus_3exon__restored_rescued	103	.	CA	C	.	PASS	.	GT	1|0
+minus_3exon__restored_rescued	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__restored_early_stop	103	.	CA	C	.	PASS	.	GT	1|0
+minus_3exon__restored_early_stop	194	.	A	AC	.	PASS	.	GT	1|0
+minus_3exon__restored_rescued_wide	33	.	CC	C	.	PASS	.	GT	1|0
+minus_3exon__restored_rescued_wide	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__restored_early_stop_wide	33	.	CC	C	.	PASS	.	GT	1|0
+minus_3exon__restored_early_stop_wide	194	.	A	AC	.	PASS	.	GT	1|0
+minus_3exon__restored_near_introns	110	.	CC	C	.	PASS	.	GT	1|0
+minus_3exon__restored_near_introns	170	.	T	TA	.	PASS	.	GT	1|0
+minus_3exon__restored_minus_plus	94	.	T	TG	.	PASS	.	GT	1|0
+minus_3exon__restored_minus_plus	183	.	GG	G	.	PASS	.	GT	1|0
+minus_3exon__restored_plus2_minus2	107	.	GGC	G	.	PASS	.	GT	1|0
+minus_3exon__restored_plus2_minus2	173	.	G	GGT	.	PASS	.	GT	1|0
+minus_3exon__restored_minus2_plus2	104	.	A	ACG	.	PASS	.	GT	1|0
+minus_3exon__restored_minus2_plus2	172	.	CGA	C	.	PASS	.	GT	1|0
+minus_3exon__restoring_insertion_creates_stop	104	.	A	ATC	.	PASS	.	GT	1|0
+minus_3exon__restoring_insertion_creates_stop	172	.	CGA	C	.	PASS	.	GT	1|0
+minus_3exon__restored_identical_peptide_early	184	.	G	GA	.	PASS	.	GT	1|0
+minus_3exon__restored_identical_peptide_early	186	.	AG	A	.	PASS	.	GT	1|0
+minus_3exon__restored_identical_peptide_late	38	.	T	TA	.	PASS	.	GT	1|0
+minus_3exon__restored_identical_peptide_late	41	.	GG	G	.	PASS	.	GT	1|0
+minus_3exon__restored_two_pairs	45	.	AG	A	.	PASS	.	GT	1|0
+minus_3exon__restored_two_pairs	104	.	A	AT	.	PASS	.	GT	1|0
+minus_3exon__restored_two_pairs	118	.	TG	T	.	PASS	.	GT	1|0
+minus_3exon__restored_two_pairs	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__restored_three_insertions	94	.	T	TG	.	PASS	.	GT	1|0
+minus_3exon__restored_three_insertions	114	.	G	GT	.	PASS	.	GT	1|0
+minus_3exon__restored_three_insertions	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__restored_ins1_ins2	104	.	A	AGT	.	PASS	.	GT	1|0
+minus_3exon__restored_ins1_ins2	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__restored_del1_del2	102	.	GCA	G	.	PASS	.	GT	1|0
+minus_3exon__restored_del1_del2	173	.	GA	G	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_snv	125	.	G	A	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_cis_pair	32	.	G	T	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_cis_pair	34	.	C	A	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_inframe_insertion	104	.	A	ATTA	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_post_stop_frame	44	.	G	GC	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_post_stop_frame	125	.	G	A	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_after_restoration	27	.	A	T	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_after_restoration	103	.	CA	C	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_after_restoration	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__early_stop_then_missense	101	.	C	A	.	PASS	.	GT	1|0
+minus_3exon__early_stop_then_missense	194	.	A	AC	.	PASS	.	GT	1|0
+minus_3exon__trans_control_of_pair	103	.	CA	C	.	PASS	.	GT	0|1
+minus_3exon__trans_control_of_pair	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__hom_alt_frame_open	174	.	A	AA	.	PASS	.	GT	1|1
+minus_3exon__start_codon_insertion	202	.	C	CG	.	PASS	.	GT	1|0
