@@ -1,0 +1,873 @@
+##fileformat=VCFv4.2
+##contig=<ID=plus_1exon__start_snv_first,length=140>
+##contig=<ID=plus_1exon__start_snv_last,length=140>
+##contig=<ID=plus_1exon__start_mnv,length=140>
+##contig=<ID=plus_1exon__start_deletion_frame,length=140>
+##contig=<ID=plus_1exon__start_deletion_inframe,length=140>
+##contig=<ID=plus_1exon__start_insertion_inside,length=140>
+##contig=<ID=plus_1exon__start_insertion_after_start,length=140>
+##contig=<ID=plus_1exon__start_rescued_by_insertion_a,length=140>
+##contig=<ID=plus_1exon__start_rescued_by_insertion_b,length=140>
+##contig=<ID=plus_1exon__start_deletion_within_exon,length=140>
+##contig=<ID=plus_1exon__start_lost_suppresses_missense,length=140>
+##contig=<ID=plus_1exon__start_lost_suppresses_frame,length=140>
+##contig=<ID=plus_1exon__start_lost_suppresses_stop_gain,length=140>
+##contig=<ID=plus_1exon__start_lost_suppresses_stop_lost,length=140>
+##contig=<ID=plus_1exon__start_lost_trans_control,length=140>
+##contig=<ID=plus_1exon__start_lost_hom_alt,length=140>
+##contig=<ID=plus_1exon__start_intact_frame_open_early_stop,length=140>
+##contig=<ID=plus_1exon__stop_lost_snv_first,length=140>
+##contig=<ID=plus_1exon__stop_lost_snv_second,length=140>
+##contig=<ID=plus_1exon__stop_lost_snv_third,length=140>
+##contig=<ID=plus_1exon__stop_lost_mnv,length=140>
+##contig=<ID=plus_1exon__stop_lost_terminator_deleted,length=140>
+##contig=<ID=plus_1exon__stop_lost_last_codon_and_terminator_deleted,length=140>
+##contig=<ID=plus_1exon__stop_lost_deletion_partial,length=140>
+##contig=<ID=plus_1exon__stop_lost_insertion_inside,length=140>
+##contig=<ID=plus_1exon__stop_lost_insertion_before_plus1,length=140>
+##contig=<ID=plus_1exon__stop_lost_insertion_before_plus2,length=140>
+##contig=<ID=plus_1exon__run_off_deletion,length=140>
+##contig=<ID=plus_1exon__run_off_insertion_plus2,length=140>
+##contig=<ID=plus_1exon__run_off_inside_codon_35,length=140>
+##contig=<ID=plus_1exon__run_off_trans_control,length=140>
+##contig=<ID=plus_1exon__stop_lost_hom_alt,length=140>
+##contig=<ID=plus_1exon__stop_lost_and_missense,length=140>
+##contig=<ID=plus_1exon__stop_retained_tag,length=140>
+##contig=<ID=plus_1exon__stop_retained_tga,length=140>
+##contig=<ID=plus_1exon__stop_retained_plus_synonymous,length=140>
+##contig=<ID=plus_1exon__stop_retained_plus_missense,length=140>
+##contig=<ID=plus_1exon__stop_retained_plus_inframe_insertion,length=140>
+##contig=<ID=plus_1exon__stop_retained_trans_control,length=140>
+##contig=<ID=plus_1exon__stop_retained_hom_alt,length=140>
+##contig=<ID=plus_1exon__stop_retained_after_frame_pair,length=140>
+##contig=<ID=plus_1exon__stop_retained_displaced_insertion,length=140>
+##contig=<ID=plus_1exon__inframe_insertion_before_terminator,length=140>
+##contig=<ID=plus_1exon__stop_inserted_before_terminator,length=140>
+##contig=<ID=plus_1exon__stop_gained_in_codon_35,length=140>
+##contig=<ID=plus_1exon__inframe_deletion_before_terminator,length=140>
+##contig=<ID=plus_1exon__rescued_termination_by_restoring_insertion,length=140>
+##contig=<ID=plus_1exon__rescued_termination_restore_inside_terminator,length=140>
+##contig=<ID=plus_1exon__rescued_termination_by_deletion_in_terminator,length=140>
+##contig=<ID=plus_1exon__rescued_termination_by_terminator_deletion,length=140>
+##contig=<ID=plus_1exon__rescued_termination_after_stop_lost,length=140>
+##contig=<ID=plus_1exon__post_stop_terminator_lost,length=140>
+##contig=<ID=plus_1exon__post_stop_terminator_retained,length=140>
+##contig=<ID=plus_1exon__post_stop_run_off,length=140>
+##contig=<ID=plus_1exon__post_stop_two_edits,length=140>
+##contig=<ID=plus_1exon__post_stop_restoring_deletion,length=140>
+##contig=<ID=plus_1exon__restoring_insertion_creates_stop,length=140>
+##contig=<ID=plus_1exon__post_stop_after_start_lost,length=140>
+##contig=<ID=plus_2exon__start_snv_first,length=180>
+##contig=<ID=plus_2exon__start_snv_last,length=180>
+##contig=<ID=plus_2exon__start_mnv,length=180>
+##contig=<ID=plus_2exon__start_deletion_frame,length=180>
+##contig=<ID=plus_2exon__start_deletion_inframe,length=180>
+##contig=<ID=plus_2exon__start_insertion_inside,length=180>
+##contig=<ID=plus_2exon__start_insertion_after_start,length=180>
+##contig=<ID=plus_2exon__start_rescued_by_insertion_a,length=180>
+##contig=<ID=plus_2exon__start_rescued_by_insertion_b,length=180>
+##contig=<ID=plus_2exon__start_deletion_within_exon,length=180>
+##contig=<ID=plus_2exon__start_lost_suppresses_missense,length=180>
+##contig=<ID=plus_2exon__start_lost_suppresses_frame,length=180>
+##contig=<ID=plus_2exon__start_lost_suppresses_stop_gain,length=180>
+##contig=<ID=plus_2exon__start_lost_suppresses_stop_lost,length=180>
+##contig=<ID=plus_2exon__start_lost_trans_control,length=180>
+##contig=<ID=plus_2exon__start_lost_hom_alt,length=180>
+##contig=<ID=plus_2exon__start_intact_frame_open_early_stop,length=180>
+##contig=<ID=plus_2exon__stop_lost_snv_first,length=180>
+##contig=<ID=plus_2exon__stop_lost_snv_second,length=180>
+##contig=<ID=plus_2exon__stop_lost_snv_third,length=180>
+##contig=<ID=plus_2exon__stop_lost_mnv,length=180>
+##contig=<ID=plus_2exon__stop_lost_terminator_deleted,length=180>
+##contig=<ID=plus_2exon__stop_lost_last_codon_and_terminator_deleted,length=180>
+##contig=<ID=plus_2exon__stop_lost_deletion_partial,length=180>
+##contig=<ID=plus_2exon__stop_lost_insertion_inside,length=180>
+##contig=<ID=plus_2exon__stop_lost_insertion_before_plus1,length=180>
+##contig=<ID=plus_2exon__stop_lost_insertion_before_plus2,length=180>
+##contig=<ID=plus_2exon__run_off_deletion,length=180>
+##contig=<ID=plus_2exon__run_off_insertion_plus2,length=180>
+##contig=<ID=plus_2exon__run_off_inside_codon_35,length=180>
+##contig=<ID=plus_2exon__run_off_trans_control,length=180>
+##contig=<ID=plus_2exon__stop_lost_hom_alt,length=180>
+##contig=<ID=plus_2exon__stop_lost_and_missense,length=180>
+##contig=<ID=plus_2exon__stop_retained_tag,length=180>
+##contig=<ID=plus_2exon__stop_retained_tga,length=180>
+##contig=<ID=plus_2exon__stop_retained_plus_synonymous,length=180>
+##contig=<ID=plus_2exon__stop_retained_plus_missense,length=180>
+##contig=<ID=plus_2exon__stop_retained_plus_inframe_insertion,length=180>
+##contig=<ID=plus_2exon__stop_retained_trans_control,length=180>
+##contig=<ID=plus_2exon__stop_retained_hom_alt,length=180>
+##contig=<ID=plus_2exon__stop_retained_after_frame_pair,length=180>
+##contig=<ID=plus_2exon__stop_retained_displaced_insertion,length=180>
+##contig=<ID=plus_2exon__inframe_insertion_before_terminator,length=180>
+##contig=<ID=plus_2exon__stop_inserted_before_terminator,length=180>
+##contig=<ID=plus_2exon__stop_gained_in_codon_35,length=180>
+##contig=<ID=plus_2exon__inframe_deletion_before_terminator,length=180>
+##contig=<ID=plus_2exon__rescued_termination_by_restoring_insertion,length=180>
+##contig=<ID=plus_2exon__rescued_termination_restore_inside_terminator,length=180>
+##contig=<ID=plus_2exon__rescued_termination_by_deletion_in_terminator,length=180>
+##contig=<ID=plus_2exon__rescued_termination_by_terminator_deletion,length=180>
+##contig=<ID=plus_2exon__rescued_termination_after_stop_lost,length=180>
+##contig=<ID=plus_2exon__post_stop_terminator_lost,length=180>
+##contig=<ID=plus_2exon__post_stop_terminator_retained,length=180>
+##contig=<ID=plus_2exon__post_stop_run_off,length=180>
+##contig=<ID=plus_2exon__post_stop_two_edits,length=180>
+##contig=<ID=plus_2exon__post_stop_restoring_deletion,length=180>
+##contig=<ID=plus_2exon__restoring_insertion_creates_stop,length=180>
+##contig=<ID=plus_2exon__post_stop_after_start_lost,length=180>
+##contig=<ID=plus_3exon__start_snv_first,length=220>
+##contig=<ID=plus_3exon__start_snv_last,length=220>
+##contig=<ID=plus_3exon__start_mnv,length=220>
+##contig=<ID=plus_3exon__start_deletion_frame,length=220>
+##contig=<ID=plus_3exon__start_deletion_inframe,length=220>
+##contig=<ID=plus_3exon__start_insertion_inside,length=220>
+##contig=<ID=plus_3exon__start_insertion_after_start,length=220>
+##contig=<ID=plus_3exon__start_rescued_by_insertion_a,length=220>
+##contig=<ID=plus_3exon__start_rescued_by_insertion_b,length=220>
+##contig=<ID=plus_3exon__start_deletion_within_exon,length=220>
+##contig=<ID=plus_3exon__start_lost_suppresses_missense,length=220>
+##contig=<ID=plus_3exon__start_lost_suppresses_frame,length=220>
+##contig=<ID=plus_3exon__start_lost_suppresses_stop_gain,length=220>
+##contig=<ID=plus_3exon__start_lost_suppresses_stop_lost,length=220>
+##contig=<ID=plus_3exon__start_lost_trans_control,length=220>
+##contig=<ID=plus_3exon__start_lost_hom_alt,length=220>
+##contig=<ID=plus_3exon__start_intact_frame_open_early_stop,length=220>
+##contig=<ID=plus_3exon__stop_lost_snv_first,length=220>
+##contig=<ID=plus_3exon__stop_lost_snv_second,length=220>
+##contig=<ID=plus_3exon__stop_lost_snv_third,length=220>
+##contig=<ID=plus_3exon__stop_lost_mnv,length=220>
+##contig=<ID=plus_3exon__stop_lost_terminator_deleted,length=220>
+##contig=<ID=plus_3exon__stop_lost_last_codon_and_terminator_deleted,length=220>
+##contig=<ID=plus_3exon__stop_lost_deletion_partial,length=220>
+##contig=<ID=plus_3exon__stop_lost_insertion_inside,length=220>
+##contig=<ID=plus_3exon__stop_lost_insertion_before_plus1,length=220>
+##contig=<ID=plus_3exon__stop_lost_insertion_before_plus2,length=220>
+##contig=<ID=plus_3exon__run_off_deletion,length=220>
+##contig=<ID=plus_3exon__run_off_insertion_plus2,length=220>
+##contig=<ID=plus_3exon__run_off_inside_codon_35,length=220>
+##contig=<ID=plus_3exon__run_off_trans_control,length=220>
+##contig=<ID=plus_3exon__stop_lost_hom_alt,length=220>
+##contig=<ID=plus_3exon__stop_lost_and_missense,length=220>
+##contig=<ID=plus_3exon__stop_retained_tag,length=220>
+##contig=<ID=plus_3exon__stop_retained_tga,length=220>
+##contig=<ID=plus_3exon__stop_retained_plus_synonymous,length=220>
+##contig=<ID=plus_3exon__stop_retained_plus_missense,length=220>
+##contig=<ID=plus_3exon__stop_retained_plus_inframe_insertion,length=220>
+##contig=<ID=plus_3exon__stop_retained_trans_control,length=220>
+##contig=<ID=plus_3exon__stop_retained_hom_alt,length=220>
+##contig=<ID=plus_3exon__stop_retained_after_frame_pair,length=220>
+##contig=<ID=plus_3exon__stop_retained_displaced_insertion,length=220>
+##contig=<ID=plus_3exon__inframe_insertion_before_terminator,length=220>
+##contig=<ID=plus_3exon__stop_inserted_before_terminator,length=220>
+##contig=<ID=plus_3exon__stop_gained_in_codon_35,length=220>
+##contig=<ID=plus_3exon__inframe_deletion_before_terminator,length=220>
+##contig=<ID=plus_3exon__rescued_termination_by_restoring_insertion,length=220>
+##contig=<ID=plus_3exon__rescued_termination_restore_inside_terminator,length=220>
+##contig=<ID=plus_3exon__rescued_termination_by_deletion_in_terminator,length=220>
+##contig=<ID=plus_3exon__rescued_termination_by_terminator_deletion,length=220>
+##contig=<ID=plus_3exon__rescued_termination_after_stop_lost,length=220>
+##contig=<ID=plus_3exon__post_stop_terminator_lost,length=220>
+##contig=<ID=plus_3exon__post_stop_terminator_retained,length=220>
+##contig=<ID=plus_3exon__post_stop_run_off,length=220>
+##contig=<ID=plus_3exon__post_stop_two_edits,length=220>
+##contig=<ID=plus_3exon__post_stop_restoring_deletion,length=220>
+##contig=<ID=plus_3exon__restoring_insertion_creates_stop,length=220>
+##contig=<ID=plus_3exon__post_stop_after_start_lost,length=220>
+##contig=<ID=minus_1exon__start_snv_first,length=140>
+##contig=<ID=minus_1exon__start_snv_last,length=140>
+##contig=<ID=minus_1exon__start_mnv,length=140>
+##contig=<ID=minus_1exon__start_deletion_frame,length=140>
+##contig=<ID=minus_1exon__start_deletion_inframe,length=140>
+##contig=<ID=minus_1exon__start_insertion_inside,length=140>
+##contig=<ID=minus_1exon__start_insertion_after_start,length=140>
+##contig=<ID=minus_1exon__start_rescued_by_insertion_a,length=140>
+##contig=<ID=minus_1exon__start_rescued_by_insertion_b,length=140>
+##contig=<ID=minus_1exon__start_deletion_within_exon,length=140>
+##contig=<ID=minus_1exon__start_lost_suppresses_missense,length=140>
+##contig=<ID=minus_1exon__start_lost_suppresses_frame,length=140>
+##contig=<ID=minus_1exon__start_lost_suppresses_stop_gain,length=140>
+##contig=<ID=minus_1exon__start_lost_suppresses_stop_lost,length=140>
+##contig=<ID=minus_1exon__start_lost_trans_control,length=140>
+##contig=<ID=minus_1exon__start_lost_hom_alt,length=140>
+##contig=<ID=minus_1exon__start_intact_frame_open_early_stop,length=140>
+##contig=<ID=minus_1exon__stop_lost_snv_first,length=140>
+##contig=<ID=minus_1exon__stop_lost_snv_second,length=140>
+##contig=<ID=minus_1exon__stop_lost_snv_third,length=140>
+##contig=<ID=minus_1exon__stop_lost_mnv,length=140>
+##contig=<ID=minus_1exon__stop_lost_terminator_deleted,length=140>
+##contig=<ID=minus_1exon__stop_lost_last_codon_and_terminator_deleted,length=140>
+##contig=<ID=minus_1exon__stop_lost_deletion_partial,length=140>
+##contig=<ID=minus_1exon__stop_lost_insertion_inside,length=140>
+##contig=<ID=minus_1exon__stop_lost_insertion_before_plus1,length=140>
+##contig=<ID=minus_1exon__stop_lost_insertion_before_plus2,length=140>
+##contig=<ID=minus_1exon__run_off_deletion,length=140>
+##contig=<ID=minus_1exon__run_off_insertion_plus2,length=140>
+##contig=<ID=minus_1exon__run_off_inside_codon_35,length=140>
+##contig=<ID=minus_1exon__run_off_trans_control,length=140>
+##contig=<ID=minus_1exon__stop_lost_hom_alt,length=140>
+##contig=<ID=minus_1exon__stop_lost_and_missense,length=140>
+##contig=<ID=minus_1exon__stop_retained_tag,length=140>
+##contig=<ID=minus_1exon__stop_retained_tga,length=140>
+##contig=<ID=minus_1exon__stop_retained_plus_synonymous,length=140>
+##contig=<ID=minus_1exon__stop_retained_plus_missense,length=140>
+##contig=<ID=minus_1exon__stop_retained_plus_inframe_insertion,length=140>
+##contig=<ID=minus_1exon__stop_retained_trans_control,length=140>
+##contig=<ID=minus_1exon__stop_retained_hom_alt,length=140>
+##contig=<ID=minus_1exon__stop_retained_after_frame_pair,length=140>
+##contig=<ID=minus_1exon__stop_retained_displaced_insertion,length=140>
+##contig=<ID=minus_1exon__inframe_insertion_before_terminator,length=140>
+##contig=<ID=minus_1exon__stop_inserted_before_terminator,length=140>
+##contig=<ID=minus_1exon__stop_gained_in_codon_35,length=140>
+##contig=<ID=minus_1exon__inframe_deletion_before_terminator,length=140>
+##contig=<ID=minus_1exon__rescued_termination_by_restoring_insertion,length=140>
+##contig=<ID=minus_1exon__rescued_termination_restore_inside_terminator,length=140>
+##contig=<ID=minus_1exon__rescued_termination_by_deletion_in_terminator,length=140>
+##contig=<ID=minus_1exon__rescued_termination_by_terminator_deletion,length=140>
+##contig=<ID=minus_1exon__rescued_termination_after_stop_lost,length=140>
+##contig=<ID=minus_1exon__post_stop_terminator_lost,length=140>
+##contig=<ID=minus_1exon__post_stop_terminator_retained,length=140>
+##contig=<ID=minus_1exon__post_stop_run_off,length=140>
+##contig=<ID=minus_1exon__post_stop_two_edits,length=140>
+##contig=<ID=minus_1exon__post_stop_restoring_deletion,length=140>
+##contig=<ID=minus_1exon__restoring_insertion_creates_stop,length=140>
+##contig=<ID=minus_1exon__post_stop_after_start_lost,length=140>
+##contig=<ID=minus_2exon__start_snv_first,length=180>
+##contig=<ID=minus_2exon__start_snv_last,length=180>
+##contig=<ID=minus_2exon__start_mnv,length=180>
+##contig=<ID=minus_2exon__start_deletion_frame,length=180>
+##contig=<ID=minus_2exon__start_deletion_inframe,length=180>
+##contig=<ID=minus_2exon__start_insertion_inside,length=180>
+##contig=<ID=minus_2exon__start_insertion_after_start,length=180>
+##contig=<ID=minus_2exon__start_rescued_by_insertion_a,length=180>
+##contig=<ID=minus_2exon__start_rescued_by_insertion_b,length=180>
+##contig=<ID=minus_2exon__start_deletion_within_exon,length=180>
+##contig=<ID=minus_2exon__start_lost_suppresses_missense,length=180>
+##contig=<ID=minus_2exon__start_lost_suppresses_frame,length=180>
+##contig=<ID=minus_2exon__start_lost_suppresses_stop_gain,length=180>
+##contig=<ID=minus_2exon__start_lost_suppresses_stop_lost,length=180>
+##contig=<ID=minus_2exon__start_lost_trans_control,length=180>
+##contig=<ID=minus_2exon__start_lost_hom_alt,length=180>
+##contig=<ID=minus_2exon__start_intact_frame_open_early_stop,length=180>
+##contig=<ID=minus_2exon__stop_lost_snv_first,length=180>
+##contig=<ID=minus_2exon__stop_lost_snv_second,length=180>
+##contig=<ID=minus_2exon__stop_lost_snv_third,length=180>
+##contig=<ID=minus_2exon__stop_lost_mnv,length=180>
+##contig=<ID=minus_2exon__stop_lost_terminator_deleted,length=180>
+##contig=<ID=minus_2exon__stop_lost_last_codon_and_terminator_deleted,length=180>
+##contig=<ID=minus_2exon__stop_lost_deletion_partial,length=180>
+##contig=<ID=minus_2exon__stop_lost_insertion_inside,length=180>
+##contig=<ID=minus_2exon__stop_lost_insertion_before_plus1,length=180>
+##contig=<ID=minus_2exon__stop_lost_insertion_before_plus2,length=180>
+##contig=<ID=minus_2exon__run_off_deletion,length=180>
+##contig=<ID=minus_2exon__run_off_insertion_plus2,length=180>
+##contig=<ID=minus_2exon__run_off_inside_codon_35,length=180>
+##contig=<ID=minus_2exon__run_off_trans_control,length=180>
+##contig=<ID=minus_2exon__stop_lost_hom_alt,length=180>
+##contig=<ID=minus_2exon__stop_lost_and_missense,length=180>
+##contig=<ID=minus_2exon__stop_retained_tag,length=180>
+##contig=<ID=minus_2exon__stop_retained_tga,length=180>
+##contig=<ID=minus_2exon__stop_retained_plus_synonymous,length=180>
+##contig=<ID=minus_2exon__stop_retained_plus_missense,length=180>
+##contig=<ID=minus_2exon__stop_retained_plus_inframe_insertion,length=180>
+##contig=<ID=minus_2exon__stop_retained_trans_control,length=180>
+##contig=<ID=minus_2exon__stop_retained_hom_alt,length=180>
+##contig=<ID=minus_2exon__stop_retained_after_frame_pair,length=180>
+##contig=<ID=minus_2exon__stop_retained_displaced_insertion,length=180>
+##contig=<ID=minus_2exon__inframe_insertion_before_terminator,length=180>
+##contig=<ID=minus_2exon__stop_inserted_before_terminator,length=180>
+##contig=<ID=minus_2exon__stop_gained_in_codon_35,length=180>
+##contig=<ID=minus_2exon__inframe_deletion_before_terminator,length=180>
+##contig=<ID=minus_2exon__rescued_termination_by_restoring_insertion,length=180>
+##contig=<ID=minus_2exon__rescued_termination_restore_inside_terminator,length=180>
+##contig=<ID=minus_2exon__rescued_termination_by_deletion_in_terminator,length=180>
+##contig=<ID=minus_2exon__rescued_termination_by_terminator_deletion,length=180>
+##contig=<ID=minus_2exon__rescued_termination_after_stop_lost,length=180>
+##contig=<ID=minus_2exon__post_stop_terminator_lost,length=180>
+##contig=<ID=minus_2exon__post_stop_terminator_retained,length=180>
+##contig=<ID=minus_2exon__post_stop_run_off,length=180>
+##contig=<ID=minus_2exon__post_stop_two_edits,length=180>
+##contig=<ID=minus_2exon__post_stop_restoring_deletion,length=180>
+##contig=<ID=minus_2exon__restoring_insertion_creates_stop,length=180>
+##contig=<ID=minus_2exon__post_stop_after_start_lost,length=180>
+##contig=<ID=minus_3exon__start_snv_first,length=220>
+##contig=<ID=minus_3exon__start_snv_last,length=220>
+##contig=<ID=minus_3exon__start_mnv,length=220>
+##contig=<ID=minus_3exon__start_deletion_frame,length=220>
+##contig=<ID=minus_3exon__start_deletion_inframe,length=220>
+##contig=<ID=minus_3exon__start_insertion_inside,length=220>
+##contig=<ID=minus_3exon__start_insertion_after_start,length=220>
+##contig=<ID=minus_3exon__start_rescued_by_insertion_a,length=220>
+##contig=<ID=minus_3exon__start_rescued_by_insertion_b,length=220>
+##contig=<ID=minus_3exon__start_deletion_within_exon,length=220>
+##contig=<ID=minus_3exon__start_lost_suppresses_missense,length=220>
+##contig=<ID=minus_3exon__start_lost_suppresses_frame,length=220>
+##contig=<ID=minus_3exon__start_lost_suppresses_stop_gain,length=220>
+##contig=<ID=minus_3exon__start_lost_suppresses_stop_lost,length=220>
+##contig=<ID=minus_3exon__start_lost_trans_control,length=220>
+##contig=<ID=minus_3exon__start_lost_hom_alt,length=220>
+##contig=<ID=minus_3exon__start_intact_frame_open_early_stop,length=220>
+##contig=<ID=minus_3exon__stop_lost_snv_first,length=220>
+##contig=<ID=minus_3exon__stop_lost_snv_second,length=220>
+##contig=<ID=minus_3exon__stop_lost_snv_third,length=220>
+##contig=<ID=minus_3exon__stop_lost_mnv,length=220>
+##contig=<ID=minus_3exon__stop_lost_terminator_deleted,length=220>
+##contig=<ID=minus_3exon__stop_lost_last_codon_and_terminator_deleted,length=220>
+##contig=<ID=minus_3exon__stop_lost_deletion_partial,length=220>
+##contig=<ID=minus_3exon__stop_lost_insertion_inside,length=220>
+##contig=<ID=minus_3exon__stop_lost_insertion_before_plus1,length=220>
+##contig=<ID=minus_3exon__stop_lost_insertion_before_plus2,length=220>
+##contig=<ID=minus_3exon__run_off_deletion,length=220>
+##contig=<ID=minus_3exon__run_off_insertion_plus2,length=220>
+##contig=<ID=minus_3exon__run_off_inside_codon_35,length=220>
+##contig=<ID=minus_3exon__run_off_trans_control,length=220>
+##contig=<ID=minus_3exon__stop_lost_hom_alt,length=220>
+##contig=<ID=minus_3exon__stop_lost_and_missense,length=220>
+##contig=<ID=minus_3exon__stop_retained_tag,length=220>
+##contig=<ID=minus_3exon__stop_retained_tga,length=220>
+##contig=<ID=minus_3exon__stop_retained_plus_synonymous,length=220>
+##contig=<ID=minus_3exon__stop_retained_plus_missense,length=220>
+##contig=<ID=minus_3exon__stop_retained_plus_inframe_insertion,length=220>
+##contig=<ID=minus_3exon__stop_retained_trans_control,length=220>
+##contig=<ID=minus_3exon__stop_retained_hom_alt,length=220>
+##contig=<ID=minus_3exon__stop_retained_after_frame_pair,length=220>
+##contig=<ID=minus_3exon__stop_retained_displaced_insertion,length=220>
+##contig=<ID=minus_3exon__inframe_insertion_before_terminator,length=220>
+##contig=<ID=minus_3exon__stop_inserted_before_terminator,length=220>
+##contig=<ID=minus_3exon__stop_gained_in_codon_35,length=220>
+##contig=<ID=minus_3exon__inframe_deletion_before_terminator,length=220>
+##contig=<ID=minus_3exon__rescued_termination_by_restoring_insertion,length=220>
+##contig=<ID=minus_3exon__rescued_termination_restore_inside_terminator,length=220>
+##contig=<ID=minus_3exon__rescued_termination_by_deletion_in_terminator,length=220>
+##contig=<ID=minus_3exon__rescued_termination_by_terminator_deletion,length=220>
+##contig=<ID=minus_3exon__rescued_termination_after_stop_lost,length=220>
+##contig=<ID=minus_3exon__post_stop_terminator_lost,length=220>
+##contig=<ID=minus_3exon__post_stop_terminator_retained,length=220>
+##contig=<ID=minus_3exon__post_stop_run_off,length=220>
+##contig=<ID=minus_3exon__post_stop_two_edits,length=220>
+##contig=<ID=minus_3exon__post_stop_restoring_deletion,length=220>
+##contig=<ID=minus_3exon__restoring_insertion_creates_stop,length=220>
+##contig=<ID=minus_3exon__post_stop_after_start_lost,length=220>
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S
+plus_1exon__start_snv_first	17	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__start_snv_last	19	.	G	A	.	PASS	.	GT	1|0
+plus_1exon__start_mnv	17	.	ATG	CCC	.	PASS	.	GT	1|0
+plus_1exon__start_deletion_frame	17	.	ATG	A	.	PASS	.	GT	1|0
+plus_1exon__start_deletion_inframe	17	.	ATGA	A	.	PASS	.	GT	1|0
+plus_1exon__start_insertion_inside	18	.	T	TCC	.	PASS	.	GT	1|0
+plus_1exon__start_insertion_after_start	19	.	G	GGAA	.	PASS	.	GT	1|0
+plus_1exon__start_rescued_by_insertion_a	17	.	A	ATGA	.	PASS	.	GT	1|0
+plus_1exon__start_rescued_by_insertion_b	18	.	T	TGAT	.	PASS	.	GT	1|0
+plus_1exon__start_deletion_within_exon	17	.	ATGAGTCCCATCCGAAACTTCCTCCGTGATT	A	.	PASS	.	GT	1|0
+plus_1exon__start_lost_suppresses_missense	17	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__start_lost_suppresses_missense	66	.	T	A	.	PASS	.	GT	1|0
+plus_1exon__start_lost_suppresses_frame	18	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__start_lost_suppresses_frame	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__start_lost_suppresses_stop_gain	17	.	A	T	.	PASS	.	GT	1|0
+plus_1exon__start_lost_suppresses_stop_gain	56	.	C	T	.	PASS	.	GT	1|0
+plus_1exon__start_lost_suppresses_stop_lost	17	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__start_lost_suppresses_stop_lost	122	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__start_lost_trans_control	17	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__start_lost_trans_control	66	.	T	A	.	PASS	.	GT	0|1
+plus_1exon__start_lost_hom_alt	17	.	A	C	.	PASS	.	GT	1|1
+plus_1exon__start_intact_frame_open_early_stop	19	.	G	GG	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_snv_first	122	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_snv_second	123	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_snv_third	124	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_mnv	122	.	TAA	TGG	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_terminator_deleted	121	.	TTAA	T	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_last_codon_and_terminator_deleted	118	.	TAATTAA	T	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_deletion_partial	121	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_insertion_inside	122	.	T	TCCC	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_insertion_before_plus1	121	.	T	TG	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_insertion_before_plus2	121	.	T	TGG	.	PASS	.	GT	1|0
+plus_1exon__run_off_deletion	66	.	TC	T	.	PASS	.	GT	1|0
+plus_1exon__run_off_insertion_plus2	56	.	C	CAC	.	PASS	.	GT	1|0
+plus_1exon__run_off_inside_codon_35	119	.	A	AG	.	PASS	.	GT	1|0
+plus_1exon__run_off_trans_control	56	.	C	A	.	PASS	.	GT	0|1
+plus_1exon__run_off_trans_control	66	.	TC	T	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_hom_alt	122	.	T	C	.	PASS	.	GT	1|1
+plus_1exon__stop_lost_and_missense	66	.	T	A	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_and_missense	122	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_tag	124	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_tga	123	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_plus_synonymous	25	.	C	A	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_plus_synonymous	123	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_plus_missense	66	.	T	A	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_plus_missense	123	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_plus_inframe_insertion	76	.	T	TGGG	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_plus_inframe_insertion	124	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_trans_control	66	.	T	A	.	PASS	.	GT	0|1
+plus_1exon__stop_retained_trans_control	123	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_hom_alt	123	.	A	G	.	PASS	.	GT	1|1
+plus_1exon__stop_retained_after_frame_pair	46	.	T	TT	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_after_frame_pair	76	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_after_frame_pair	124	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_displaced_insertion	122	.	T	TG	.	PASS	.	GT	1|0
+plus_1exon__inframe_insertion_before_terminator	121	.	T	TGGG	.	PASS	.	GT	1|0
+plus_1exon__stop_inserted_before_terminator	121	.	T	TTAA	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_in_codon_35	119	.	A	T	.	PASS	.	GT	1|0
+plus_1exon__stop_gained_in_codon_35	121	.	T	A	.	PASS	.	GT	1|0
+plus_1exon__inframe_deletion_before_terminator	118	.	TAAT	T	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_by_restoring_insertion	66	.	TC	T	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_by_restoring_insertion	120	.	A	AC	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_restore_inside_terminator	66	.	TC	T	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_restore_inside_terminator	122	.	T	TC	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_by_deletion_in_terminator	66	.	T	TA	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_by_deletion_in_terminator	122	.	TA	T	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_by_terminator_deletion	66	.	T	TA	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_by_terminator_deletion	121	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_after_stop_lost	66	.	TC	T	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_after_stop_lost	86	.	A	AC	.	PASS	.	GT	1|0
+plus_1exon__rescued_termination_after_stop_lost	122	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__post_stop_terminator_lost	56	.	C	T	.	PASS	.	GT	1|0
+plus_1exon__post_stop_terminator_lost	122	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__post_stop_terminator_retained	56	.	C	T	.	PASS	.	GT	1|0
+plus_1exon__post_stop_terminator_retained	123	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__post_stop_run_off	26	.	A	AG	.	PASS	.	GT	1|0
+plus_1exon__post_stop_run_off	121	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__post_stop_two_edits	56	.	C	T	.	PASS	.	GT	1|0
+plus_1exon__post_stop_two_edits	86	.	A	AC	.	PASS	.	GT	1|0
+plus_1exon__post_stop_two_edits	124	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__post_stop_restoring_deletion	26	.	A	AG	.	PASS	.	GT	1|0
+plus_1exon__post_stop_restoring_deletion	76	.	TT	T	.	PASS	.	GT	1|0
+plus_1exon__restoring_insertion_creates_stop	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_1exon__restoring_insertion_creates_stop	76	.	T	TGA	.	PASS	.	GT	1|0
+plus_1exon__post_stop_after_start_lost	17	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__post_stop_after_start_lost	56	.	C	T	.	PASS	.	GT	1|0
+plus_1exon__post_stop_after_start_lost	122	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__start_snv_first	17	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__start_snv_last	19	.	G	A	.	PASS	.	GT	1|0
+plus_2exon__start_mnv	17	.	ATG	CCC	.	PASS	.	GT	1|0
+plus_2exon__start_deletion_frame	17	.	ATG	A	.	PASS	.	GT	1|0
+plus_2exon__start_deletion_inframe	17	.	ATGA	A	.	PASS	.	GT	1|0
+plus_2exon__start_insertion_inside	18	.	T	TCC	.	PASS	.	GT	1|0
+plus_2exon__start_insertion_after_start	19	.	G	GGAA	.	PASS	.	GT	1|0
+plus_2exon__start_rescued_by_insertion_a	17	.	A	ATGA	.	PASS	.	GT	1|0
+plus_2exon__start_rescued_by_insertion_b	18	.	T	TGAT	.	PASS	.	GT	1|0
+plus_2exon__start_deletion_within_exon	17	.	ATGAGTCCCATCCGAAACTTCCTCCGTGATT	A	.	PASS	.	GT	1|0
+plus_2exon__start_lost_suppresses_missense	17	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__start_lost_suppresses_missense	66	.	T	A	.	PASS	.	GT	1|0
+plus_2exon__start_lost_suppresses_frame	18	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__start_lost_suppresses_frame	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__start_lost_suppresses_stop_gain	17	.	A	T	.	PASS	.	GT	1|0
+plus_2exon__start_lost_suppresses_stop_gain	56	.	C	T	.	PASS	.	GT	1|0
+plus_2exon__start_lost_suppresses_stop_lost	17	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__start_lost_suppresses_stop_lost	162	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__start_lost_trans_control	17	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__start_lost_trans_control	66	.	T	A	.	PASS	.	GT	0|1
+plus_2exon__start_lost_hom_alt	17	.	A	C	.	PASS	.	GT	1|1
+plus_2exon__start_intact_frame_open_early_stop	19	.	G	GG	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_snv_first	162	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_snv_second	163	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_snv_third	164	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_mnv	162	.	TAA	TGG	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_terminator_deleted	161	.	TTAA	T	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_last_codon_and_terminator_deleted	158	.	TAATTAA	T	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_deletion_partial	161	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_insertion_inside	162	.	T	TCCC	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_insertion_before_plus1	161	.	T	TG	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_insertion_before_plus2	161	.	T	TGG	.	PASS	.	GT	1|0
+plus_2exon__run_off_deletion	66	.	TC	T	.	PASS	.	GT	1|0
+plus_2exon__run_off_insertion_plus2	56	.	C	CAC	.	PASS	.	GT	1|0
+plus_2exon__run_off_inside_codon_35	159	.	A	AG	.	PASS	.	GT	1|0
+plus_2exon__run_off_trans_control	56	.	C	A	.	PASS	.	GT	0|1
+plus_2exon__run_off_trans_control	66	.	TC	T	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_hom_alt	162	.	T	C	.	PASS	.	GT	1|1
+plus_2exon__stop_lost_and_missense	66	.	T	A	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_and_missense	162	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_tag	164	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_tga	163	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_plus_synonymous	25	.	C	A	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_plus_synonymous	163	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_plus_missense	66	.	T	A	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_plus_missense	163	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_plus_inframe_insertion	116	.	T	TGGG	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_plus_inframe_insertion	164	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_trans_control	66	.	T	A	.	PASS	.	GT	0|1
+plus_2exon__stop_retained_trans_control	163	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_hom_alt	163	.	A	G	.	PASS	.	GT	1|1
+plus_2exon__stop_retained_after_frame_pair	46	.	T	TT	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_after_frame_pair	116	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_after_frame_pair	164	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_displaced_insertion	162	.	T	TG	.	PASS	.	GT	1|0
+plus_2exon__inframe_insertion_before_terminator	161	.	T	TGGG	.	PASS	.	GT	1|0
+plus_2exon__stop_inserted_before_terminator	161	.	T	TTAA	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_in_codon_35	159	.	A	T	.	PASS	.	GT	1|0
+plus_2exon__stop_gained_in_codon_35	161	.	T	A	.	PASS	.	GT	1|0
+plus_2exon__inframe_deletion_before_terminator	158	.	TAAT	T	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_by_restoring_insertion	66	.	TC	T	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_by_restoring_insertion	160	.	A	AC	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_restore_inside_terminator	66	.	TC	T	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_restore_inside_terminator	162	.	T	TC	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_by_deletion_in_terminator	66	.	T	TA	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_by_deletion_in_terminator	162	.	TA	T	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_by_terminator_deletion	66	.	T	TA	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_by_terminator_deletion	161	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_after_stop_lost	66	.	TC	T	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_after_stop_lost	126	.	A	AC	.	PASS	.	GT	1|0
+plus_2exon__rescued_termination_after_stop_lost	162	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__post_stop_terminator_lost	56	.	C	T	.	PASS	.	GT	1|0
+plus_2exon__post_stop_terminator_lost	162	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__post_stop_terminator_retained	56	.	C	T	.	PASS	.	GT	1|0
+plus_2exon__post_stop_terminator_retained	163	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__post_stop_run_off	26	.	A	AG	.	PASS	.	GT	1|0
+plus_2exon__post_stop_run_off	161	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__post_stop_two_edits	56	.	C	T	.	PASS	.	GT	1|0
+plus_2exon__post_stop_two_edits	126	.	A	AC	.	PASS	.	GT	1|0
+plus_2exon__post_stop_two_edits	164	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__post_stop_restoring_deletion	26	.	A	AG	.	PASS	.	GT	1|0
+plus_2exon__post_stop_restoring_deletion	116	.	TT	T	.	PASS	.	GT	1|0
+plus_2exon__restoring_insertion_creates_stop	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_2exon__restoring_insertion_creates_stop	116	.	T	TGA	.	PASS	.	GT	1|0
+plus_2exon__post_stop_after_start_lost	17	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__post_stop_after_start_lost	56	.	C	T	.	PASS	.	GT	1|0
+plus_2exon__post_stop_after_start_lost	162	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__start_snv_first	17	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__start_snv_last	19	.	G	A	.	PASS	.	GT	1|0
+plus_3exon__start_mnv	17	.	ATG	CCC	.	PASS	.	GT	1|0
+plus_3exon__start_deletion_frame	17	.	ATG	A	.	PASS	.	GT	1|0
+plus_3exon__start_deletion_inframe	17	.	ATGA	A	.	PASS	.	GT	1|0
+plus_3exon__start_insertion_inside	18	.	T	TCC	.	PASS	.	GT	1|0
+plus_3exon__start_insertion_after_start	19	.	G	GGAA	.	PASS	.	GT	1|0
+plus_3exon__start_rescued_by_insertion_a	17	.	A	ATGA	.	PASS	.	GT	1|0
+plus_3exon__start_rescued_by_insertion_b	18	.	T	TGAT	.	PASS	.	GT	1|0
+plus_3exon__start_deletion_within_exon	17	.	ATGAGTCCCATCCGAAACTTCCTCCGTGATT	A	.	PASS	.	GT	1|0
+plus_3exon__start_lost_suppresses_missense	17	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__start_lost_suppresses_missense	106	.	T	A	.	PASS	.	GT	1|0
+plus_3exon__start_lost_suppresses_frame	18	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__start_lost_suppresses_frame	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__start_lost_suppresses_stop_gain	17	.	A	T	.	PASS	.	GT	1|0
+plus_3exon__start_lost_suppresses_stop_gain	96	.	C	T	.	PASS	.	GT	1|0
+plus_3exon__start_lost_suppresses_stop_lost	17	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__start_lost_suppresses_stop_lost	202	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__start_lost_trans_control	17	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__start_lost_trans_control	106	.	T	A	.	PASS	.	GT	0|1
+plus_3exon__start_lost_hom_alt	17	.	A	C	.	PASS	.	GT	1|1
+plus_3exon__start_intact_frame_open_early_stop	19	.	G	GG	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_snv_first	202	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_snv_second	203	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_snv_third	204	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_mnv	202	.	TAA	TGG	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_terminator_deleted	201	.	TTAA	T	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_last_codon_and_terminator_deleted	198	.	TAATTAA	T	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_deletion_partial	201	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_insertion_inside	202	.	T	TCCC	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_insertion_before_plus1	201	.	T	TG	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_insertion_before_plus2	201	.	T	TGG	.	PASS	.	GT	1|0
+plus_3exon__run_off_deletion	106	.	TC	T	.	PASS	.	GT	1|0
+plus_3exon__run_off_insertion_plus2	96	.	C	CAC	.	PASS	.	GT	1|0
+plus_3exon__run_off_inside_codon_35	199	.	A	AG	.	PASS	.	GT	1|0
+plus_3exon__run_off_trans_control	96	.	C	A	.	PASS	.	GT	0|1
+plus_3exon__run_off_trans_control	106	.	TC	T	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_hom_alt	202	.	T	C	.	PASS	.	GT	1|1
+plus_3exon__stop_lost_and_missense	106	.	T	A	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_and_missense	202	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_tag	204	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_tga	203	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_plus_synonymous	25	.	C	A	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_plus_synonymous	203	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_plus_missense	106	.	T	A	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_plus_missense	203	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_plus_inframe_insertion	116	.	T	TGGG	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_plus_inframe_insertion	204	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_trans_control	106	.	T	A	.	PASS	.	GT	0|1
+plus_3exon__stop_retained_trans_control	203	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_hom_alt	203	.	A	G	.	PASS	.	GT	1|1
+plus_3exon__stop_retained_after_frame_pair	46	.	T	TT	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_after_frame_pair	116	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_after_frame_pair	204	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_displaced_insertion	202	.	T	TG	.	PASS	.	GT	1|0
+plus_3exon__inframe_insertion_before_terminator	201	.	T	TGGG	.	PASS	.	GT	1|0
+plus_3exon__stop_inserted_before_terminator	201	.	T	TTAA	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_in_codon_35	199	.	A	T	.	PASS	.	GT	1|0
+plus_3exon__stop_gained_in_codon_35	201	.	T	A	.	PASS	.	GT	1|0
+plus_3exon__inframe_deletion_before_terminator	198	.	TAAT	T	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_by_restoring_insertion	106	.	TC	T	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_by_restoring_insertion	200	.	A	AC	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_restore_inside_terminator	106	.	TC	T	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_restore_inside_terminator	202	.	T	TC	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_by_deletion_in_terminator	106	.	T	TA	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_by_deletion_in_terminator	202	.	TA	T	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_by_terminator_deletion	106	.	T	TA	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_by_terminator_deletion	201	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_after_stop_lost	106	.	TC	T	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_after_stop_lost	126	.	A	AC	.	PASS	.	GT	1|0
+plus_3exon__rescued_termination_after_stop_lost	202	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__post_stop_terminator_lost	96	.	C	T	.	PASS	.	GT	1|0
+plus_3exon__post_stop_terminator_lost	202	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__post_stop_terminator_retained	96	.	C	T	.	PASS	.	GT	1|0
+plus_3exon__post_stop_terminator_retained	203	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__post_stop_run_off	26	.	A	AG	.	PASS	.	GT	1|0
+plus_3exon__post_stop_run_off	201	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__post_stop_two_edits	96	.	C	T	.	PASS	.	GT	1|0
+plus_3exon__post_stop_two_edits	126	.	A	AC	.	PASS	.	GT	1|0
+plus_3exon__post_stop_two_edits	204	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__post_stop_restoring_deletion	26	.	A	AG	.	PASS	.	GT	1|0
+plus_3exon__post_stop_restoring_deletion	116	.	TT	T	.	PASS	.	GT	1|0
+plus_3exon__restoring_insertion_creates_stop	46	.	TTC	T	.	PASS	.	GT	1|0
+plus_3exon__restoring_insertion_creates_stop	116	.	T	TGA	.	PASS	.	GT	1|0
+plus_3exon__post_stop_after_start_lost	17	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__post_stop_after_start_lost	96	.	C	T	.	PASS	.	GT	1|0
+plus_3exon__post_stop_after_start_lost	202	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__start_snv_first	124	.	T	G	.	PASS	.	GT	1|0
+minus_1exon__start_snv_last	122	.	C	T	.	PASS	.	GT	1|0
+minus_1exon__start_mnv	122	.	CAT	GGG	.	PASS	.	GT	1|0
+minus_1exon__start_deletion_frame	121	.	TCA	T	.	PASS	.	GT	1|0
+minus_1exon__start_deletion_inframe	120	.	CTCA	C	.	PASS	.	GT	1|0
+minus_1exon__start_insertion_inside	122	.	C	CGG	.	PASS	.	GT	1|0
+minus_1exon__start_insertion_after_start	121	.	T	TTTC	.	PASS	.	GT	1|0
+minus_1exon__start_rescued_by_insertion_a	123	.	A	ATCA	.	PASS	.	GT	1|0
+minus_1exon__start_rescued_by_insertion_b	122	.	C	CATC	.	PASS	.	GT	1|0
+minus_1exon__start_deletion_within_exon	93	.	GAATCACGGAGGAAGTTTCGGATGGGACTCA	G	.	PASS	.	GT	1|0
+minus_1exon__start_lost_suppresses_missense	75	.	A	T	.	PASS	.	GT	1|0
+minus_1exon__start_lost_suppresses_missense	124	.	T	G	.	PASS	.	GT	1|0
+minus_1exon__start_lost_suppresses_frame	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__start_lost_suppresses_frame	123	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__start_lost_suppresses_stop_gain	85	.	G	A	.	PASS	.	GT	1|0
+minus_1exon__start_lost_suppresses_stop_gain	124	.	T	A	.	PASS	.	GT	1|0
+minus_1exon__start_lost_suppresses_stop_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__start_lost_suppresses_stop_lost	124	.	T	G	.	PASS	.	GT	1|0
+minus_1exon__start_lost_trans_control	75	.	A	T	.	PASS	.	GT	0|1
+minus_1exon__start_lost_trans_control	124	.	T	G	.	PASS	.	GT	1|0
+minus_1exon__start_lost_hom_alt	124	.	T	G	.	PASS	.	GT	1|1
+minus_1exon__start_intact_frame_open_early_stop	121	.	T	TC	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_snv_first	19	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_snv_second	18	.	T	G	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_snv_third	17	.	T	G	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_mnv	17	.	TTA	CCA	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_terminator_deleted	16	.	GTTA	G	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_last_codon_and_terminator_deleted	16	.	GTTAATT	G	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_deletion_partial	18	.	TA	T	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_insertion_inside	18	.	T	TGGG	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_insertion_before_plus1	19	.	A	AC	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_insertion_before_plus2	19	.	A	ACC	.	PASS	.	GT	1|0
+minus_1exon__run_off_deletion	73	.	AG	A	.	PASS	.	GT	1|0
+minus_1exon__run_off_insertion_plus2	84	.	T	TGT	.	PASS	.	GT	1|0
+minus_1exon__run_off_inside_codon_35	21	.	T	TC	.	PASS	.	GT	1|0
+minus_1exon__run_off_trans_control	73	.	AG	A	.	PASS	.	GT	1|0
+minus_1exon__run_off_trans_control	85	.	G	T	.	PASS	.	GT	0|1
+minus_1exon__stop_lost_hom_alt	19	.	A	G	.	PASS	.	GT	1|1
+minus_1exon__stop_lost_and_missense	19	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_and_missense	75	.	A	T	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_tag	17	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_tga	18	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_plus_synonymous	18	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_plus_synonymous	116	.	G	T	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_plus_missense	18	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_plus_missense	75	.	A	T	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_plus_inframe_insertion	17	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_plus_inframe_insertion	64	.	A	ACCC	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_trans_control	18	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_trans_control	75	.	A	T	.	PASS	.	GT	0|1
+minus_1exon__stop_retained_hom_alt	18	.	T	C	.	PASS	.	GT	1|1
+minus_1exon__stop_retained_after_frame_pair	17	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_after_frame_pair	63	.	CA	C	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_after_frame_pair	94	.	A	AA	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_displaced_insertion	18	.	T	TC	.	PASS	.	GT	1|0
+minus_1exon__inframe_insertion_before_terminator	19	.	A	ACCC	.	PASS	.	GT	1|0
+minus_1exon__stop_inserted_before_terminator	19	.	A	ATTA	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_in_codon_35	20	.	A	T	.	PASS	.	GT	1|0
+minus_1exon__stop_gained_in_codon_35	22	.	T	A	.	PASS	.	GT	1|0
+minus_1exon__inframe_deletion_before_terminator	19	.	AATT	A	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_by_restoring_insertion	20	.	A	AG	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_by_restoring_insertion	73	.	AG	A	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_restore_inside_terminator	18	.	T	TG	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_restore_inside_terminator	73	.	AG	A	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_by_deletion_in_terminator	17	.	TT	T	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_by_deletion_in_terminator	74	.	G	GT	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_by_terminator_deletion	18	.	TA	T	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_by_terminator_deletion	74	.	G	GT	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_after_stop_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_after_stop_lost	54	.	T	TG	.	PASS	.	GT	1|0
+minus_1exon__rescued_termination_after_stop_lost	73	.	AG	A	.	PASS	.	GT	1|0
+minus_1exon__post_stop_terminator_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__post_stop_terminator_lost	85	.	G	A	.	PASS	.	GT	1|0
+minus_1exon__post_stop_terminator_retained	18	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__post_stop_terminator_retained	85	.	G	A	.	PASS	.	GT	1|0
+minus_1exon__post_stop_run_off	18	.	TA	T	.	PASS	.	GT	1|0
+minus_1exon__post_stop_run_off	114	.	A	AC	.	PASS	.	GT	1|0
+minus_1exon__post_stop_two_edits	17	.	T	G	.	PASS	.	GT	1|0
+minus_1exon__post_stop_two_edits	54	.	T	TG	.	PASS	.	GT	1|0
+minus_1exon__post_stop_two_edits	85	.	G	A	.	PASS	.	GT	1|0
+minus_1exon__post_stop_restoring_deletion	63	.	CA	C	.	PASS	.	GT	1|0
+minus_1exon__post_stop_restoring_deletion	114	.	A	AC	.	PASS	.	GT	1|0
+minus_1exon__restoring_insertion_creates_stop	64	.	A	ATC	.	PASS	.	GT	1|0
+minus_1exon__restoring_insertion_creates_stop	92	.	CGA	C	.	PASS	.	GT	1|0
+minus_1exon__post_stop_after_start_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__post_stop_after_start_lost	85	.	G	A	.	PASS	.	GT	1|0
+minus_1exon__post_stop_after_start_lost	124	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__start_snv_first	164	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__start_snv_last	162	.	C	T	.	PASS	.	GT	1|0
+minus_2exon__start_mnv	162	.	CAT	GGG	.	PASS	.	GT	1|0
+minus_2exon__start_deletion_frame	161	.	TCA	T	.	PASS	.	GT	1|0
+minus_2exon__start_deletion_inframe	160	.	CTCA	C	.	PASS	.	GT	1|0
+minus_2exon__start_insertion_inside	162	.	C	CGG	.	PASS	.	GT	1|0
+minus_2exon__start_insertion_after_start	161	.	T	TTTC	.	PASS	.	GT	1|0
+minus_2exon__start_rescued_by_insertion_a	163	.	A	ATCA	.	PASS	.	GT	1|0
+minus_2exon__start_rescued_by_insertion_b	162	.	C	CATC	.	PASS	.	GT	1|0
+minus_2exon__start_deletion_within_exon	133	.	GAATCACGGAGGAAGTTTCGGATGGGACTCA	G	.	PASS	.	GT	1|0
+minus_2exon__start_lost_suppresses_missense	115	.	A	T	.	PASS	.	GT	1|0
+minus_2exon__start_lost_suppresses_missense	164	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__start_lost_suppresses_frame	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__start_lost_suppresses_frame	163	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__start_lost_suppresses_stop_gain	125	.	G	A	.	PASS	.	GT	1|0
+minus_2exon__start_lost_suppresses_stop_gain	164	.	T	A	.	PASS	.	GT	1|0
+minus_2exon__start_lost_suppresses_stop_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__start_lost_suppresses_stop_lost	164	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__start_lost_trans_control	115	.	A	T	.	PASS	.	GT	0|1
+minus_2exon__start_lost_trans_control	164	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__start_lost_hom_alt	164	.	T	G	.	PASS	.	GT	1|1
+minus_2exon__start_intact_frame_open_early_stop	161	.	T	TC	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_snv_first	19	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_snv_second	18	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_snv_third	17	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_mnv	17	.	TTA	CCA	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_terminator_deleted	16	.	GTTA	G	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_last_codon_and_terminator_deleted	16	.	GTTAATT	G	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_deletion_partial	18	.	TA	T	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_insertion_inside	18	.	T	TGGG	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_insertion_before_plus1	19	.	A	AC	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_insertion_before_plus2	19	.	A	ACC	.	PASS	.	GT	1|0
+minus_2exon__run_off_deletion	113	.	AG	A	.	PASS	.	GT	1|0
+minus_2exon__run_off_insertion_plus2	124	.	T	TGT	.	PASS	.	GT	1|0
+minus_2exon__run_off_inside_codon_35	21	.	T	TC	.	PASS	.	GT	1|0
+minus_2exon__run_off_trans_control	113	.	AG	A	.	PASS	.	GT	1|0
+minus_2exon__run_off_trans_control	125	.	G	T	.	PASS	.	GT	0|1
+minus_2exon__stop_lost_hom_alt	19	.	A	G	.	PASS	.	GT	1|1
+minus_2exon__stop_lost_and_missense	19	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_and_missense	115	.	A	T	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_tag	17	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_tga	18	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_plus_synonymous	18	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_plus_synonymous	156	.	G	T	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_plus_missense	18	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_plus_missense	115	.	A	T	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_plus_inframe_insertion	17	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_plus_inframe_insertion	64	.	A	ACCC	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_trans_control	18	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_trans_control	115	.	A	T	.	PASS	.	GT	0|1
+minus_2exon__stop_retained_hom_alt	18	.	T	C	.	PASS	.	GT	1|1
+minus_2exon__stop_retained_after_frame_pair	17	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_after_frame_pair	63	.	CA	C	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_after_frame_pair	134	.	A	AA	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_displaced_insertion	18	.	T	TC	.	PASS	.	GT	1|0
+minus_2exon__inframe_insertion_before_terminator	19	.	A	ACCC	.	PASS	.	GT	1|0
+minus_2exon__stop_inserted_before_terminator	19	.	A	ATTA	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_in_codon_35	20	.	A	T	.	PASS	.	GT	1|0
+minus_2exon__stop_gained_in_codon_35	22	.	T	A	.	PASS	.	GT	1|0
+minus_2exon__inframe_deletion_before_terminator	19	.	AATT	A	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_by_restoring_insertion	20	.	A	AG	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_by_restoring_insertion	113	.	AG	A	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_restore_inside_terminator	18	.	T	TG	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_restore_inside_terminator	113	.	AG	A	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_by_deletion_in_terminator	17	.	TT	T	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_by_deletion_in_terminator	114	.	G	GT	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_by_terminator_deletion	18	.	TA	T	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_by_terminator_deletion	114	.	G	GT	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_after_stop_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_after_stop_lost	54	.	T	TG	.	PASS	.	GT	1|0
+minus_2exon__rescued_termination_after_stop_lost	113	.	AG	A	.	PASS	.	GT	1|0
+minus_2exon__post_stop_terminator_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__post_stop_terminator_lost	125	.	G	A	.	PASS	.	GT	1|0
+minus_2exon__post_stop_terminator_retained	18	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__post_stop_terminator_retained	125	.	G	A	.	PASS	.	GT	1|0
+minus_2exon__post_stop_run_off	18	.	TA	T	.	PASS	.	GT	1|0
+minus_2exon__post_stop_run_off	154	.	A	AC	.	PASS	.	GT	1|0
+minus_2exon__post_stop_two_edits	17	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__post_stop_two_edits	54	.	T	TG	.	PASS	.	GT	1|0
+minus_2exon__post_stop_two_edits	125	.	G	A	.	PASS	.	GT	1|0
+minus_2exon__post_stop_restoring_deletion	63	.	CA	C	.	PASS	.	GT	1|0
+minus_2exon__post_stop_restoring_deletion	154	.	A	AC	.	PASS	.	GT	1|0
+minus_2exon__restoring_insertion_creates_stop	64	.	A	ATC	.	PASS	.	GT	1|0
+minus_2exon__restoring_insertion_creates_stop	132	.	CGA	C	.	PASS	.	GT	1|0
+minus_2exon__post_stop_after_start_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__post_stop_after_start_lost	125	.	G	A	.	PASS	.	GT	1|0
+minus_2exon__post_stop_after_start_lost	164	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__start_snv_first	204	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__start_snv_last	202	.	C	T	.	PASS	.	GT	1|0
+minus_3exon__start_mnv	202	.	CAT	GGG	.	PASS	.	GT	1|0
+minus_3exon__start_deletion_frame	201	.	TCA	T	.	PASS	.	GT	1|0
+minus_3exon__start_deletion_inframe	200	.	CTCA	C	.	PASS	.	GT	1|0
+minus_3exon__start_insertion_inside	202	.	C	CGG	.	PASS	.	GT	1|0
+minus_3exon__start_insertion_after_start	201	.	T	TTTC	.	PASS	.	GT	1|0
+minus_3exon__start_rescued_by_insertion_a	203	.	A	ATCA	.	PASS	.	GT	1|0
+minus_3exon__start_rescued_by_insertion_b	202	.	C	CATC	.	PASS	.	GT	1|0
+minus_3exon__start_deletion_within_exon	173	.	GAATCACGGAGGAAGTTTCGGATGGGACTCA	G	.	PASS	.	GT	1|0
+minus_3exon__start_lost_suppresses_missense	115	.	A	T	.	PASS	.	GT	1|0
+minus_3exon__start_lost_suppresses_missense	204	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__start_lost_suppresses_frame	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__start_lost_suppresses_frame	203	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__start_lost_suppresses_stop_gain	125	.	G	A	.	PASS	.	GT	1|0
+minus_3exon__start_lost_suppresses_stop_gain	204	.	T	A	.	PASS	.	GT	1|0
+minus_3exon__start_lost_suppresses_stop_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__start_lost_suppresses_stop_lost	204	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__start_lost_trans_control	115	.	A	T	.	PASS	.	GT	0|1
+minus_3exon__start_lost_trans_control	204	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__start_lost_hom_alt	204	.	T	G	.	PASS	.	GT	1|1
+minus_3exon__start_intact_frame_open_early_stop	201	.	T	TC	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_snv_first	19	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_snv_second	18	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_snv_third	17	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_mnv	17	.	TTA	CCA	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_terminator_deleted	16	.	GTTA	G	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_last_codon_and_terminator_deleted	16	.	GTTAATT	G	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_deletion_partial	18	.	TA	T	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_insertion_inside	18	.	T	TGGG	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_insertion_before_plus1	19	.	A	AC	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_insertion_before_plus2	19	.	A	ACC	.	PASS	.	GT	1|0
+minus_3exon__run_off_deletion	113	.	AG	A	.	PASS	.	GT	1|0
+minus_3exon__run_off_insertion_plus2	124	.	T	TGT	.	PASS	.	GT	1|0
+minus_3exon__run_off_inside_codon_35	21	.	T	TC	.	PASS	.	GT	1|0
+minus_3exon__run_off_trans_control	113	.	AG	A	.	PASS	.	GT	1|0
+minus_3exon__run_off_trans_control	125	.	G	T	.	PASS	.	GT	0|1
+minus_3exon__stop_lost_hom_alt	19	.	A	G	.	PASS	.	GT	1|1
+minus_3exon__stop_lost_and_missense	19	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_and_missense	115	.	A	T	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_tag	17	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_tga	18	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_plus_synonymous	18	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_plus_synonymous	196	.	G	T	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_plus_missense	18	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_plus_missense	115	.	A	T	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_plus_inframe_insertion	17	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_plus_inframe_insertion	104	.	A	ACCC	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_trans_control	18	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_trans_control	115	.	A	T	.	PASS	.	GT	0|1
+minus_3exon__stop_retained_hom_alt	18	.	T	C	.	PASS	.	GT	1|1
+minus_3exon__stop_retained_after_frame_pair	17	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_after_frame_pair	103	.	CA	C	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_after_frame_pair	174	.	A	AA	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_displaced_insertion	18	.	T	TC	.	PASS	.	GT	1|0
+minus_3exon__inframe_insertion_before_terminator	19	.	A	ACCC	.	PASS	.	GT	1|0
+minus_3exon__stop_inserted_before_terminator	19	.	A	ATTA	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_in_codon_35	20	.	A	T	.	PASS	.	GT	1|0
+minus_3exon__stop_gained_in_codon_35	22	.	T	A	.	PASS	.	GT	1|0
+minus_3exon__inframe_deletion_before_terminator	19	.	AATT	A	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_by_restoring_insertion	20	.	A	AG	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_by_restoring_insertion	113	.	AG	A	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_restore_inside_terminator	18	.	T	TG	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_restore_inside_terminator	113	.	AG	A	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_by_deletion_in_terminator	17	.	TT	T	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_by_deletion_in_terminator	114	.	G	GT	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_by_terminator_deletion	18	.	TA	T	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_by_terminator_deletion	114	.	G	GT	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_after_stop_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_after_stop_lost	94	.	T	TG	.	PASS	.	GT	1|0
+minus_3exon__rescued_termination_after_stop_lost	113	.	AG	A	.	PASS	.	GT	1|0
+minus_3exon__post_stop_terminator_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__post_stop_terminator_lost	125	.	G	A	.	PASS	.	GT	1|0
+minus_3exon__post_stop_terminator_retained	18	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__post_stop_terminator_retained	125	.	G	A	.	PASS	.	GT	1|0
+minus_3exon__post_stop_run_off	18	.	TA	T	.	PASS	.	GT	1|0
+minus_3exon__post_stop_run_off	194	.	A	AC	.	PASS	.	GT	1|0
+minus_3exon__post_stop_two_edits	17	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__post_stop_two_edits	94	.	T	TG	.	PASS	.	GT	1|0
+minus_3exon__post_stop_two_edits	125	.	G	A	.	PASS	.	GT	1|0
+minus_3exon__post_stop_restoring_deletion	103	.	CA	C	.	PASS	.	GT	1|0
+minus_3exon__post_stop_restoring_deletion	194	.	A	AC	.	PASS	.	GT	1|0
+minus_3exon__restoring_insertion_creates_stop	104	.	A	ATC	.	PASS	.	GT	1|0
+minus_3exon__restoring_insertion_creates_stop	172	.	CGA	C	.	PASS	.	GT	1|0
+minus_3exon__post_stop_after_start_lost	19	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__post_stop_after_start_lost	125	.	G	A	.	PASS	.	GT	1|0
+minus_3exon__post_stop_after_start_lost	204	.	T	G	.	PASS	.	GT	1|0
