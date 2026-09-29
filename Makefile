@@ -20,7 +20,7 @@ endif
 include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
 include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
 
-.PHONY: all test test_debug test_release test_haplotype_contract test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme
+.PHONY: all test test_debug test_release test_haplotype_contract test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme build_asan test_release_asan
 all: configure release
 configure: venv platform extension_version
 platform: venv
@@ -82,3 +82,27 @@ site:
 
 site-check: site
 	Rscript scripts/check-site-links.R
+
+# AddressSanitizer + UBSan build of the extension in a separate directory, and the SQL suite
+# run against it. The extension has no DuckDB link dependency (stable C API), so the runtime
+# is preloaded into the unsanitized Python DuckDB host that the sqllogictest runner embeds.
+# Any sanitizer report aborts the host process, which fails the target. Leak detection is off
+# because the host process itself is not leak-clean.
+ASAN_SANITIZE=-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all
+ASAN_LIB=$(shell gcc -print-file-name=libasan.so)
+ASAN_CXXLIB=$(shell gcc -print-file-name=libstdc++.so.6)
+build_asan: check_configure
+	cmake $(CMAKE_BUILD_FLAGS) -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DCMAKE_C_FLAGS="$(ASAN_SANITIZE) -O1 -g" -DCMAKE_CXX_FLAGS="$(ASAN_SANITIZE) -O1 -g" \
+		-DCMAKE_SHARED_LINKER_FLAGS="$(ASAN_SANITIZE)" -S $(PROJ_DIR) -B cmake_build/asan
+	cmake --build cmake_build/asan --config RelWithDebInfo
+	mkdir -p build/asan
+	$(PYTHON_VENV_BIN) extension-ci-tools/scripts/append_extension_metadata.py \
+		-l cmake_build/asan/$(EXTENSION_LIB_FILENAME) -o build/asan/$(EXTENSION_FILENAME) \
+		-n $(EXTENSION_NAME) -dv $(TARGET_DUCKDB_VERSION) \
+		-evf configure/extension_version.txt -pf configure/platform.txt
+test_release_asan: build_asan
+	@test -f "$(ASAN_LIB)" || { echo "libasan.so not found (install gcc's libasan)" >&2; exit 1; }
+	LD_PRELOAD="$(ASAN_LIB) $(ASAN_CXXLIB)" ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:halt_on_error=1 \
+		UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+		$(TEST_RUNNER) --test-dir test/sql --external-extension build/asan/$(EXTENSION_FILENAME)
