@@ -1,7 +1,7 @@
 #' Prepare a single-repeat ExpansionHunter v5 VCF allele
 #'
 #' The supported contract is ExpansionHunter v5.0.0 INFO/REF, RL, RU, END,
-#' symbolic `<STRn>` ALT, and FORMAT/GT, REPCN, REPCI, SO. The caller supplies
+#' symbolic `<STRn>` ALT, and FORMAT/GT, SO with either CN/CI or REPCN/REPCI. The caller supplies
 #' the literal reference interval from POS+1 through END (excluding the VCF
 #' padding base). An ALT is accepted only if a called, spanning allele has a
 #' point confidence interval matching its symbolic copy number. Other records
@@ -72,21 +72,26 @@ rduckvep_prepare_expansionhunter <- function(info, format, sample, ref, alt,
   if (length(fields) != length(entries) || anyDuplicated(fields))
     return(result("invalid", "format_shape", reference))
   names(entries) <- fields
-  if (!all(c("GT", "REPCN", "REPCI", "SO") %in% fields))
+  count_field <- if (all(c("CN", "CI") %in% fields)) c("CN", "CI") else
+    if (all(c("REPCN", "REPCI") %in% fields)) c("REPCN", "REPCI") else character()
+  if (!all(c("GT", "SO") %in% fields) || length(count_field) == 0L)
     return(result("incomplete", "missing_format", reference))
+  if (all(c("CN", "CI", "REPCN", "REPCI") %in% fields))
+    return(result("invalid", "ambiguous_count_fields", reference))
   gt <- strsplit(entries[["GT"]], "[/|]")[[1L]]
-  copies <- strsplit(entries[["REPCN"]], "/", fixed = TRUE)[[1L]]
-  ranges <- strsplit(entries[["REPCI"]], "/", fixed = TRUE)[[1L]]
+  copies <- strsplit(entries[[count_field[1L]]], "/", fixed = TRUE)[[1L]]
+  ranges <- strsplit(entries[[count_field[2L]]], "/", fixed = TRUE)[[1L]]
   support <- strsplit(entries[["SO"]], "/", fixed = TRUE)[[1L]]
   if (length(gt) != length(copies) || length(gt) != length(ranges) ||
       length(gt) != length(support))
     return(result("invalid", "format_shape", reference))
-  if (any(!gt %in% c(".", as.character(seq.int(0L, length(alts))))))
+  if (!all(gt %in% c(".", as.character(seq.int(0L, length(alts))))))
     return(result("invalid", "genotype_index", reference))
   called <- which(gt == as.character(alt_index))
-  if (!length(called)) return(result("summary_only", "uncalled_alt", reference))
-  if (any(!vapply(copies[called], function(x) is.finite(number(x)) &&
-                 number(x) == alternate_count, TRUE)))
+  if (length(called) == 0L)
+    return(result("summary_only", "uncalled_alt", reference))
+  if (!all(vapply(copies[called], function(x) is.finite(number(x)) &&
+                  number(x) == alternate_count, TRUE)))
     return(result("invalid", "count_mismatch", reference))
   if (!any(support[called] == "SPANNING" &
            ranges[called] == paste0(alternate_count, "-", alternate_count)))

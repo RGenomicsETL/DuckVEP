@@ -47,5 +47,31 @@ for (i in 1:2) {
             identical(observed$alternate, alternate),
             observed$length_change == nchar(alternate) - nchar(reference))
 }
+# The documented ALS example has a consistent, reference-backed exact allele.
+als <- strsplit(tail(readLines(
+  "test/duckvep/conformance/data/expansionhunter_v5_documented_als.vcf"), 1L),
+  "\t", fixed = TRUE)[[1L]]
+fasta37 <- "/root/duckvep/data/mane-grch37/Homo_sapiens.GRCh37.dna.primary_assembly.fa"
+anchor <- tail(system2("samtools", c("faidx", fasta37,
+  "9:27573526-27573526"), stdout = TRUE), 1L)
+literal <- tail(system2("samtools", c("faidx", fasta37,
+  "9:27573527-27573544"), stdout = TRUE), 1L)
+stopifnot(identical(anchor, als[4L]), identical(literal, strrep("GGCCCC", 3L)))
+call <- function(i) rduckvep_prepare_expansionhunter(als[8L], als[9L], als[10L],
+  als[4L], als[5L], literal, alt_index = i)
+exact <- call(1L)
+stopifnot(identical(exact$status, "ok"),
+  identical(call(2L)$reason, "estimated_count"))
+ref <- exact$reference_components
+alt <- exact$alternate_components
+query <- sprintf("SELECT r.* FROM (SELECT duckvep_repeat_alleles(
+  [{unit:%s,count:%s}],[{unit:%s,count:%s}],true) r)",
+  as.character(dbQuoteString(con, ref$unit)), ref$count,
+  as.character(dbQuoteString(con, alt$unit)), alt$count)
+observed <- dbGetQuery(con, query)
+stopifnot(identical(observed$status, "ok"),
+          identical(observed$reference, literal),
+          identical(observed$alternate, strrep("GGCCCC", 2L)),
+          observed$length_change == -6)
 })
-cat("ExpansionHunter v5 example: 2 raw reference mismatches, 2 controlled exact alleles\n")
+cat("ExpansionHunter v5: 1 raw exact, 1 raw summary, 2 raw mismatches, 2 controlled exact alleles\n")
