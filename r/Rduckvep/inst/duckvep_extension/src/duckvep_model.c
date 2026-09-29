@@ -100,7 +100,9 @@ duckvep_model_reserve_regions(duckvep_owned_model_t *model, size_t needed)
 
 	if (needed <= model->known_seq_region_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(
+	if (model->capacity_locked)
+		return 0;
+	capacity = model->exact_capacity ? needed : duckvep_sql_next_capacity(
 	    model->known_seq_region_capacity, needed);
 	if (!duckvep_sql_resize((void **)&model->known_seq_regions,
 	    sizeof(*model->known_seq_regions), capacity))
@@ -126,8 +128,10 @@ duckvep_model_reserve_transcripts(duckvep_owned_model_t *model,
 
 	if (needed <= model->transcript_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(model->transcript_capacity,
-	    needed);
+	if (model->capacity_locked)
+		return 0;
+	capacity = model->exact_capacity ? needed :
+	    duckvep_sql_next_capacity(model->transcript_capacity, needed);
 #define DUCKVEP_RESIZE_TRANSCRIPT(member) \
 	if (!duckvep_sql_resize((void **)&model->member, \
 	    sizeof(*model->member), capacity)) \
@@ -161,7 +165,10 @@ duckvep_model_reserve_exons(duckvep_owned_model_t *model, size_t needed)
 
 	if (needed <= model->exon_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(model->exon_capacity, needed);
+	if (model->capacity_locked)
+		return 0;
+	capacity = model->exact_capacity ? needed :
+	    duckvep_sql_next_capacity(model->exon_capacity, needed);
 #define DUCKVEP_RESIZE_EXON(member) \
 	if (!duckvep_sql_resize((void **)&model->member, \
 	    sizeof(*model->member), capacity)) \
@@ -184,8 +191,10 @@ duckvep_model_reserve_sequence(duckvep_owned_model_t *model, size_t needed)
 
 	if (needed <= model->cds_sequence_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(model->cds_sequence_capacity,
-	    needed);
+	if (model->capacity_locked)
+		return 0;
+	capacity = model->exact_capacity ? needed :
+	    duckvep_sql_next_capacity(model->cds_sequence_capacity, needed);
 	if (!duckvep_sql_resize((void **)&model->cds_sequence_bytes,
 	    sizeof(*model->cds_sequence_bytes), capacity))
 		return 0;
@@ -201,8 +210,10 @@ duckvep_model_reserve_mature_mirna(duckvep_owned_model_t *model,
 
 	if (needed <= model->mature_mirna_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(model->mature_mirna_capacity,
-	    needed);
+	if (model->capacity_locked)
+		return 0;
+	capacity = model->exact_capacity ? needed :
+	    duckvep_sql_next_capacity(model->mature_mirna_capacity, needed);
 	if (!duckvep_sql_resize((void **)&model->mature_mirna_starts,
 	    sizeof(*model->mature_mirna_starts), capacity) ||
 	    !duckvep_sql_resize((void **)&model->mature_mirna_ends,
@@ -220,8 +231,10 @@ duckvep_model_reserve_peptide_edits(duckvep_owned_model_t *model,
 
 	if (needed <= model->peptide_edit_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(model->peptide_edit_capacity,
-	    needed);
+	if (model->capacity_locked)
+		return 0;
+	capacity = model->exact_capacity ? needed :
+	    duckvep_sql_next_capacity(model->peptide_edit_capacity, needed);
 	if (!duckvep_sql_resize((void **)&model->peptide_edit_positions,
 	    sizeof(*model->peptide_edit_positions), capacity) ||
 	    !duckvep_sql_resize((void **)&model->peptide_edit_alts,
@@ -238,8 +251,10 @@ duckvep_model_reserve_flanks(duckvep_owned_model_t *model, size_t needed)
 
 	if (needed <= model->flank_sequence_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(model->flank_sequence_capacity,
-	    needed);
+	if (model->capacity_locked)
+		return 0;
+	capacity = model->exact_capacity ? needed :
+	    duckvep_sql_next_capacity(model->flank_sequence_capacity, needed);
 	if (!duckvep_sql_resize((void **)&model->flank_sequence_bytes,
 	    sizeof(*model->flank_sequence_bytes), capacity))
 		return 0;
@@ -255,8 +270,10 @@ duckvep_model_reserve_interval_features(duckvep_owned_model_t *model,
 
 	if (needed <= model->interval_feature_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(model->interval_feature_capacity,
-	    needed);
+	if (model->capacity_locked)
+		return 0;
+	capacity = model->exact_capacity ? needed :
+	    duckvep_sql_next_capacity(model->interval_feature_capacity, needed);
 #define DUCKVEP_RESIZE_INTERVAL_FEATURE(member) \
 	if (!duckvep_sql_resize((void **)&model->member, \
 	    sizeof(*model->member), capacity)) \
@@ -2025,6 +2042,110 @@ duckvep_registry_query_acquire(duckvep_registry_t *registry, char *error, size_t
 }
 
 static int
+duckvep_model_count_query(duckdb_connection connection, const char *query,
+	int transcript, size_t *rows, size_t *cds_bytes, size_t *flank_bytes,
+	char *error, size_t error_size)
+{
+	duckvep_query_result_t source = {0}, counted = {0};
+	duckdb_data_chunk chunk = NULL;
+	duckdb_vector vector;
+	const uint64_t *values;
+	const char *cds_length, *pre_length, *post_length;
+	char *sql;
+	size_t sql_size;
+	idx_t columns, index, expected;
+	int ok = 0;
+
+	if (strlen(query) > SIZE_MAX - 512) {
+		duckvep_sql_set_error(error, error_size, "model query is too long");
+		return 0;
+	}
+	sql_size = strlen(query) + 512;
+	sql = malloc(sql_size);
+	if (sql == NULL) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory counting model rows");
+		return 0;
+	}
+	(void)snprintf(sql, sql_size,
+	    "SELECT * FROM (%s) AS source_rows LIMIT 0", query);
+	if (!duckvep_query_result_open(connection, sql, &source, error,
+	    error_size))
+		goto done;
+	columns = duckdb_column_count(&source.result);
+	if (transcript && columns != 11 && columns != 13) {
+		duckvep_sql_set_error(error, error_size,
+		    "transcript query must return 11 CDS-only columns or 13 with complete pre_cds_sequence and post_cds_sequence");
+		goto done;
+	}
+	cds_length = transcript && duckdb_column_type(&source.result, 9) ==
+	    DUCKDB_TYPE_VARCHAR ? "octet_length(encode(cds_sequence))" :
+	    "octet_length(cds_sequence)";
+	pre_length = transcript && columns == 13 &&
+	    duckdb_column_type(&source.result, 11) == DUCKDB_TYPE_VARCHAR ?
+	    "octet_length(encode(pre_cds_sequence))" :
+	    "octet_length(pre_cds_sequence)";
+	post_length = transcript && columns == 13 &&
+	    duckdb_column_type(&source.result, 12) == DUCKDB_TYPE_VARCHAR ?
+	    "octet_length(encode(post_cds_sequence))" :
+	    "octet_length(post_cds_sequence)";
+	duckvep_query_result_close(&source);
+	if (transcript && columns == 13)
+		(void)snprintf(sql, sql_size,
+		    "SELECT count(*)::UBIGINT, coalesce(sum(%s),0)::UBIGINT, "
+		    "(coalesce(sum(%s),0) + coalesce(sum(%s),0))::UBIGINT "
+		    "FROM (%s) AS source_rows", cds_length, pre_length,
+		    post_length, query);
+	else if (transcript)
+		(void)snprintf(sql, sql_size,
+		    "SELECT count(*)::UBIGINT, coalesce(sum(%s),0)::UBIGINT "
+		    "FROM (%s) AS source_rows", cds_length, query);
+	else
+		(void)snprintf(sql, sql_size,
+		    "SELECT count(*)::UBIGINT FROM (%s) AS source_rows", query);
+	if (!duckvep_query_result_open(connection, sql, &counted, error,
+	    error_size))
+		goto done;
+	expected = transcript ? (columns == 13 ? 3 : 2) : 1;
+	chunk = duckdb_fetch_chunk(counted.result);
+	if (chunk == NULL || duckdb_data_chunk_get_size(chunk) != 1 ||
+	    duckdb_column_count(&counted.result) != expected) {
+		duckvep_sql_set_error(error, error_size,
+		    "invalid model capacity count");
+		goto done;
+	}
+	for (index = 0; index < expected; index++) {
+		vector = duckdb_data_chunk_get_vector(chunk, index);
+		if (duckdb_column_type(&counted.result, index) !=
+		    DUCKDB_TYPE_UBIGINT || duckvep_row_is_null(vector, 0)) {
+			duckvep_sql_set_error(error, error_size,
+			    "invalid model capacity count");
+			goto done;
+		}
+		values = duckdb_vector_get_data(vector);
+		if (values[0] > SIZE_MAX) {
+			duckvep_sql_set_error(error, error_size,
+			    "model capacity exceeds addressable memory");
+			goto done;
+		}
+		if (index == 0)
+			*rows = (size_t)values[0];
+		else if (index == 1)
+			*cds_bytes = (size_t)values[0];
+		else
+			*flank_bytes = (size_t)values[0];
+	}
+	ok = 1;
+done:
+	if (chunk != NULL)
+		duckdb_destroy_data_chunk(&chunk);
+	duckvep_query_result_close(&source);
+	duckvep_query_result_close(&counted);
+	free(sql);
+	return ok;
+}
+
+static int
 duckvep_model_load_queries(duckdb_connection connection,
 	const char *region_query, const char *transcript_query,
 	const char *exon_query, const char *mature_mirna_query,
@@ -2034,6 +2155,7 @@ duckvep_model_load_queries(duckdb_connection connection,
 	char *error, size_t error_size)
 {
 	duckvep_error_t kernel_error;
+	size_t counts[6] = {0}, cds_bytes = 0, flank_bytes = 0;
 	size_t transcript;
 	int ok;
 
@@ -2047,7 +2169,36 @@ duckvep_model_load_queries(duckdb_connection connection,
 	if (!duckvep_query_command(connection, "BEGIN TRANSACTION", error,
 	    error_size))
 		return 0;
-	ok = duckvep_load_regions(connection, region_query,
+	ok = duckvep_model_count_query(connection, region_query, 0,
+	    &counts[0], NULL, NULL, error, error_size) &&
+	    duckvep_model_count_query(connection, transcript_query, 1,
+	    &counts[1], &cds_bytes, &flank_bytes, error, error_size) &&
+	    duckvep_model_count_query(connection, exon_query, 0,
+	    &counts[2], NULL, NULL, error, error_size) &&
+	    (mature_mirna_query == NULL || duckvep_model_count_query(connection,
+	    mature_mirna_query, 0, &counts[3], NULL, NULL, error, error_size)) &&
+	    (peptide_edit_query == NULL || duckvep_model_count_query(connection,
+	    peptide_edit_query, 0, &counts[4], NULL, NULL, error, error_size)) &&
+	    (interval_feature_query == NULL || duckvep_model_count_query(
+	    connection, interval_feature_query, 0, &counts[5], NULL, NULL,
+	    error, error_size));
+	if (ok) {
+		model->exact_capacity = 1;
+		ok = duckvep_model_reserve_regions(model, counts[0]) &&
+		    duckvep_model_reserve_transcripts(model, counts[1]) &&
+		    duckvep_model_reserve_exons(model, counts[2]) &&
+		    duckvep_model_reserve_mature_mirna(model, counts[3]) &&
+		    duckvep_model_reserve_peptide_edits(model, counts[4]) &&
+		    duckvep_model_reserve_interval_features(model, counts[5]) &&
+		    duckvep_model_reserve_sequence(model, cds_bytes) &&
+		    duckvep_model_reserve_flanks(model, flank_bytes);
+		if (!ok)
+			duckvep_sql_set_error(error, error_size,
+			    "out of memory reserving model capacity");
+		model->capacity_locked = 1;
+	}
+	if (ok)
+		ok = duckvep_load_regions(connection, region_query,
 	    reference_fasta != NULL, model, error, error_size) &&
 	    duckvep_validate_reference_fasta(reference_fasta, model, error,
 	    error_size) &&
@@ -2063,6 +2214,18 @@ duckvep_model_load_queries(duckdb_connection connection,
 	    (interval_feature_query == NULL ||
 	    duckvep_load_interval_features(connection, interval_feature_query,
 	    model, error, error_size));
+	if (ok && (model->known_seq_region_count != counts[0] ||
+	    model->transcripts.transcript_count != counts[1] ||
+	    model->exons.exon_count != counts[2] ||
+	    model->mature_mirna_count != counts[3] ||
+	    model->peptide_edit_count != counts[4] ||
+	    model->interval_feature_count != counts[5] ||
+	    model->cds_sequence_length != cds_bytes ||
+	    model->flank_sequence_length != flank_bytes)) {
+		duckvep_sql_set_error(error, error_size,
+		    "model source changed between capacity count and load");
+		ok = 0;
+	}
 	if (ok)
 		ok = duckvep_query_command(connection, "COMMIT", error, error_size);
 	if (!ok)
