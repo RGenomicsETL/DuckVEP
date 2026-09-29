@@ -138,7 +138,7 @@ bool duckvep_builder_option_vectors(duckdb_function_info info, duckdb_vector vec
 bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
                              idx_t row, const char *const *names, size_t count,
                              char **values) {
-    duckvep_option_kind *kinds = malloc(count * sizeof(*kinds));
+    duckvep_option_kind *kinds = calloc(count, sizeof(*kinds));
     duckdb_vector *fields = calloc(count, sizeof(*fields));
     if (!kinds || !fields) {
         free(kinds); free(fields);
