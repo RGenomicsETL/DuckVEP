@@ -101,10 +101,15 @@ walk <- function(edits, lane) {
     isl <- lapply(mine, island)
     isl <- isl[order(vapply(isl, function(x) x$start, numeric(1L)))]
     seq_out <- character(); displaced <- logical(); at <- 1L; offset <- 0L
+    # in_window flags the edited bases that hold the reference terminator: retained bases of the last
+    # three reference positions and every base of an island that reaches them (an insertion inside them
+    # counts, one just before them does not).
+    in_window <- logical(); term0 <- nchar(cds) - 3L
     retained <- function(upto) {
         if (upto >= at) {
             seq_out <<- c(seq_out, strsplit(substr(cds, at, upto), '')[[1L]])
             displaced <<- c(displaced, rep(offset %% 3L != 0L, upto - at + 1L))
+            in_window <<- c(in_window, at:upto > term0)
         }
     }
     for (e in isl) {
@@ -113,11 +118,13 @@ walk <- function(edits, lane) {
         if (nchar(e$alt)) {
             seq_out <- c(seq_out, strsplit(e$alt, '')[[1L]])
             displaced <- c(displaced, rep(offset %% 3L != 0L || (offset + d) %% 3L != 0L, nchar(e$alt)))
+            in_window <- c(in_window, rep(e$start - 1L + e$ref_len > term0 && e$start - 1L < nchar(cds), nchar(e$alt)))
         }
         at <- e$start + e$ref_len; offset <- offset + d
     }
     retained(nchar(cds))
-    list(alt = paste(seq_out, collapse = ''), displaced = displaced, nominal = vapply(isl,
+    list(alt = paste(seq_out, collapse = ''), displaced = displaced,
+        window = if (any(in_window)) which(in_window)[1L] else length(seq_out) + 1L, nominal = vapply(isl,
         function(x) (nchar(x$alt) - x$ref_len) %% 3L != 0L, logical(1L)), n = length(isl),
         kinds = vapply(isl, function(x) if (x$ref_len == 0L) 'ins' else if (!nchar(x$alt)) 'del' else
             if (x$ref_len == nchar(x$alt)) 'sub' else 'mixed', character(1L)))
@@ -130,8 +137,14 @@ impact_of <- function(terms) {
     order <- c('HIGH', 'MODERATE', 'LOW')
     order[min(match(levels[terms], order))]
 }
-# Returns the reduced whole-protein term set, or NA when the lane is outside this slice (start/terminal
-# codon effects, or a first stop overlapping the reference terminator).
+# Returns the reduced whole-protein term set of the edited cDNA (contract section 2), in this order:
+# the edited CDS not beginning with ATG is start_lost alone; no stop is stop_lost (plus frameshift when
+# the length is not a multiple of three, i.e. the frame is displaced when the CDS runs out; nothing is
+# ever extended downstream); a first stop starting before the terminator's window is stop_gained (plus
+# frameshift when one of its bases is displaced); a first stop at the window is a frameshift when
+# displaced, else identical peptide is stop_retained (terminal codon changed or moved) or synonymous
+# (unchanged), and a changed peptide is protein_altering (any nominal frame edit), missense, inframe
+# insertion/deletion or protein_altering.
 classify <- function(edits, lane) {
     if (!any(vapply(edits, function(e) lane %in% e$lane, logical(1L)))) return(list(terms = character(), protein = ''))
     w <- walk(edits, lane); alt <- w$alt; L <- nchar(alt)
@@ -140,19 +153,20 @@ classify <- function(edits, lane) {
     text <- paste(visible, collapse = '')
     if (substr(alt, 1L, 3L) != 'ATG') return(list(terms = 'start_lost', protein = text))
     terms <- if (is.na(first)) {
-        if (L %% 3L != 0L) 'frameshift_variant' else NA_character_
+        c('stop_lost', if (L %% 3L != 0L) 'frameshift_variant')
     } else {
         last <- 3L * first
         stop_bases <- (last - 2L):last
-        if (last == L && L %% 3L == 0L) { # the reference terminator, read in frame
-            if (any(w$displaced[stop_bases])) 'frameshift_variant' else {
-                a <- protein[-length(protein)]; r <- ref_protein[-length(ref_protein)]
-                if (identical(a, r)) 'synonymous_variant' else if (any(w$nominal)) 'protein_altering_variant' else
-                    if (all(w$kinds == 'sub')) 'missense_variant' else if (all(w$kinds == 'ins')) 'inframe_insertion' else
-                    if (all(w$kinds == 'del')) 'inframe_deletion' else 'protein_altering_variant'
-            }
-        } else if (last <= L - 3L) c('stop_gained', if (any(w$displaced[stop_bases])) 'frameshift_variant')
-        else NA_character_
+        a <- protein[seq_len(first - 1L)]; r <- ref_protein[-length(ref_protein)]
+        if (last - 2L < w$window && !identical(a, r)) c('stop_gained', if (any(w$displaced[stop_bases])) 'frameshift_variant')
+        else if (any(w$displaced[stop_bases])) 'frameshift_variant' else {
+            if (identical(a, r)) {
+                if (last - 2L != w$window || substr(alt, last - 2L, last) != substring(cds, nchar(cds) - 2L))
+                    'stop_retained_variant' else 'synonymous_variant'
+            } else if (any(w$nominal)) 'protein_altering_variant' else
+                if (all(w$kinds == 'sub')) 'missense_variant' else if (all(w$kinds == 'ins')) 'inframe_insertion' else
+                if (all(w$kinds == 'del')) 'inframe_deletion' else 'protein_altering_variant'
+        }
     }
     list(terms = terms, protein = text)
 }

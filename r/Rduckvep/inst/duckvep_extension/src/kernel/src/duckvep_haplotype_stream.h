@@ -80,8 +80,8 @@ typedef struct {
 
 /* Versioned coding-v1 status of one completed leaf. ELIGIBLE means the leaf is inside
  * the supported domain but its whole-haplotype consequence needs a classifier that has
- * not landed (see the PENDING reason); PREDICTED means the same-codon or frame/stop-gain
- * classifier decided it and leaf.haplotype_so_mask is authoritative. No NMD is predicted yet.
+ * not landed (no path is left in this state since the start/stop classifier); PREDICTED means the
+ * same-codon, frame/stop-gain or start/stop classifier decided it and leaf.haplotype_so_mask is authoritative. No NMD is predicted yet.
  * Failures keep every contributor. */
 typedef enum {
     DUCKVEP_PREDICTION_ELIGIBLE = 0,
@@ -116,7 +116,7 @@ typedef enum {
     DUCKVEP_REASON_INTERNAL_STOP,
     DUCKVEP_REASON_NON_LITERAL_ALLELE,
     DUCKVEP_REASON_ALLELE_OVER_50,
-    /* Eligible, not yet classified: slice 5 (start/terminal codon effects). */
+    /* No longer emitted since slice 5 (every eligible path is decided); kept so the numbering is stable. */
     DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING
 } duckvep_prediction_reason_t;
 

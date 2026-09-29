@@ -106,7 +106,7 @@
 #' the nominal net length change. A new first stop upstream of the reference
 #' terminator is `stop_gained` (HIGH), and `frameshift_variant` (HIGH) is added when
 #' that stop codon intersects a displaced-frame interval; with no stop at all, a frame
-#' still displaced when the CDS runs out is `frameshift_variant` alone. A frame that is
+#' still displaced when the CDS runs out is `frameshift_variant` and `stop_lost`. A frame that is
 #' displaced and restored before termination has no frame term: an unchanged peptide
 #' is `synonymous_variant` (LOW), any other change `protein_altering_variant`. Two
 #' compensating indels can therefore be rescued or end in an earlier stop. Without
@@ -119,15 +119,23 @@
 #' `haplotype_consequences` per carrier (the edited sequence is shared, so its set is
 #' defined for every predicted carrier), so a row with an ineligible carrier (for
 #' example a triploid call) has NULL row-level fields but keeps the set of its
-#' eligible carriers. Edits in the first or terminal codon, or a first stop that
-#' overlaps the terminator-length tail of the edited CDS, stay
-#' `eligible_classifier_pending` with reason `start_stop_classifier_pending`
-#' (start_lost, stop_lost and stop_retained_variant are not yet decided), their SO
-#' and IMPACT NULL. Reference lanes have no carrier row.
+#' eligible carriers. The start/stop classifier decides the remaining paths, in this
+#' order. An edited CDS that no longer begins with ATG is `start_lost` (HIGH) alone: initiation
+#' and NMD are unknown, so start loss suppresses every other prediction. An edited CDS with no
+#' stop is `stop_lost` (HIGH), plus `frameshift_variant` when the frame is still displaced
+#' when the CDS runs out; no downstream extension is invented. A first stop before the
+#' homologous reference terminator that truncates the peptide is `stop_gained`, as above. A first
+#' stop at the terminator with an unchanged peptide is `stop_retained_variant` (LOW) when the
+#' terminal codon changed or moved (it precedes `synonymous_variant`), and any other change
+#' keeps the whole-protein category above; a stop inserted next to the terminator is judged the
+#' same way. Every eligible path is therefore decided and the reason
+#' `start_stop_classifier_pending` no longer occurs. Reference lanes have no carrier row.
 #' `contributor_provenance` lists every source of the path, including omitted,
 #' shadowed, unapplied (conflicting or incomplete) and post-stop ones, with its
 #' original operands, `alt_index`, evidence, projection status, `role` and
-#' differing edit count. `normalized_edits` lists the differing CDS edit islands in
+#' differing edit count. The role is assigned per edit by its position relative to the
+#' first stop of the edited sequence: a source is `post_stop` only when every edit it
+#' contributes starts after that stop, even if it shares an interaction block with an earlier edit. `normalized_edits` lists the differing CDS edit islands in
 #' ascending order with their source `event_index` and `coding_blocks` index
 #' (NULL when no sequence was rebuilt). Sequence deduplication never merges or
 #' drops contributors. Malformed identities and exhausted budgets error.

@@ -24,6 +24,14 @@
   per carrier, so an ineligible carrier no longer hides the set of eligible carriers of the same row. The
   reason `frame_classifier_pending` no longer occurs; only start/terminal-codon paths stay
   `start_stop_classifier_pending`.
+- The start/stop classifier (coding-v1 slice 5) decides the remaining paths: `start_lost` alone when the
+  edited CDS does not begin with ATG (initiation and NMD unknown, other predictions suppressed), `stop_lost`
+  when no stop is left (plus `frameshift_variant` for a frame still displaced at the CDS end, which previously
+  gave `frameshift_variant` alone; no downstream extension is invented), and `stop_retained_variant` (LOW) for
+  a changed terminal codon that is still a stop with an unchanged peptide. No eligible path stays
+  `eligible_classifier_pending` and the reason `start_stop_classifier_pending` no longer occurs. Contributor
+  `role` is now assigned per edit: an edit that starts after the first stop is `post_stop` even when it shares an
+  interaction block with an earlier edit (a restoring deletion after an early stop was `applied`).
 - The extension's SQL preparation and annotation entry points are native builders:
   `query(duckvep_annotate_sql('events', 'model', {hgvs: true}))` replaces
   direct annotation macro calls. `rduckvep_annotate_sql()` and the other

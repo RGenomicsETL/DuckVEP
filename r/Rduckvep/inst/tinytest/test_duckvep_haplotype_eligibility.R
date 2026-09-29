@@ -2,8 +2,8 @@ library(tinytest)
 library(DBI)
 
 # Coding-v1 eligibility and provenance (slice 2 of #2), the same-codon classifier (slice 3) and the frame/stop-gain
-# classifier (slice 4). prediction_status says whether a path is inside the supported domain and whether a
-# classifier decided it (`predicted`) or the start/terminal classifier still must (`eligible_classifier_pending`).
+# classifier (slice 4) and the start/stop classifier (slice 5). prediction_status says whether a path is inside the supported domain and whether a
+# classifier decided it (`predicted`); since slice 5 no eligible path is left pending (`eligible_classifier_pending`).
 # Transcript 0 is + strand with exons 100-108 (ATGGCTGCT) and 120-128 (GAAGGTTAA).
 # Transcripts 1-6 are single-exon variants that each break one v1 CDS requirement.
 local({
