@@ -1225,6 +1225,165 @@ SELECT * FROM query(duckvep_annotate_sql('duckvep_invalid_event', 'structural'))
 ----
 a structural event requires end_position and a supported structural_type
 
+# Every relation-level validation rule reports its own error, and the rule
+# reported is the first failing rule in declaration order across all rows.
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (NULL::UBIGINT, 1::UINTEGER, 100::UBIGINT, 'A'::VARCHAR, 'C'::VARCHAR,
+   NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+event_index is required
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 0::UBIGINT, 'A'::VARCHAR, 'C'::VARCHAR,
+   NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+seq_region and positive one-based position are required
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, 'A'::VARCHAR, '<NON_REF>'::VARCHAR,
+   NULL::UBIGINT, 'DEL'::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+a non-variant gVCF allele cannot carry structural or breakend fields
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, 'A'::VARCHAR, '<*>'::VARCHAR,
+   NULL::UBIGINT, 'DUP'::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+<*> cannot carry structural or breakend fields
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, NULL::VARCHAR, 'N]1:5]'::VARCHAR,
+   NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, 1::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+a breakend requires both mate_seq_region and mate_position
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, NULL::VARCHAR, 'N]1:5]'::VARCHAR,
+   300::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, 1::UINTEGER, 5::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+breakend mate coordinates cannot be mixed with single-locus structural fields
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, NULL::VARCHAR, 'N]1:5]'::VARCHAR,
+   NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, 1::UINTEGER, 0::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+mate_position must be positive and one-based
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, ''::VARCHAR, 'C'::VARCHAR,
+   NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+literal small variants require reference and alternate
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, NULL::VARCHAR, NULL::VARCHAR,
+   300::UBIGINT, 'FOO'::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+unsupported structural_type
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, ''::VARCHAR, 'C'::VARCHAR,
+   NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT),
+  (2::UBIGINT, 1::UINTEGER, 0::UBIGINT, 'A'::VARCHAR, 'C'::VARCHAR,
+   NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+seq_region and positive one-based position are required
+
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM (VALUES
+  (1::UBIGINT, 1::UINTEGER, 100::UBIGINT, NULL::VARCHAR, NULL::VARCHAR,
+   300::UBIGINT, 'FOO'::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT),
+  (2::UBIGINT, 1::UINTEGER, 100::UBIGINT, 'A'::VARCHAR, '*'::VARCHAR,
+   NULL::UBIGINT, NULL::VARCHAR, 'GAIN'::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)
+) t(event_index, seq_region, position, reference, alternate, end_position,
+    structural_type, copy_change, mate_seq_region, mate_position);
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+a non-variant gVCF allele cannot carry structural or breakend fields
+
+# A valid relation and an empty relation pass validation.
+statement ok
+CREATE OR REPLACE TABLE duckvep_validation_event AS
+SELECT * FROM duckvep_mixed_events WHERE false;
+
+query I
+SELECT count(*) FROM query(duckvep_annotate_sql('duckvep_validation_event', 'structural'));
+----
+0
+
 query ITTI
 SELECT bit_index, consequence, impact, severity_rank
 FROM duckvep_so_terms()
