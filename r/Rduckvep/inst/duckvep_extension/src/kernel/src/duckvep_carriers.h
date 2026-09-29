@@ -38,6 +38,9 @@ typedef struct {
     uint16_t lane;                  /* One-based, at most ploidy. */
     uint16_t ploidy;
     uint8_t phase_set_present;      /* Absent and a present PS=0 are distinct. */
+    /* Provenance only, not identity: the sample has several heterozygous phase
+     * domains for this transcript, so cross-domain phase is unresolved. */
+    uint8_t domain_split;
 } duckvep_carrier_key_t;
 
 enum {
