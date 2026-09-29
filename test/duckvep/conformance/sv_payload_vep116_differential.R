@@ -3,9 +3,9 @@ suppressPackageStartupMessages({ library(DBI); library(duckdb); library(jsonlite
 source("r/Rduckvep/R/builders.R")
 source("r/Rduckvep/R/structural_geometry.R")
 vcf <- "test/duckvep/conformance/data/sv_payload_grch38.vcf"
-fasta <- "/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
-cache <- "/root/.cache/duckhts/vep/cache-grch38-chr21"
-model <- "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb"
+fasta <- Sys.getenv("DUCKVEP_GRCH38_FASTA", "/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa")
+cache <- Sys.getenv("DUCKVEP_GRCH38_VEP_CACHE", "/root/.cache/duckhts/vep/cache-grch38-chr21")
+model <- Sys.getenv("DUCKVEP_GRCH38_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
 stopifnot(identical(tail(system2("samtools", c("faidx", fasta,
   "21:13546123-13546123"), stdout = TRUE), 1L), "G"))
 lines <- grep("^21\\t", readLines(vcf), value = TRUE)
@@ -13,7 +13,7 @@ records <- lapply(lines, function(line) strsplit(line, "\t", fixed = TRUE)[[1L]]
 directory <- tempfile("sv-vep116-")
 dir.create(directory)
 binary <- file.path(directory, "duckvep.duckdb_extension")
-stopifnot(file.copy("build/release/duckvep.duckdb_extension", binary))
+stopifnot(file.copy(Sys.getenv("DUCKVEP_EXTENSION_FILE", "build/release/duckvep.duckdb_extension"), binary))
 con <- dbConnect(duckdb(shared_home = FALSE,
   config = list(allow_unsigned_extensions = "true")))
 q <- function(value) as.character(dbQuoteString(con, value))

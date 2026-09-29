@@ -2,7 +2,7 @@
 # Seeded paired-allele expansion and evidence-status checks against base R.
 suppressPackageStartupMessages({ library(DBI); library(duckdb); library(optparse) })
 op <- OptionParser()
-op <- add_option(op, '--extension', default = 'build/release/duckhts.duckdb_extension')
+op <- add_option(op, '--extension', default = Sys.getenv('DUCKVEP_EXTENSION_FILE', 'build/release/duckvep.duckdb_extension'))
 op <- add_option(op, '--trials', type = 'integer', default = 100000L)
 op <- add_option(op, '--seed', type = 'integer', default = 173L)
 op <- add_option(op, '--out', default = '')
@@ -271,7 +271,7 @@ run <- function() {
   write.csv(capacity_checks, file.path(out, 'capacity_checks.csv'), row.names = FALSE)
   sha <- function(path) digest::digest(file = path, algo = 'sha256', serialize = FALSE)
   sources <- c('test/duckvep/conformance/repeat_alleles_differential.R',
-               'src/duckvep/duckvep_sql.c')
+               'src/duckvep_sql.c', 'src/duckvep_repeat.c')
   for (path in sources) {
     destination <- file.path(out, 'source', path)
     dir.create(dirname(destination), recursive = TRUE, showWarnings = FALSE)
