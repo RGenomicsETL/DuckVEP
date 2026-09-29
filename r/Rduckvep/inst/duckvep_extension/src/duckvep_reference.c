@@ -1,11 +1,19 @@
 #include "duckvep_reference.h"
 #include "duckvep_model.h"
+#include "kernel/src/duckvep_budget.h"
 
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
 #define DUCKVEP_REFERENCE_READ_AHEAD 65536u
+
+void duckvep_reference_reader_close(duckvep_reference_reader_t *reader) {
+    if (reader->fai) fai_destroy(reader->fai);
+    reader->fai = NULL;
+    if (reader->htslib_reserved) duckvep_budget_unreserve(DUCKVEP_OWNER_REFERENCE, reader->htslib_reserved);
+    reader->htslib_reserved = 0u;
+}
 
 int duckvep_reference_reader_init(duckvep_reference_reader_t *reader,
     const duckvep_owned_model_t *model, char *bases, size_t capacity,
@@ -22,14 +30,24 @@ int duckvep_reference_reader_init(duckvep_reference_reader_t *reader,
             "DuckVEP: model reference FASTA or index changed after model load");
         return 0;
     }
+    /* htslib allocates the parsed .fai (about twice its file size in hash
+     * tables) and two BGZF blocks with its own allocator: reserve that much
+     * before opening, and hold it as long as the handle lives. */
+    reader->htslib_reserved = 2u * model->reference_fai_identity.size + 4u * 65536u;
+    if (!duckvep_budget_reserve(DUCKVEP_OWNER_REFERENCE, reader->htslib_reserved)) {
+        reader->htslib_reserved = 0u;
+        duckvep_sql_set_error(error, error_size, "DuckVEP: could not reserve the reference index");
+        return 0;
+    }
     reader->fai = fai_load3_format(model->reference_fasta_open_path,
         model->reference_fai_open_path, model->reference_gzi_open_path, 0, FAI_FASTA);
     if (!reader->fai) {
+        duckvep_reference_reader_close(reader);
         duckvep_sql_set_error(error, error_size, "DuckVEP: could not open the model reference FASTA/index");
         return 0;
     }
     if (!duckvep_model_reference_identity_matches(model)) {
-        fai_destroy(reader->fai); reader->fai = NULL;
+        duckvep_reference_reader_close(reader);
         duckvep_sql_set_error(error, error_size,
             "DuckVEP: model reference FASTA or index changed while a worker was opening it");
         return 0;

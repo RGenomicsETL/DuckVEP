@@ -1,4 +1,5 @@
 #include "duckvep_registration.h"
+#include "kernel/src/duckvep_budget.h"
 DUCKDB_EXTENSION_EXTERN
 
 #include <stdint.h>
@@ -35,7 +36,7 @@ bool duckhts_register_sql_parts(duckhts_registration_t *registration,
         length += part_length;
     }
 
-    char *sql = malloc(length + 1);
+    char *sql = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
     if (sql == NULL) {
         return duckhts_registration_error(registration,
             "DuckVEP could not allocate SQL registration text");
@@ -48,6 +49,6 @@ bool duckhts_register_sql_parts(duckhts_registration_t *registration,
     }
     sql[offset] = '\0';
     bool ok = duckhts_register_sql(registration, sql);
-    free(sql);
+    duckvep_budget_free(sql);
     return ok;
 }

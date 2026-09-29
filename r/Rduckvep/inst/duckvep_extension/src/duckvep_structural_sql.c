@@ -1,4 +1,5 @@
 #include "duckvep_builder.h"
+#include "kernel/src/duckvep_budget.h"
 #include "duckvep_registration.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -118,7 +119,7 @@ static void run_builder(const builder_spec *spec, duckdb_function_info info,
             duckdb_scalar_function_set_error(info, message);
         }
         duckvep_sql_free(&sql);
-        for (size_t i = 0; i < 2; i++) free(relations[i]);
+        for (size_t i = 0; i < 2; i++) duckvep_budget_free(relations[i]);
         if (!ok) return;
     }
 }

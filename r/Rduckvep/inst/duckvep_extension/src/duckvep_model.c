@@ -1,5 +1,6 @@
 #include "duckvep_model.h"
 #include "kernel/src/duckvep_model_internal.h"
+#include "kernel/src/duckvep_budget.h"
 
 #include <htslib/faidx.h>
 
@@ -65,6 +66,22 @@ duckvep_sql_set_error(char *error, size_t error_size, const char *message)
 		    message != NULL ? message : "unknown error");
 }
 
+/* If a native-budget or lease refusal is pending on this thread, the message
+ * becomes an explicit capacity error that names the exhausted owner. */
+const char *
+duckvep_sql_final_error(char *out, size_t out_size, const char *error,
+	const char *fallback)
+{
+	char capacity[192];
+	const char *detail;
+
+	detail = error != NULL && error[0] != '\0' ? error : fallback;
+	if (!duckvep_budget_take_failure(capacity, sizeof(capacity)))
+		return detail;
+	(void)snprintf(out, out_size, "%s (%s)", capacity, detail);
+	return out;
+}
+
 int
 duckvep_sql_resize(void **pointer, size_t width, size_t count)
 {
@@ -72,7 +89,7 @@ duckvep_sql_resize(void **pointer, size_t width, size_t count)
 
 	if (width != 0 && count > SIZE_MAX / width)
 		return 0;
-	resized = realloc(*pointer, width * count);
+	resized = duckvep_budget_realloc(DUCKVEP_OWNER_MODEL, *pointer, width * count);
 	if (resized == NULL && count != 0)
 		return 0;
 	*pointer = resized;
@@ -283,72 +300,72 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 	}
 	if (model->kernel != NULL)
 		duckvep_model_close(model->kernel);
-	free(model->known_seq_regions);
-	free(model->sequence_lengths);
-	free(model->region_circular);
+	duckvep_budget_free(model->known_seq_regions);
+	duckvep_budget_free(model->sequence_lengths);
+	duckvep_budget_free(model->region_circular);
 	if (model->sequence_names != NULL) {
 		size_t region;
 
 		for (region = 0; region < model->known_seq_region_count; region++)
-			free(model->sequence_names[region]);
+			duckvep_budget_free(model->sequence_names[region]);
 	}
-	free(model->sequence_names);
-	free(model->reference_fasta_path);
-	free(model->reference_fai_path);
-	free(model->reference_gzi_path);
-	free(model->reference_fasta_open_path);
-	free(model->reference_fai_open_path);
-	free(model->reference_gzi_open_path);
+	duckvep_budget_free(model->sequence_names);
+	duckvep_budget_free(model->reference_fasta_path);
+	duckvep_budget_free(model->reference_fai_path);
+	duckvep_budget_free(model->reference_gzi_path);
+	duckvep_budget_free(model->reference_fasta_open_path);
+	duckvep_budget_free(model->reference_fai_open_path);
+	duckvep_budget_free(model->reference_gzi_open_path);
 	if (model->reference_descriptors_open) {
 		duckvep_reference_descriptor_close(
 		    model->reference_fasta_descriptor);
 		duckvep_reference_descriptor_close(model->reference_fai_descriptor);
 		duckvep_reference_descriptor_close(model->reference_gzi_descriptor);
 	}
-	free(model->seq_regions);
-	free(model->transcript_starts);
-	free(model->transcript_ends);
-	free(model->strands);
-	free(model->transcript_flags);
-	free(model->gene_indices);
-	free(model->exon_offsets);
-	free(model->exon_counts);
-	free(model->cds_starts);
-	free(model->cds_ends);
-	free(model->cds_sequence_offsets);
-	free(model->cds_sequence_lengths);
-	free(model->codon_tables);
-	free(model->pre_cds_sequence_offsets);
-	free(model->pre_cds_sequence_lengths);
-	free(model->post_cds_sequence_offsets);
-	free(model->post_cds_sequence_lengths);
-	free(model->exon_starts);
-	free(model->exon_ends);
-	free(model->exon_cdna_starts);
-	free(model->exon_cdna_ends);
-	free(model->exon_phases);
-	free(model->exon_end_phases);
-	free(model->mature_mirna_offsets);
-	free(model->mature_mirna_starts);
-	free(model->mature_mirna_ends);
-	free(model->peptide_edit_offsets);
-	free(model->peptide_edit_positions);
-	free(model->peptide_edit_alts);
-	free(model->cds_sequence_bytes);
-	free(model->flank_sequence_bytes);
-	free(model->interval_feature_seq_regions);
-	free(model->interval_feature_starts);
-	free(model->interval_feature_ends);
-	free(model->interval_feature_kinds);
+	duckvep_budget_free(model->seq_regions);
+	duckvep_budget_free(model->transcript_starts);
+	duckvep_budget_free(model->transcript_ends);
+	duckvep_budget_free(model->strands);
+	duckvep_budget_free(model->transcript_flags);
+	duckvep_budget_free(model->gene_indices);
+	duckvep_budget_free(model->exon_offsets);
+	duckvep_budget_free(model->exon_counts);
+	duckvep_budget_free(model->cds_starts);
+	duckvep_budget_free(model->cds_ends);
+	duckvep_budget_free(model->cds_sequence_offsets);
+	duckvep_budget_free(model->cds_sequence_lengths);
+	duckvep_budget_free(model->codon_tables);
+	duckvep_budget_free(model->pre_cds_sequence_offsets);
+	duckvep_budget_free(model->pre_cds_sequence_lengths);
+	duckvep_budget_free(model->post_cds_sequence_offsets);
+	duckvep_budget_free(model->post_cds_sequence_lengths);
+	duckvep_budget_free(model->exon_starts);
+	duckvep_budget_free(model->exon_ends);
+	duckvep_budget_free(model->exon_cdna_starts);
+	duckvep_budget_free(model->exon_cdna_ends);
+	duckvep_budget_free(model->exon_phases);
+	duckvep_budget_free(model->exon_end_phases);
+	duckvep_budget_free(model->mature_mirna_offsets);
+	duckvep_budget_free(model->mature_mirna_starts);
+	duckvep_budget_free(model->mature_mirna_ends);
+	duckvep_budget_free(model->peptide_edit_offsets);
+	duckvep_budget_free(model->peptide_edit_positions);
+	duckvep_budget_free(model->peptide_edit_alts);
+	duckvep_budget_free(model->cds_sequence_bytes);
+	duckvep_budget_free(model->flank_sequence_bytes);
+	duckvep_budget_free(model->interval_feature_seq_regions);
+	duckvep_budget_free(model->interval_feature_starts);
+	duckvep_budget_free(model->interval_feature_ends);
+	duckvep_budget_free(model->interval_feature_kinds);
 	if (model->interval_index != NULL) {
 		/* cgranges 0.1.1 does not release its interval array. */
-		free(model->interval_index->r);
+		duckvep_budget_free(model->interval_index->r);
 		model->interval_index->r = NULL;
 		cr_destroy(model->interval_index);
 	}
 	if (model->interval_feature_index != NULL) {
 		/* cgranges 0.1.1 does not release its interval array. */
-		free(model->interval_feature_index->r);
+		duckvep_budget_free(model->interval_feature_index->r);
 		model->interval_feature_index->r = NULL;
 		cr_destroy(model->interval_feature_index);
 	}
@@ -516,7 +533,7 @@ duckvep_query_count(duckdb_connection connection, const char *query,
 		duckvep_sql_set_error(error, error_size, "model query is too long");
 		return 0;
 	}
-	sql = malloc(length + sizeof("SELECT CAST(count(*) AS UBIGINT) FROM () q"));
+	sql = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + sizeof("SELECT CAST(count(*) AS UBIGINT) FROM () q"));
 	if (sql == NULL) {
 		duckvep_sql_set_error(error, error_size, "out of memory counting model rows");
 		return 0;
@@ -524,7 +541,7 @@ duckvep_query_count(duckdb_connection connection, const char *query,
 	(void)sprintf(sql, "SELECT CAST(count(*) AS UBIGINT) FROM (%s) q", query);
 	memset(&result, 0, sizeof(result));
 	state = duckdb_query(connection, sql, &result);
-	free(sql);
+	duckvep_budget_free(sql);
 	if (state != DuckDBSuccess) {
 		duckvep_sql_set_error(error, error_size, duckdb_result_error(&result));
 		duckdb_destroy_result(&result);
@@ -639,14 +656,14 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 	uint8_t *seen;
 	int ok;
 
-	seen = calloc((size_t)UINT16_MAX + 1u, 1u);
+	seen = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, (size_t)UINT16_MAX + 1u, 1u);
 	if (seen == NULL) {
 		duckvep_sql_set_error(error, error_size, "out of memory loading sequence regions");
 		return 0;
 	}
 	if (!duckvep_query_result_open(connection, query, &query_result, error,
 	    error_size)) {
-		free(seen);
+		duckvep_budget_free(seen);
 		return 0;
 	}
 	ok = 0;
@@ -738,9 +755,16 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 			if (name_vector != NULL) {
 				model->sequence_names[index] =
 				    duckvep_vector_string(name_vector, row);
+				if (model->sequence_names[index] == NULL &&
+				    duckvep_vector_string_wellformed(name_vector, row)) {
+					duckvep_sql_set_error(error, error_size,
+					    "out of memory copying a sequence region name");
+					duckdb_destroy_data_chunk(&chunk);
+					goto done;
+				}
 				if (model->sequence_names[index] == NULL ||
 				    model->sequence_names[index][0] == '\0') {
-					free(model->sequence_names[index]);
+					duckvep_budget_free(model->sequence_names[index]);
 					model->sequence_names[index] = NULL;
 					duckvep_sql_set_error(error, error_size,
 					    "seq_region_name must be a non-empty string without embedded NUL bytes");
@@ -767,7 +791,7 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 		duckvep_region_row_t *sorted;
 		size_t i, n = model->known_seq_region_count;
 
-		sorted = malloc(n * sizeof(*sorted));
+		sorted = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, n * sizeof(*sorted));
 		if (sorted == NULL) {
 			duckvep_sql_set_error(error, error_size,
 			    "out of memory sorting sequence regions");
@@ -786,11 +810,11 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 			model->sequence_names[i] = sorted[i].name;
 			model->region_circular[i] = sorted[i].circular;
 		}
-		free(sorted);
+		duckvep_budget_free(sorted);
 	}
 	ok = 1;
 done:
-	free(seen);
+	duckvep_budget_free(seen);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -817,7 +841,7 @@ duckvep_reference_path_with_suffix(const char *path, const char *suffix)
 	suffix_length = strlen(suffix);
 	if (path_length > SIZE_MAX - suffix_length - 1u)
 		return NULL;
-	result = malloc(path_length + suffix_length + 1u);
+	result = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, path_length + suffix_length + 1u);
 	if (result == NULL)
 		return NULL;
 	memcpy(result, path, path_length);
@@ -929,13 +953,13 @@ duckvep_reference_descriptor_path(int descriptor, const char *source_path)
 	/* `needed + 1` is passed back to a DWORD-sized Win32 API. */
 	if (needed == 0 || needed == (DWORD)-1)
 		return NULL;
-	path = malloc((size_t)needed + 1u);
+	path = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, (size_t)needed + 1u);
 	if (path == NULL)
 		return NULL;
 	written = GetFinalPathNameByHandleA(handle, path, needed + 1u,
 	    FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
 	if (written == 0 || written > needed) {
-		free(path);
+		duckvep_budget_free(path);
 		return NULL;
 	}
 	return path;
@@ -1051,6 +1075,7 @@ duckvep_validate_reference_fasta(const char *reference_fasta,
 	duckvep_owned_model_t *model, char *error, size_t error_size)
 {
 	faidx_t *fai;
+	uint64_t fai_reserved;
 	char **sorted_names;
 	size_t region;
 	int ok;
@@ -1116,7 +1141,7 @@ duckvep_validate_reference_fasta(const char *reference_fasta,
 		    "reference FASTA region map exceeds addressable memory");
 		return 0;
 	}
-	sorted_names = malloc(model->known_seq_region_count *
+	sorted_names = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, model->known_seq_region_count *
 	    sizeof(*sorted_names));
 	if (sorted_names == NULL) {
 		duckvep_sql_set_error(error, error_size,
@@ -1126,7 +1151,7 @@ duckvep_validate_reference_fasta(const char *reference_fasta,
 	for (region = 0; region < model->known_seq_region_count; region++) {
 		if (model->sequence_names[region] == NULL ||
 		    model->sequence_lengths[region] == 0) {
-			free(sorted_names);
+			duckvep_budget_free(sorted_names);
 			duckvep_sql_set_error(error, error_size,
 			    "reference FASTA requires a name and length for every model region");
 			return 0;
@@ -1137,23 +1162,31 @@ duckvep_validate_reference_fasta(const char *reference_fasta,
 	    sizeof(*sorted_names), duckvep_sequence_name_compare);
 	for (region = 1; region < model->known_seq_region_count; region++) {
 		if (strcmp(sorted_names[region - 1], sorted_names[region]) == 0) {
-			free(sorted_names);
+			duckvep_budget_free(sorted_names);
 			duckvep_sql_set_error(error, error_size,
 			    "seq_region_name values must be unique");
 			return 0;
 		}
 	}
-	free(sorted_names);
+	duckvep_budget_free(sorted_names);
 	if (!duckvep_model_reference_identity_matches(model)) {
 		duckvep_sql_set_error(error, error_size,
 		    "reference FASTA or index changed while the model was loading");
 		return 0;
 	}
 
+	/* Transient htslib index: reserve its estimated size before opening. */
+	fai_reserved = 2u * model->reference_fai_identity.size + 4u * 65536u;
+	if (!duckvep_budget_reserve(DUCKVEP_OWNER_REFERENCE, fai_reserved)) {
+		duckvep_sql_set_error(error, error_size,
+		    "could not reserve the reference index");
+		return 0;
+	}
 	fai = fai_load3_format(model->reference_fasta_open_path,
 	    model->reference_fai_open_path, model->reference_gzi_open_path,
 	    0, FAI_FASTA);
 	if (fai == NULL) {
+		duckvep_budget_unreserve(DUCKVEP_OWNER_REFERENCE, fai_reserved);
 		duckvep_sql_set_error(error, error_size,
 		    "could not open the indexed reference FASTA without creating an index");
 		return 0;
@@ -1173,6 +1206,7 @@ duckvep_validate_reference_fasta(const char *reference_fasta,
 		}
 	}
 	fai_destroy(fai);
+	duckvep_budget_unreserve(DUCKVEP_OWNER_REFERENCE, fai_reserved);
 	if (!ok)
 		return 0;
 	if (!duckvep_model_reference_identity_matches(model)) {
@@ -1237,14 +1271,14 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 		    "transcript count is empty, exceeds uint32, or cannot be allocated");
 		return 0;
 	}
-	seen = calloc(expected, 1u);
+	seen = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, expected, 1u);
 	if (seen == NULL) {
 		duckvep_sql_set_error(error, error_size, "out of memory tracking transcript indexes");
 		return 0;
 	}
 	if (!duckvep_query_result_open(connection, query, &query_result, error,
 	    error_size)) {
-		free(seen);
+		duckvep_budget_free(seen);
 		return 0;
 	}
 	received = 0;
@@ -1477,13 +1511,13 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 		uint8_t *cds, *flanks;
 		size_t i, cds_offset = 0u, flank_offset = 0u;
 
-		cds = malloc(model->cds_sequence_length == 0 ? 1u :
+		cds = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, model->cds_sequence_length == 0 ? 1u :
 		    model->cds_sequence_length);
-		flanks = malloc(model->flank_sequence_length == 0 ? 1u :
+		flanks = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, model->flank_sequence_length == 0 ? 1u :
 		    model->flank_sequence_length);
 		if (cds == NULL || flanks == NULL) {
-			free(cds);
-			free(flanks);
+			duckvep_budget_free(cds);
+			duckvep_budget_free(flanks);
 			duckvep_sql_set_error(error, error_size,
 			    "out of memory ordering transcript sequences");
 			goto done;
@@ -1506,8 +1540,8 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 			cds_offset += length;
 			flank_offset += pre + post;
 		}
-		free(model->cds_sequence_bytes);
-		free(model->flank_sequence_bytes);
+		duckvep_budget_free(model->cds_sequence_bytes);
+		duckvep_budget_free(model->flank_sequence_bytes);
 		model->cds_sequence_bytes = cds;
 		model->flank_sequence_bytes = flanks;
 		model->cds_sequence_capacity = model->cds_sequence_length;
@@ -1515,7 +1549,7 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 	}
 	ok = 1;
 done:
-	free(seen);
+	duckvep_budget_free(seen);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -1550,11 +1584,11 @@ duckvep_rows_group(const void *rows, size_t count, size_t width,
 	char *sorted;
 	size_t *cursor, i;
 
-	sorted = malloc(count == 0 ? 1u : count * width);
-	cursor = malloc((transcript_count + 1u) * sizeof(*cursor));
+	sorted = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, count == 0 ? 1u : count * width);
+	cursor = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, (transcript_count + 1u) * sizeof(*cursor));
 	if (sorted == NULL || cursor == NULL) {
-		free(sorted);
-		free(cursor);
+		duckvep_budget_free(sorted);
+		duckvep_budget_free(cursor);
 		return NULL;
 	}
 	for (i = 1u; i <= transcript_count; i++)
@@ -1566,7 +1600,7 @@ duckvep_rows_group(const void *rows, size_t count, size_t width,
 		memcpy(sorted + cursor[*(const uint32_t *)row]++ * width, row,
 		    width);
 	}
-	free(cursor);
+	duckvep_budget_free(cursor);
 	return sorted;
 }
 
@@ -1606,7 +1640,7 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 	transcript_count = model->transcripts.transcript_count;
 	rows = sorted = NULL;
 	row_count = row_capacity = 0;
-	offsets = calloc(transcript_count + 1u, sizeof(*offsets));
+	offsets = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, transcript_count + 1u, sizeof(*offsets));
 	if (offsets == NULL) {
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory loading exons");
@@ -1614,7 +1648,7 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 	}
 	if (!duckvep_query_result_open(connection, query, &query_result, error,
 	    error_size)) {
-		free(offsets);
+		duckvep_budget_free(offsets);
 		return 0;
 	}
 	ok = 0;
@@ -1719,7 +1753,7 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 	}
 	sorted = duckvep_rows_group(rows, row_count, sizeof(*rows),
 	    transcript_count, offsets);
-	free(rows);
+	duckvep_budget_free(rows);
 	rows = NULL;
 	if (sorted == NULL || !duckvep_model_reserve_exons(model, row_count)) {
 		duckvep_sql_set_error(error, error_size,
@@ -1811,9 +1845,9 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 	model->exons.exon_count = row_count;
 	ok = 1;
 done:
-	free(rows);
-	free(sorted);
-	free(offsets);
+	duckvep_budget_free(rows);
+	duckvep_budget_free(sorted);
+	duckvep_budget_free(offsets);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -1884,18 +1918,18 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 	}
 	rows = sorted = NULL;
 	row_count = row_capacity = 0;
-	model->mature_mirna_offsets = calloc(transcript_count + 1u,
+	model->mature_mirna_offsets = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, transcript_count + 1u,
 	    sizeof(*model->mature_mirna_offsets));
-	offsets = calloc(transcript_count + 1u, sizeof(*offsets));
+	offsets = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, transcript_count + 1u, sizeof(*offsets));
 	if (model->mature_mirna_offsets == NULL || offsets == NULL) {
-		free(offsets);
+		duckvep_budget_free(offsets);
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory loading mature-miRNA row offsets");
 		return 0;
 	}
 	if (!duckvep_query_result_open(connection, query, &query_result, error,
 	    error_size)) {
-		free(offsets);
+		duckvep_budget_free(offsets);
 		return 0;
 	}
 	ok = 0;
@@ -1984,7 +2018,7 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 	}
 	sorted = duckvep_rows_group(rows, row_count, sizeof(*rows),
 	    transcript_count, offsets);
-	free(rows);
+	duckvep_budget_free(rows);
 	rows = NULL;
 	if (sorted == NULL ||
 	    !duckvep_model_reserve_mature_mirna(model, row_count)) {
@@ -2007,9 +2041,9 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 	model->mature_mirna_count = row_count;
 	ok = 1;
 done:
-	free(rows);
-	free(sorted);
-	free(offsets);
+	duckvep_budget_free(rows);
+	duckvep_budget_free(sorted);
+	duckvep_budget_free(offsets);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -2059,18 +2093,18 @@ duckvep_load_peptide_edits(duckdb_connection connection, const char *query,
 	}
 	rows = sorted = NULL;
 	row_count = row_capacity = 0;
-	model->peptide_edit_offsets = calloc(transcript_count + 1u,
+	model->peptide_edit_offsets = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, transcript_count + 1u,
 	    sizeof(*model->peptide_edit_offsets));
-	offsets = calloc(transcript_count + 1u, sizeof(*offsets));
+	offsets = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, transcript_count + 1u, sizeof(*offsets));
 	if (model->peptide_edit_offsets == NULL || offsets == NULL) {
-		free(offsets);
+		duckvep_budget_free(offsets);
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory loading peptide-edit row offsets");
 		return 0;
 	}
 	if (!duckvep_query_result_open(connection, query, &query_result, error,
 	    error_size)) {
-		free(offsets);
+		duckvep_budget_free(offsets);
 		return 0;
 	}
 	ok = 0;
@@ -2145,7 +2179,7 @@ duckvep_load_peptide_edits(duckdb_connection connection, const char *query,
 	}
 	sorted = duckvep_rows_group(rows, row_count, sizeof(*rows),
 	    transcript_count, offsets);
-	free(rows);
+	duckvep_budget_free(rows);
 	rows = NULL;
 	if (sorted == NULL ||
 	    !duckvep_model_reserve_peptide_edits(model, row_count)) {
@@ -2174,9 +2208,9 @@ duckvep_load_peptide_edits(duckdb_connection connection, const char *query,
 	model->peptide_edit_count = row_count;
 	ok = 1;
 done:
-	free(rows);
-	free(sorted);
-	free(offsets);
+	duckvep_budget_free(rows);
+	duckvep_budget_free(sorted);
+	duckvep_budget_free(offsets);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -2210,7 +2244,7 @@ duckvep_load_interval_features(duckdb_connection connection,
 		    "out of memory loading interval features");
 		return 0;
 	}
-	seen = calloc(expected == 0 ? 1u : expected, 1u);
+	seen = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, expected == 0 ? 1u : expected, 1u);
 	if (seen == NULL) {
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory loading interval features");
@@ -2218,7 +2252,7 @@ duckvep_load_interval_features(duckdb_connection connection,
 	}
 	if (!duckvep_query_result_open(connection, query, &query_result, error,
 	    error_size)) {
-		free(seen);
+		duckvep_budget_free(seen);
 		return 0;
 	}
 	ok = 0;
@@ -2308,7 +2342,7 @@ duckvep_load_interval_features(duckdb_connection connection,
 	model->interval_feature_count = expected;
 	ok = 1;
 done:
-	free(seen);
+	duckvep_budget_free(seen);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -2369,19 +2403,19 @@ duckvep_lifted_destroy(duckvep_lifted_model_t *lifted)
 	lm = &lifted->model;
 	if (lm->kernel != NULL)
 		duckvep_model_close(lm->kernel);
-	free(lm->gene_indices);
+	duckvep_budget_free(lm->gene_indices);
 	if (lm->interval_index != NULL) {
-		free(lm->interval_index->r);
+		duckvep_budget_free(lm->interval_index->r);
 		lm->interval_index->r = NULL;
 		cr_destroy(lm->interval_index);
 	}
 	if (lm->interval_feature_index != NULL) {
-		free(lm->interval_feature_index->r);
+		duckvep_budget_free(lm->interval_feature_index->r);
 		lm->interval_feature_index->r = NULL;
 		cr_destroy(lm->interval_feature_index);
 	}
 	duckvep_lift_close(lifted->lift);
-	free(lifted);
+	duckvep_budget_free(lifted);
 }
 
 static int
@@ -2399,7 +2433,7 @@ duckvep_lifted_build(duckvep_owned_model_t *src, char *error,
 	regions.length = src->sequence_lengths;
 	regions.circular = src->region_circular;
 	regions.count = src->known_seq_region_count;
-	lifted = calloc(1, sizeof(*lifted));
+	lifted = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, 1u, sizeof(*lifted));
 	if (lifted == NULL) {
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory building the lifted circular model");
@@ -2414,7 +2448,7 @@ duckvep_lifted_build(duckvep_owned_model_t *src, char *error,
 		(void)snprintf(error, error_size, "circular model: %s",
 		    kernel_error.message[0] != '\0' ? kernel_error.message :
 		    "lifting failed");
-		free(lifted);
+		duckvep_budget_free(lifted);
 		return 0;
 	}
 	lm->transcripts = lifted->lift->transcripts;
@@ -2434,7 +2468,7 @@ duckvep_lifted_build(duckvep_owned_model_t *src, char *error,
 	    lifted->lift->interval_features.feature_count;
 	lm->transcript_coverage_complete = src->transcript_coverage_complete;
 	lm->transcript_flanks_complete = src->transcript_flanks_complete;
-	lm->gene_indices = calloc(lm->transcripts.transcript_count + 1u,
+	lm->gene_indices = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, lm->transcripts.transcript_count + 1u,
 	    sizeof(*lm->gene_indices));
 	if (lm->gene_indices == NULL) {
 		duckvep_sql_set_error(error, error_size,
@@ -2579,9 +2613,9 @@ duckvep_model_entry_destroy(duckvep_model_entry_t *entry)
 		next = workspace->next;
 		duckvep_workspace_cache_destroy(workspace);
 	}
-	free(entry->name);
+	duckvep_budget_free(entry->name);
 	duckvep_owned_model_destroy(&entry->model);
-	free(entry);
+	duckvep_budget_free(entry);
 }
 
 void
@@ -2589,11 +2623,10 @@ duckvep_workspace_cache_destroy(duckvep_workspace_cache_t *cache)
 {
 	if (cache == NULL)
 		return;
-	if (cache->reference.fai != NULL)
-		fai_destroy(cache->reference.fai);
-	free(cache->reference.bases);
+	duckvep_reference_reader_close(&cache->reference);
+	duckvep_budget_free(cache->reference.bases);
 	duckvep_workspace_close(cache->workspace);
-	free(cache);
+	duckvep_budget_free(cache);
 }
 
 static duckvep_model_entry_t *
@@ -2651,7 +2684,7 @@ duckvep_registry_workspace_take(duckvep_registry_t *registry,
 	pthread_mutex_unlock(&registry->mutex);
 	if (cache != NULL)
 		return cache;
-	cache = calloc(1, sizeof(*cache));
+	cache = duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, 1, sizeof(*cache));
 	if (cache == NULL) {
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory allocating a DuckVEP workspace");
@@ -2664,7 +2697,7 @@ duckvep_registry_workspace_take(duckvep_registry_t *registry,
 		(void)snprintf(error, error_size, "%s",
 		    kernel_error.message[0] != '\0' ? kernel_error.message :
 		    "could not open a DuckVEP workspace");
-		free(cache);
+		duckvep_budget_free(cache);
 		return NULL;
 	}
 	return cache;
@@ -2716,9 +2749,26 @@ duckvep_registry_release(void *pointer)
 		    registry->annotation_state_pool);
 	if (registry->query_connection != NULL)
 		duckdb_disconnect(&registry->query_connection);
+	pthread_cond_destroy(&registry->admission);
 	pthread_mutex_destroy(&registry->query_mutex);
 	pthread_mutex_destroy(&registry->mutex);
-	free(registry);
+	duckvep_budget_free(registry);
+}
+
+/* True for a non-NULL, non-empty string without embedded NUL bytes, i.e. one
+ * duckvep_vector_string can only fail to copy for lack of memory. */
+int
+duckvep_vector_string_wellformed(duckdb_vector vector, idx_t row)
+{
+	duckdb_string_t *strings;
+	uint32_t length;
+
+	if (duckvep_row_is_null(vector, row))
+		return 0;
+	strings = duckdb_vector_get_data(vector);
+	length = duckdb_string_t_length(strings[row]);
+	return length != 0 &&
+	    memchr(duckdb_string_t_data(&strings[row]), '\0', length) == NULL;
 }
 
 char *
@@ -2736,7 +2786,7 @@ duckvep_vector_string(duckdb_vector vector, idx_t row)
 	data = duckdb_string_t_data(&strings[row]);
 	if (memchr(data, '\0', length) != NULL)
 		return NULL;
-	copy = malloc((size_t)length + 1);
+	copy = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, (size_t)length + 1);
 	if (copy == NULL)
 		return NULL;
 	memcpy(copy, data, length);
@@ -2770,7 +2820,7 @@ duckvep_string_copy(const char *source)
 	if (source == NULL)
 		return NULL;
 	length = strlen(source);
-	copy = malloc(length + 1);
+	copy = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
 	if (copy != NULL)
 		memcpy(copy, source, length + 1);
 	return copy;
@@ -2797,7 +2847,7 @@ duckvep_model_load_bind_destroy(void *pointer)
 		duckdb_free(bind->interval_feature_query);
 	if (bind->reference_fasta != NULL)
 		duckdb_free(bind->reference_fasta);
-	free(bind);
+	duckvep_budget_free(bind);
 }
 
 static void
@@ -2819,7 +2869,7 @@ duckvep_model_load_bind(duckdb_bind_info info)
 		    "duckvep_model_load: expected four positional arguments");
 		return;
 	}
-	bind = calloc(1, sizeof(*bind));
+	bind = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, 1, sizeof(*bind));
 	if (bind == NULL) {
 		duckdb_bind_set_error(info, "duckvep_model_load: out of memory");
 		return;
@@ -2930,7 +2980,7 @@ duckvep_model_load_bind(duckdb_bind_info info)
 static void
 duckvep_model_load_state_destroy(void *pointer)
 {
-	free(pointer);
+	duckvep_budget_free(pointer);
 }
 
 static void
@@ -2941,18 +2991,21 @@ duckvep_model_load_init(duckdb_init_info info)
 	duckvep_registry_t *registry;
 	duckvep_model_entry_t *entry;
 	char error[DUCKVEP_SQL_ERROR_SIZE];
+	char final_error[DUCKVEP_SQL_ERROR_SIZE + 256];
 	int loaded;
 
 	duckdb_init_set_max_threads(info, 1);
+	duckvep_budget_clear_failure();
 	bind = duckdb_init_get_bind_data(info);
 	if (bind == NULL || bind->registry == NULL) {
 		duckdb_init_set_error(info,
 		    "duckvep_model_load: missing bind state");
 		return;
 	}
-	state = calloc(1, sizeof(*state));
+	state = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, 1, sizeof(*state));
 	if (state == NULL) {
-		duckdb_init_set_error(info, "duckvep_model_load: out of memory");
+		duckdb_init_set_error(info, duckvep_sql_final_error(final_error,
+		    sizeof(final_error), NULL, "duckvep_model_load: out of memory"));
 		return;
 	}
 	registry = bind->registry;
@@ -2960,23 +3013,24 @@ duckvep_model_load_init(duckdb_init_info info)
 	entry = duckvep_registry_find_locked(registry, bind->arguments[0]);
 	pthread_mutex_unlock(&registry->mutex);
 	if (entry != NULL) {
-		free(state);
+		duckvep_budget_free(state);
 		duckdb_init_set_error(info,
 		    "duckvep_model_load: model name already exists");
 		return;
 	}
-	entry = calloc(1, sizeof(*entry));
+	entry = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, 1, sizeof(*entry));
 	if (entry == NULL ||
 	    (entry->name = duckvep_string_copy(bind->arguments[0])) == NULL) {
 		duckvep_model_entry_destroy(entry);
-		free(state);
-		duckdb_init_set_error(info, "duckvep_model_load: out of memory");
+		duckvep_budget_free(state);
+		duckdb_init_set_error(info, duckvep_sql_final_error(final_error,
+		    sizeof(final_error), NULL, "duckvep_model_load: out of memory"));
 		return;
 	}
 	memset(error, 0, sizeof(error));
 	if (!duckvep_registry_query_acquire(registry, error, sizeof(error))) {
 		duckvep_model_entry_destroy(entry);
-		free(state);
+		duckvep_budget_free(state);
 		duckdb_init_set_error(info, error);
 		return;
 	}
@@ -2991,16 +3045,17 @@ duckvep_model_load_init(duckdb_init_info info)
 	pthread_mutex_unlock(&registry->query_mutex);
 	if (!loaded) {
 		duckvep_model_entry_destroy(entry);
-		free(state);
-		duckdb_init_set_error(info, error[0] != '\0' ? error :
-		    "duckvep_model_load: model load failed");
+		duckvep_budget_free(state);
+		duckdb_init_set_error(info, duckvep_sql_final_error(final_error,
+		    sizeof(final_error), error,
+		    "duckvep_model_load: model load failed"));
 		return;
 	}
 	pthread_mutex_lock(&registry->mutex);
 	if (duckvep_registry_find_locked(registry, entry->name) != NULL) {
 		pthread_mutex_unlock(&registry->mutex);
 		duckvep_model_entry_destroy(entry);
-		free(state);
+		duckvep_budget_free(state);
 		duckdb_init_set_error(info,
 		    "duckvep_model_load: model name was created concurrently");
 		return;
@@ -3049,7 +3104,7 @@ duckvep_model_drop_scalar(duckdb_function_info info,
 
 		name = duckvep_vector_string(name_vector, row);
 		if (name == NULL || *name == '\0') {
-			free(name);
+			duckvep_budget_free(name);
 			duckdb_scalar_function_set_error(info,
 			    "duckvep_model_drop: name must be a non-empty string");
 			return;
@@ -3072,7 +3127,7 @@ duckvep_model_drop_scalar(duckdb_function_info info,
 			entry = NULL;
 		}
 		pthread_mutex_unlock(&registry->mutex);
-		free(name);
+		duckvep_budget_free(name);
 		values[row] = entry != NULL;
 		duckvep_model_entry_destroy(entry);
 	}
@@ -3085,17 +3140,19 @@ duckvep_registry_create(duckdb_database database)
 {
 	duckvep_registry_t *registry;
 
-	registry = calloc(1, sizeof(*registry));
+	registry = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, 1, sizeof(*registry));
 	if (registry == NULL)
 		return NULL;
 	(void)pthread_mutex_init(&registry->mutex, NULL);
 	(void)pthread_mutex_init(&registry->query_mutex, NULL);
+	(void)pthread_cond_init(&registry->admission, NULL);
 	registry->references = 1;
 	if (duckdb_connect(database, &registry->query_connection) !=
 	    DuckDBSuccess || registry->query_connection == NULL) {
+		pthread_cond_destroy(&registry->admission);
 		pthread_mutex_destroy(&registry->query_mutex);
 		pthread_mutex_destroy(&registry->mutex);
-		free(registry);
+		duckvep_budget_free(registry);
 		return NULL;
 	}
 	return registry;

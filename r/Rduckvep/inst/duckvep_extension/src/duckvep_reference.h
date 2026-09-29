@@ -16,9 +16,15 @@ typedef struct duckvep_reference_reader {
     faidx_t *fai;
     char *bases;
     size_t capacity, length;
+    /* Budget reservation standing in for htslib's own (unroutable) index and
+     * BGZF buffers; released with the handle. */
+    uint64_t htslib_reserved;
     uint32_t start1;
     uint16_t chrom_id;
 } duckvep_reference_reader_t;
+
+/* Releases the faidx handle and its budget reservation. Idempotent. */
+void duckvep_reference_reader_close(duckvep_reference_reader_t *reader);
 
 /* Initialization owns one mutable faidx handle. The pinned model and supplied
  * byte span are borrowed and must outlive the reader. Teardown destroys fai;
