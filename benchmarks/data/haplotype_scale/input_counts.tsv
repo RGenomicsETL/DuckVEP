@@ -1,0 +1,5 @@
+input	records	alt_alleles
+hg002.ens.vcf.gz	4023088	4070522
+qual5m.vcf.gz	5000000	5047434
+dense.vcf.gz	4000	4000
+low_sharing.vcf.gz	19065	19065
