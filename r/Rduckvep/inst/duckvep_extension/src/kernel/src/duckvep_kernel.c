@@ -898,6 +898,13 @@ struct duckvep_workspace {
     uint32_t                *interval_feature_candidates;
     uint16_t                *point_exon_rank;
     uint16_t                *span_exon_rank;
+    /* One flag per WORKSPACE_RANK_BLOCK transcripts, set whenever a rank in
+     * that block may have left the unknown (0xffff) state. A cursor reset
+     * then restores only the touched blocks instead of the whole model. The
+     * flag arrays are carved from the tail of the rank allocations. */
+    uint8_t                 *point_rank_dirty;
+    uint8_t                 *span_rank_dirty;
+    size_t                   rank_block_count;
     size_t                   point_exon_count;
     size_t                   active_cap;
     size_t                   interval_feature_active_cap;
@@ -915,16 +922,40 @@ struct duckvep_workspace {
     int                                     force_generalized_annotation;
 };
 
+#define WORKSPACE_RANK_BLOCK_SHIFT 10u
+#define WORKSPACE_RANK_BLOCK (((size_t)1) << WORKSPACE_RANK_BLOCK_SHIFT)
+
+/* Restores every block whose dirty flag is set to the unknown rank. All other
+ * entries are still 0xffff by construction, so the result is identical to a
+ * full fill. */
+static void workspace_rank_reset(uint16_t *rank, uint8_t *dirty,
+                                 size_t count, size_t blocks) {
+    size_t block;
+
+    for (block = 0u; block < blocks; block++) {
+        size_t begin, n;
+
+        if (!dirty[block]) continue;
+        dirty[block] = 0u;
+        begin = block << WORKSPACE_RANK_BLOCK_SHIFT;
+        n = count - begin;
+        if (n > WORKSPACE_RANK_BLOCK) n = WORKSPACE_RANK_BLOCK;
+        memset(rank + begin, 0xff, n * sizeof *rank);
+    }
+}
+
 static void workspace_point_cursor_reset(duckvep_workspace_t *workspace) {
     if (workspace == NULL || workspace->point_exon_rank == NULL) return;
-    memset(workspace->point_exon_rank, 0xff,
-           workspace->point_exon_count * sizeof *workspace->point_exon_rank);
+    workspace_rank_reset(workspace->point_exon_rank, workspace->point_rank_dirty,
+                         workspace->point_exon_count,
+                         workspace->rank_block_count);
 }
 
 static void workspace_span_cursor_reset(duckvep_workspace_t *workspace) {
     if (workspace == NULL || workspace->span_exon_rank == NULL) return;
-    memset(workspace->span_exon_rank, 0xff,
-           workspace->point_exon_count * sizeof *workspace->span_exon_rank);
+    workspace_rank_reset(workspace->span_exon_rank, workspace->span_rank_dirty,
+                         workspace->point_exon_count,
+                         workspace->rank_block_count);
 }
 
 DUCKVEP_INTERNAL_API void duckvep_workspace_force_generalized_annotation(
@@ -1116,6 +1147,7 @@ duckvep_status_t duckvep_workspace_open(
     size_t cap;
     size_t interval_feature_cap;
     size_t point_bytes = 0u;
+    size_t rank_blocks = 0u;
 
     if (out_workspace == NULL || model == NULL) {
         return fail(error, DUCKVEP_ERR_INVALID_ARG, DVW_WS_NULL_ARG,
@@ -1135,6 +1167,12 @@ duckvep_status_t duckvep_workspace_open(
         return fail(error, DUCKVEP_ERR_OUT_OF_RANGE, DVW_WS_SCRATCH_RANGE,
                     "workspace point cursor capacity overflow");
     }
+    rank_blocks = (model->transcripts.transcript_count +
+                   (WORKSPACE_RANK_BLOCK - 1u)) >> WORKSPACE_RANK_BLOCK_SHIFT;
+    if (point_bytes > SIZE_MAX - rank_blocks) {
+        return fail(error, DUCKVEP_ERR_OUT_OF_RANGE, DVW_WS_SCRATCH_RANGE,
+                    "workspace point cursor capacity overflow");
+    }
 
     w = (struct duckvep_workspace *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, 1u, sizeof *w);
     if (w == NULL) {
@@ -1147,8 +1185,8 @@ duckvep_status_t duckvep_workspace_open(
     w->interval_feature_candidates = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE,
         interval_feature_cap, sizeof *w->interval_feature_candidates);
     if (model->transcripts.transcript_count > 0u) {
-        w->point_exon_rank = (uint16_t *)duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, point_bytes);
-        w->span_exon_rank = (uint16_t *)duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, point_bytes);
+        w->point_exon_rank = (uint16_t *)duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, point_bytes + rank_blocks);
+        w->span_exon_rank = (uint16_t *)duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, point_bytes + rank_blocks);
     }
     if (w->active == NULL || w->candidates == NULL ||
         w->interval_feature_active == NULL ||
@@ -1178,8 +1216,15 @@ duckvep_status_t duckvep_workspace_open(
     }
     w->model = model;
     w->point_exon_count = model->transcripts.transcript_count;
-    workspace_point_cursor_reset(w);
-    workspace_span_cursor_reset(w);
+    w->rank_block_count = rank_blocks;
+    if (w->point_exon_rank != NULL) {
+        w->point_rank_dirty = (uint8_t *)w->point_exon_rank + point_bytes;
+        w->span_rank_dirty = (uint8_t *)w->span_exon_rank + point_bytes;
+        memset(w->point_exon_rank, 0xff, point_bytes);
+        memset(w->span_exon_rank, 0xff, point_bytes);
+        memset(w->point_rank_dirty, 0, rank_blocks);
+        memset(w->span_rank_dirty, 0, rank_blocks);
+    }
     w->active_cap = cap;
     w->interval_feature_active_cap = interval_feature_cap;
     *out_workspace = w;
@@ -1872,6 +1917,8 @@ static DUCKVEP_HOT_ALIGN int annotate_pair(
         duckvep_region_state_t region;
         duckvep_splice_state_t splice;
 
+        c->workspace->point_rank_dirty[
+            (size_t)tx_idx >> WORKSPACE_RANK_BLOCK_SHIFT] = 1u;
         duckvep_classify_point_sorted(
             tx, &c->model->exons, (size_t)tx_idx,
             event->feature_start1,
@@ -1894,7 +1941,12 @@ static DUCKVEP_HOT_ALIGN int annotate_pair(
     } else if (kind != DUCKVEP_KIND_SV && have_feature_alleles) {
         int sorted_span = c->span_sorted_safe &&
             c->model->point_ordered[tx_idx];
-        uint16_t sorted_rank = sorted_span
+        uint16_t sorted_rank;
+
+        if (sorted_span)
+            c->workspace->span_rank_dirty[
+                (size_t)tx_idx >> WORKSPACE_RANK_BLOCK_SHIFT] = 1u;
+        sorted_rank = sorted_span
             ? c->workspace->span_exon_rank[tx_idx] : UINT16_MAX;
         uint16_t *rank_io = sorted_span && !event->interbase
             ? &c->workspace->span_exon_rank[tx_idx] : &sorted_rank;
