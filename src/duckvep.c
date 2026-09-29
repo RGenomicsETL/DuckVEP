@@ -59,6 +59,7 @@ extern bool register_duckvep_functions(duckdb_connection, duckdb_database);
 extern bool register_duckvep_sql_kernels(duckvep_registration_t *);
 extern bool register_duckvep_ensembl_functions(duckvep_registration_t *);
 extern bool register_duckvep_sql_functions(duckvep_registration_t *);
+extern bool register_duckvep_prepare_sql(duckdb_connection);
 
 DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection,
                             duckdb_extension_info info,
@@ -77,5 +78,6 @@ DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection,
            register_duckvep_functions(connection, *access->get_database(info)) &&
            register_duckvep_sql_kernels(&registration) &&
            register_duckvep_sql_functions(&registration) &&
+           register_duckvep_prepare_sql(connection) &&
            register_duckvep_ensembl_functions(&registration);
 }
