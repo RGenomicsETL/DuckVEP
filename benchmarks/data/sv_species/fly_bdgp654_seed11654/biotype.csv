@@ -1,0 +1,11 @@
+"biotype","exact","oracle_only","duckvep_only","terms_differ","pairs","events"
+"miRNA",270,0,0,0,270,83
+"ncRNA",882,0,0,0,882,501
+"pre_miRNA",138,0,0,0,138,83
+"protein_coding",22416,0,0,0,22416,1710
+"pseudogene",80,0,0,0,80,53
+"rRNA",13,0,0,0,13,1
+"snRNA",4,0,0,0,4,4
+"snoRNA",313,0,0,0,313,69
+"tRNA",56,0,0,0,56,29
+"transposable_element",1484,0,0,0,1484,474
