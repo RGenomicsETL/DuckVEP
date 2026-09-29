@@ -14,7 +14,7 @@ suppressPackageStartupMessages({ library(DBI); library(duckdb) })
 source("r/Rduckvep/R/builders.R")
 source("r/Rduckvep/R/structural_identity.R")
 data_dir <- "test/duckvep/conformance/data/breakend_fusion"
-model <- "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb"
+model <- Sys.getenv("DUCKVEP_GRCH38_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
 results_file <- file.path(data_dir, "fusioncatcher_v1.20_endpoint_genes.tsv")
 
 provenance <- read.delim(file.path(data_dir, "PROVENANCE.tsv"), stringsAsFactors = FALSE)
@@ -34,7 +34,7 @@ read_vcf <- function(path) {
 directory <- tempfile("bnd-fusion-")
 dir.create(directory)
 binary <- file.path(directory, "duckvep.duckdb_extension")
-stopifnot(file.copy("build/release/duckvep.duckdb_extension", binary))
+stopifnot(file.copy(Sys.getenv("DUCKVEP_EXTENSION_FILE", "build/release/duckvep.duckdb_extension"), binary))
 con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extensions = "true")))
 on.exit({dbDisconnect(con, shutdown = TRUE); unlink(directory, recursive = TRUE)}, add = TRUE)
 q <- function(value) as.character(dbQuoteString(con, value))

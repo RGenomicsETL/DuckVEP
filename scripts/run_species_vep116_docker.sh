@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Cache version is the Ensembl cache version, which can differ from VEP 116.
 # Optional trailing arguments are passed to vep unchanged (for example --hgvs).
+# VEP_BUFFER_SIZE overrides the default buffer of 5000 (BND campaigns need 1).
 if [[ $# -lt 7 ]]; then
   echo "usage: $0 SPECIES ASSEMBLY CACHE_VERSION CACHE_ROOT FASTA INPUT_VCF OUTPUT_JSON [VEP_ARG...]" >&2
   exit 2
@@ -33,6 +34,6 @@ docker run --rm --network none --user "$(id -u):$(id -g)" \
   --fasta "/reference/$(basename "$fasta")" \
   --cache --offline --dir_cache /cache \
   --species "$species" --assembly "$assembly" \
-  --cache_version "$cache_version" --distance 5000 --buffer_size 5000 \
+  --cache_version "$cache_version" --distance 5000 --buffer_size "${VEP_BUFFER_SIZE:-5000}" \
   --json --no_stats --force_overwrite \
   -o "/output/$output_name" ${extra[@]+"${extra[@]}"}

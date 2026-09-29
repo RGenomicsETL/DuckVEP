@@ -14,7 +14,7 @@ reference <- substr(fasta, 2006L, 2008L)
 directory <- tempfile("duckvep-receipt-")
 dir.create(directory)
 binary <- file.path(directory, "duckvep.duckdb_extension")
-stopifnot(file.copy("build/release/duckvep.duckdb_extension", binary))
+stopifnot(file.copy(Sys.getenv("DUCKVEP_EXTENSION_FILE", "build/release/duckvep.duckdb_extension"), binary))
 con <- dbConnect(duckdb(shared_home = FALSE,
                         config = list(allow_unsigned_extensions = "true")))
 dbExecute(con, paste("LOAD", as.character(dbQuoteString(con, binary))))
@@ -57,7 +57,7 @@ for (i in 1:2) {
 als <- strsplit(tail(readLines(
   "test/duckvep/conformance/data/expansionhunter_v5_documented_als.vcf"), 1L),
   "\t", fixed = TRUE)[[1L]]
-fasta37 <- "/root/duckvep/data/mane-grch37/Homo_sapiens.GRCh37.dna.primary_assembly.fa"
+fasta37 <- Sys.getenv("DUCKVEP_GRCH37_FASTA", "/root/duckvep/data/mane-grch37/Homo_sapiens.GRCh37.dna.primary_assembly.fa")
 anchor <- tail(system2("samtools", c("faidx", fasta37,
   "9:27573526-27573526"), stdout = TRUE), 1L)
 literal <- tail(system2("samtools", c("faidx", fasta37,
