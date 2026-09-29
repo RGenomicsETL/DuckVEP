@@ -1,0 +1,37 @@
+name: Native properties
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/kernel/**'
+      - 'test/duckvep/property/**'
+      - 'test/duckvep/vendor/**'
+      - 'Makefile'
+      - '.github/workflows/properties.yml'
+  pull_request:
+    paths:
+      - 'src/kernel/**'
+      - 'test/duckvep/property/**'
+      - 'test/duckvep/vendor/**'
+      - 'Makefile'
+      - '.github/workflows/properties.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  sanitizers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The Makefile includes extension-ci-tools unconditionally, even for this target.
+          submodules: true
+          persist-credentials: false
+      # Offline: the suite is pure C over vendored greatest and theft. Any AddressSanitizer or
+      # UndefinedBehaviorSanitizer report aborts the run (no recovery), and a failed property is a
+      # nonzero exit, so either fails the job.
+      - name: Build and run the property suite under ASan and UBSan
+        run: make test_properties
