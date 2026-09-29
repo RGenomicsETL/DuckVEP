@@ -45,6 +45,7 @@ set(EXTENSION_SOURCES
     src/duckvep.c
     src/duckvep_registration.c
     src/duckvep_builder.c
+    src/duckvep_prepare_sql.c
     src/duckvep_repeat.c
     src/duckvep_annotate.c
     src/duckvep_ensembl.c
