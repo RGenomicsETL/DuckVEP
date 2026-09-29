@@ -6,6 +6,7 @@ on:
     paths:
       - 'test/data/haplotype/**'
       - 'test/scripts/*haplotype*'
+      - 'test/scripts/*same_codon*'
       - 'src/kernel/src/duckvep_so_metadata.inc'
       - 'Makefile'
       - '.github/workflows/haplotype-contract.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'test/data/haplotype/**'
       - 'test/scripts/*haplotype*'
+      - 'test/scripts/*same_codon*'
       - 'src/kernel/src/duckvep_so_metadata.inc'
       - 'Makefile'
       - '.github/workflows/haplotype-contract.yml'
