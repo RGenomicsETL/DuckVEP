@@ -1,0 +1,38 @@
+name: SQL tests under sanitizers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'test/sql/**'
+      - 'Makefile'
+      - '.github/workflows/asan.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'test/sql/**'
+      - 'Makefile'
+      - '.github/workflows/asan.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  asan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The Makefile includes extension-ci-tools unconditionally.
+          submodules: true
+          persist-credentials: false
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake zlib1g-dev
+      - name: Build with ASan+UBSan and run the SQL suite (any sanitizer report fails)
+        run: make test_release_asan
