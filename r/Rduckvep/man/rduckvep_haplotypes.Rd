@@ -123,8 +123,8 @@ through the model transcript ordinal; the suffix contains no accession.
 
 `prediction_policy` names the versioned contract (`duckvep-coding-v1`).
 `prediction_status` and `prediction_reason` state eligibility for its supported
-domain and whether the same-codon classifier decided it (see below); no NMD is
-predicted yet. The domain is strict complete diploid calls, one
+domain and whether the classifiers decided it (see below), and `nmd_prediction` gives
+the rule `ejc50-v1` NMD prediction. The domain is strict complete diploid calls, one
 unambiguous heterozygous phase domain per transcript and sample, literal ACGT
 SNVs, MNVs and indels of at most 50 normalized bases, non-overlapping and
 inside coding exons of complete table-1 CDSs with a canonical start and stop
@@ -185,6 +185,36 @@ ascending order with their source `event_index` and `coding_blocks` index
 (NULL when no sequence was rebuilt). Sequence deduplication never merges or
 drops contributors. Malformed identities and exhausted budgets error.
 
+`nmd_prediction` is the versioned NMD prediction of the edited transcript under rule
+`nmd_rule` (`ejc50-v1`), an EJC-distance heuristic on the whole haplotype, never per
+allele, never a union of single-allele results and not the VEP NMD plugin. For a newly
+premature stop (`stop_gained` in `haplotype_consequences`, with or without
+`frameshift_variant`) it is `trigger` when J - S > 50 and `escape` otherwise. S
+(`nmd_stop_position`) is the final nucleotide of the first stop codon and J
+(`nmd_junction_position`) the final nucleotide of the penultimate exon, both 1-based in
+the edited spliced-transcript (cDNA, 5' UTR included) coordinates, so an indel before the
+stop moves S, an indel before or inside the penultimate exon moves J, and one in the last
+exon moves neither; an edit after the stop still moves J when it lies at or before the
+penultimate exon's last base, while S never moves. A single-exon transcript is `escape`
+and has no `nmd_junction_position`. `not_applicable` is known termination without a new
+premature stop (synonymous, missense, protein-altering, in-frame, `stop_retained_variant`,
+a frame displaced and restored before termination) and a reference lane, which has no
+termination change (strict decoded input gives an ALT-free lane no carrier, so no such row
+is returned). `unknown` is lost initiation (`start_lost`), an edited CDS with no stop (a
+frame that runs off the CDS and `stop_lost`: the termination is unavailable, not known
+absent), unresolved exon topology, and every path that is not `predicted`
+(`incomplete_input`, `edit_conflict`, `unsupported_overlap`, `unsupported_context`, and
+the non-strict phase policy), whose consequences and IMPACT are NULL as before.
+`nmd_stop_position` and `nmd_junction_position` are NULL unless a premature stop was
+decided (J also needs a junction). `nmd_contributors` lists the `event_index` of the
+contributors with role `applied`, the edits up to and including the stop, and never a
+`post_stop`, `shadowed` or `omitted` source; it is NULL when nothing is premature. The
+row fields are `unknown` and NULL unless every carrier is predicted; the keyed
+`carrier_predictions` also carry `nmd_prediction`, `nmd_stop_position` and
+`nmd_junction_position`, so one ineligible carrier does not hide the others. Only the
+EJC distance is modelled: no reinitiation, no long-exon exception and no
+`NMD_transcript_variant` biotype term.
+
 `stop_in_displaced_frame` reports whether any of the first translated stop
 codon's three bases overlaps a frame-displaced span of the rebuilt CDS.
 Displacement starts at a frame-changing edit and ends after the alternate
@@ -193,7 +223,7 @@ It is FALSE for no stop or a stop after frame restoration, and NA when
 sequence is unavailable. It is a sequence fact, not a combined SO consequence
 or a claim that a restored DNA frame rescues the protein.
 
-Start-codon and terminal-codon whole-haplotype SO, NMD, DNA HGVS, complete protein HGVS and structural-event
+Whole-haplotype DNA HGVS, complete protein HGVS and structural-event
 composition remain unfinished. Input must contain one row per
 `event_index`, `transcript_index`, `sample_index`, with columns `seq_region`,
 `position`, `reference`, `alternate`, `alt_index`, `alleles`, `phase_before`
