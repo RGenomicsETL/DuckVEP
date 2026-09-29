@@ -927,8 +927,11 @@ static void duckvep_model_receipt_sql(duckdb_function_info info,
             if (ok) ok = duckvep_sql_append(&sql, " AS ");
             if (ok) ok = duckvep_sql_append(&sql, parameters[i]);
         }
-        if (ok) ok = duckvep_sql_append(&sql, "), regions AS MATERIALIZED (SELECT * FROM ");
+        /* Region relations prepared before circular topology existed have no
+         * circular column; treat its absence as a non-circular region. */
+        if (ok) ok = duckvep_sql_append(&sql, "), regions AS MATERIALIZED (SELECT * REPLACE (coalesce(circular, false) AS circular) FROM (SELECT NULL::BOOLEAN AS circular WHERE false UNION ALL BY NAME SELECT * FROM ");
         if (ok) ok = duckvep_sql_identifier(&sql, values[0]);
+        if (ok) ok = duckvep_sql_append(&sql, ")");
         if (ok) ok = duckvep_sql_append(&sql, "), model AS MATERIALIZED (SELECT * FROM ");
         if (ok) ok = duckvep_sql_identifier(&sql, values[1]);
         if (ok) ok = duckvep_sql_append(&sql, "), regulation AS MATERIALIZED (SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM ");
