@@ -20,7 +20,7 @@ endif
 include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
 include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
 
-.PHONY: all test test_debug test_release test_haplotype_contract test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme build_asan test_release_asan test_properties test_properties_sanitized
+.PHONY: all test test_debug test_release test_fault_injection build_fault_injection test_haplotype_contract test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme build_asan test_release_asan test_properties test_properties_sanitized
 all: configure release
 configure: venv platform extension_version
 platform: venv
@@ -37,6 +37,23 @@ test: debug
 	$(MAKE) test_debug
 test_debug: test_extension_debug
 test_release: test_extension_release test-extension-symbols test-sql-lambda-syntax
+
+# Fault injection: an AddressSanitizer + LeakSanitizer build whose allocation
+# budget can fail the Nth allocation (duckvep_fault_arm). Every allocation made
+# by model load and annotation is failed in turn; each failure must be a clean
+# error that publishes nothing and leaks nothing. Linux/GCC-compatible hosts.
+build_fault_injection: check_configure
+	cmake $(CMAKE_VERSION_PARAMS) -DCMAKE_BUILD_TYPE=Debug \
+		"-DCMAKE_C_FLAGS=-fsanitize=address -fno-omit-frame-pointer -O1 -g -DDUCKVEP_FAULT_INJECTION=1" \
+		-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address -S $(PROJ_DIR) -B cmake_build/fault
+	cmake --build cmake_build/fault --parallel
+	mkdir -p build/fault
+	$(PYTHON_VENV_BIN) extension-ci-tools/scripts/append_extension_metadata.py \
+		-l cmake_build/fault/$(EXTENSION_LIB_FILENAME) -o build/fault/$(EXTENSION_FILENAME) \
+		-n $(EXTENSION_NAME) -dv $(TARGET_DUCKDB_VERSION) \
+		-evf configure/extension_version.txt -pf configure/platform.txt
+test_fault_injection: build_fault_injection
+	python3 test/scripts/test_fault_injection.py
 
 # Pure policy fixtures run offline. The full-release receipt needs the external
 # Parquet output and is invoked explicitly after building a staged release.
