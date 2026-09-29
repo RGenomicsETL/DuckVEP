@@ -1,0 +1,45 @@
+id	fusion	end	expected_gene	endpoint_genes	expected_gene_at_endpoint	identity_reason	fusion_status
+FGFR3--TACC3__5__0	FGFR3--TACC3	5	ENSG00000068078	ENSG00000068078	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+FGFR3--TACC3__3__0	FGFR3--TACC3	3	ENSG00000013810	ENSG00000013810	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+FGFR3--TACC3__5__1	FGFR3--TACC3	5	ENSG00000068078	ENSG00000068078	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+FGFR3--TACC3__3__1	FGFR3--TACC3	3	ENSG00000013810	ENSG00000013810	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+FIP1L1--PDGFRA__5	FIP1L1--PDGFRA	5	ENSG00000145216	ENSG00000145216	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+FIP1L1--PDGFRA__3	FIP1L1--PDGFRA	3	ENSG00000134853	ENSG00000134853	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+GOPC--ROS1__5__3	GOPC--ROS1	5	ENSG00000047932	ENSG00000047932,ENSG00000164465	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+GOPC--ROS1__3__3	GOPC--ROS1	3	ENSG00000047936	ENSG00000047936	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+GOPC--ROS1__5__4	GOPC--ROS1	5	ENSG00000047932	ENSG00000047932,ENSG00000164465	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+GOPC--ROS1__3__4	GOPC--ROS1	3	ENSG00000047936	ENSG00000047936	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+IGH@--CRLF2__5__5	IGH@--CRLF2	5	ENSG09000000014		FALSE	mate_orientation_conflict	endpoint_without_gene
+IGH@--CRLF2__3__5	IGH@--CRLF2	3	ENSG00000205755		FALSE	mate_orientation_conflict	endpoint_without_gene
+IGH@--CRLF2__5__6	IGH@--CRLF2	5	ENSG09000000014		FALSE	mate_orientation_conflict	endpoint_without_gene
+IGH@--CRLF2__3__6	IGH@--CRLF2	3	ENSG00000205755		FALSE	mate_orientation_conflict	endpoint_without_gene
+IGH@--CRLF2__5__7	IGH@--CRLF2	5	ENSG09000000014		FALSE	mate_orientation_conflict	endpoint_without_gene
+IGH@--CRLF2__3__7	IGH@--CRLF2	3	ENSG00000205755		FALSE	mate_orientation_conflict	endpoint_without_gene
+HOOK3--RET__5	HOOK3--RET	5	ENSG00000168172	ENSG00000168172	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+HOOK3--RET__3	HOOK3--RET	3	ENSG00000165731	ENSG00000165731	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+AKAP9--BRAF__5	AKAP9--BRAF	5	ENSG00000127914	ENSG00000127914	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+AKAP9--BRAF__3	AKAP9--BRAF	3	ENSG00000157764	ENSG00000157764,ENSG00000289788	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+EWSR1--ATF1__5	EWSR1--ATF1	5	ENSG00000182944	ENSG00000182944	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+EWSR1--ATF1__3	EWSR1--ATF1	3	ENSG00000123268	ENSG00000123268	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+TMPRSS2--ETV1__5	TMPRSS2--ETV1	5	ENSG00000184012	ENSG00000184012	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+TMPRSS2--ETV1__3	TMPRSS2--ETV1	3	ENSG00000006468	ENSG00000006468	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+EWSR1--FLI1__5	EWSR1--FLI1	5	ENSG00000182944	ENSG00000182944	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+EWSR1--FLI1__3	EWSR1--FLI1	3	ENSG00000151702	ENSG00000151702	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+ETV6--NTRK3__5	ETV6--NTRK3	5	ENSG00000139083	ENSG00000139083	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+ETV6--NTRK3__3	ETV6--NTRK3	3	ENSG00000140538	ENSG00000140538	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+BRD4--NUTM1__5	BRD4--NUTM1	5	ENSG00000141867	ENSG00000141867	TRUE	reciprocal	candidate_partner_genes
+BRD4--NUTM1__3	BRD4--NUTM1	3	ENSG00000184507	ENSG00000184507	TRUE	reciprocal	candidate_partner_genes
+CD74--ROS1__5	CD74--ROS1	5	ENSG00000019582	ENSG00000019582	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+CD74--ROS1__3	CD74--ROS1	3	ENSG00000047936	ENSG00000047936	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+CIC--DUX4__5	CIC--DUX4	5	ENSG00000079432	ENSG00000079432	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+CIC--DUX4__3	CIC--DUX4	3	ENSG00000260596	ENSG00000260596	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+DUX4--IGH@__5__17	DUX4--IGH@	5	ENSG00000260596		FALSE	mate_orientation_conflict	endpoint_without_gene
+DUX4--IGH@__3__17	DUX4--IGH@	3	ENSG09000000014		FALSE	mate_orientation_conflict	endpoint_without_gene
+EML4--ALK__5	EML4--ALK	5	ENSG00000143924	ENSG00000143924	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+EML4--ALK__3	EML4--ALK	3	ENSG00000171094	ENSG00000171094	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+DUX4--IGH@__5__19	DUX4--IGH@	5	ENSG00000260596	ENSG00000260596	TRUE	mate_orientation_conflict	endpoint_without_gene
+DUX4--IGH@__3__19	DUX4--IGH@	3	ENSG09000001017		FALSE	mate_orientation_conflict	endpoint_without_gene
+MALT1--IGH@__5	MALT1--IGH@	5	ENSG00000172175		FALSE	mate_orientation_conflict	endpoint_without_gene
+MALT1--IGH@__3	MALT1--IGH@	3	ENSG09000000014	ENSG00000211912,ENSG00000226777	FALSE	mate_orientation_conflict	endpoint_without_gene
+NPM1--ALK__5	NPM1--ALK	5	ENSG00000181163	ENSG00000181163	TRUE	mate_orientation_conflict	candidate_orientation_conflict
+NPM1--ALK__3	NPM1--ALK	3	ENSG00000171094	ENSG00000171094	TRUE	mate_orientation_conflict	candidate_orientation_conflict
