@@ -1,0 +1,25 @@
+control	key	value
+model_load_budget	error	Invalid Error: Invalid Input Error: capacity error: native memory (model) budget exceeded (requested 8388608 bytes, 65164640 in use, limit 67108864) (out of memory loading transcript flanks) ℹ Context: rapi_execute ℹ Error type: INVALID
+model_load_budget	explicit_capacity_error	TRUE
+model_load_budget	bytes_charged_after	400
+model_load_budget	model_published	FALSE
+model_load_budget	reload_after_failure	TRUE
+model_load_budget	resident_bytes_after_reload	1381862560
+haplotype_budget	partial_file_bytes_left_by_copy	2581
+haplotype_budget	error	Invalid Error: Invalid Input Error: capacity error: native memory (workspace) budget exceeded (requested 16781312 bytes, 1441214896 in use, limit 1448971424) (duckvep_haplotypes: workspace allocation or configured limit exceeded) ℹ Context: rapi_execute ℹ Error type: INVALID
+haplotype_budget	explicit_capacity_error	TRUE
+haplotype_budget	output_published	FALSE
+haplotype_budget	table_published	FALSE
+haplotype_budget	bytes_charged_after	1381862560
+haplotype_budget	bytes_equal_resident	TRUE
+haplotype_budget	connection_reusable	TRUE
+alignment_capacity	cells	1e+05
+alignment_capacity	error	Invalid Error: Invalid Input Error: duckvep_haplotypes: CDS difference status 3, max_alignment_cells=100000, required=166049 at transcript 669 ℹ Context: rapi_execute ℹ Error type: INVALID
+alignment_capacity	explicit_error	TRUE
+alignment_capacity	names_limit	TRUE
+alignment_capacity	partial_file_bytes_left_by_copy	0
+alignment_capacity	output_published	FALSE
+alignment_capacity	bytes_equal_resident	TRUE
+alignment_capacity	connection_reusable	TRUE
+builder_defaults	succeeds_with_max_alignment_cells_16777216	TRUE
+builder_defaults	output_rows	157986

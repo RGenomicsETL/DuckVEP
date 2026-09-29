@@ -1,0 +1,5 @@
+build	max_alignment_cells	outcome
+base (01f37f4)	268435456	duckvep_haplotypes: CDS difference status 3, max_alignment_cells=268435456, required=451073810 at transcript 3762
+base (01f37f4)	3221225472	duckvep_haplotypes: CDS difference status 3, max_alignment_cells=3221225472, required=11659140506 at transcript 6435
+final	268435456	succeeds (predict 8.98 s)
+final	3221225472	succeeds (predict 9.10 s)

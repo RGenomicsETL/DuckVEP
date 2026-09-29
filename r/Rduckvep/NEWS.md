@@ -1,5 +1,12 @@
 # Rduckvep
 
+- `rduckvep_coding_transcripts()` wraps the SQL scalar `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)`:
+  the (event, transcript) pairs of the annotation builder's CDS overlap, found from the resident interval index (the fast
+  discovery route for haplotype calls on whole-genome input). The bundled extension also makes `rduckvep_haplotypes()`
+  aligns CDS and protein differences much faster with unchanged output. `max_alignment_cells` is now checked against the
+  band an alignment needs rather than a feasible bound, so long transcripts with several edits fit the default; see the
+  project NEWS.md and `benchmarks/data/haplotype_scale/README.md`.
+
 - The bundled extension annotates models that contain origin-crossing transcripts, exons or
   regulation features on circular sequence regions (lifted-interval execution); see the project
   NEWS.md. Structural, breakend and phased entry points still refuse such models.
