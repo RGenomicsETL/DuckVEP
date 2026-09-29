@@ -1,0 +1,7 @@
+build	trial	load_seconds	peak_rss_kib	model_reserved_bytes	model_used_bytes	index_reserved_bytes	index_used_bytes	effective_native_budget_bytes
+origin-main	1	3.570	5284236	NA	NA	NA	NA	NA
+origin-main	2	3.553	5284416	NA	NA	NA	NA	NA
+origin-main	3	3.519	5284020	NA	NA	NA	NA	NA
+exact-capacity	1	4.057	5462700	NA	NA	NA	NA	NA
+exact-capacity	2	4.656	5462168	NA	NA	NA	NA	NA
+exact-capacity	3	5.038	5461964	NA	NA	NA	NA	NA
