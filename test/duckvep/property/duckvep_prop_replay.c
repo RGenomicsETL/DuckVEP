@@ -81,9 +81,10 @@ int haplo_oracle_rebuild(const uint8_t *ref, size_t ref_len,
 
 /* Deliberately full-matrix, signed-score, gapped-string oracle. Production
  * instead uses nonnegative costs, a proved band and ungapped output spans. */
+enum { ORACLE_SIDE = 130 };
 static size_t difference_alignment_oracle(const uint8_t *a, size_t n,
     const uint8_t *b, size_t m, int align, uint8_t *oa, uint8_t *ob) {
-    int score[8][8], direction[8][8];
+    static int score[ORACLE_SIDE][ORACLE_SIDE], direction[ORACLE_SIDE][ORACLE_SIDE];
     for (size_t i = 0u; i <= n; i++) { score[i][0] = -(int)i; direction[i][0] = 1; }
     for (size_t j = 0u; j <= m; j++) { score[0][j] = -(int)j; direction[0][j] = -1; }
     for (size_t i = 1u; i <= n; i++) for (size_t j = 1u; j <= m; j++) {
@@ -106,6 +107,67 @@ static size_t difference_alignment_oracle(const uint8_t *a, size_t n,
     return length;
 }
 
+/* Difference runs of a gapped alignment: adjacent columns join when both sides have the same gap/non-gap type. */
+static size_t differences_from_alignment(const uint8_t *oa, const uint8_t *ob, size_t length,
+    duckvep_sequence_difference_t *expected) {
+    size_t count = 0u, ri = 0u, ai = 0u;
+    for (size_t col = 0u; col < length;) {
+        if (oa[col] == ob[col]) { ri++; ai++; col++; continue; }
+        size_t begin = col, rn = 0u, an = 0u;
+        int rgap = oa[col] == '-', agap = ob[col] == '-';
+        do {
+            rn += oa[col] != '-'; an += ob[col] != '-'; col++;
+        } while (col < length && oa[col] != ob[col] &&
+            (oa[col] == '-') == rgap && (ob[col] == '-') == agap);
+        expected[count++] = (duckvep_sequence_difference_t){ri, ai, rn, an, begin};
+        ri += rn; ai += an;
+    }
+    return count;
+}
+
+/* Long, repeat-rich pairs: shared prefixes and suffixes of every length, indels inside homopolymers and tandem
+ * repeats (equal-cost placements), several edits, and unequal lengths, against the same independent full matrix.
+ * This is the regime of the closed-form prefix rows and the widening band. */
+TEST haplotype_differences_match_full_matrix_on_repeats_and_long_prefixes(void) {
+    static uint8_t a[ORACLE_SIDE], b[ORACLE_SIDE], oa[2u * ORACLE_SIDE], ob[2u * ORACLE_SIDE], trace[ORACLE_SIDE * ORACLE_SIDE];
+    static uint64_t scores[2u * ORACLE_SIDE];
+    static duckvep_sequence_difference_t actual[2u * ORACLE_SIDE], expected[2u * ORACLE_SIDE];
+    duckvep_sequence_diff_scratch_t scratch = {scores, sizeof(scores) / sizeof(*scores), trace, sizeof(trace)};
+    uint64_t state = UINT64_C(0x9e3779b97f4a7c15);
+    for (unsigned round = 0u; round < 40000u; round++) {
+        state ^= state << 13; state ^= state >> 7; state ^= state << 17;
+        uint64_t r = state;
+        size_t alphabet = 1u + (size_t)(r % 3u); r >>= 2;
+        size_t n = 1u + (size_t)(r % 96u); r >>= 7;
+        for (size_t i = 0u; i < n; i++) {
+            state ^= state << 13; state ^= state >> 7; state ^= state << 17;
+            a[i] = (uint8_t)"ACGT"[state % alphabet];
+            if ((r & 1u) && i >= 3u && i > n / 2u) a[i] = a[i - 3u];
+        }
+        size_t m = 0u, at = 0u;
+        for (unsigned edit = 0u; edit < 1u + (unsigned)(r % 3u); edit++) {
+            state ^= state << 13; state ^= state >> 7; state ^= state << 17;
+            size_t where = (size_t)(state % (n + 1u)), length = 1u + (size_t)((state >> 20) % 7u);
+            while (at < where && m < 100u) b[m++] = a[at++];
+            if ((state >> 40) % 3u == 0u) { for (size_t k = 0u; k < length && m < 100u; k++) b[m++] = (uint8_t)"ACGT"[(state >> (44u + k)) % alphabet]; }
+            else if ((state >> 40) % 3u == 1u) at = at + length < n ? at + length : n;
+            else if (at < n && m < 100u) { b[m++] = (uint8_t)"ACGT"[(state >> 52) % 4u]; at++; }
+        }
+        while (at < n && m < 100u) b[m++] = a[at++];
+        if (m == 0u) b[m++] = 'A';
+        for (int align = 0; align <= 1; align++) {
+            size_t length = difference_alignment_oracle(a, n, b, m, align, oa, ob);
+            size_t count = differences_from_alignment(oa, ob, length, expected);
+            duckvep_sequence_diff_result_t result;
+            ASSERT_EQ(DUCKVEP_SEQUENCE_DIFF_OK, duckvep_sequence_differences(
+                a, n, b, m, align, &scratch, actual, 2u * ORACLE_SIDE, &result));
+            ASSERT_EQ(length, result.alignment_length); ASSERT_EQ(count, result.count);
+            ASSERT_EQ(0, memcmp(actual, expected, count * sizeof(*actual)));
+        }
+    }
+    PASS();
+}
+
 TEST haplotype_differences_match_full_matrix_exhaustively(void) {
     uint8_t a[7], b[7], oa[14], ob[14], trace[64];
     uint64_t scores[16];
@@ -117,18 +179,7 @@ TEST haplotype_differences_match_full_matrix_exhaustively(void) {
             for (size_t j = 0u; j < m; j++) b[j] = (y >> j) & 1u ? 'A' : 'C';
             for (int align = 0; align <= 1; align++) {
                 size_t length = difference_alignment_oracle(a, n, b, m, align, oa, ob);
-                size_t count = 0u, ri = 0u, ai = 0u;
-                for (size_t col = 0u; col < length;) {
-                    if (oa[col] == ob[col]) { ri++; ai++; col++; continue; }
-                    size_t begin = col, rn = 0u, an = 0u;
-                    int rgap = oa[col] == '-', agap = ob[col] == '-';
-                    do {
-                        rn += oa[col] != '-'; an += ob[col] != '-'; col++;
-                    } while (col < length && oa[col] != ob[col] &&
-                        (oa[col] == '-') == rgap && (ob[col] == '-') == agap);
-                    expected[count++] = (duckvep_sequence_difference_t){ri, ai, rn, an, begin};
-                    ri += rn; ai += an;
-                }
+                size_t count = differences_from_alignment(oa, ob, length, expected);
                 duckvep_sequence_diff_result_t result;
                 ASSERT_EQ(DUCKVEP_SEQUENCE_DIFF_OK, duckvep_sequence_differences(
                     a, n, b, m, align, &scratch, actual, 14u, &result));
