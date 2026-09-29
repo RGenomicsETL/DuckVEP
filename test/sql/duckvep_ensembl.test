@@ -504,7 +504,12 @@ statement ok
 UPDATE receipt_temp_regions SET circular = true;
 
 query I
-SELECT model_sha256 != (SELECT model_sha256 FROM query(duckvep_model_receipt_sql(
+SELECT model_sha256 = (SELECT model_sha256 FROM query(duckvep_model_receipt_sql(
+  'receipt_temp_regions', 'duckvep_prepared_transcripts',
+  'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),
+  'all current transcripts on FASTA-covered assembly regions',
+  {regulation_features_table: 'duckvep_prepared_regulation'}
+))) AND topology_sha256 != (SELECT topology_sha256 FROM query(duckvep_model_receipt_sql(
   'receipt_temp_regions', 'duckvep_prepared_transcripts',
   'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),
   'all current transcripts on FASTA-covered assembly regions',
@@ -1007,8 +1012,16 @@ FROM (
   SELECT * FROM duckvep_grch37_receipt
 ) ORDER BY assembly;
 ----
-GRCh37	a2a8f34f587b770adebf11fc60bbb798065dc8146a8147f26a7bea000e6640c6	all current transcripts on MT and GL000201.1
-GRCh38	a16d797bd97faf5a1c3bdc88ed3774ebdd56607c412b46e0e4c99f715565bb61	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
+GRCh37	de042a5650929ba7dca9c64b487e45463e71a0492b3df686f9365e40b6bda4e9	all current transcripts on MT and GL000201.1
+GRCh38	6d9f79077e8dfcca418ef82fffcc49f7c44f939eea83045a49bc1139e66b037b	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
+
+query IIII
+SELECT (SELECT circular_region_count FROM duckvep_grch38_receipt),
+       (SELECT circular_region_count FROM duckvep_grch37_receipt),
+       (SELECT count(*) FROM duckvep_grch38_regions WHERE circular),
+       (SELECT count(*) FROM duckvep_grch37_regions WHERE circular);
+----
+0	0	0	0
 
 query I
 SELECT loaded FROM duckvep_model_load(
