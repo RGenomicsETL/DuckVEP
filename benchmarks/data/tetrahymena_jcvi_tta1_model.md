@@ -1,0 +1,5 @@
+# Tetrahymena thermophila JCVI-TTA1-2.2 model
+
+`Rscript scripts/build_species_model.R CORE_DB REFERENCE_PARQUET FASTA MODEL_DB JCVI-TTA1-2.2 63/116 EXTENSION_COPY` builds the model from [pinned sources](tetrahymena_jcvi_tta1_sources.md). The model artifact SHA-256 is `c00654e682db45b96e6182776023af7de464c28c28d62a08aa6cf9d349cb4f08`; receipt SHA-256 is `23fc4aa4ebee8dd2dbb515a9a8a5c6436a7da99c71e5844d7150c13e0bb6352a`.
+
+The receipt covers 1,158 regions (103,014,375 reference bases), 25,655 transcripts and genes, 24,725 coding transcripts, 114,990 exon memberships, 48,193,658 CDS bases, and 1,117,538 transcript-flank bases. All 24,725 coding transcripts have sequence and NCBI translation table 6; 930 noncoding transcripts have no codon table. Table 6 translates TAA and TAG as glutamine (Q), and TGA as stop. The source manifest and FASTA digests are recorded in `benchmarks/data/duckvep_model_receipts.csv`; source revision `eb7c6861c00c741896feeb9e5d4aa71b32e512c6` is a full commit on `origin/main` with matching extension sources.

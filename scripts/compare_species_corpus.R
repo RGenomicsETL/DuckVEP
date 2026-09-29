@@ -20,8 +20,11 @@ con <- dbConnect(duckdb(shared_home = FALSE,
                         config = list(allow_unsigned_extensions = "true")))
 on.exit(dbDisconnect(con, shutdown = TRUE))
 q <- function(x) as.character(dbQuoteString(con, x))
-dbExecute(con, paste0("LOAD ", q(normalizePath(
-  "build/release/extension/duckvep/duckvep.duckdb_extension", mustWork = TRUE))))
+extension <- Sys.getenv("DUCKVEP_EXTENSION_FILE")
+if (!nzchar(extension) || grepl("/build/release/", normalizePath(extension, mustWork = TRUE), fixed = TRUE)) {
+  stop("DUCKVEP_EXTENSION_FILE must be an immutable copy outside build/release", call. = FALSE)
+}
+dbExecute(con, paste0("LOAD ", q(normalizePath(extension, mustWork = TRUE))))
 dbExecute(con, paste0("ATTACH ", q(model), " AS model (READ_ONLY)"))
 dbExecute(con, "SET threads=4")
 dbExecute(con, "CREATE TABLE duckvep_sequence_regions AS

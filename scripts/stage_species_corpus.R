@@ -78,8 +78,8 @@ for (i in chosen) {
 }
 
 # Translation-table witnesses are mapped from single-exon CDS coordinates.
-# TGG-to-TGA witnesses distinguish table 1 from tables 2, 4, and 5;
-# table 11 witnesses exercise GTG initiation and ATG-to-GTG changes.
+# Table 6 TAA/TAG to CAA/CAG tests glutamine rather than standard stops;
+# table 11 witnesses exercise initiation codons.
 for (table in tables) {
   candidates <- transcripts[transcripts$codon_table == table &
                               transcripts$exon_count == 1L &
@@ -88,6 +88,8 @@ for (table in tables) {
   if (table == 11L) {
     candidates <- candidates[startsWith(candidates$cds, "ATG") |
                                startsWith(candidates$cds, "GTG"), ]
+  } else if (table == 6L) {
+    candidates <- candidates[grepl("TAA|TAG", candidates$cds), ]
   } else {
     candidates <- candidates[grepl("TGG", candidates$cds, fixed = TRUE), ]
   }
@@ -100,14 +102,14 @@ for (table in tables) {
     offset <- if (gtg_start) 1L else if (table == 11L) 0L else {
       codons <- substring(t$cds, seq.int(1L, nchar(t$cds) - 2L, by = 3L),
                           seq.int(3L, nchar(t$cds), by = 3L))
-      hit <- which(codons == "TGG")
+      hit <- if (table == 6L) which(codons %in% c("TAA", "TAG")) else which(codons == "TGG")
       if (!length(hit)) next
-      (hit[[1L]] - 1L) * 3L + 2L
+      (hit[[1L]] - 1L) * 3L + if (table == 6L) 0L else 2L
     }
     pos <- if (t$strand == 1L) t$cds_start + offset else t$cds_end - offset
     ref <- base_at(t$chrom, pos)
-    expected <- if (gtg_start) "T" else if (table == 11L) "A" else "G"
-    alt <- if (gtg_start) "C" else if (table == 11L) "G" else "A"
+    expected <- if (gtg_start || table == 6L) "T" else if (table == 11L) "A" else "G"
+    alt <- if (gtg_start || table == 6L) "C" else if (table == 11L) "G" else "A"
     if (t$strand == -1L) {
       expected <- as.character(complement(DNAString(expected)))
       alt <- as.character(complement(DNAString(alt)))
