@@ -8,7 +8,7 @@
 # Ceilings enforced per job (never advisory):
 #   process   cgroup v2 memory.max 16 GiB, memory.swap.max 0 (an OOM kill is "failed")
 #   DuckDB    memory_limit 8GB, job-local temp_directory, max_temp_directory_size 32GiB
-#   native    4 GiB budget, 6 workers x 128 MiB scratch + 128 MiB emit, threads 6
+#   native    4 GiB budget, 6 workers x 128 MiB scratch + 256 MiB emit, threads 6
 # Each job ends ok, capacity_error (explicit) or failed (with the reason).
 set -euo pipefail
 
@@ -36,13 +36,15 @@ usage: duckvep_scale_run.sh --jobs N --panel PANEL --out DIR [options]
   --modes LIST             compact,complete17 (default both)
   --spill-dir DIR          parent for per-job spill directories (default OUT)
   --keep-output            keep each job's output Parquet (default: checksum, then delete)
+  --regulation             load the resident regulatory and motif feature intervals (default, the production configuration)
+  --no-regulation          annotate without them
   --retry-after-capacity   test hook: after a load capacity error, restore the ceiling and annotate again
   --limit-rows N           annotate only the first N panel rows (tests and smoke runs)
   --self-test              run the capacity-failure tests and exit
 
 Test overrides for the ceilings (defaults are the agreed values):
   --memory-max SIZE (16G)  --duckdb-memory-limit (8GB)  --max-temp (32GiB)
-  --native-budget-mib (4096)  --workers (6)  --scratch-mib (128)  --emit-mib (128; 64 fails complete-17 on gene-dense panels)
+  --native-budget-mib (4096)  --workers (6)  --scratch-mib (128)  --emit-mib (256, the extension default; 64 fails complete-17 on gene-dense panels)
 Exit status: 0 all jobs ok; 2 usage or refused by the pre-flight; 3 some job was not ok.
 EOF
 }
@@ -113,7 +115,7 @@ fi
 JOBS=1 PANEL="" OUT="" MODEL="${DUCKVEP_SCALE_MODEL:-/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb}"
 EXTENSION="$REPO/build/release/extension/duckvep/duckvep.duckdb_extension"
 THREADS=6 CGROUP=auto ALLOW_UNENFORCED=0 OVERSUBSCRIBE=0 MODES="compact,complete17" SPILL_PARENT="" KEEP=0
-MIN_FREE_GIB=10 RETRY=0 LIMIT_ROWS="" MEMORY_MAX=16G DUCKDB_LIMIT=8GB MAX_TEMP=32GiB BUDGET_MIB=4096 WORKERS=6 SCRATCH_MIB=128 EMIT_MIB=128
+MIN_FREE_GIB=10 REGULATION=1 RETRY=0 LIMIT_ROWS="" MEMORY_MAX=16G DUCKDB_LIMIT=8GB MAX_TEMP=32GiB BUDGET_MIB=4096 WORKERS=6 SCRATCH_MIB=128 EMIT_MIB=256
 while [[ $# -gt 0 ]]; do
   need() { [[ $# -ge 2 ]] || die "missing value for $1"; }
   case "$1" in
@@ -131,6 +133,8 @@ while [[ $# -gt 0 ]]; do
     --spill-dir) need "$@"; SPILL_PARENT="$2"; shift 2 ;;
     --keep-output) KEEP=1; shift ;;
     --retry-after-capacity) RETRY=1; shift ;;
+    --regulation) REGULATION=1; shift ;;
+    --no-regulation) REGULATION=0; shift ;;
     --limit-rows) need "$@"; LIMIT_ROWS="$2"; shift 2 ;;
     --memory-max) need "$@"; MEMORY_MAX="$2"; shift 2 ;;
     --duckdb-memory-limit) need "$@"; DUCKDB_LIMIT="$2"; shift 2 ;;
@@ -228,6 +232,7 @@ RUN_ID="scale-$(date -u +%Y%m%dT%H%M%SZ)-$$"
   printf 'git_revision\t%s\ngit_dirty\t%s\n' "$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo unknown)" \
     "$(git -C "$REPO" status --porcelain 2>/dev/null | wc -l)"
   printf 'cgroup_mode\t%s\nenforced\t%s\noversubscribed\t%s\n' "$CGROUP" "$ENFORCED" "$OVERSUBSCRIBE"
+  printf 'regulation\t%s\n' "$REGULATION"
   printf 'min_free_gib\t%s\n' "$MIN_FREE_GIB"
   printf 'threads_per_job\t%s\nmodes\t%s\nlimit_rows\t%s\n' "$THREADS" "$MODES" "${LIMIT_ROWS:-all}"
   printf 'memory_max_bytes\t%s\nmemory_swap_max\t0\nduckdb_memory_limit\t%s\nmax_temp_bytes\t%s\n' \
@@ -241,6 +246,7 @@ job_args=(--panel "$PANEL_FILE" --modes "$MODES" --threads "$THREADS" --model "$
   --native-budget-mib "$BUDGET_MIB" --workers "$WORKERS" --scratch-mib "$SCRATCH_MIB" --emit-mib "$EMIT_MIB")
 (( KEEP )) && job_args+=(--keep-output)
 (( RETRY )) && job_args+=(--retry-after-capacity)
+if (( REGULATION )); then job_args+=(--regulation); else job_args+=(--no-regulation); fi
 [[ -n "$LIMIT_ROWS" ]] && job_args+=(--limit-rows "$LIMIT_ROWS")
 
 pids=()

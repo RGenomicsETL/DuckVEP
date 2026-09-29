@@ -8,8 +8,9 @@
 # Options (defaults are the agreed ceilings):
 #   --modes compact,complete17   --threads 6          --model PATH        --extension PATH
 #   --memory-limit 8GB           --max-temp 32GiB     --native-budget-mib 4096
-#   --workers 6                  --scratch-mib 128    --emit-mib 128
+#   --workers 6                  --scratch-mib 128    --emit-mib 256
 #   --limit-rows N               --keep-output        --retry-after-capacity   --job-id ID
+#   --regulation (default) | --no-regulation   resident RegulatoryFeature and MotifFeature intervals
 #   --temp-dir DIR (DuckDB spill; default JOBDIR/spill)
 #
 # Writes JOBDIR/result.tsv (one row per mode) and never leaves a partial Parquet behind. The
@@ -17,7 +18,7 @@
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
 
 parse_args <- function(argv) {
-  flags <- c("keep-output", "retry-after-capacity")
+  flags <- c("keep-output", "retry-after-capacity", "regulation", "no-regulation")
   out <- list()
   i <- 1L
   while (i <= length(argv)) {
@@ -52,10 +53,11 @@ max_temp <- get_opt("max-temp", "32GiB")
 budget_mib <- as.numeric(get_opt("native-budget-mib", "4096"))
 workers <- as.integer(get_opt("workers", "6"))
 scratch_mib <- as.numeric(get_opt("scratch-mib", "128"))
-emit_mib <- as.numeric(get_opt("emit-mib", "128"))
+emit_mib <- as.numeric(get_opt("emit-mib", "256"))
 limit_rows <- get_opt("limit-rows")
 keep_output <- isTRUE(opt[["keep-output"]])
 retry <- isTRUE(opt[["retry-after-capacity"]])
+regulation <- !isTRUE(opt[["no-regulation"]])
 for (f in c(panel, model, extension)) if (!file.exists(f)) stop("missing file: ", f)
 dir.create(job_dir, recursive = TRUE, showWarnings = FALSE)
 spill <- get_opt("temp-dir", file.path(job_dir, "spill"))
@@ -96,6 +98,7 @@ emit_row <- function(fields) {
 }
 
 job_start <- proc.time()[["elapsed"]]
+regulation_features <- NA_real_
 base <- list(job = job_id, panel = panel, threads = threads, memory_limit = memory_limit,
   max_temp = max_temp, native_budget_mib = budget_mib, workers = workers,
   scratch_mib = scratch_mib, emit_mib = emit_mib)
@@ -106,13 +109,14 @@ row_of <- function(mode, outcome, reason, extra = list()) {
 }
 
 load_model <- function() {
-  run("SELECT * FROM duckvep_model_load('grch38',
+  interval <- if (regulation) paste0(",\n interval_feature_query := 'SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM duckvep_bench_model.duckvep_regulation_features ORDER BY seq_region, feature_start, regulation_feature_index'") else ""
+  run(paste0("SELECT * FROM duckvep_model_load('grch38',
  'SELECT seq_region, sequence_length FROM duckvep_bench_model.duckvep_sequence_regions ORDER BY seq_region',
  'SELECT * FROM duckvep_bench_model.duckvep_transcripts ORDER BY seq_region, transcript_start, transcript_index',
  'SELECT * FROM duckvep_bench_model.duckvep_exons ORDER BY transcript_index, exon_cdna_start',
  mature_mirna_query := 'SELECT * FROM duckvep_bench_model.duckvep_mature_mirna ORDER BY transcript_index, mature_mirna_start',
  peptide_edit_query := 'SELECT * FROM duckvep_bench_model.duckvep_peptide_edits ORDER BY transcript_index, protein_position',
- transcript_coverage_complete := TRUE)")
+ transcript_coverage_complete := TRUE", interval, ")"))
 }
 set_ceilings <- function(budget_bytes) {
   run(paste0("SELECT duckvep_native_budget_set(", format(budget_bytes, scientific = FALSE), ")"))
@@ -200,6 +204,8 @@ rc <- tryCatch({
   run("INSTALL json")
   run("LOAD json")
   run(paste0("ATTACH ", q(normalizePath(model)), " AS duckvep_bench_model (READ_ONLY)"))
+  if (regulation) regulation_features <- get("SELECT count(*)::DOUBLE AS n FROM duckvep_bench_model.duckvep_regulation_features")$n
+  base$regulation <- regulation; base$regulation_features <- if (regulation) regulation_features else 0
   set_ceilings(budget_mib * 1048576)
   baseline <- budget_table()
   load_s <- NA_real_
