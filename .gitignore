@@ -32,3 +32,7 @@ third_party/htslib/htslib/htslib_static.mk
 # repository; configure's build output is not.
 r/Rduckvep/inst/duckvep_extension/artifacts/
 _site/
+
+# Scratch databases the SQL tests create under __TEST_DIR__
+test/sql/*.duckdb
+test/sql/*.duckdb.wal
