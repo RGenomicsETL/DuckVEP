@@ -275,3 +275,19 @@ SELECT contains(duckvep_prepare_structural_hgvs_sql('sv";λ', 'ref";λ'), '"ref"
  duckvep_prepare_structural_hgvs_sql('sv";λ', 'ref";λ');
 ----
 1	1
+
+# 40,000 physical records (20,000 reciprocal pairs) resolve through hash joins, not a
+# nested loop; the previous plan was quadratic in the record count (50,000 pairs took 16 s).
+statement ok
+CREATE TEMP TABLE bnd_scale AS
+SELECT (2 * p)::BIGINT AS event_index, '1' AS chrom, (1000 + 3 * p)::BIGINT AS pos, 'a' || p AS id, 'N' AS ref,
+  'N[2:' || (500 + 3 * p) || '[' AS alt, 'MATEID=b' || p || ';EVENT=e' || p AS info FROM range(20000) t(p)
+UNION ALL
+SELECT (2 * p + 1)::BIGINT, '2', (500 + 3 * p)::BIGINT, 'b' || p, 'N',
+  ']1:' || (1000 + 3 * p) || ']N', 'MATEID=a' || p || ';EVENT=e' || p FROM range(20000) t(p);
+
+query III
+SELECT count(*), count(*) FILTER (WHERE status = 'reciprocal'), count(DISTINCT pair_key)
+FROM query(duckvep_prepare_breakend_pairs_sql('bnd_scale'));
+----
+40000	40000	20000
