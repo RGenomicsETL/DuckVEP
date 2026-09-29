@@ -952,6 +952,12 @@ static const char *role_name(uint8_t role) {
     }
 }
 
+/* NMD attribution: the applied edits (up to and including the stop) plus the post_stop edits that changed length at or
+ * before the penultimate exon's last base, i.e. exactly the edits that moved J. Roles are unchanged. */
+static int nmd_attributed(const duckvep_haplotype_contributor_t *c) {
+    return c->role == DUCKVEP_ROLE_APPLIED || (c->role == DUCKVEP_ROLE_POST_STOP && c->nmd_moved_junction);
+}
+
 static const char *nmd_name(duckvep_haplotype_nmd_t nmd) {
     switch (nmd) {
     case DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE: return "not_applicable";
@@ -1119,7 +1125,7 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
     duckdb_vector attribution = duckdb_data_chunk_get_vector(output, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN);
     size_t attributed = 0u;
     if (decided && leaf->nmd_stop_valid)
-        for (size_t i = 0u; i < leaf->contributor_count; i++) attributed += leaf->contributors[i].role == DUCKVEP_ROLE_APPLIED;
+        for (size_t i = 0u; i < leaf->contributor_count; i++) attributed += nmd_attributed(&leaf->contributors[i]);
     duckdb_list_entry attribution_entry;
     if (!duckvep_list_extend(attribution, attributed, &attribution_entry)) return 0;
     ((duckdb_list_entry *)duckdb_vector_get_data(attribution))[row] = attribution_entry;
@@ -1129,7 +1135,7 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
         duckdb_vector_ensure_validity_writable(values);
         size_t at = 0u;
         for (size_t i = 0u; i < leaf->contributor_count; i++) {
-            if (leaf->contributors[i].role != DUCKVEP_ROLE_APPLIED) continue;
+            if (!nmd_attributed(&leaf->contributors[i])) continue;
             duckdb_validity_set_row_valid(duckdb_vector_get_validity(values), attribution_entry.offset + at);
             ((uint64_t *)duckdb_vector_get_data(values))[attribution_entry.offset + at++] = leaf->contributors[i].source.event_id;
         }

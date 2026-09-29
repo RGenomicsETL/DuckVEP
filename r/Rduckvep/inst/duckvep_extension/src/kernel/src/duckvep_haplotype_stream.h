@@ -173,6 +173,8 @@ typedef struct {
     uint8_t role;            /* duckvep_haplotype_role_t. */
     uint32_t edit_count;     /* Differing edit islands contributed by this source. */
     uint32_t post_stop_edits; /* Of those, islands after the first stop of the rebuilt protein. */
+    /* ejc50-v1: one of its edits changes length at or before the penultimate exon's last base, so it moved J. */
+    uint8_t nmd_moved_junction;
 } duckvep_haplotype_contributor_t;
 
 typedef struct {

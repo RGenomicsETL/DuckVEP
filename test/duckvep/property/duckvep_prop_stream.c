@@ -3372,7 +3372,7 @@ static bool nm_random_edit(struct theft *t, struct nm_case *c, unsigned after, u
 
 static unsigned nm_seen[16];
 enum { NM_SEEN_TRIGGER, NM_SEEN_ESCAPE, NM_SEEN_UNKNOWN, NM_SEEN_NA, NM_SEEN_INTRONLESS, NM_SEEN_REVERSE, NM_SEEN_UTR, NM_SEEN_INDEL_SHIFT,
-       NM_SEEN_POST, NM_SEEN_FLIP, NM_SEEN_EXONS4, NM_SEEN_RUN };
+       NM_SEEN_POST, NM_SEEN_FLIP, NM_SEEN_EXONS4, NM_SEEN_RUN, NM_SEEN_ATTRIBUTED_POST };
 
 /* Fills the mRNA/exon layout of a case: UTR lengths, cuts with at least eight bases per exon. */
 static bool nm_random_layout(struct theft *t, struct nm_case *c, unsigned codons) {
@@ -3436,6 +3436,15 @@ static enum theft_trial_res prop_nmd_matches_edited_geometry_oracle(struct theft
         for (size_t j = 0u; j < leaf.contributor_count; j++) if (leaf.contributors[j].source.event_id == k + 1u) {
             found = true;
             if (leaf.contributors[j].role != (post[k] ? DUCKVEP_ROLE_POST_STOP : DUCKVEP_ROLE_APPLIED)) goto done;
+            /* Attribution (applied, or post_stop and moved J) equals the oracle's: applied edits plus the post-stop
+             * indels that change length at or before the penultimate exon's last base. Roles are unchanged. */
+            if (x.junction_valid) {
+                int moved = nm_edit_change(&c->edits[k]) && nm_edit_start(c, &c->edits[k]) <= c->ends[c->exons - 2u];
+                int attributed = leaf.contributors[j].role == DUCKVEP_ROLE_APPLIED ||
+                    (leaf.contributors[j].role == DUCKVEP_ROLE_POST_STOP && leaf.contributors[j].nmd_moved_junction);
+                if (attributed != (!post[k] || moved)) goto done;
+                nm_seen[NM_SEEN_ATTRIBUTED_POST] += post[k] && moved;
+            }
         }
         if (!found) goto done;
     }
@@ -3467,15 +3476,15 @@ TEST haplotype_nmd_matches_independent_edited_transcript_geometry(void) {
     cfg.trials = kprop_env_u64("DUCKVEP_PROP_TRIALS", KPROP_DEFAULT_TRIALS);
     cfg.seed = (theft_seed)kprop_env_u64("DUCKVEP_PROP_SEED", KPROP_DEFAULT_SEED);
     ASSERT_EQ(THEFT_RUN_PASS, theft_run(&cfg));
-    fprintf(stderr, "[nmd oracle coverage] trigger=%u escape=%u unknown=%u not_applicable=%u intronless=%u reverse=%u utr=%u four_exon=%u "
-        "indel_before_junction=%u post_stop_edits=%u\n", nm_seen[NM_SEEN_TRIGGER], nm_seen[NM_SEEN_ESCAPE], nm_seen[NM_SEEN_UNKNOWN],
+    fprintf(stderr, "[nmd oracle coverage] attributed_post_stop=%u trigger=%u escape=%u unknown=%u not_applicable=%u intronless=%u reverse=%u utr=%u four_exon=%u "
+        "indel_before_junction=%u post_stop_edits=%u\n", nm_seen[NM_SEEN_ATTRIBUTED_POST], nm_seen[NM_SEEN_TRIGGER], nm_seen[NM_SEEN_ESCAPE], nm_seen[NM_SEEN_UNKNOWN],
         nm_seen[NM_SEEN_NA], nm_seen[NM_SEEN_INTRONLESS], nm_seen[NM_SEEN_REVERSE], nm_seen[NM_SEEN_UTR], nm_seen[NM_SEEN_EXONS4],
         nm_seen[NM_SEEN_INDEL_SHIFT], nm_seen[NM_SEEN_POST]);
     if (cfg.trials >= KPROP_DEFAULT_TRIALS)
         ASSERT(nm_seen[NM_SEEN_TRIGGER] > 20u && nm_seen[NM_SEEN_ESCAPE] > 20u && nm_seen[NM_SEEN_UNKNOWN] > 5u &&
                nm_seen[NM_SEEN_NA] > 5u && nm_seen[NM_SEEN_INTRONLESS] > 5u && nm_seen[NM_SEEN_INDEL_SHIFT] > 20u &&
                nm_seen[NM_SEEN_UTR] > 20u && nm_seen[NM_SEEN_EXONS4] > 5u && nm_seen[NM_SEEN_POST] > 10u &&
-               nm_seen[NM_SEEN_REVERSE] > 100u);
+               nm_seen[NM_SEEN_REVERSE] > 100u && nm_seen[NM_SEEN_ATTRIBUTED_POST] > 10u);
     PASS();
 }
 
@@ -3595,6 +3604,10 @@ static enum theft_trial_res prop_nmd_ignores_post_stop_edits_except_through_junc
         uint64_t id = after.contributors[j].source.event_id;
         if (id == 1u && after.contributors[j].role != DUCKVEP_ROLE_APPLIED) goto done;
         if (id == 2u && after.contributors[j].role != DUCKVEP_ROLE_POST_STOP) goto done;
+        /* Its attribution follows J: attributed exactly when it is an indel at or before the penultimate exon's last base. */
+        if (id == 2u && (after.contributors[j].nmd_moved_junction != 0u) !=
+            (nm_edit_change(&p->extra) != 0 && nm_edit_start(&with, &p->extra) <= p->base.ends[p->base.exons - 2u])) goto done;
+        if (id == 1u && after.contributors[j].nmd_moved_junction) goto done;
     }
     /* J moves by exactly the extra edit's length change when it starts at or before the penultimate exon's last base. */
     bool moves = nm_edit_start(&with, &p->extra) <= p->base.ends[p->base.exons - 2u];
