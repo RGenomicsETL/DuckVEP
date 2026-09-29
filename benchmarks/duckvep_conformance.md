@@ -1409,3 +1409,48 @@ minimized edit coordinates drive consequence and sequence changes, while
 the original feature endpoints drive NMD. A padded and a minimal allele
 can encode the same sequence edit but cross the plugin’s inclusive
 positional threshold differently.
+
+## Species product matrix
+
+The receipt column is the SHA-256 of the model's current-definition receipt in
+[`duckvep_model_receipts.csv`](data/duckvep_model_receipts.csv). Exact pairs count
+normalized `(variant ID, transcript ID, SO-term set)` agreements with the
+indexed-cache oracle; the corpus links specify the sampling and comparator.
+Human ledger rows predate their most recent receipt rebuilds, so their receipt
+hashes identify the current product definition, not the binary artifact used by
+those historical differential runs.
+
+| Species / assembly | Receipt SHA-256 | Corpus | Exact pairs |
+| --- | --- | --- | ---: |
+| Human GRCh38 | `392fa11d6c8fc9d2fa060fb870cf7566016916325e0a12b8d168a12df0fd3c01` | [ClinVar cross-chromosome](#latest-tested-revision-per-corpus) | 316,397 / 316,397 |
+| Human GRCh37 | `21e113d9148132491bc935f3d1b0ec7d50663f450b62e346cb1f0f447de0b290` | [GRCh37](#latest-tested-revision-per-corpus) | 486,464 / 486,464 |
+| *P. falciparum* GCA000002765v3 | `d9c7056823755f83d5b189b9e59fdd1129ebe3e342095453e0d2208f3081d81b` | [seed11663](data/plasmodium_seed11663_differential.md) | 32,131 / 32,131 |
+| Mouse GRCm39 | `ae39ffc9e647d0a096a13b737599d480fae2b94d3a202938a8eeaa44208c62be` | [seed11639](data/mouse_seed11639_differential.md) | 400,145 / 400,145 |
+| Fly BDGP6.54 | `e6deea1ac2b0097589df9da501bd4a1ddf47ec5f8e0d4291ee49e727352533c8` | [seed11654](data/fly_seed11654_differential.md) | 36,136 / 36,136 |
+| Arabidopsis TAIR10 | `5b3fac7c92db9c2dfd13cc83df457a993ece29b5b703343194c5363136d0a12f` | [seed11663](data/plant_seed11663_differential.md) | 21,772 / 21,772 |
+| Tetrahymena JCVI-TTA1-2.2 | `23fc4aa4ebee8dd2dbb515a9a8a5c6436a7da99c71e5844d7150c13e0bb6352a` | [seed11606](data/tetrahymena_seed11606_differential.md) | 100,201 / 100,201 |
+
+### Issue #5 completion evidence
+
+- **Deterministic receipts and exact indexed-cache differentials:** the matrix
+  above and each product's source/model/corpus records, including the table-6
+  [Tetrahymena pins](data/tetrahymena_jcvi_tta1_sources.md).
+- **Genetic-code translation or failure before publication:** coding-table
+  counts appear in the receipt ledger; every admitted pair is exact against
+  VEP 116. Unsupported table IDs fail projection in
+  `test/sql/duckvep_projection.test`.
+- **Actual alternative codons:** [table-6 TAA/TAG](data/tetrahymena_seed11606_corpus.md),
+  fly table-5 TGG/TGA, Pf table-4 and table-11 witnesses and plant table-11
+  initiation witnesses are exercised by the Docker comparisons. The
+  [offline excerpts](../test/data/duckvep/species/README.md) compare source codons
+  under table 6 and table 1 in both SQL and installed-package R.
+- **Distinct GRCh37 / no fabricated MANE:** the GRCh37 row retains its own
+  receipt and differential. `test/sql/duckvep_mane_grch37.test` enforces
+  GRCh37 MANE ownership; missing mappings remain absent.
+- **Coexistence, packaging and ownership:** `test/sql/duckvep_species_coexistence.test`
+  and `r/Rduckvep/inst/tinytest/test_species_coexistence.R` load three
+  assembly-specific models at once, check local ordinals and receipts, and
+  exercise independent model dropping and FASTA pinning. The SQL/R release
+  tests, randomized coverage and sanitizer evidence are recorded in the
+  preceding conformance sections. The offline fixtures are source excerpts
+  rather than whole-model performance or oracle substitutes.
