@@ -20,7 +20,7 @@ endif
 include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
 include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
 
-.PHONY: all test test_debug test_release test_haplotype_contract test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme build_asan test_release_asan test_properties
+.PHONY: all test test_debug test_release test_haplotype_contract test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme build_asan test_release_asan test_properties test_properties_sanitized
 all: configure release
 configure: venv platform extension_version
 platform: venv
@@ -61,7 +61,11 @@ PROPERTY_SANITIZE := -fsanitize=address,undefined -fno-sanitize-recover=all -fno
 PROPERTY_FLAGS ?= -std=gnu11 -O1 -g
 PROPERTY_SOURCES := $(wildcard $(PROJ_DIR)test/duckvep/property/*.c) \
 	$(wildcard $(PROJ_DIR)test/duckvep/vendor/theft/src/*.c) $(wildcard $(PROJ_DIR)src/kernel/src/*.c)
+# Host-neutral C properties over the kernel views (theft + greatest, no DuckDB),
+# always under ASan and UBSan. DUCKVEP_PROP_TRIALS and DUCKVEP_PROP_SEED make a
+# run larger or reproducible; read_sources.pl checks every test is registered.
 test_properties:
+	perl $(PROJ_DIR)test/duckvep/property/read_sources.pl >/dev/null
 	mkdir -p $(PROPERTY_BUILD)
 	$(PROPERTY_CC) $(PROPERTY_FLAGS) $(PROPERTY_SANITIZE) \
 		-I$(PROJ_DIR)src/kernel/include -I$(PROJ_DIR)src/kernel/src -I$(PROJ_DIR)test/duckvep/property \
@@ -71,6 +75,8 @@ test_properties:
 	ASAN_OPTIONS=detect_leaks=1:abort_on_error=0:halt_on_error=1:strict_string_checks=1:detect_stack_use_after_return=1 \
 	UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
 		$(PROPERTY_BUILD)/duckvep_properties
+
+test_properties_sanitized: test_properties
 
 test_mane_grch37_receipt:
 	@test -n "$(MANE_GRCH37_OUTPUT)" || { echo 'Set MANE_GRCH37_OUTPUT to the full-release output directory' >&2; exit 1; }

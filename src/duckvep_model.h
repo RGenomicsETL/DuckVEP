@@ -6,6 +6,7 @@
 #include "cgranges.h"
 #include "kernel/include/duckvep_kernel.h"
 #include "duckvep_reference.h"
+#include "kernel/src/duckvep_lift.h"
 
 #include <htslib/faidx.h>
 
@@ -24,6 +25,8 @@ typedef struct duckvep_reference_file_identity {
 	int present;
 } duckvep_reference_file_identity_t;
 
+struct duckvep_lifted_model;
+
 typedef struct duckvep_owned_model {
 	duckvep_transcript_model_t transcripts;
 	duckvep_exon_model_t exons;
@@ -34,6 +37,10 @@ typedef struct duckvep_owned_model {
 	uint32_t *sequence_lengths;
 	uint8_t *region_circular;
 	int has_wrapped_coordinates;
+	/* Non-NULL when a circular region carries wrapped objects. Its objects
+	 * are represented by lifted images and every annotation entry point reads
+	 * this one execution view; this struct keeps the source contract. */
+	struct duckvep_lifted_model *lifted;
 	char **sequence_names;
 	char *reference_fasta_path;
 	char *reference_fai_path;
@@ -104,6 +111,28 @@ typedef struct duckvep_owned_model {
 	size_t flank_sequence_capacity;
 	size_t interval_feature_capacity;
 } duckvep_owned_model_t;
+
+/* Lifted-interval execution view of a model with wrapped circular objects
+ * (see kernel/src/duckvep_lift.h). `model` is a facade over the lifted linear
+ * arrays: the prepared kernel views, kernel, interval indexes and per-object
+ * gene ordinals that annotation consumes. Annotation rows carry lifted object
+ * indices until duckvep_lift_resolve maps them to the source model. */
+typedef struct duckvep_lifted_model {
+	duckvep_owned_model_t model;
+	duckvep_lift_t *lift;
+} duckvep_lifted_model_t;
+
+/* The model whose views annotation consumes: the lifted view when present. */
+static inline const duckvep_owned_model_t *
+duckvep_model_active(const duckvep_owned_model_t *model)
+{
+	return model->lifted != NULL ? &model->lifted->model : model;
+}
+
+/* Lift parameters of a region; returns 0 when the region runs unlifted. */
+int duckvep_model_region_lift(const duckvep_owned_model_t *model,
+	uint16_t seq_region, uint32_t *length, uint32_t *base,
+	uint32_t *virtual_length);
 
 typedef struct duckvep_workspace_cache {
 	duckvep_workspace_t *workspace;
