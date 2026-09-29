@@ -85,7 +85,7 @@ int duckvep_sequence_delta_consequence_flags_complete_for_hgvs(
 }
 
 static char delta_norm_base(char c) {
-    return duckvep_dna_normalize(c, 1);
+    return duckvep_dna_normalize_n(c);
 }
 
 static char delta_orient_genomic_base(char genomic_base,

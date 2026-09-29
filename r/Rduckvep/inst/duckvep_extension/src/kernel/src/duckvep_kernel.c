@@ -240,11 +240,24 @@ static int model_genomic_to_cdna(
     return 0;
 }
 
-static int model_sequence_base_valid(uint8_t base) {
-    uint8_t upper = (uint8_t)(base & UINT8_C(0xdf));
-    return upper == (uint8_t)'A' || upper == (uint8_t)'C' ||
-           upper == (uint8_t)'G' || upper == (uint8_t)'T' ||
-           upper == (uint8_t)'N';
+/* A stored sequence byte is valid when, ignoring case, it is A, C, G, T or N. The flank and CDS pools are the bulk
+ * of a model and a branchy per-byte test mispredicts on mixed bases, so validation uses a table. */
+static int model_sequence_bases_valid(const uint8_t *bytes, size_t length) {
+    static const uint8_t valid[256] = {
+        ['A'] = 1u, ['C'] = 1u, ['G'] = 1u, ['T'] = 1u, ['N'] = 1u,
+        ['a'] = 1u, ['c'] = 1u, ['g'] = 1u, ['t'] = 1u, ['n'] = 1u
+    };
+    uint8_t all = 1u;
+    size_t i = 0u;
+
+    for (; i + 8u <= length; i += 8u) {
+        all &= (uint8_t)(valid[bytes[i]] & valid[bytes[i + 1u]] &
+                         valid[bytes[i + 2u]] & valid[bytes[i + 3u]] &
+                         valid[bytes[i + 4u]] & valid[bytes[i + 5u]] &
+                         valid[bytes[i + 6u]] & valid[bytes[i + 7u]]);
+    }
+    for (; i < length; i++) all &= valid[bytes[i]];
+    return all != 0u;
 }
 
 static int model_peptide_edit_alt_valid(uint8_t amino_acid) {
@@ -562,7 +575,6 @@ duckvep_status_t duckvep_model_open(
                 ? seq->post_cds_offset[t] : 0u;
             uint64_t post_len = have_flank_columns
                 ? (uint64_t)seq->post_cds_length[t] : 0u;
-            size_t flank_i;
 
             if (seq->peptide_edit_offset != NULL) {
                 size_t begin = seq->peptide_edit_offset[t];
@@ -598,21 +610,17 @@ duckvep_status_t duckvep_model_open(
                             DVW_MODEL_SEQ_RANGE,
                             "transcript flank offset/length is out of range");
             }
-            for (flank_i = 0u; flank_i < (size_t)pre_len; flank_i++) {
-                if (!model_sequence_base_valid(
-                    seq->flank_bytes[(size_t)pre_off + flank_i])) {
-                    return fail(error, DUCKVEP_ERR_MODEL_INVALID,
-                                DVW_MODEL_SEQ_CONTRACT,
-                                "pre-CDS sequence contains a non-ACGTN base");
-                }
+            if (!model_sequence_bases_valid(
+                seq->flank_bytes + (size_t)pre_off, (size_t)pre_len)) {
+                return fail(error, DUCKVEP_ERR_MODEL_INVALID,
+                            DVW_MODEL_SEQ_CONTRACT,
+                            "pre-CDS sequence contains a non-ACGTN base");
             }
-            for (flank_i = 0u; flank_i < (size_t)post_len; flank_i++) {
-                if (!model_sequence_base_valid(
-                    seq->flank_bytes[(size_t)post_off + flank_i])) {
-                    return fail(error, DUCKVEP_ERR_MODEL_INVALID,
-                                DVW_MODEL_SEQ_CONTRACT,
-                                "post-CDS sequence contains a non-ACGTN base");
-                }
+            if (!model_sequence_bases_valid(
+                seq->flank_bytes + (size_t)post_off, (size_t)post_len)) {
+                return fail(error, DUCKVEP_ERR_MODEL_INVALID,
+                            DVW_MODEL_SEQ_CONTRACT,
+                            "post-CDS sequence contains a non-ACGTN base");
             }
             if (off > (uint64_t)seq->cds_bytes_len ||
                 len > (uint64_t)seq->cds_bytes_len - off) {
@@ -628,7 +636,6 @@ duckvep_status_t duckvep_model_open(
                 uint32_t coding_start_genomic;
                 uint32_t coding_end_genomic;
                 size_t coding_start_exon;
-                size_t i;
                 int8_t phase;
                 uint8_t phase_offset;
 
@@ -685,12 +692,10 @@ duckvep_status_t duckvep_model_open(
                                 DVW_MODEL_SEQ_CONTRACT,
                                 "transcript flank lengths are inconsistent with cDNA projection");
                 }
-                for (i = 0u; i < (size_t)len; i++) {
-                    if (!model_sequence_base_valid(seq->cds_bytes[(size_t)off + i])) {
-                        return fail(error, DUCKVEP_ERR_MODEL_INVALID,
-                                    DVW_MODEL_SEQ_CONTRACT,
-                                    "prepared CDS contains a non-ACGTN base");
-                    }
+                if (!model_sequence_bases_valid(seq->cds_bytes + (size_t)off, (size_t)len)) {
+                    return fail(error, DUCKVEP_ERR_MODEL_INVALID,
+                                DVW_MODEL_SEQ_CONTRACT,
+                                "prepared CDS contains a non-ACGTN base");
                 }
                 if (seq->first_stop_position1 != NULL) {
                     uint32_t first_stop_position1 = 0u;
