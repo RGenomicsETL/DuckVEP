@@ -123,8 +123,8 @@ through the model transcript ordinal; the suffix contains no accession.
 
 `prediction_policy` names the versioned contract (`duckvep-coding-v1`).
 `prediction_status` and `prediction_reason` state eligibility for its supported
-domain; they predict no SO, IMPACT or NMD yet, and the eligible status is
-`eligible_classifier_pending`. The domain is strict complete diploid calls, one
+domain and whether the same-codon classifier decided it (see below); no NMD is
+predicted yet. The domain is strict complete diploid calls, one
 unambiguous heterozygous phase domain per transcript and sample, literal ACGT
 SNVs, MNVs and indels of at most 50 normalized bases, non-overlapping and
 inside coding exons of complete table-1 CDSs with a canonical start and stop
@@ -139,8 +139,24 @@ and no curated RNA or peptide edits. Statuses: `incomplete_input` (reasons
 and preserved projection or sequence reasons such as `reference_mismatch`,
 `outside_cds`, `non_contiguous`, `invalid_allele`). Phase-domain completeness and
 ploidy belong to each sample/phase/lane, so `carrier_predictions` gives the keyed
-result in `carriers` order; the row status is `eligible_classifier_pending` only
-when every carrier is, and otherwise the first ineligible carrier's result.
+result in `carriers` order; the row status is `predicted` or
+`eligible_classifier_pending` only when every carrier is eligible, and
+otherwise the first ineligible carrier's result.
+
+`haplotype_consequences` (a character list) and `haplotype_impact` give the
+reduced whole-protein SO set and IMPACT of the edited coding sequence, decided
+by the same-codon classifier for an eligible path with no start, stop or frame
+effect; both are NULL unless `prediction_status` is `predicted`. The combined
+haplotype is classified, never one edit alone: an unchanged peptide is
+`synonymous_variant` (LOW); substitutions that change the peptide are
+`missense_variant`; edits that are all pure insertions or all pure deletions
+are `inframe_insertion` or `inframe_deletion`; any other frame-preserving
+replacement is `protein_altering_variant` (all MODERATE). Cis and trans edits
+are separate carriers of separate paths. Paths with a length change that is not
+a multiple of three, an edit in the first or terminal codon, or a first stop
+other than the terminal one stay `eligible_classifier_pending` with reason
+`frame_classifier_pending` or `start_stop_classifier_pending`, their SO and
+IMPACT NULL until those classifiers land. Reference lanes have no carrier row.
 `contributor_provenance` lists every source of the path, including omitted,
 shadowed, unapplied (conflicting or incomplete) and post-stop ones, with its
 original operands, `alt_index`, evidence, projection status, `role` and
@@ -157,7 +173,7 @@ It is FALSE for no stop or a stop after frame restoration, and NA when
 sequence is unavailable. It is a sequence fact, not a combined SO consequence
 or a claim that a restored DNA frame rescues the protein.
 
-Whole-haplotype SO, DNA HGVS, complete protein HGVS and structural-event
+Frame, start and stop whole-haplotype SO, NMD, DNA HGVS, complete protein HGVS and structural-event
 composition remain unfinished. Input must contain one row per
 `event_index`, `transcript_index`, `sample_index`, with columns `seq_region`,
 `position`, `reference`, `alternate`, `alt_index`, `alleles`, `phase_before`

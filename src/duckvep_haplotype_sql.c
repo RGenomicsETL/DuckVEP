@@ -28,8 +28,9 @@ enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
     HAPLOTYPE_HGVSP_COLUMN = 15, HAPLOTYPE_HGVSP_STATUS_COLUMN = 16,
     HAPLOTYPE_POLICY_COLUMN = 17, HAPLOTYPE_STATUS_COLUMN = 18, HAPLOTYPE_REASON_COLUMN = 19,
     HAPLOTYPE_PROVENANCE_COLUMN = 20, HAPLOTYPE_EDITS_COLUMN = 21,
-    HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 22, HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 23,
-    HAPLOTYPE_OUTPUT_COLUMNS = 24 };
+    HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 22, HAPLOTYPE_CONSEQUENCES_COLUMN = 23,
+    HAPLOTYPE_IMPACT_COLUMN = 24, HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 25,
+    HAPLOTYPE_OUTPUT_COLUMNS = 26 };
 enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 5 };
 #define HAPLOTYPE_POLICY_VERSION "duckvep-coding-v1"
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10 };
@@ -225,6 +226,15 @@ static void haplotype_bind(duckdb_bind_info info) {
         DUCKDB_TYPE_USMALLINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR};
     bind_record_list(info, "carrier_predictions", carrier_prediction_names, carrier_prediction_ids,
         HAPLOTYPE_CARRIER_PREDICTION_FIELDS, 0);
+    /* Slice 3: whole-haplotype reduced SO set and IMPACT of the same-codon classifier. */
+    duckdb_logical_type so_element = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
+    duckdb_logical_type so_list = duckdb_create_list_type(so_element);
+    duckdb_bind_add_result_column(info, "haplotype_consequences", so_list);
+    duckdb_destroy_logical_type(&so_list);
+    duckdb_destroy_logical_type(&so_element);
+    string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
+    duckdb_bind_add_result_column(info, "haplotype_impact", string_type);
+    duckdb_destroy_logical_type(&string_type);
     duckdb_logical_type length_type = duckdb_create_logical_type(DUCKDB_TYPE_BIGINT);
     duckdb_bind_add_result_column(info, "nominal_length_diff", length_type);
     duckdb_destroy_logical_type(&length_type);
@@ -869,6 +879,7 @@ static int append_hgvsp(duckdb_vector text, duckdb_vector status_vector, idx_t r
 static const char *status_name(duckvep_prediction_status_t status) {
     switch (status) {
     case DUCKVEP_PREDICTION_ELIGIBLE: return "eligible_classifier_pending";
+    case DUCKVEP_PREDICTION_PREDICTED: return "predicted";
     case DUCKVEP_PREDICTION_INCOMPLETE_INPUT: return "incomplete_input";
     case DUCKVEP_PREDICTION_EDIT_CONFLICT: return "edit_conflict";
     case DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP: return "unsupported_overlap";
@@ -900,6 +911,8 @@ static const char *reason_name(duckvep_prediction_reason_t reason, duckvep_cds_e
     case DUCKVEP_REASON_INTERNAL_STOP: return "internal_stop";
     case DUCKVEP_REASON_NON_LITERAL_ALLELE: return "non_literal_allele";
     case DUCKVEP_REASON_ALLELE_OVER_50: return "allele_over_50_bases";
+    case DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING: return "frame_classifier_pending";
+    case DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING: return "start_stop_classifier_pending";
     default: return "invalid_sequence";
     }
 }
@@ -990,6 +1003,38 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
         }
     }
     (void)bind;
+    /* Whole-haplotype reduced SO set: NULL unless the same-codon classifier decided every carrier
+     * of this row; an empty list (with NULL IMPACT) is a lane equal to the reference. */
+    duckdb_vector consequences =
+        duckdb_data_chunk_get_vector(output, HAPLOTYPE_CONSEQUENCES_COLUMN);
+    duckdb_vector impact = duckdb_data_chunk_get_vector(output, HAPLOTYPE_IMPACT_COLUMN);
+    duckdb_list_entry entry = {0u, 0u};
+    int decided = leaf->prediction_status == DUCKVEP_PREDICTION_PREDICTED;
+    unsigned bits[DUCKVEP_SO_BIT_COUNT], n = 0u;
+    if (decided) {
+        for (unsigned bit = 0u; bit < DUCKVEP_SO_BIT_COUNT; bit++)
+            if (leaf->haplotype_so_mask & DUCKVEP_SO(bit)) {
+                unsigned at = n++;
+                while (at && duckvep_so_rank(bits[at - 1u]) > duckvep_so_rank(bit)) { bits[at] = bits[at - 1u]; at--; }
+                bits[at] = bit;
+            }
+    }
+    if (!duckvep_list_extend(consequences, decided ? n : 0u, &entry)) return 0;
+    ((duckdb_list_entry *)duckdb_vector_get_data(consequences))[row] = entry;
+    if (!decided) null_cell(consequences, row);
+    else {
+        duckdb_validity_set_row_valid(duckdb_vector_get_validity(consequences), row);
+        duckdb_vector terms = duckdb_list_vector_get_child(consequences);
+        duckdb_vector_ensure_validity_writable(terms);
+        for (unsigned i = 0u; i < n; i++) {
+            duckdb_validity_set_row_valid(duckdb_vector_get_validity(terms), entry.offset + i);
+            duckdb_vector_assign_string_element(terms, entry.offset + i, duckvep_so_name((duckvep_so_bit_t)bits[i]));
+        }
+    }
+    if (decided && n) {
+        duckdb_validity_set_row_valid(duckdb_vector_get_validity(impact), row);
+        duckdb_vector_assign_string_element(impact, row, duckvep_impact_name(duckvep_so_impact(leaf->haplotype_so_mask)));
+    } else null_cell(impact, row);
     return 1;
 }
 
@@ -1264,7 +1309,7 @@ static void haplotype_scan(duckdb_function_info info, duckdb_data_chunk output) 
         if (duckdb_list_vector_set_size(duckdb_data_chunk_get_vector(output, i), 0u) != DuckDBSuccess) {
             duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset output list"); return;
         }
-    for (unsigned i = HAPLOTYPE_PROVENANCE_COLUMN; i <= HAPLOTYPE_CARRIER_PREDICTION_COLUMN; i++)
+    for (unsigned i = HAPLOTYPE_PROVENANCE_COLUMN; i <= HAPLOTYPE_CONSEQUENCES_COLUMN; i++)
         if (duckdb_list_vector_set_size(duckdb_data_chunk_get_vector(output, i), 0u) != DuckDBSuccess) {
             duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset output list"); return;
         }
