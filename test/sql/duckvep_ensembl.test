@@ -646,7 +646,7 @@ SELECT loaded FROM duckvep_model_load(
   peptide_edit_query := 'SELECT * FROM (VALUES (0::UINTEGER, 2::UINTEGER, ''U''::VARCHAR), (0::UINTEGER, 2::UINTEGER, ''U''::VARCHAR)) edits(transcript_index, protein_position, alternate_amino_acid)'
 );
 ----
-peptide-edit query must be ordered and unique
+peptide-edit query must be unique
 
 # Ensembl stores mature-miRNA cDNA ranges as repeated transcript attributes.
 # The importer projects them through ranked exons into a packed side relation;
