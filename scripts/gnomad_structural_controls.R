@@ -4,7 +4,10 @@ library(Rsamtools)
 library(GenomicRanges)
 root <- "/root/duckvep/data/gnomad-v4.1"
 out <- file.path(root, "structural-controls.parquet")
-if (file.exists(out)) stop("structural control artifact already exists")
+if (file.exists(out)) {
+  cat(out, "\n")
+  quit(save = "no", status = 0L)
+}
 reference <- "/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
 index <- read.delim(paste0(reference, ".fai"), header = FALSE)
 lengths <- setNames(index$V2, index$V1)
