@@ -1,0 +1,8 @@
+"builder","corpus","rows_in","rows_out","sql_build_s","median_s","min_s","max_s","peak_rss_before_mb","peak_rss_mb","status_counts","rows_per_second","extension_sha256","duckdb_r_package","synthetic_events"
+"sv_geometry","sniffles2_chr22",10176,10176,0.001,0.126,0.125,0.126,156,162,"ok:211;unsupported_geometry:9965",80762,"bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3","1.5.5",1000000
+"breakend_pairs","sniffles2_chr22",10176,10176,0.001,0.056,0.054,0.058,156,179,"not_applicable:7061;unproven:3115",181714,"bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3","1.5.5",1000000
+"sv_geometry","synthetic",1000000,1000000,0.001,1.343,1.338,1.35,176,299,"ok:1000000",744602,"bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3","1.5.5",1000000
+"breakend_pairs","synthetic",1000000,1000000,0.001,2.107,2.096,2.266,248,1240,"conflict:40208;reciprocal:959792",474608,"bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3","1.5.5",1000000
+"breakend_fusion","synthetic",1000000,1000000,0.001,1.36,1.333,1.375,1200,1212,"candidate_partner_genes:927220;endpoint_without_gene:72768;shared_gene_endpoints:12",735294,"bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3","1.5.5",1000000
+"structural_hgvs","synthetic",1000000,1000000,0.001,3.45,3.423,3.458,244,646,"supported:769991;unsupported:230009",289855,"bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3","1.5.5",1000000
+"expansionhunter","synthetic",1000000,1000000,0,4.358,4.343,4.491,297,665,"invalid:100000;ok:500000;summary_only:400000",229463,"bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3","1.5.5",1000000
