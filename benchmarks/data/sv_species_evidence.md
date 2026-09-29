@@ -254,4 +254,3 @@ not re-validated per species.
   counts, so the row content is identical. The FASTA, FASTA index, and indexed-cache archive hashes were re-verified against the source pins.
 - No receipt in `duckvep_model_receipts.csv` was changed.
 - Disk: the three staged inputs and caches used about 11 GB and were deleted after the runs.
-
