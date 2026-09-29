@@ -56,6 +56,21 @@ void duckvep_sql_free(duckvep_sql_text *text) {
     *text = (duckvep_sql_text){0};
 }
 
+/* A qualified name has exactly one schema separator; each component is quoted. */
+bool duckvep_sql_relation(duckvep_sql_text *sql, const char *name) {
+    const char *dot = strchr(name, '.');
+    if (!*name || (dot && (!dot[1] || dot == name || strchr(dot + 1, '.')))) return false;
+    if (!dot) return duckvep_sql_identifier(sql, name);
+    size_t size = (size_t)(dot - name);
+    char *schema = malloc(size + 1);
+    if (!schema) return false;
+    memcpy(schema, name, size); schema[size] = 0;
+    bool ok = duckvep_sql_identifier(sql, schema) && duckvep_sql_append(sql, ".") &&
+        duckvep_sql_identifier(sql, dot + 1);
+    free(schema);
+    return ok;
+}
+
 char *duckvep_builder_string(duckdb_string_t string) {
     size_t length = duckdb_string_t_length(string);
     const char *data = duckdb_string_t_data(&string);

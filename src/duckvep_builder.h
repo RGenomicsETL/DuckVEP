@@ -15,6 +15,7 @@ typedef struct {
 bool duckvep_sql_append(duckvep_sql_text *text, const char *part);
 bool duckvep_sql_identifier(duckvep_sql_text *text, const char *name);
 bool duckvep_sql_literal(duckvep_sql_text *text, const char *value);
+bool duckvep_sql_relation(duckvep_sql_text *text, const char *name);
 void duckvep_sql_free(duckvep_sql_text *text);
 
 /* NULL options use defaults; every supplied field must have its declared type. */

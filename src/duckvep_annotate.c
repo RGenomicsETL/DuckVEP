@@ -665,6 +665,18 @@ duckvep_allele_geometry_scalar(duckdb_function_info info,
 	}
 }
 
+/* A NULL STRUCT row must also invalidate its children, or copying the vector
+ * (TRY, projections) reads uninitialized child strings. */
+static void
+duckvep_breakend_null_row(duckdb_vector output, duckdb_vector *fields, idx_t row)
+{
+	size_t field;
+
+	duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
+	for (field = 0; field < 5; field++)
+		duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[field]), row);
+}
+
 static void
 duckvep_breakend_geometry_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
@@ -685,14 +697,14 @@ duckvep_breakend_geometry_scalar(duckdb_function_info info,
 		duckvep_breakend_status_t status;
 
 		if (duckvep_validity_is_null(duckdb_vector_get_validity(source), row)) {
-			duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
+			duckvep_breakend_null_row(output, fields, row);
 			continue;
 		}
 		status = duckvep_breakend_parse(
 		    (const uint8_t *)duckdb_string_t_data(&alternates[row]),
 		    (size_t)duckdb_string_t_length(alternates[row]), &parsed);
 		if (status == DUCKVEP_BREAKEND_NOT_BREAKEND) {
-			duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
+			duckvep_breakend_null_row(output, fields, row);
 			continue;
 		}
 		if (status != DUCKVEP_BREAKEND_OK) {
