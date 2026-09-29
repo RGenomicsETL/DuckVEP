@@ -17,3 +17,11 @@ expect_identical(literal$inserted_sequence, "ATG")
 expect_identical(literal$mode, "literal_insertion")
 expect_identical(rduckvep_prepare_sv_geometry(20, "A", "<DEL>",
   "END=22;CIPOS=3,-3")$status, "unsupported_geometry")
+expect_identical(rduckvep_prepare_sv_geometry(20, "AC", "<DEL>",
+  "END=22")$status, "unsupported_geometry")
+expect_identical(rduckvep_prepare_sv_geometry(20, "A", "<DEL>",
+  "END=20.5")$status, "unsupported_geometry")
+expect_identical(rduckvep_prepare_sv_geometry(20, "A", "<DEL>",
+  "END=19")$status, "unsupported_geometry")
+expect_identical(rduckvep_prepare_sv_geometry(2147483647, "A", "AT",
+  ".")$status, "unsupported_geometry")
