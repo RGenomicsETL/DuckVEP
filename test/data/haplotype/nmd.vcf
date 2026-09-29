@@ -1,0 +1,571 @@
+##fileformat=VCFv4.2
+##contig=<ID=d49__plus__u0,length=192>
+##contig=<ID=d49__plus__u1,length=222>
+##contig=<ID=d49__minus__u0,length=192>
+##contig=<ID=d49__minus__u1,length=222>
+##contig=<ID=d50__plus__u0,length=192>
+##contig=<ID=d50__plus__u1,length=222>
+##contig=<ID=d50__minus__u0,length=192>
+##contig=<ID=d50__minus__u1,length=222>
+##contig=<ID=d51__plus__u0,length=192>
+##contig=<ID=d51__plus__u1,length=222>
+##contig=<ID=d51__minus__u0,length=192>
+##contig=<ID=d51__minus__u1,length=222>
+##contig=<ID=d52__plus__u0,length=192>
+##contig=<ID=d52__plus__u1,length=222>
+##contig=<ID=d52__minus__u0,length=192>
+##contig=<ID=d52__minus__u1,length=222>
+##contig=<ID=d0_stop_ends_exon__plus__u0,length=192>
+##contig=<ID=d0_stop_ends_exon__plus__u1,length=222>
+##contig=<ID=d0_stop_ends_exon__minus__u0,length=192>
+##contig=<ID=d0_stop_ends_exon__minus__u1,length=222>
+##contig=<ID=pen_d50__plus__u0,length=232>
+##contig=<ID=pen_d50__plus__u1,length=262>
+##contig=<ID=pen_d50__minus__u0,length=232>
+##contig=<ID=pen_d50__minus__u1,length=262>
+##contig=<ID=pen_d51__plus__u0,length=232>
+##contig=<ID=pen_d51__plus__u1,length=262>
+##contig=<ID=pen_d51__minus__u0,length=232>
+##contig=<ID=pen_d51__minus__u1,length=262>
+##contig=<ID=first_of_three_trigger__plus__u0,length=232>
+##contig=<ID=first_of_three_trigger__plus__u1,length=262>
+##contig=<ID=first_of_three_trigger__minus__u0,length=232>
+##contig=<ID=first_of_three_trigger__minus__u1,length=262>
+##contig=<ID=first_of_three_escape__plus__u0,length=232>
+##contig=<ID=first_of_three_escape__plus__u1,length=262>
+##contig=<ID=first_of_three_escape__minus__u0,length=232>
+##contig=<ID=first_of_three_escape__minus__u1,length=262>
+##contig=<ID=pen_exon_escape__plus__u0,length=232>
+##contig=<ID=pen_exon_escape__plus__u1,length=262>
+##contig=<ID=pen_exon_escape__minus__u0,length=232>
+##contig=<ID=pen_exon_escape__minus__u1,length=262>
+##contig=<ID=last_exon_stop__plus__u0,length=192>
+##contig=<ID=last_exon_stop__plus__u1,length=222>
+##contig=<ID=last_exon_stop__minus__u0,length=192>
+##contig=<ID=last_exon_stop__minus__u1,length=222>
+##contig=<ID=last_of_three__plus__u0,length=232>
+##contig=<ID=last_of_three__plus__u1,length=262>
+##contig=<ID=last_of_three__minus__u0,length=232>
+##contig=<ID=last_of_three__minus__u1,length=262>
+##contig=<ID=four_exons_escape__plus__u0,length=272>
+##contig=<ID=four_exons_escape__plus__u1,length=302>
+##contig=<ID=four_exons_escape__minus__u0,length=272>
+##contig=<ID=four_exons_escape__minus__u1,length=302>
+##contig=<ID=four_exons_first_far__plus__u0,length=272>
+##contig=<ID=four_exons_first_far__plus__u1,length=302>
+##contig=<ID=four_exons_first_far__minus__u0,length=272>
+##contig=<ID=four_exons_first_far__minus__u1,length=302>
+##contig=<ID=intronless__plus__u0,length=152>
+##contig=<ID=intronless__plus__u1,length=182>
+##contig=<ID=intronless__minus__u0,length=152>
+##contig=<ID=intronless__minus__u1,length=182>
+##contig=<ID=intronless_frame__plus__u0,length=140>
+##contig=<ID=intronless_frame__plus__u1,length=170>
+##contig=<ID=intronless_frame__minus__u0,length=140>
+##contig=<ID=intronless_frame__minus__u1,length=170>
+##contig=<ID=intronless_early_stop__plus__u0,length=152>
+##contig=<ID=intronless_early_stop__plus__u1,length=182>
+##contig=<ID=intronless_early_stop__minus__u0,length=152>
+##contig=<ID=intronless_early_stop__minus__u1,length=182>
+##contig=<ID=up_ins3_d51__plus__u0,length=192>
+##contig=<ID=up_ins3_d51__plus__u1,length=222>
+##contig=<ID=up_ins3_d51__minus__u0,length=192>
+##contig=<ID=up_ins3_d51__minus__u1,length=222>
+##contig=<ID=up_ins3_d50__plus__u0,length=192>
+##contig=<ID=up_ins3_d50__plus__u1,length=222>
+##contig=<ID=up_ins3_d50__minus__u0,length=192>
+##contig=<ID=up_ins3_d50__minus__u1,length=222>
+##contig=<ID=up_del3_d50__plus__u0,length=192>
+##contig=<ID=up_del3_d50__plus__u1,length=222>
+##contig=<ID=up_del3_d50__minus__u0,length=192>
+##contig=<ID=up_del3_d50__minus__u1,length=222>
+##contig=<ID=up_del3_d51__plus__u0,length=192>
+##contig=<ID=up_del3_d51__plus__u1,length=222>
+##contig=<ID=up_del3_d51__minus__u0,length=192>
+##contig=<ID=up_del3_d51__minus__u1,length=222>
+##contig=<ID=up_ins6_three_exons__plus__u0,length=232>
+##contig=<ID=up_ins6_three_exons__plus__u1,length=262>
+##contig=<ID=up_ins6_three_exons__minus__u0,length=232>
+##contig=<ID=up_ins6_three_exons__minus__u1,length=262>
+##contig=<ID=up_indel_in_pen_exon__plus__u0,length=232>
+##contig=<ID=up_indel_in_pen_exon__plus__u1,length=262>
+##contig=<ID=up_indel_in_pen_exon__minus__u0,length=232>
+##contig=<ID=up_indel_in_pen_exon__minus__u1,length=262>
+##contig=<ID=up_del_in_first_exon_of_three__plus__u0,length=232>
+##contig=<ID=up_del_in_first_exon_of_three__plus__u1,length=262>
+##contig=<ID=up_del_in_first_exon_of_three__minus__u0,length=232>
+##contig=<ID=up_del_in_first_exon_of_three__minus__u1,length=262>
+##contig=<ID=post_ins_pen_shifts_j__plus__u0,length=232>
+##contig=<ID=post_ins_pen_shifts_j__plus__u1,length=262>
+##contig=<ID=post_ins_pen_shifts_j__minus__u0,length=232>
+##contig=<ID=post_ins_pen_shifts_j__minus__u1,length=262>
+##contig=<ID=post_del_pen_shifts_j__plus__u0,length=232>
+##contig=<ID=post_del_pen_shifts_j__plus__u1,length=262>
+##contig=<ID=post_del_pen_shifts_j__minus__u0,length=232>
+##contig=<ID=post_del_pen_shifts_j__minus__u1,length=262>
+##contig=<ID=post_ins_pen_two_exon__plus__u0,length=192>
+##contig=<ID=post_ins_pen_two_exon__plus__u1,length=222>
+##contig=<ID=post_ins_pen_two_exon__minus__u0,length=192>
+##contig=<ID=post_ins_pen_two_exon__minus__u1,length=222>
+##contig=<ID=post_indel_last_exon_d49__plus__u0,length=232>
+##contig=<ID=post_indel_last_exon_d49__plus__u1,length=262>
+##contig=<ID=post_indel_last_exon_d49__minus__u0,length=232>
+##contig=<ID=post_indel_last_exon_d49__minus__u1,length=262>
+##contig=<ID=post_indel_last_exon_d51__plus__u0,length=232>
+##contig=<ID=post_indel_last_exon_d51__plus__u1,length=262>
+##contig=<ID=post_indel_last_exon_d51__minus__u0,length=232>
+##contig=<ID=post_indel_last_exon_d51__minus__u1,length=262>
+##contig=<ID=post_snv_after_stop__plus__u0,length=192>
+##contig=<ID=post_snv_after_stop__plus__u1,length=222>
+##contig=<ID=post_snv_after_stop__minus__u0,length=192>
+##contig=<ID=post_snv_after_stop__minus__u1,length=222>
+##contig=<ID=post_snv_last_exon__plus__u0,length=192>
+##contig=<ID=post_snv_last_exon__plus__u1,length=222>
+##contig=<ID=post_snv_last_exon__minus__u0,length=192>
+##contig=<ID=post_snv_last_exon__minus__u1,length=222>
+##contig=<ID=fs_d49__plus__u0,length=180>
+##contig=<ID=fs_d49__plus__u1,length=210>
+##contig=<ID=fs_d49__minus__u0,length=180>
+##contig=<ID=fs_d49__minus__u1,length=210>
+##contig=<ID=fs_d50__plus__u0,length=180>
+##contig=<ID=fs_d50__plus__u1,length=210>
+##contig=<ID=fs_d50__minus__u0,length=180>
+##contig=<ID=fs_d50__minus__u1,length=210>
+##contig=<ID=fs_d51__plus__u0,length=180>
+##contig=<ID=fs_d51__plus__u1,length=210>
+##contig=<ID=fs_d51__minus__u0,length=180>
+##contig=<ID=fs_d51__minus__u1,length=210>
+##contig=<ID=fs_three_exons__plus__u0,length=220>
+##contig=<ID=fs_three_exons__plus__u1,length=250>
+##contig=<ID=fs_three_exons__minus__u0,length=220>
+##contig=<ID=fs_three_exons__minus__u1,length=250>
+##contig=<ID=fs_deletion_minus2__plus__u0,length=180>
+##contig=<ID=fs_deletion_minus2__plus__u1,length=210>
+##contig=<ID=fs_deletion_minus2__minus__u0,length=180>
+##contig=<ID=fs_deletion_minus2__minus__u1,length=210>
+##contig=<ID=fs_stop_by_insertion__plus__u0,length=192>
+##contig=<ID=fs_stop_by_insertion__plus__u1,length=222>
+##contig=<ID=fs_stop_by_insertion__minus__u0,length=192>
+##contig=<ID=fs_stop_by_insertion__minus__u1,length=222>
+##contig=<ID=fs_post_stop_edits__plus__u0,length=180>
+##contig=<ID=fs_post_stop_edits__plus__u1,length=210>
+##contig=<ID=fs_post_stop_edits__minus__u0,length=180>
+##contig=<ID=fs_post_stop_edits__minus__u1,length=210>
+##contig=<ID=run_off_deletion__plus__u0,length=180>
+##contig=<ID=run_off_deletion__plus__u1,length=210>
+##contig=<ID=run_off_deletion__minus__u0,length=180>
+##contig=<ID=run_off_deletion__minus__u1,length=210>
+##contig=<ID=run_off_plus2__plus__u0,length=180>
+##contig=<ID=run_off_plus2__plus__u1,length=210>
+##contig=<ID=run_off_plus2__minus__u0,length=180>
+##contig=<ID=run_off_plus2__minus__u1,length=210>
+##contig=<ID=run_off_intronless__plus__u0,length=140>
+##contig=<ID=run_off_intronless__plus__u1,length=170>
+##contig=<ID=run_off_intronless__minus__u0,length=140>
+##contig=<ID=run_off_intronless__minus__u1,length=170>
+##contig=<ID=start_lost__plus__u0,length=192>
+##contig=<ID=start_lost__plus__u1,length=222>
+##contig=<ID=start_lost__minus__u0,length=192>
+##contig=<ID=start_lost__minus__u1,length=222>
+##contig=<ID=start_lost_with_stop__plus__u0,length=192>
+##contig=<ID=start_lost_with_stop__plus__u1,length=222>
+##contig=<ID=start_lost_with_stop__minus__u0,length=192>
+##contig=<ID=start_lost_with_stop__minus__u1,length=222>
+##contig=<ID=stop_lost__plus__u0,length=192>
+##contig=<ID=stop_lost__plus__u1,length=222>
+##contig=<ID=stop_lost__minus__u0,length=192>
+##contig=<ID=stop_lost__minus__u1,length=222>
+##contig=<ID=missense__plus__u0,length=192>
+##contig=<ID=missense__plus__u1,length=222>
+##contig=<ID=missense__minus__u0,length=192>
+##contig=<ID=missense__minus__u1,length=222>
+##contig=<ID=synonymous__plus__u0,length=192>
+##contig=<ID=synonymous__plus__u1,length=222>
+##contig=<ID=synonymous__minus__u0,length=192>
+##contig=<ID=synonymous__minus__u1,length=222>
+##contig=<ID=stop_retained__plus__u0,length=192>
+##contig=<ID=stop_retained__plus__u1,length=222>
+##contig=<ID=stop_retained__minus__u0,length=192>
+##contig=<ID=stop_retained__minus__u1,length=222>
+##contig=<ID=inframe_deletion__plus__u0,length=192>
+##contig=<ID=inframe_deletion__plus__u1,length=222>
+##contig=<ID=inframe_deletion__minus__u0,length=192>
+##contig=<ID=inframe_deletion__minus__u1,length=222>
+##contig=<ID=inframe_insertion__plus__u0,length=192>
+##contig=<ID=inframe_insertion__plus__u1,length=222>
+##contig=<ID=inframe_insertion__minus__u0,length=192>
+##contig=<ID=inframe_insertion__minus__u1,length=222>
+##contig=<ID=frame_restored__plus__u0,length=180>
+##contig=<ID=frame_restored__plus__u1,length=210>
+##contig=<ID=frame_restored__minus__u0,length=180>
+##contig=<ID=frame_restored__minus__u1,length=210>
+##contig=<ID=cis_pair_stop__plus__u0,length=192>
+##contig=<ID=cis_pair_stop__plus__u1,length=222>
+##contig=<ID=cis_pair_stop__minus__u0,length=192>
+##contig=<ID=cis_pair_stop__minus__u1,length=222>
+##contig=<ID=cis_pair_stop_d50__plus__u0,length=192>
+##contig=<ID=cis_pair_stop_d50__plus__u1,length=222>
+##contig=<ID=cis_pair_stop_d50__minus__u0,length=192>
+##contig=<ID=cis_pair_stop_d50__minus__u1,length=222>
+##contig=<ID=trans_pair_halves__plus__u0,length=192>
+##contig=<ID=trans_pair_halves__plus__u1,length=222>
+##contig=<ID=trans_pair_halves__minus__u0,length=192>
+##contig=<ID=trans_pair_halves__minus__u1,length=222>
+##contig=<ID=trans_stop_and_missense__plus__u0,length=192>
+##contig=<ID=trans_stop_and_missense__plus__u1,length=222>
+##contig=<ID=trans_stop_and_missense__minus__u0,length=192>
+##contig=<ID=trans_stop_and_missense__minus__u1,length=222>
+##contig=<ID=trans_missense_only__plus__u0,length=192>
+##contig=<ID=trans_missense_only__plus__u1,length=222>
+##contig=<ID=trans_missense_only__minus__u0,length=192>
+##contig=<ID=trans_missense_only__minus__u1,length=222>
+##contig=<ID=hom_alt_stop__plus__u0,length=192>
+##contig=<ID=hom_alt_stop__plus__u1,length=222>
+##contig=<ID=hom_alt_stop__minus__u0,length=192>
+##contig=<ID=hom_alt_stop__minus__u1,length=222>
+##contig=<ID=frame_pair_stop_second__plus__u0,length=192>
+##contig=<ID=frame_pair_stop_second__plus__u1,length=222>
+##contig=<ID=frame_pair_stop_second__minus__u0,length=192>
+##contig=<ID=frame_pair_stop_second__minus__u1,length=222>
+##contig=<ID=utr_last_exon__plus__u1,length=222>
+##contig=<ID=utr_last_exon__minus__u1,length=222>
+##contig=<ID=utr_first_exon__plus__u1,length=222>
+##contig=<ID=utr_first_exon__minus__u1,length=222>
+##contig=<ID=utr_first_and_last__plus__u1,length=302>
+##contig=<ID=utr_first_and_last__minus__u1,length=302>
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S
+d49__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+d49__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+d49__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+d49__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+d50__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+d50__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+d50__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+d50__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+d51__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+d51__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+d51__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+d51__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+d52__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+d52__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+d52__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+d52__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+d0_stop_ends_exon__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+d0_stop_ends_exon__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+d0_stop_ends_exon__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+d0_stop_ends_exon__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+pen_d50__plus__u0	105	.	C	T	.	PASS	.	GT	1|0
+pen_d50__plus__u1	118	.	C	T	.	PASS	.	GT	1|0
+pen_d50__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+pen_d50__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+pen_d51__plus__u0	105	.	C	T	.	PASS	.	GT	1|0
+pen_d51__plus__u1	118	.	C	T	.	PASS	.	GT	1|0
+pen_d51__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+pen_d51__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+first_of_three_trigger__plus__u0	26	.	C	T	.	PASS	.	GT	1|0
+first_of_three_trigger__plus__u1	39	.	C	T	.	PASS	.	GT	1|0
+first_of_three_trigger__minus__u0	207	.	G	A	.	PASS	.	GT	1|0
+first_of_three_trigger__minus__u1	224	.	G	A	.	PASS	.	GT	1|0
+first_of_three_escape__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+first_of_three_escape__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+first_of_three_escape__minus__u0	168	.	G	A	.	PASS	.	GT	1|0
+first_of_three_escape__minus__u1	185	.	G	A	.	PASS	.	GT	1|0
+pen_exon_escape__plus__u0	144	.	C	T	.	PASS	.	GT	1|0
+pen_exon_escape__plus__u1	157	.	C	T	.	PASS	.	GT	1|0
+pen_exon_escape__minus__u0	89	.	G	A	.	PASS	.	GT	1|0
+pen_exon_escape__minus__u1	106	.	G	A	.	PASS	.	GT	1|0
+last_exon_stop__plus__u0	156	.	C	T	.	PASS	.	GT	1|0
+last_exon_stop__plus__u1	169	.	C	T	.	PASS	.	GT	1|0
+last_exon_stop__minus__u0	37	.	G	A	.	PASS	.	GT	1|0
+last_exon_stop__minus__u1	54	.	G	A	.	PASS	.	GT	1|0
+last_of_three__plus__u0	196	.	C	T	.	PASS	.	GT	1|0
+last_of_three__plus__u1	209	.	C	T	.	PASS	.	GT	1|0
+last_of_three__minus__u0	37	.	G	A	.	PASS	.	GT	1|0
+last_of_three__minus__u1	54	.	G	A	.	PASS	.	GT	1|0
+four_exons_escape__plus__u0	26	.	C	T	.	PASS	.	GT	1|0
+four_exons_escape__plus__u1	39	.	C	T	.	PASS	.	GT	1|0
+four_exons_escape__minus__u0	247	.	G	A	.	PASS	.	GT	1|0
+four_exons_escape__minus__u1	264	.	G	A	.	PASS	.	GT	1|0
+four_exons_first_far__plus__u0	26	.	C	T	.	PASS	.	GT	1|0
+four_exons_first_far__plus__u1	39	.	C	T	.	PASS	.	GT	1|0
+four_exons_first_far__minus__u0	247	.	G	A	.	PASS	.	GT	1|0
+four_exons_first_far__minus__u1	264	.	G	A	.	PASS	.	GT	1|0
+intronless__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+intronless__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+intronless__minus__u0	88	.	G	A	.	PASS	.	GT	1|0
+intronless__minus__u1	105	.	G	A	.	PASS	.	GT	1|0
+intronless_frame__plus__u0	26	.	A	AG	.	PASS	.	GT	1|0
+intronless_frame__plus__u1	39	.	A	AG	.	PASS	.	GT	1|0
+intronless_frame__minus__u0	114	.	A	AC	.	PASS	.	GT	1|0
+intronless_frame__minus__u1	131	.	A	AC	.	PASS	.	GT	1|0
+intronless_early_stop__plus__u0	26	.	C	T	.	PASS	.	GT	1|0
+intronless_early_stop__plus__u1	39	.	C	T	.	PASS	.	GT	1|0
+intronless_early_stop__minus__u0	127	.	G	A	.	PASS	.	GT	1|0
+intronless_early_stop__minus__u1	144	.	G	A	.	PASS	.	GT	1|0
+up_ins3_d51__plus__u0	46	.	A	AGGG	.	PASS	.	GT	1|0
+up_ins3_d51__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+up_ins3_d51__plus__u1	59	.	A	AGGG	.	PASS	.	GT	1|0
+up_ins3_d51__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+up_ins3_d51__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+up_ins3_d51__minus__u0	146	.	G	GCCC	.	PASS	.	GT	1|0
+up_ins3_d51__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+up_ins3_d51__minus__u1	163	.	G	GCCC	.	PASS	.	GT	1|0
+up_ins3_d50__plus__u0	46	.	A	AGGG	.	PASS	.	GT	1|0
+up_ins3_d50__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+up_ins3_d50__plus__u1	59	.	A	AGGG	.	PASS	.	GT	1|0
+up_ins3_d50__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+up_ins3_d50__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+up_ins3_d50__minus__u0	146	.	G	GCCC	.	PASS	.	GT	1|0
+up_ins3_d50__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+up_ins3_d50__minus__u1	163	.	G	GCCC	.	PASS	.	GT	1|0
+up_del3_d50__plus__u0	46	.	ACAA	A	.	PASS	.	GT	1|0
+up_del3_d50__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+up_del3_d50__plus__u1	59	.	ACAA	A	.	PASS	.	GT	1|0
+up_del3_d50__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+up_del3_d50__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+up_del3_d50__minus__u0	143	.	GTTG	G	.	PASS	.	GT	1|0
+up_del3_d50__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+up_del3_d50__minus__u1	160	.	GTTG	G	.	PASS	.	GT	1|0
+up_del3_d51__plus__u0	46	.	ACAA	A	.	PASS	.	GT	1|0
+up_del3_d51__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+up_del3_d51__plus__u1	59	.	ACAA	A	.	PASS	.	GT	1|0
+up_del3_d51__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+up_del3_d51__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+up_del3_d51__minus__u0	143	.	GTTG	G	.	PASS	.	GT	1|0
+up_del3_d51__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+up_del3_d51__minus__u1	160	.	GTTG	G	.	PASS	.	GT	1|0
+up_ins6_three_exons__plus__u0	86	.	A	AGGGGGG	.	PASS	.	GT	1|0
+up_ins6_three_exons__plus__u0	105	.	C	T	.	PASS	.	GT	1|0
+up_ins6_three_exons__plus__u1	99	.	A	AGGGGGG	.	PASS	.	GT	1|0
+up_ins6_three_exons__plus__u1	118	.	C	T	.	PASS	.	GT	1|0
+up_ins6_three_exons__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+up_ins6_three_exons__minus__u0	146	.	G	GCCCCCC	.	PASS	.	GT	1|0
+up_ins6_three_exons__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+up_ins6_three_exons__minus__u1	163	.	G	GCCCCCC	.	PASS	.	GT	1|0
+up_indel_in_pen_exon__plus__u0	86	.	A	AGGG	.	PASS	.	GT	1|0
+up_indel_in_pen_exon__plus__u0	105	.	C	T	.	PASS	.	GT	1|0
+up_indel_in_pen_exon__plus__u1	99	.	A	AGGG	.	PASS	.	GT	1|0
+up_indel_in_pen_exon__plus__u1	118	.	C	T	.	PASS	.	GT	1|0
+up_indel_in_pen_exon__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+up_indel_in_pen_exon__minus__u0	146	.	G	GCCC	.	PASS	.	GT	1|0
+up_indel_in_pen_exon__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+up_indel_in_pen_exon__minus__u1	163	.	G	GCCC	.	PASS	.	GT	1|0
+up_del_in_first_exon_of_three__plus__u0	28	.	ACAA	A	.	PASS	.	GT	1|0
+up_del_in_first_exon_of_three__plus__u0	105	.	C	T	.	PASS	.	GT	1|0
+up_del_in_first_exon_of_three__plus__u1	41	.	ACAA	A	.	PASS	.	GT	1|0
+up_del_in_first_exon_of_three__plus__u1	118	.	C	T	.	PASS	.	GT	1|0
+up_del_in_first_exon_of_three__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+up_del_in_first_exon_of_three__minus__u0	201	.	GTTG	G	.	PASS	.	GT	1|0
+up_del_in_first_exon_of_three__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+up_del_in_first_exon_of_three__minus__u1	218	.	GTTG	G	.	PASS	.	GT	1|0
+post_ins_pen_shifts_j__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+post_ins_pen_shifts_j__plus__u0	136	.	A	AGGG	.	PASS	.	GT	1|0
+post_ins_pen_shifts_j__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+post_ins_pen_shifts_j__plus__u1	149	.	A	AGGG	.	PASS	.	GT	1|0
+post_ins_pen_shifts_j__minus__u0	96	.	T	TCCC	.	PASS	.	GT	1|0
+post_ins_pen_shifts_j__minus__u0	168	.	G	A	.	PASS	.	GT	1|0
+post_ins_pen_shifts_j__minus__u1	113	.	T	TCCC	.	PASS	.	GT	1|0
+post_ins_pen_shifts_j__minus__u1	185	.	G	A	.	PASS	.	GT	1|0
+post_del_pen_shifts_j__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+post_del_pen_shifts_j__plus__u0	136	.	AACA	A	.	PASS	.	GT	1|0
+post_del_pen_shifts_j__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+post_del_pen_shifts_j__plus__u1	149	.	AACA	A	.	PASS	.	GT	1|0
+post_del_pen_shifts_j__minus__u0	93	.	TTGT	T	.	PASS	.	GT	1|0
+post_del_pen_shifts_j__minus__u0	168	.	G	A	.	PASS	.	GT	1|0
+post_del_pen_shifts_j__minus__u1	110	.	TTGT	T	.	PASS	.	GT	1|0
+post_del_pen_shifts_j__minus__u1	185	.	G	A	.	PASS	.	GT	1|0
+post_ins_pen_two_exon__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+post_ins_pen_two_exon__plus__u0	96	.	A	AGGG	.	PASS	.	GT	1|0
+post_ins_pen_two_exon__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+post_ins_pen_two_exon__plus__u1	109	.	A	AGGG	.	PASS	.	GT	1|0
+post_ins_pen_two_exon__minus__u0	96	.	T	TCCC	.	PASS	.	GT	1|0
+post_ins_pen_two_exon__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+post_ins_pen_two_exon__minus__u1	113	.	T	TCCC	.	PASS	.	GT	1|0
+post_ins_pen_two_exon__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+post_indel_last_exon_d49__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+post_indel_last_exon_d49__plus__u0	206	.	A	AGGG	.	PASS	.	GT	1|0
+post_indel_last_exon_d49__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+post_indel_last_exon_d49__plus__u1	219	.	A	AGGG	.	PASS	.	GT	1|0
+post_indel_last_exon_d49__minus__u0	26	.	T	TCCC	.	PASS	.	GT	1|0
+post_indel_last_exon_d49__minus__u0	168	.	G	A	.	PASS	.	GT	1|0
+post_indel_last_exon_d49__minus__u1	43	.	T	TCCC	.	PASS	.	GT	1|0
+post_indel_last_exon_d49__minus__u1	185	.	G	A	.	PASS	.	GT	1|0
+post_indel_last_exon_d51__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+post_indel_last_exon_d51__plus__u0	206	.	AACA	A	.	PASS	.	GT	1|0
+post_indel_last_exon_d51__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+post_indel_last_exon_d51__plus__u1	219	.	AACA	A	.	PASS	.	GT	1|0
+post_indel_last_exon_d51__minus__u0	23	.	TTGT	T	.	PASS	.	GT	1|0
+post_indel_last_exon_d51__minus__u0	168	.	G	A	.	PASS	.	GT	1|0
+post_indel_last_exon_d51__minus__u1	40	.	TTGT	T	.	PASS	.	GT	1|0
+post_indel_last_exon_d51__minus__u1	185	.	G	A	.	PASS	.	GT	1|0
+post_snv_after_stop__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+post_snv_after_stop__plus__u0	86	.	C	G	.	PASS	.	GT	1|0
+post_snv_after_stop__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+post_snv_after_stop__plus__u1	99	.	C	G	.	PASS	.	GT	1|0
+post_snv_after_stop__minus__u0	107	.	G	C	.	PASS	.	GT	1|0
+post_snv_after_stop__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+post_snv_after_stop__minus__u1	124	.	G	C	.	PASS	.	GT	1|0
+post_snv_after_stop__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+post_snv_last_exon__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+post_snv_last_exon__plus__u0	166	.	A	G	.	PASS	.	GT	1|0
+post_snv_last_exon__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+post_snv_last_exon__plus__u1	179	.	A	G	.	PASS	.	GT	1|0
+post_snv_last_exon__minus__u0	27	.	T	C	.	PASS	.	GT	1|0
+post_snv_last_exon__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+post_snv_last_exon__minus__u1	44	.	T	C	.	PASS	.	GT	1|0
+post_snv_last_exon__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+fs_d49__plus__u0	26	.	A	AG	.	PASS	.	GT	1|0
+fs_d49__plus__u1	39	.	A	AG	.	PASS	.	GT	1|0
+fs_d49__minus__u0	154	.	A	AC	.	PASS	.	GT	1|0
+fs_d49__minus__u1	171	.	A	AC	.	PASS	.	GT	1|0
+fs_d50__plus__u0	26	.	A	AG	.	PASS	.	GT	1|0
+fs_d50__plus__u1	39	.	A	AG	.	PASS	.	GT	1|0
+fs_d50__minus__u0	154	.	A	AC	.	PASS	.	GT	1|0
+fs_d50__minus__u1	171	.	A	AC	.	PASS	.	GT	1|0
+fs_d51__plus__u0	26	.	A	AG	.	PASS	.	GT	1|0
+fs_d51__plus__u1	39	.	A	AG	.	PASS	.	GT	1|0
+fs_d51__minus__u0	154	.	A	AC	.	PASS	.	GT	1|0
+fs_d51__minus__u1	171	.	A	AC	.	PASS	.	GT	1|0
+fs_three_exons__plus__u0	26	.	A	AG	.	PASS	.	GT	1|0
+fs_three_exons__plus__u1	39	.	A	AG	.	PASS	.	GT	1|0
+fs_three_exons__minus__u0	194	.	A	AC	.	PASS	.	GT	1|0
+fs_three_exons__minus__u1	211	.	A	AC	.	PASS	.	GT	1|0
+fs_deletion_minus2__plus__u0	26	.	ATC	A	.	PASS	.	GT	1|0
+fs_deletion_minus2__plus__u1	39	.	ATC	A	.	PASS	.	GT	1|0
+fs_deletion_minus2__minus__u0	152	.	GGA	G	.	PASS	.	GT	1|0
+fs_deletion_minus2__minus__u1	169	.	GGA	G	.	PASS	.	GT	1|0
+fs_stop_by_insertion__plus__u0	46	.	A	ATAAG	.	PASS	.	GT	1|0
+fs_stop_by_insertion__plus__u1	59	.	A	ATAAG	.	PASS	.	GT	1|0
+fs_stop_by_insertion__minus__u0	146	.	G	GCTTA	.	PASS	.	GT	1|0
+fs_stop_by_insertion__minus__u1	163	.	G	GCTTA	.	PASS	.	GT	1|0
+fs_post_stop_edits__plus__u0	26	.	A	AG	.	PASS	.	GT	1|0
+fs_post_stop_edits__plus__u0	146	.	T	TC	.	PASS	.	GT	1|0
+fs_post_stop_edits__plus__u0	156	.	T	A	.	PASS	.	GT	1|0
+fs_post_stop_edits__plus__u1	39	.	A	AG	.	PASS	.	GT	1|0
+fs_post_stop_edits__plus__u1	159	.	T	TC	.	PASS	.	GT	1|0
+fs_post_stop_edits__plus__u1	169	.	T	A	.	PASS	.	GT	1|0
+fs_post_stop_edits__minus__u0	25	.	A	T	.	PASS	.	GT	1|0
+fs_post_stop_edits__minus__u0	34	.	C	CG	.	PASS	.	GT	1|0
+fs_post_stop_edits__minus__u0	154	.	A	AC	.	PASS	.	GT	1|0
+fs_post_stop_edits__minus__u1	42	.	A	T	.	PASS	.	GT	1|0
+fs_post_stop_edits__minus__u1	51	.	C	CG	.	PASS	.	GT	1|0
+fs_post_stop_edits__minus__u1	171	.	A	AC	.	PASS	.	GT	1|0
+run_off_deletion__plus__u0	66	.	TC	T	.	PASS	.	GT	1|0
+run_off_deletion__plus__u1	79	.	TC	T	.	PASS	.	GT	1|0
+run_off_deletion__minus__u0	113	.	AG	A	.	PASS	.	GT	1|0
+run_off_deletion__minus__u1	130	.	AG	A	.	PASS	.	GT	1|0
+run_off_plus2__plus__u0	56	.	C	CAC	.	PASS	.	GT	1|0
+run_off_plus2__plus__u1	69	.	C	CAC	.	PASS	.	GT	1|0
+run_off_plus2__minus__u0	124	.	T	TGT	.	PASS	.	GT	1|0
+run_off_plus2__minus__u1	141	.	T	TGT	.	PASS	.	GT	1|0
+run_off_intronless__plus__u0	66	.	TC	T	.	PASS	.	GT	1|0
+run_off_intronless__plus__u1	79	.	TC	T	.	PASS	.	GT	1|0
+run_off_intronless__minus__u0	73	.	AG	A	.	PASS	.	GT	1|0
+run_off_intronless__minus__u1	90	.	AG	A	.	PASS	.	GT	1|0
+start_lost__plus__u0	17	.	A	C	.	PASS	.	GT	1|0
+start_lost__plus__u1	30	.	A	C	.	PASS	.	GT	1|0
+start_lost__minus__u0	176	.	T	G	.	PASS	.	GT	1|0
+start_lost__minus__u1	193	.	T	G	.	PASS	.	GT	1|0
+start_lost_with_stop__plus__u0	17	.	A	C	.	PASS	.	GT	1|0
+start_lost_with_stop__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+start_lost_with_stop__plus__u1	30	.	A	C	.	PASS	.	GT	1|0
+start_lost_with_stop__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+start_lost_with_stop__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+start_lost_with_stop__minus__u0	176	.	T	G	.	PASS	.	GT	1|0
+start_lost_with_stop__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+start_lost_with_stop__minus__u1	193	.	T	G	.	PASS	.	GT	1|0
+stop_lost__plus__u0	174	.	T	C	.	PASS	.	GT	1|0
+stop_lost__plus__u1	187	.	T	C	.	PASS	.	GT	1|0
+stop_lost__minus__u0	19	.	A	G	.	PASS	.	GT	1|0
+stop_lost__minus__u1	36	.	A	G	.	PASS	.	GT	1|0
+missense__plus__u0	65	.	C	G	.	PASS	.	GT	1|0
+missense__plus__u1	78	.	C	G	.	PASS	.	GT	1|0
+missense__minus__u0	128	.	G	C	.	PASS	.	GT	1|0
+missense__minus__u1	145	.	G	C	.	PASS	.	GT	1|0
+synonymous__plus__u0	67	.	A	G	.	PASS	.	GT	1|0
+synonymous__plus__u1	80	.	A	G	.	PASS	.	GT	1|0
+synonymous__minus__u0	126	.	T	C	.	PASS	.	GT	1|0
+synonymous__minus__u1	143	.	T	C	.	PASS	.	GT	1|0
+stop_retained__plus__u0	176	.	A	G	.	PASS	.	GT	1|0
+stop_retained__plus__u1	189	.	A	G	.	PASS	.	GT	1|0
+stop_retained__minus__u0	17	.	T	C	.	PASS	.	GT	1|0
+stop_retained__minus__u1	34	.	T	C	.	PASS	.	GT	1|0
+inframe_deletion__plus__u0	65	.	CAAC	C	.	PASS	.	GT	1|0
+inframe_deletion__plus__u1	78	.	CAAC	C	.	PASS	.	GT	1|0
+inframe_deletion__minus__u0	124	.	TGTT	T	.	PASS	.	GT	1|0
+inframe_deletion__minus__u1	141	.	TGTT	T	.	PASS	.	GT	1|0
+inframe_insertion__plus__u0	65	.	C	CGGG	.	PASS	.	GT	1|0
+inframe_insertion__plus__u1	78	.	C	CGGG	.	PASS	.	GT	1|0
+inframe_insertion__minus__u0	127	.	T	TCCC	.	PASS	.	GT	1|0
+inframe_insertion__minus__u1	144	.	T	TCCC	.	PASS	.	GT	1|0
+frame_restored__plus__u0	46	.	T	TT	.	PASS	.	GT	1|0
+frame_restored__plus__u0	76	.	TT	T	.	PASS	.	GT	1|0
+frame_restored__plus__u1	59	.	T	TT	.	PASS	.	GT	1|0
+frame_restored__plus__u1	89	.	TT	T	.	PASS	.	GT	1|0
+frame_restored__minus__u0	103	.	CA	C	.	PASS	.	GT	1|0
+frame_restored__minus__u0	134	.	A	AA	.	PASS	.	GT	1|0
+frame_restored__minus__u1	120	.	CA	C	.	PASS	.	GT	1|0
+frame_restored__minus__u1	151	.	A	AA	.	PASS	.	GT	1|0
+cis_pair_stop__plus__u0	20	.	A	T	.	PASS	.	GT	1|0
+cis_pair_stop__plus__u0	22	.	C	A	.	PASS	.	GT	1|0
+cis_pair_stop__plus__u1	33	.	A	T	.	PASS	.	GT	1|0
+cis_pair_stop__plus__u1	35	.	C	A	.	PASS	.	GT	1|0
+cis_pair_stop__minus__u0	171	.	G	T	.	PASS	.	GT	1|0
+cis_pair_stop__minus__u0	173	.	T	A	.	PASS	.	GT	1|0
+cis_pair_stop__minus__u1	188	.	G	T	.	PASS	.	GT	1|0
+cis_pair_stop__minus__u1	190	.	T	A	.	PASS	.	GT	1|0
+cis_pair_stop_d50__plus__u0	20	.	A	T	.	PASS	.	GT	1|0
+cis_pair_stop_d50__plus__u0	22	.	C	A	.	PASS	.	GT	1|0
+cis_pair_stop_d50__plus__u1	33	.	A	T	.	PASS	.	GT	1|0
+cis_pair_stop_d50__plus__u1	35	.	C	A	.	PASS	.	GT	1|0
+cis_pair_stop_d50__minus__u0	171	.	G	T	.	PASS	.	GT	1|0
+cis_pair_stop_d50__minus__u0	173	.	T	A	.	PASS	.	GT	1|0
+cis_pair_stop_d50__minus__u1	188	.	G	T	.	PASS	.	GT	1|0
+cis_pair_stop_d50__minus__u1	190	.	T	A	.	PASS	.	GT	1|0
+trans_pair_halves__plus__u0	20	.	A	T	.	PASS	.	GT	1|0
+trans_pair_halves__plus__u0	22	.	C	A	.	PASS	.	GT	0|1
+trans_pair_halves__plus__u1	33	.	A	T	.	PASS	.	GT	1|0
+trans_pair_halves__plus__u1	35	.	C	A	.	PASS	.	GT	0|1
+trans_pair_halves__minus__u0	171	.	G	T	.	PASS	.	GT	0|1
+trans_pair_halves__minus__u0	173	.	T	A	.	PASS	.	GT	1|0
+trans_pair_halves__minus__u1	188	.	G	T	.	PASS	.	GT	0|1
+trans_pair_halves__minus__u1	190	.	T	A	.	PASS	.	GT	1|0
+trans_stop_and_missense__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+trans_stop_and_missense__plus__u0	86	.	C	G	.	PASS	.	GT	0|1
+trans_stop_and_missense__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+trans_stop_and_missense__plus__u1	99	.	C	G	.	PASS	.	GT	0|1
+trans_stop_and_missense__minus__u0	107	.	G	C	.	PASS	.	GT	0|1
+trans_stop_and_missense__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+trans_stop_and_missense__minus__u1	124	.	G	C	.	PASS	.	GT	0|1
+trans_stop_and_missense__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+trans_missense_only__plus__u0	36	.	A	T	.	PASS	.	GT	0|1
+trans_missense_only__plus__u0	66	.	A	G	.	PASS	.	GT	1|0
+trans_missense_only__plus__u1	49	.	A	T	.	PASS	.	GT	0|1
+trans_missense_only__plus__u1	79	.	A	G	.	PASS	.	GT	1|0
+trans_missense_only__minus__u0	127	.	T	C	.	PASS	.	GT	1|0
+trans_missense_only__minus__u0	157	.	T	A	.	PASS	.	GT	0|1
+trans_missense_only__minus__u1	144	.	T	C	.	PASS	.	GT	1|0
+trans_missense_only__minus__u1	174	.	T	A	.	PASS	.	GT	0|1
+hom_alt_stop__plus__u0	65	.	C	T	.	PASS	.	GT	1|1
+hom_alt_stop__plus__u1	78	.	C	T	.	PASS	.	GT	1|1
+hom_alt_stop__minus__u0	128	.	G	A	.	PASS	.	GT	1|1
+hom_alt_stop__minus__u1	145	.	G	A	.	PASS	.	GT	1|1
+frame_pair_stop_second__plus__u0	28	.	A	AT	.	PASS	.	GT	1|0
+frame_pair_stop_second__plus__u0	36	.	AA	A	.	PASS	.	GT	1|0
+frame_pair_stop_second__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+frame_pair_stop_second__plus__u1	41	.	A	AT	.	PASS	.	GT	1|0
+frame_pair_stop_second__plus__u1	49	.	AA	A	.	PASS	.	GT	1|0
+frame_pair_stop_second__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+frame_pair_stop_second__minus__u0	128	.	G	A	.	PASS	.	GT	1|0
+frame_pair_stop_second__minus__u0	155	.	GT	G	.	PASS	.	GT	1|0
+frame_pair_stop_second__minus__u0	164	.	G	GA	.	PASS	.	GT	1|0
+frame_pair_stop_second__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+frame_pair_stop_second__minus__u1	172	.	GT	G	.	PASS	.	GT	1|0
+frame_pair_stop_second__minus__u1	181	.	G	GA	.	PASS	.	GT	1|0
+utr_last_exon__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+utr_last_exon__minus__u1	145	.	G	A	.	PASS	.	GT	1|0
+utr_first_exon__plus__u1	118	.	C	T	.	PASS	.	GT	1|0
+utr_first_exon__minus__u1	105	.	G	A	.	PASS	.	GT	1|0
+utr_first_and_last__plus__u1	118	.	C	T	.	PASS	.	GT	1|0
+utr_first_and_last__minus__u1	185	.	G	A	.	PASS	.	GT	1|0
