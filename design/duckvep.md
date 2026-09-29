@@ -381,7 +381,7 @@ putting that selection in the receipt and validation evidence.
 
 | Builder | Required canonical source relations |
 | --- | --- |
-| `duckvep_ensembl_regions` | `core_schema.coord_system`, `core_schema.seq_region`, and a reference-chunk relation with `chrom`, zero-based `start`, half-open `end`, and `seq` |
+| `duckvep_ensembl_regions` | `core_schema.coord_system`, `core_schema.seq_region`, `core_schema.seq_region_attrib`, `core_schema.attrib_type`, and a reference-chunk relation with `chrom`, zero-based `start`, half-open `end`, and `seq` |
 | `duckvep_ensembl_transcripts` | region inputs plus `core_schema.seq_region_attrib`, `transcript`, `gene`, `translation`, `exon_transcript`, `exon`, `transcript_attrib`, `translation_attrib`, and `attrib_type` |
 | `duckvep_ensembl_regulation_features` | `funcgen_schema.regulatory_feature`, `feature_type`, and `motif_feature`, plus the canonical region relation |
 
@@ -399,6 +399,22 @@ source/release manifest and reference identity, canonical-model receipt validati
 release-specific differential cases against the pinned upstream VEP target. The evidence
 must state the supported consequence/HGVS/CSQ subset and every intentional difference;
 passing VEP 116 evidence does not validate another release.
+
+The prepared region relation contains `sequence_length` and a Boolean `circular` sourced
+from the same Ensembl core release as its `seq_region`. The builder accepts one
+`circular_seq` attribute with value `1` per circular region and rejects duplicate
+or invalid circular attributes; absence means linear. The model receipt includes
+this topology and length in its deterministic hash, so changing either changes
+model identity. Circular topology is a property of the reference sequence region;
+`codon_table` is an independently sourced translation rule. A mitochondrial
+codon table does not imply that a region is circular, and a circular region does
+not imply mitochondrial translation. Ordinary human Ensembl-116 MT transcripts
+in the acceptance fixture do not cross the origin. Wrapped transcript and
+feature objects require ranked continuity, lifted intervals and explicit
+load-time validation before they can be admitted; recording circular region
+topology alone does not make origin-crossing annotation executable. A bounded
+survey of two other public Ensembl-116 core databases is recorded in
+`benchmarks/data/circular_source_survey.md`.
 
 `query(duckvep_model_receipt_sql(...))` checks dense ordinals, region/transcript agreement, and every
 regulatory/motif interval against its declared region. It
