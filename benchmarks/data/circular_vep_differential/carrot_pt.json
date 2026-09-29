@@ -1,0 +1,82 @@
+{
+ "target": "carrot_pt",
+ "species": "daucus_carota",
+ "region": "Pt",
+ "region_length": 155848,
+ "extension_sha256": "6ab81a98689b664f9856900e6d52028ef50e49e0dc9c0d4fb1de310ebdf09da4",
+ "events": 8100,
+ "events_in_hgvs_run": 7437,
+ "vep_hgvs_run_succeeded": true,
+ "region_transcripts": 152,
+ "origin_crossing_transcripts": "KZM81246:-1",
+ "fasta_sha256": "9117846c7dcc8f9762c0541cf9c1a264aaa92da56f8a120e8e584f6546491fe0",
+ "cache_sha256": "70d66d3cec29276d340d3dbd148db3c3751b5e4e2d923abdd6daf49e09e56e7f",
+ "transcript_dump_sha256": "53a7e311ca8f17c48ae4525f3578b369312dcb383b69c9789652a57c3e61d2e9",
+ "unwrapped": {
+  "pairs": 83892,
+  "identical_terms": 81365,
+  "duckvep_only": 2527,
+  "vep_only": 0,
+  "different_terms": 0,
+  "hgvsc_pairs": 4738,
+  "hgvsc_identical": 4714,
+  "hgvsp_pairs": 3197,
+  "hgvsp_identical": 3192,
+  "duckvep_only_across_origin": 2527,
+  "hgvs_differences_near_origin_vs_interior": {
+   "hgvsc_near_origin": 24,
+   "hgvsc_interior": 0,
+   "hgvsp_near_origin": 4,
+   "hgvsp_interior": 1
+  }
+ },
+ "wrapped_transcript": {
+  "pairs": 7409,
+  "identical_terms": 382,
+  "duckvep_only": 3771,
+  "vep_only": 0,
+  "different_terms": 3256,
+  "vep_terms_by_duckvep_terms": [
+   [
+    "intergenic_variant",
+    "intron_variant",
+    3068
+   ],
+   [
+    "(none)",
+    "intron_variant",
+    2930
+   ],
+   [
+    "(none)",
+    "downstream_gene_variant",
+    381
+   ],
+   [
+    "(none)",
+    "missense_variant",
+    178
+   ],
+   [
+    "(none)",
+    "frameshift_variant",
+    115
+   ],
+   [
+    "3_prime_UTR_variant",
+    "missense_variant",
+    79
+   ]
+  ]
+ },
+ "baseline_extension_sha256": "6087f9e9961f8743a5beb2232c330d4f80bcf07812cf84e8a5f50f86f7b7742d",
+ "lifted_vs_prelift_linear": {
+  "pairs": 83892,
+  "identical": 81341,
+  "different_interior": 0,
+  "different_near_origin": 24,
+  "lifted_only_rows_near_origin": 2527,
+  "prelift_only_rows": 0
+ },
+ "source_revision": "a88399998df62955f3e72ed57b71a9b99d3ff7c9"
+}

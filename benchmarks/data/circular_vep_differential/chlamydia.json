@@ -1,0 +1,82 @@
+{
+ "target": "chlamydia",
+ "species": "chlamydia_trachomatis_d_uw_3_cx_gca_000008725",
+ "region": "Chromosome",
+ "region_length": 1042519,
+ "extension_sha256": "6ab81a98689b664f9856900e6d52028ef50e49e0dc9c0d4fb1de310ebdf09da4",
+ "events": 6268,
+ "events_in_hgvs_run": 5674,
+ "vep_hgvs_run_succeeded": true,
+ "region_transcripts": 937,
+ "origin_crossing_transcripts": "AAC68473:1",
+ "fasta_sha256": "5cebcffb053dd6b76e59393b62b9c388886e4acb990e0ebc721d20f71786cb94",
+ "cache_sha256": "59127de0ce177db96721e6c4dc83f3586eca1b26eec47957495ef6a99542feb0",
+ "transcript_dump_sha256": "84d4b949054d44a53b2c89015e299231151faa4a5c46f558e741fa1de1d05843",
+ "unwrapped": {
+  "pairs": 59323,
+  "identical_terms": 56381,
+  "duckvep_only": 2942,
+  "vep_only": 0,
+  "different_terms": 0,
+  "hgvsc_pairs": 4862,
+  "hgvsc_identical": 4862,
+  "hgvsp_pairs": 4793,
+  "hgvsp_identical": 4792,
+  "duckvep_only_across_origin": 2942,
+  "hgvs_differences_near_origin_vs_interior": {
+   "hgvsc_near_origin": 0,
+   "hgvsc_interior": 0,
+   "hgvsp_near_origin": 0,
+   "hgvsp_interior": 1
+  }
+ },
+ "wrapped_transcript": {
+  "pairs": 981,
+  "identical_terms": 210,
+  "duckvep_only": 488,
+  "vep_only": 0,
+  "different_terms": 283,
+  "vep_terms_by_duckvep_terms": [
+   [
+    "(none)",
+    "upstream_gene_variant",
+    208
+   ],
+   [
+    "(none)",
+    "missense_variant",
+    142
+   ],
+   [
+    "intergenic_variant",
+    "missense_variant",
+    141
+   ],
+   [
+    "(none)",
+    "frameshift_variant",
+    85
+   ],
+   [
+    "intergenic_variant",
+    "frameshift_variant",
+    85
+   ],
+   [
+    "intergenic_variant",
+    "synonymous_variant",
+    33
+   ]
+  ]
+ },
+ "baseline_extension_sha256": "6087f9e9961f8743a5beb2232c330d4f80bcf07812cf84e8a5f50f86f7b7742d",
+ "lifted_vs_prelift_linear": {
+  "pairs": 59323,
+  "identical": 56381,
+  "different_interior": 0,
+  "different_near_origin": 0,
+  "lifted_only_rows_near_origin": 2942,
+  "prelift_only_rows": 0
+ },
+ "source_revision": "a88399998df62955f3e72ed57b71a9b99d3ff7c9"
+}

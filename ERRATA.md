@@ -65,6 +65,21 @@ All 336,000 independent SO comparisons agree in that finite matrix. These are re
 diagnostics, not current-build certificates, population error rates, or proof for
 compound events, reverse strands or phase-padded indels.
 
+Circular sequence regions are modelled where VEP has no model. A region flagged `circular_seq` that holds a
+transcript, exon or feature with `start > end` runs on lifted intervals; VEP 116 reads such a transcript as
+an ordinary interval with reversed bounds. In three public genomes with a VEP cache
+([receipts](benchmarks/data/circular_vep_differential/), [survey](benchmarks/data/circular_source_survey.md)),
+DuckVEP and VEP agree on every SO term of every other transcript except flank rows that exist only through the
+origin, which VEP cannot emit; HGVS 3' shifting within 1,100 bases of the origin also differs, because VEP clips
+its window at the sequence end. For the crossing transcript itself, VEP reports no row for most events inside it
+or an `intergenic_variant` transcript consequence, and it aborts `--hgvs` on insertions in its translation. These
+are DuckVEP differences by design (an observed VEP limitation the model deliberately does not follow), not
+matched results: the origin-crossing behavior is proved by rotation equivariance and agreement with a linear model,
+not by VEP. Human MT, whose transcripts do not cross the origin, is byte-identical to the linear path. The
+one remaining SO disagreement in those receipts (an insertion at the first base of a *N. equitans* stop codon,
+`inframe_insertion&stop_retained_variant` in VEP against `coding_sequence_variant&inframe_insertion`) and six interior
+HGVSp differences also occur without lifting; they are compatibility gaps unrelated to topology.
+
 The [conformance guide](test/duckvep/conformance/README.md) and
 [rendered report](benchmarks/duckvep_conformance.md) describe executable checks and their
 scope. The [evidence policy](design/duckvep_corpus_workflow.md) governs retained failures,
