@@ -82,7 +82,8 @@ if (file.exists(avail_path)) {
   b <- read.delim(bounds_path, colClasses = "character")
   receipts$detail[receipts$panel == "exomes-2M"] <- paste0(
     paste0(a$bin, ": required ", a$required, ", available ", a$available, collapse = "; "),
-    "; distinct literal alleles by class (snv, indel, mnv, all): ", paste(b$source_upper_bound, collapse = ","))
+    "; distinct literal alleles by class (snv, indel, mnv, all): ", paste(b$source_upper_bound, collapse = ","),
+    "; gnomAD sites contain no MNVs, so the 100k CDS MNV quota moved to cds_indel and MNV coverage comes from the ClinVar and indel/MNV controls")
 }
 is_genome <- startsWith(receipts$panel, "genomes-")
 receipts$source_alleles <- ifelse(is_genome, counts$source_alts, "")

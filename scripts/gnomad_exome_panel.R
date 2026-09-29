@@ -44,7 +44,10 @@ if (get("SELECT count(*) AS n FROM source_alleles a
 # chromosome) at a time, so spill stays small; the wide rows are joined back for the selected
 # ranks. A chromosome lives in exactly one shard, so per-shard deduplication equals global.
 quotas <- data.frame(bin = c("cds_snv", "cds_indel", "cds_mnv", "splice_remainder"),
-  required = c(1000000L, 500000L, 100000L, 400000L))
+  required = c(1000000L, 600000L, 0L, 400000L))
+# gnomAD sites hold no equal-length multi-base substitutions (measured: 0 of 183.7M alleles), so
+# the former 100k CDS MNV bin is folded into cds_indel; MNV coverage comes from the ClinVar and
+# indel/MNV controls, not from gnomAD.
 source(file.path(dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1L])), "gnomad_exome_classify.R"))
 exome_prepare(execute)
 classify_sql <- exome_classify_sql
@@ -96,8 +99,7 @@ if (all(availability$available >= availability$required)) {
   target <- file.path(out, "exome-2m.parquet")
   execute(paste0("COPY (SELECT s.* FROM source_alleles s JOIN (SELECT source_object, record_index, alt_index
     FROM ranked WHERE (bin = 'cds_snv' AND rank <= 1000000)
-       OR (bin = 'cds_indel' AND rank <= 500000)
-       OR (bin = 'cds_mnv' AND rank <= 100000)
+       OR (bin = 'cds_indel' AND rank <= 600000)
        OR (bin = 'splice_remainder' AND rank <= 400000)) k USING (source_object, record_index, alt_index)
     ORDER BY s.seq_region, s.position, s.source_object, s.record_index, s.alt_index) TO ",
     q(target), " (FORMAT PARQUET, COMPRESSION ZSTD)"))
