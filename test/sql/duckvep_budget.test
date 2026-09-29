@@ -1,0 +1,248 @@
+# name: test/sql/duckvep_budget.test
+# description: Process-wide native allocation budget, per-worker leases and worker admission
+# group: [duckvep]
+
+require duckvep
+
+# The default ceiling is 4 GiB; every owner is reported.
+query TI
+SELECT owner, limit_bytes = 4294967296 FROM duckvep_native_budget() ORDER BY owner;
+----
+control	1
+emit	1
+index	1
+model	1
+reference	1
+scratch	1
+total	1
+workspace	1
+
+statement ok
+CREATE TABLE b_regions AS SELECT r::UINTEGER seq_region, 200000::UBIGINT sequence_length
+FROM range(3) t(r);
+
+statement ok
+CREATE TABLE b_transcripts AS SELECT
+  i::UINTEGER transcript_index, (i // 1500)::UINTEGER seq_region,
+  (11 + (i % 1500))::UBIGINT transcript_start,
+  (22 + (i % 1500))::UBIGINT transcript_end,
+  1::TINYINT strand, i::UINTEGER gene_index, 3::UBIGINT transcript_flags,
+  (11 + (i % 1500))::UBIGINT cds_start, (22 + (i % 1500))::UBIGINT cds_end,
+  (CASE i % 3 WHEN 0 THEN 'ATGAAAGCCTAA' WHEN 1 THEN 'ATGAACGCCTAA' ELSE 'ATGCGTGCCTAA' END)::BLOB cds_sequence,
+  1::UTINYINT codon_table, ''::BLOB pre_cds_sequence, ''::BLOB post_cds_sequence
+FROM range(4500) t(i);
+
+statement ok
+CREATE TABLE b_exons AS
+SELECT transcript_index, (transcript_start + 6 * e)::UBIGINT exon_start,
+  (transcript_start + 5 + 6 * e)::UBIGINT exon_end,
+  (1 + 6 * e)::UBIGINT exon_cdna_start, (6 + 6 * e)::UBIGINT exon_cdna_end,
+  0::TINYINT phase, 0::TINYINT end_phase
+FROM b_transcripts, range(2) x(e);
+
+statement ok
+CREATE TABLE b_events AS SELECT
+  (transcript_index * 4 + 1)::UBIGINT event_index, seq_region,
+  (transcript_start + 1)::UBIGINT AS position, 'T' reference, 'G' alternate,
+  NULL::UBIGINT end_position, NULL::VARCHAR structural_type,
+  NULL::VARCHAR copy_change, NULL::UINTEGER mate_seq_region,
+  NULL::UBIGINT mate_position
+FROM b_transcripts;
+
+# Other test files leave models loaded in this process; measure relative to them.
+statement ok
+SET VARIABLE b_models0 = (SELECT sum(current_bytes) FROM duckvep_native_budget() WHERE owner IN ('model', 'index'));
+
+# Idle workers keep nothing between queries, so the budget arithmetic below is exact.
+query I
+SELECT duckvep_worker_limits_set(6, 134217728, 67108864, 0);
+----
+1
+
+# A budget below what is already charged is refused, not silently clipped.
+statement error
+SELECT duckvep_native_budget_set(1);
+----
+capacity error
+
+# A load under a sufficient budget succeeds and is charged to the model owner.
+query I
+SELECT loaded FROM duckvep_model_load('budget-ok',
+  'SELECT * FROM b_regions', 'SELECT * FROM b_transcripts', 'SELECT * FROM b_exons',
+  transcript_coverage_complete := TRUE);
+----
+1
+
+query II
+SELECT model > 100000, total <= cap FROM (
+  SELECT max(current_bytes) FILTER (WHERE owner = 'model') AS model,
+         max(current_bytes) FILTER (WHERE owner = 'total') AS total,
+         max(limit_bytes) FILTER (WHERE owner = 'total') AS cap
+  FROM duckvep_native_budget());
+----
+1	1
+
+query I
+SELECT count(DISTINCT transcript_index)
+FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_distance := 0, downstream_distance := 0)));
+----
+4500
+
+statement ok
+CREATE TABLE b_golden AS SELECT *
+FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_distance := 0, downstream_distance := 0)));
+
+# --- Load over budget: explicit capacity error, nothing published, nothing leaked.
+statement ok
+SET VARIABLE b_before = (SELECT current_bytes FROM duckvep_native_budget() WHERE owner = 'total');
+
+query I
+SELECT duckvep_native_budget_set(getvariable('b_before') + 65536) - getvariable('b_before');
+----
+65536
+
+statement error
+SELECT loaded FROM duckvep_model_load('budget-over',
+  'SELECT * FROM b_regions', 'SELECT * FROM b_transcripts', 'SELECT * FROM b_exons',
+  transcript_coverage_complete := TRUE);
+----
+capacity error
+
+# The refused load left no charge behind.
+query I
+SELECT current_bytes = getvariable('b_before') FROM duckvep_native_budget() WHERE owner = 'total';
+----
+1
+
+query I
+SELECT duckvep_native_budget_set(4294967296);
+----
+4294967296
+
+query I
+SELECT duckvep_model_drop('budget-over');
+----
+0
+
+statement error
+SELECT count(*) FROM query(duckvep_annotate_sql('b_events', 'budget-over'));
+----
+unknown model name
+
+# The model that was already loaded is untouched and answers as before.
+query I
+SELECT count(DISTINCT transcript_index) FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_distance := 0, downstream_distance := 0)));
+----
+4500
+
+# --- Annotation over budget: the pooled worker is warm, so a budget at exactly the
+# current charge leaves no room for its buffers.
+statement ok
+SET VARIABLE b_before = (SELECT current_bytes FROM duckvep_native_budget() WHERE owner = 'total');
+
+query I
+SELECT duckvep_native_budget_set(getvariable('b_before')) - getvariable('b_before');
+----
+0
+
+statement error
+SELECT count(*) FROM query(duckvep_annotate_sql('b_events', 'budget-ok'));
+----
+capacity error
+
+query I
+SELECT duckvep_native_budget_set(4294967296);
+----
+4294967296
+
+# After the refusal the worker and the model are intact and the results identical.
+query I
+SELECT count(*) FROM (
+  (SELECT * FROM b_golden EXCEPT SELECT * FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_distance := 0, downstream_distance := 0))))
+  UNION ALL
+  (SELECT * FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_distance := 0, downstream_distance := 0))) EXCEPT SELECT * FROM b_golden));
+----
+0
+
+# --- Per-worker leases: an over-limit vector is an explicit capacity error.
+query I
+SELECT duckvep_worker_limits_set(6, 1024, 67108864, 0);
+----
+1
+
+statement error
+SELECT count(*) FROM query(duckvep_annotate_sql('b_events', 'budget-ok'));
+----
+capacity error: per-worker scratch lease
+
+query I
+SELECT duckvep_worker_limits_set(6, 134217728, 1024, 0);
+----
+1
+
+statement error
+SELECT count(*) FROM query(duckvep_annotate_sql('b_events', 'budget-ok'));
+----
+capacity error: per-worker emitted-output lease
+
+# One 60,000-base allele is supported under the default lease but not under 64 KiB.
+statement ok
+CREATE TABLE b_long AS SELECT 1::UBIGINT event_index, 0::UINTEGER seq_region, 12::UBIGINT AS position,
+  repeat('A', 60000) reference, 'C' alternate, NULL::UBIGINT end_position, NULL::VARCHAR structural_type,
+  NULL::VARCHAR copy_change, NULL::UINTEGER mate_seq_region, NULL::UBIGINT mate_position;
+
+query I
+SELECT duckvep_worker_limits_set(6, 134217728, 67108864, 0);
+----
+1
+
+query I
+SELECT count(*) > 0 FROM query(duckvep_annotate_sql('b_long', 'budget-ok'));
+----
+1
+
+query I
+SELECT duckvep_worker_limits_set(6, 65536, 67108864, 0);
+----
+1
+
+statement error
+SELECT count(*) FROM query(duckvep_annotate_sql('b_long', 'budget-ok'));
+----
+capacity error: per-worker scratch lease
+
+# --- Admission: one admitted worker serializes four DuckDB threads without changing results.
+query I
+SELECT duckvep_worker_limits_set(1, 134217728, 67108864, 0);
+----
+1
+
+statement ok
+SET threads = 4;
+
+query I
+SELECT count(*) FROM (
+  (SELECT * FROM b_golden EXCEPT SELECT * FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_distance := 0, downstream_distance := 0))))
+  UNION ALL
+  (SELECT * FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_distance := 0, downstream_distance := 0))) EXCEPT SELECT * FROM b_golden));
+----
+0
+
+statement ok
+RESET threads;
+
+query I
+SELECT duckvep_worker_limits_set(6, 134217728, 67108864, 67108864);
+----
+1
+
+# Dropping the model returns every model and index byte.
+query I
+SELECT duckvep_model_drop('budget-ok');
+----
+1
+
+query I
+SELECT sum(current_bytes) = getvariable('b_models0') FROM duckvep_native_budget() WHERE owner IN ('model', 'index');
+----
+1
