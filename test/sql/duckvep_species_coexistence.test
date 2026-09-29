@@ -1,0 +1,226 @@
+# name: test/sql/duckvep_species_coexistence.test
+# description: Source-derived, model-local codon and receipt isolation
+# group: [duckvep]
+
+require duckvep
+
+statement ok
+CREATE TABLE pf_regions AS FROM read_parquet('__WORKING_DIRECTORY__/test/data/duckvep/species/plasmodium_regions.parquet');
+
+statement ok
+CREATE TABLE pf_transcripts AS FROM read_parquet('__WORKING_DIRECTORY__/test/data/duckvep/species/plasmodium_transcripts.parquet');
+
+statement ok
+CREATE TABLE tetra_regions AS FROM read_parquet('__WORKING_DIRECTORY__/test/data/duckvep/species/tetrahymena_regions.parquet');
+
+statement ok
+CREATE TABLE tetra_transcripts AS FROM read_parquet('__WORKING_DIRECTORY__/test/data/duckvep/species/tetrahymena_transcripts.parquet');
+
+statement ok
+CREATE TABLE human_regions AS FROM read_parquet('__WORKING_DIRECTORY__/test/data/duckvep/species/human_grch37_regions.parquet');
+
+statement ok
+CREATE TABLE human_transcripts AS FROM read_parquet('__WORKING_DIRECTORY__/test/data/duckvep/species/human_grch37_transcripts.parquet');
+
+query III
+SELECT (SELECT max(transcript_index) FROM pf_transcripts),
+       (SELECT max(transcript_index) FROM tetra_transcripts),
+       (SELECT max(transcript_index) FROM human_transcripts);
+----
+0	1	0
+
+query III
+SELECT (SELECT codon_table FROM pf_transcripts),
+       (SELECT min(codon_table) FROM tetra_transcripts),
+       (SELECT codon_table FROM human_transcripts);
+----
+4	6	1
+
+statement ok
+CREATE TABLE pf_receipt AS FROM query(duckvep_model_receipt_sql(
+  'pf_regions', 'pf_transcripts', 'Ensembl Protists', '63/116', 'ASM276v2',
+  repeat('a',64), repeat('b',64), 'source-derived excerpt'));
+
+statement ok
+CREATE TABLE tetra_receipt AS FROM query(duckvep_model_receipt_sql(
+  'tetra_regions', 'tetra_transcripts', 'Ensembl Protists', '63/116', 'JCVI-TTA1-2.2',
+  repeat('c',64), repeat('d',64), 'source-derived excerpt'));
+
+statement ok
+CREATE TABLE human_receipt AS FROM query(duckvep_model_receipt_sql(
+  'human_regions', 'human_transcripts', 'Ensembl', '116', 'GRCh37',
+  repeat('e',64), repeat('f',64), 'source-derived excerpt'));
+
+query III
+SELECT (SELECT region_count FROM pf_receipt),
+       (SELECT region_count FROM tetra_receipt),
+       (SELECT transcript_count FROM human_receipt);
+----
+1	2	1
+
+query III
+SELECT (SELECT model_sha256 FROM pf_receipt) != (SELECT model_sha256 FROM tetra_receipt),
+       (SELECT model_sha256 FROM pf_receipt) != (SELECT model_sha256 FROM human_receipt),
+       (SELECT assembly FROM tetra_receipt) = 'JCVI-TTA1-2.2';
+----
+1	1	1
+
+query I
+SELECT loaded FROM duckvep_model_load('fixture-pf',
+  'SELECT seq_region, sequence_length FROM pf_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM pf_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM pf_transcripts, unnest(exons) u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  transcript_coverage_complete := true);
+----
+1
+
+query I
+SELECT loaded FROM duckvep_model_load('fixture-tetra',
+  'SELECT seq_region, sequence_length FROM tetra_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM tetra_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM tetra_transcripts, unnest(exons) u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  transcript_coverage_complete := true);
+----
+1
+
+query I
+SELECT loaded FROM duckvep_model_load('fixture-human',
+  'SELECT seq_region, sequence_length FROM human_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM human_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM human_transcripts, unnest(exons) u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  transcript_coverage_complete := true);
+----
+1
+
+# Pinning a source FASTA on one model does not change the other models.
+query I
+SELECT loaded FROM duckvep_model_load('fixture-tetra-pinned',
+  'SELECT seq_region, sequence_length, seq_region_name FROM tetra_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM tetra_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM tetra_transcripts, unnest(exons) u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  reference_fasta := '__WORKING_DIRECTORY__/test/data/duckvep/species/tetrahymena.fa',
+  transcript_coverage_complete := true);
+----
+1
+
+# Table 6 translates the source TAA/TAG codons as glutamine. The same
+# source records under the standard nuclear code expose stop_lost instead.
+statement ok
+CREATE TABLE tetra_standard AS SELECT * REPLACE (1::UTINYINT AS codon_table) FROM tetra_transcripts;
+
+query I
+SELECT loaded FROM duckvep_model_load('fixture-standard',
+  'SELECT seq_region, sequence_length FROM tetra_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM tetra_standard ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM tetra_standard, unnest(exons) u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  transcript_coverage_complete := true);
+----
+1
+
+statement ok
+CREATE TABLE fixture_events AS
+SELECT e.*, NULL::UBIGINT AS end_position, NULL::VARCHAR AS structural_type,
+       NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region,
+       NULL::UBIGINT AS mate_position FROM (VALUES
+  (1::UBIGINT, 0::UINTEGER, 1241::UBIGINT, 'C', 'T'),
+  (2::UBIGINT, (SELECT seq_region FROM tetra_transcripts WHERE transcript_stable_id='EAR80522'), 143::UBIGINT, 'T', 'C'),
+  (3::UBIGINT, (SELECT seq_region FROM tetra_transcripts WHERE transcript_stable_id='EAR80553'), 295::UBIGINT, 'T', 'C')
+) e(event_index, seq_region, position, reference, alternate);
+
+statement ok
+CREATE TABLE pf_events AS SELECT * FROM fixture_events WHERE event_index=1;
+
+statement ok
+CREATE TABLE tetra_events AS SELECT * FROM fixture_events WHERE event_index IN (2,3);
+
+statement ok
+CREATE TABLE human_events AS SELECT 4::UBIGINT AS event_index,
+  0::UINTEGER AS seq_region, 1::UBIGINT AS position, 'A' AS reference,
+  'C' AS alternate, NULL::UBIGINT AS end_position,
+  NULL::VARCHAR AS structural_type, NULL::VARCHAR AS copy_change,
+  NULL::UINTEGER AS mate_seq_region, NULL::UBIGINT AS mate_position;
+
+statement ok
+CREATE TABLE pf_result AS SELECT a.event_index, s.consequence
+FROM query(duckvep_annotate_sql('pf_events', 'fixture-pf')) a
+JOIN duckvep_so_terms() s ON (a.consequence_mask & s.consequence_mask) != 0;
+
+statement ok
+CREATE TABLE tetra_result AS SELECT a.event_index, s.consequence
+FROM query(duckvep_annotate_sql('tetra_events', 'fixture-tetra')) a
+JOIN duckvep_so_terms() s ON (a.consequence_mask & s.consequence_mask) != 0;
+
+statement ok
+CREATE TABLE standard_result AS SELECT a.event_index, s.consequence
+FROM query(duckvep_annotate_sql('tetra_events', 'fixture-standard')) a
+JOIN duckvep_so_terms() s ON (a.consequence_mask & s.consequence_mask) != 0;
+
+statement ok
+CREATE TABLE pinned_result AS SELECT a.event_index, s.consequence
+FROM query(duckvep_annotate_sql('tetra_events', 'fixture-tetra-pinned')) a
+JOIN duckvep_so_terms() s ON (a.consequence_mask & s.consequence_mask) != 0;
+
+query IT
+SELECT event_index, consequence FROM pf_result WHERE event_index=1;
+----
+1	synonymous_variant
+
+query IT
+SELECT event_index, consequence FROM tetra_result ORDER BY event_index;
+----
+2	synonymous_variant
+3	synonymous_variant
+
+query IT
+SELECT event_index, consequence FROM standard_result ORDER BY event_index;
+----
+2	stop_lost
+3	stop_lost
+
+query I
+SELECT count(*) FROM pinned_result p JOIN tetra_result t USING (event_index, consequence);
+----
+2
+
+statement ok
+CREATE TABLE human_before AS FROM query(duckvep_annotate_sql('human_events', 'fixture-human'));
+
+query I
+SELECT duckvep_model_drop('fixture-pf');
+----
+1
+
+query II
+SELECT (SELECT count(*) FROM query(duckvep_annotate_sql('tetra_events', 'fixture-tetra'))),
+       (SELECT count(*) FROM query(duckvep_annotate_sql('human_events', 'fixture-human'))) =
+       (SELECT count(*) FROM human_before);
+----
+2	1
+
+query I
+SELECT (SELECT model_sha256 FROM tetra_receipt) =
+       (SELECT model_sha256 FROM query(duckvep_model_receipt_sql(
+         'tetra_regions','tetra_transcripts','Ensembl Protists','63/116',
+         'JCVI-TTA1-2.2',repeat('c',64),repeat('d',64),'source-derived excerpt')));
+----
+1
+
+query I
+SELECT duckvep_model_drop('fixture-standard');
+----
+1
+
+query I
+SELECT duckvep_model_drop('fixture-tetra-pinned');
+----
+1
+
+query I
+SELECT duckvep_model_drop('fixture-tetra');
+----
+1
+
+query I
+SELECT duckvep_model_drop('fixture-human');
+----
+1
