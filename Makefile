@@ -47,6 +47,8 @@ test_mane_grch37:
 test_haplotype_contract:
 	Rscript --vanilla test/scripts/check_haplotype_csq_map.R test/data/haplotype/csq_so_map_v1.tsv
 	Rscript --vanilla test/scripts/check_haplotype_goldens.R
+	Rscript --vanilla test/scripts/generate_haplotype_models.R vertical same_codon
+	Rscript --vanilla test/scripts/check_same_codon_goldens.R
 	Rscript --vanilla test/scripts/test_haplotype_accounting.R
 
 test_mane_grch37_receipt:
