@@ -411,10 +411,18 @@ receipt in the same commit. Circular topology is a property of the reference seq
 `codon_table` is an independently sourced translation rule. A mitochondrial
 codon table does not imply that a region is circular, and a circular region does
 not imply mitochondrial translation. Ordinary human Ensembl-116 MT transcripts
-in the acceptance fixture do not cross the origin. Wrapped transcript and
-feature objects require ranked continuity, lifted intervals and explicit
-load-time validation before they can be admitted; recording circular region
-topology alone does not make origin-crossing annotation executable. A bounded
+in the acceptance fixture do not cross the origin. Circular preparation preserves one-based inclusive coordinates, including
+`start > end` spans. `origin_crossing` and `circular` are explicit output
+columns; exon order is determined by transcript rank on either strand. A valid
+wrapped transcript crosses the origin exactly once across its ranked exons,
+with the first and last exon anchored to its transcript endpoints. Wrapped
+single exons use the reference tail followed by its head; regulation and motif
+features retain their original endpoints. The model loader accepts a four-column
+region query (`seq_region`, `sequence_length`, `seq_region_name`, `circular`)
+and validates wrapped coordinates, exon lengths and rank continuity against
+topology. A model containing wrapped spans is a resident data contract; annotation
+cannot pin it until circular interval projection is implemented. Ordinary
+linear models retain their validated kernel and query behavior. A bounded
 survey of two other public Ensembl-116 core databases is recorded in
 `benchmarks/data/circular_source_survey.md`.
 

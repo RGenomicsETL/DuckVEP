@@ -1,0 +1,272 @@
+# name: test/sql/duckvep_circular.test
+# description: Circular preparation preserves origin-crossing coordinates and exon rank
+# group: [duckvep]
+
+require duckvep
+
+statement ok
+CREATE SCHEMA core;
+
+statement ok
+CREATE TABLE ref(chrom VARCHAR, "start" BIGINT, "end" BIGINT, seq VARCHAR);
+
+statement ok
+INSERT INTO ref VALUES ('C', 0, 40, repeat('ACGT', 10));
+
+statement ok
+CREATE TABLE core.coord_system(coord_system_id BIGINT, species_id BIGINT, name VARCHAR, version VARCHAR, rank BIGINT);
+
+statement ok
+INSERT INTO core.coord_system VALUES (1, 1, 'chromosome', 'synthetic', 1);
+
+statement ok
+CREATE TABLE core.seq_region(seq_region_id BIGINT, name VARCHAR, coord_system_id BIGINT, length BIGINT);
+
+statement ok
+INSERT INTO core.seq_region VALUES (10, 'C', 1, 40);
+
+statement ok
+CREATE TABLE core.attrib_type(attrib_type_id BIGINT, code VARCHAR);
+
+statement ok
+INSERT INTO core.attrib_type VALUES (1, 'circular_seq');
+
+statement ok
+CREATE TABLE core.seq_region_attrib(seq_region_id BIGINT, attrib_type_id BIGINT, value BIGINT);
+
+statement ok
+INSERT INTO core.seq_region_attrib VALUES (10, 1, 1);
+
+statement ok
+CREATE TABLE core.gene(gene_id BIGINT, biotype VARCHAR, is_current BIGINT, stable_id VARCHAR, version BIGINT);
+
+statement ok
+INSERT INTO core.gene VALUES (20, 'protein_coding', 1, 'G_PLUS', 1),
+  (21, 'protein_coding', 1, 'G_MINUS', 1), (22, 'lncRNA', 1, 'G_RNA', 1),
+  (23, 'protein_coding', 1, 'G_SINGLE', 1);
+
+statement ok
+CREATE TABLE core.transcript(transcript_id BIGINT, gene_id BIGINT, seq_region_id BIGINT,
+  seq_region_start BIGINT, seq_region_end BIGINT, seq_region_strand BIGINT,
+  biotype VARCHAR, is_current BIGINT, stable_id VARCHAR, version BIGINT);
+
+statement ok
+INSERT INTO core.transcript VALUES
+  (30, 20, 10, 35, 8, 1, 'protein_coding', 1, 'T_PLUS', 1),
+  (31, 21, 10, 30, 7, -1, 'protein_coding', 1, 'T_MINUS', 1),
+  (32, 22, 10, 38, 3, 1, 'lncRNA', 1, 'T_RNA', 1),
+  (33, 23, 10, 37, 4, 1, 'protein_coding', 1, 'T_SINGLE', 1);
+
+statement ok
+CREATE TABLE core.exon(exon_id BIGINT, seq_region_id BIGINT, seq_region_start BIGINT,
+  seq_region_end BIGINT, seq_region_strand BIGINT, phase BIGINT, end_phase BIGINT,
+  is_current BIGINT, stable_id VARCHAR);
+
+statement ok
+INSERT INTO core.exon VALUES
+  (40, 10, 35, 40, 1, -1, 0, 1, 'E_PLUS_1'),
+  (41, 10, 1, 8, 1, 0, -1, 1, 'E_PLUS_2'),
+  (42, 10, 1, 7, -1, -1, 0, 1, 'E_MINUS_1'),
+  (43, 10, 30, 40, -1, 0, -1, 1, 'E_MINUS_2'),
+  (44, 10, 38, 3, 1, -1, -1, 1, 'E_RNA'),
+  (45, 10, 37, 4, 1, -1, -1, 1, 'E_SINGLE');
+
+statement ok
+CREATE TABLE core.exon_transcript(exon_id BIGINT, transcript_id BIGINT, rank BIGINT);
+
+statement ok
+INSERT INTO core.exon_transcript VALUES
+  (40, 30, 1), (41, 30, 2), (42, 31, 1), (43, 31, 2),
+  (44, 32, 1), (45, 33, 1);
+
+statement ok
+CREATE TABLE core.translation(translation_id BIGINT, transcript_id BIGINT,
+  seq_start BIGINT, start_exon_id BIGINT, seq_end BIGINT, end_exon_id BIGINT,
+  stable_id VARCHAR, version BIGINT);
+
+statement ok
+INSERT INTO core.translation VALUES
+  (50, 30, 1, 40, 6, 41, 'P_PLUS', 1),
+  (51, 31, 1, 42, 6, 43, 'P_MINUS', 1),
+  (52, 33, 1, 45, 6, 45, 'P_SINGLE', 1);
+
+statement ok
+CREATE TABLE core.transcript_attrib(transcript_id BIGINT, attrib_type_id BIGINT, value VARCHAR);
+
+statement ok
+CREATE TABLE core.translation_attrib(translation_id BIGINT, attrib_type_id BIGINT, value VARCHAR);
+
+statement ok
+CREATE SCHEMA funcgen;
+
+statement ok
+CREATE TABLE funcgen.feature_type(feature_type_id BIGINT, name VARCHAR, so_accession VARCHAR, so_term VARCHAR);
+
+statement ok
+INSERT INTO funcgen.feature_type VALUES (70, 'Promoter', 'SO:0000167', 'promoter');
+
+statement ok
+CREATE TABLE funcgen.regulatory_feature(regulatory_feature_id BIGINT, feature_type_id BIGINT,
+  seq_region_id BIGINT, seq_region_strand BIGINT, seq_region_start BIGINT,
+  seq_region_end BIGINT, stable_id VARCHAR, regulatory_build_id BIGINT);
+
+statement ok
+INSERT INTO funcgen.regulatory_feature VALUES (80, 70, 10, 0, 38, 4, 'R_WRAP', 1);
+
+statement ok
+CREATE TABLE funcgen.motif_feature(motif_feature_id BIGINT, binding_matrix_id BIGINT,
+  seq_region_id BIGINT, seq_region_start BIGINT, seq_region_end BIGINT,
+  seq_region_strand BIGINT, score DOUBLE, stable_id VARCHAR);
+
+statement ok
+INSERT INTO funcgen.motif_feature VALUES (81, 90, 10, 39, 2, 1, 1.0, 'M_WRAP');
+
+statement ok
+CREATE TABLE regions AS FROM query(duckvep_ensembl_regions_sql('core', 'ref', 'synthetic'));
+
+query TII
+SELECT seq_region_name, sequence_length, CAST(circular AS INTEGER) FROM regions;
+----
+C	40	1
+
+statement ok
+CREATE TABLE transcripts AS FROM query(duckvep_ensembl_transcripts_sql('core', 'ref', 'synthetic'));
+
+query TTIIIII
+SELECT transcript_stable_id, CAST(origin_crossing AS VARCHAR), transcript_start, transcript_end,
+  exons[1].rank, exons[1].exon_start, exons[1].exon_end
+FROM transcripts ORDER BY transcript_stable_id;
+----
+T_MINUS	true	30	7	1	1	7
+T_PLUS	true	35	8	1	35	40
+T_RNA	true	38	3	1	38	3
+T_SINGLE	true	37	4	1	37	4
+
+query TIII
+SELECT transcript_stable_id, exons[2].exon_start, exons[2].exon_end, exons[2].exon_cdna_start
+FROM transcripts WHERE transcript_stable_id IN ('T_MINUS', 'T_PLUS') ORDER BY transcript_stable_id;
+----
+T_MINUS	30	40	8
+T_PLUS	1	8	7
+
+statement ok
+CREATE TABLE features AS FROM query(duckvep_ensembl_regulation_features_sql('funcgen', 'regions'));
+
+query TTII
+SELECT feature_class, CAST(origin_crossing AS VARCHAR), feature_start, feature_end
+FROM features ORDER BY feature_class;
+----
+regulatory_region	true	38	4
+transcription_factor_binding_site	true	39	2
+
+query III
+SELECT circular_region_count, transcript_count, regulation_feature_count
+FROM query(duckvep_model_receipt_sql(
+  'regions', 'transcripts', 'Ensembl', '116', 'synthetic', repeat('a', 64),
+  repeat('b', 64), 'circular source transcripts',
+  {regulation_features_table: 'features'}));
+----
+1	4	2
+
+query I
+SELECT loaded FROM duckvep_model_load(
+  'synthetic-circular',
+  'SELECT seq_region, sequence_length, seq_region_name, circular FROM regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  interval_feature_query := 'SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM features ORDER BY regulation_feature_index'
+);
+----
+1
+
+statement error
+SELECT loaded FROM duckvep_model_load(
+  'synthetic-linear-mismatch',
+  'SELECT seq_region, sequence_length, seq_region_name, false AS circular FROM regions',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start'
+);
+----
+transcript row has an invalid region, span, or strand
+
+statement error
+SELECT loaded FROM duckvep_model_load(
+  'synthetic-invalid-exon',
+  'SELECT seq_region, sequence_length, seq_region_name, circular FROM regions',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, CASE WHEN exon.exon_start = 38 THEN 41 ELSE exon.exon_start END AS exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start'
+);
+----
+exon row has invalid coordinates or phase
+
+statement error
+SELECT loaded FROM duckvep_model_load(
+  'synthetic-invalid-feature',
+  'SELECT seq_region, sequence_length, seq_region_name, circular FROM regions',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  interval_feature_query := 'SELECT regulation_feature_index, seq_region, 41::UINTEGER AS feature_start, feature_end, feature_kind FROM features ORDER BY regulation_feature_index'
+);
+----
+interval-feature row has an invalid dense index, region, coordinate, or kind
+
+statement error
+SELECT loaded FROM duckvep_model_load(
+  'synthetic-invalid-cdna',
+  'SELECT seq_region, sequence_length, seq_region_name, circular FROM regions',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, CAST(exon.exon_cdna_end + CASE WHEN exon.exon_start = 38 THEN 1 ELSE 0 END AS UBIGINT) AS exon_cdna_end, exon.phase, exon.end_phase FROM transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start'
+);
+----
+circular exon cDNA length does not match its genomic span
+
+statement error
+SELECT loaded FROM duckvep_model_load(
+  'synthetic-no-crossing',
+  'SELECT seq_region, sequence_length, seq_region_name, circular FROM regions',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, CASE WHEN exon.exon_start = 35 THEN 9 ELSE exon.exon_start END AS exon_start, CASE WHEN exon.exon_start = 35 THEN 14 ELSE exon.exon_end END AS exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start'
+);
+----
+exon row has invalid coordinates or phase
+
+statement ok
+UPDATE core.seq_region_attrib SET value = 0;
+
+statement error
+SELECT * FROM query(duckvep_ensembl_regions_sql('core', 'ref', 'synthetic'));
+----
+circular_seq must have one value of 1 per region
+
+statement ok
+UPDATE core.seq_region_attrib SET value = 1;
+
+statement ok
+UPDATE core.exon SET seq_region_end = 41 WHERE exon_id = 40;
+
+statement error
+SELECT * FROM query(duckvep_ensembl_transcripts_sql('core', 'ref', 'synthetic'));
+----
+exon coordinates, strand, or phase are invalid
+
+statement ok
+UPDATE core.exon SET seq_region_end = 40 WHERE exon_id = 40;
+
+statement ok
+UPDATE core.exon_transcript SET rank = 3 WHERE exon_id = 41;
+
+statement error
+SELECT * FROM query(duckvep_ensembl_transcripts_sql('core', 'ref', 'synthetic'));
+----
+exon ranks must be contiguous and unique from one
+
+statement ok
+UPDATE core.exon_transcript SET rank = 2 WHERE exon_id = 41;
+
+statement ok
+UPDATE core.exon SET seq_region_start = 20 WHERE exon_id = 41;
+
+statement error
+SELECT * FROM query(duckvep_ensembl_transcripts_sql('core', 'ref', 'synthetic'));
+----
+exon coordinates, strand, or phase are invalid

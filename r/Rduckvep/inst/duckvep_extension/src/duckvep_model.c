@@ -108,6 +108,9 @@ duckvep_model_reserve_regions(duckvep_owned_model_t *model, size_t needed)
 	if (!duckvep_sql_resize((void **)&model->sequence_lengths,
 	    sizeof(*model->sequence_lengths), capacity))
 		return 0;
+	if (!duckvep_sql_resize((void **)&model->region_circular,
+	    sizeof(*model->region_circular), capacity))
+		return 0;
 	if (!duckvep_sql_resize((void **)&model->sequence_names,
 	    sizeof(*model->sequence_names), capacity))
 		return 0;
@@ -276,6 +279,7 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 		duckvep_model_close(model->kernel);
 	free(model->known_seq_regions);
 	free(model->sequence_lengths);
+	free(model->region_circular);
 	if (model->sequence_names != NULL) {
 		size_t region;
 
@@ -551,6 +555,13 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 	static const char *const three_names[] = {
 		"seq_region", "sequence_length", "seq_region_name"
 	};
+	static const char *const four_names[] = {
+		"seq_region", "sequence_length", "seq_region_name", "circular"
+	};
+	static const duckdb_type four_types[] = {
+		DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_UBIGINT,
+		DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_BOOLEAN
+	};
 	static const duckdb_type three_types[] = {
 		DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_VARCHAR
 	};
@@ -564,9 +575,10 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 		return 0;
 	ok = 0;
 	column_count = duckdb_column_count(&query_result.result);
-	if (column_count != 1 && column_count != 2 && column_count != 3) {
+	if (column_count != 1 && column_count != 2 && column_count != 3 &&
+	    column_count != 4) {
 		duckvep_sql_set_error(error, error_size,
-		    "seq_region query must return seq_region, optional sequence_length, and optional seq_region_name");
+		    "seq_region query must return seq_region, optional sequence_length, optional seq_region_name, and optional circular");
 		goto done;
 	}
 	if (model->transcript_coverage_complete && column_count < 2) {
@@ -574,31 +586,34 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 		    "complete transcript coverage requires sequence_length for every region");
 		goto done;
 	}
-	if (require_sequence_names && column_count != 3) {
+	if (require_sequence_names && column_count < 3) {
 		duckvep_sql_set_error(error, error_size,
 		    "reference_fasta requires seq_region, sequence_length, and seq_region_name in the region query");
 		goto done;
 	}
 	if (!duckvep_result_schema(&query_result.result,
 	    column_count == 1 ? one_name :
-	    (column_count == 2 ? two_names : three_names),
+	    (column_count == 2 ? two_names :
+	    (column_count == 3 ? three_names : four_names)),
 	    column_count == 1 ? one_type :
-	    (column_count == 2 ? two_types : three_types),
+	    (column_count == 2 ? two_types :
+	    (column_count == 3 ? three_types : four_types)),
 	    (size_t)column_count, SIZE_MAX, error, error_size))
 		goto done;
 	while ((chunk = duckdb_fetch_chunk(query_result.result)) != NULL) {
-		duckdb_vector region_vector, length_vector, name_vector;
+		duckdb_vector region_vector, length_vector, name_vector, circular_vector;
 		uint32_t *values;
 		uint64_t *lengths;
 		idx_t row, rows;
 
 		rows = duckdb_data_chunk_get_size(chunk);
 		region_vector = duckdb_data_chunk_get_vector(chunk, 0);
-		length_vector = column_count == 2
-		    ? duckdb_data_chunk_get_vector(chunk, 1) :
-		    (column_count == 3 ? duckdb_data_chunk_get_vector(chunk, 1) : NULL);
-		name_vector = column_count == 3
+		length_vector = column_count >= 2
+		    ? duckdb_data_chunk_get_vector(chunk, 1) : NULL;
+		name_vector = column_count >= 3
 		    ? duckdb_data_chunk_get_vector(chunk, 2) : NULL;
+		circular_vector = column_count == 4
+		    ? duckdb_data_chunk_get_vector(chunk, 3) : NULL;
 		values = (uint32_t *)duckdb_vector_get_data(region_vector);
 		lengths = length_vector != NULL
 		    ? (uint64_t *)duckdb_vector_get_data(length_vector) : NULL;
@@ -609,7 +624,9 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 			    (length_vector != NULL &&
 			    duckvep_row_is_null(length_vector, row)) ||
 			    (name_vector != NULL &&
-			    duckvep_row_is_null(name_vector, row))) {
+			    duckvep_row_is_null(name_vector, row)) ||
+		    (circular_vector != NULL &&
+		    duckvep_row_is_null(circular_vector, row))) {
 				duckvep_sql_set_error(error, error_size,
 				    "seq_region query contains NULL");
 				duckdb_destroy_data_chunk(&chunk);
@@ -659,6 +676,8 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 			model->known_seq_regions[index] = (uint16_t)values[row];
 			model->sequence_lengths[index] = lengths != NULL
 			    ? (uint32_t)lengths[row] : 0;
+			model->region_circular[index] = circular_vector != NULL
+			    ? ((bool *)duckdb_vector_get_data(circular_vector))[row] : 0;
 			model->known_seq_region_count++;
 		}
 		duckdb_destroy_data_chunk(&chunk);
@@ -1063,6 +1082,26 @@ duckvep_validate_reference_fasta(const char *reference_fasta,
 }
 
 static int
+duckvep_model_region_topology(const duckvep_owned_model_t *model,
+	uint32_t seq_region, uint32_t *length, int *circular)
+{
+	size_t lo = 0, hi = model->known_seq_region_count;
+	while (lo < hi) {
+		size_t mid = lo + (hi - lo) / 2;
+		if (model->known_seq_regions[mid] < seq_region)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	if (lo == model->known_seq_region_count ||
+	    model->known_seq_regions[lo] != seq_region)
+		return 0;
+	if (length) *length = model->sequence_lengths[lo];
+	if (circular) *circular = model->region_circular[lo];
+	return 1;
+}
+
+static int
 duckvep_load_transcripts(duckdb_connection connection, const char *query,
 	duckvep_owned_model_t *model, char *error, size_t error_size)
 {
@@ -1134,7 +1173,8 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 		for (row = 0; row < rows; row++) {
 			size_t flank_offset, index, post_length, pre_length;
 			size_t sequence_length, sequence_offset;
-			int cds_nulls, sequence_nulls;
+			int cds_nulls, sequence_nulls, circular;
+			uint32_t region_length;
 
 			for (column = 0; column < 7; column++) {
 				if (duckvep_row_is_null(vectors[column], row)) {
@@ -1159,15 +1199,24 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
+			circular = 0;
+			region_length = 0;
 			if (seq_regions[row] > UINT16_MAX || starts[row] == 0 ||
-			    starts[row] > UINT32_MAX || ends[row] > UINT32_MAX ||
-			    ends[row] < starts[row] ||
+			    ends[row] == 0 || starts[row] > UINT32_MAX ||
+			    ends[row] > UINT32_MAX ||
+			    !duckvep_model_region_topology(model, seq_regions[row],
+			    &region_length, &circular) ||
+			    (region_length != 0 &&
+			    (starts[row] > region_length || ends[row] > region_length)) ||
+			    (starts[row] > ends[row] && (!circular || !region_length)) ||
 			    (strands[row] != 1 && strands[row] != -1)) {
 				duckvep_sql_set_error(error, error_size,
 				    "transcript row has an invalid region, span, or strand");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
+			if (starts[row] > ends[row])
+				model->has_wrapped_coordinates = 1;
 			model->seq_regions[index] = (uint16_t)seq_regions[row];
 			model->transcript_starts[index] = (uint32_t)starts[row];
 			model->transcript_ends[index] = (uint32_t)ends[row];
@@ -1202,12 +1251,21 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 			sequence_offset = model->cds_sequence_length;
 			sequence_length = 0;
 			if (cds_nulls == 0) {
-				if (cds_starts[row] == 0 ||
+				if (cds_starts[row] == 0 || cds_ends[row] == 0 ||
 				    cds_starts[row] > UINT32_MAX ||
 				    cds_ends[row] > UINT32_MAX ||
-				    cds_ends[row] < cds_starts[row] ||
+				    (region_length != 0 &&
+				    (cds_starts[row] > region_length ||
+				    cds_ends[row] > region_length)) ||
+				    (starts[row] <= ends[row] &&
+				    (cds_ends[row] < cds_starts[row] ||
 				    cds_starts[row] < starts[row] ||
-				    cds_ends[row] > ends[row]) {
+				    cds_ends[row] > ends[row])) ||
+				    (starts[row] > ends[row] &&
+				    ((cds_starts[row] < starts[row] &&
+				    cds_starts[row] > ends[row]) ||
+				    (cds_ends[row] < starts[row] &&
+				    cds_ends[row] > ends[row])))) {
 					duckvep_sql_set_error(error, error_size,
 					    "coding transcript has an invalid CDS span");
 					duckdb_destroy_data_chunk(&chunk);
@@ -1354,7 +1412,8 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 		phases = duckdb_vector_get_data(vectors[5]);
 		end_phases = duckdb_vector_get_data(vectors[6]);
 		for (row = 0; row < rows; row++) {
-			uint32_t transcript_index;
+			uint32_t transcript_index, region_length;
+			int circular;
 			size_t exon_index;
 
 			for (column = 0; column < 7; column++) {
@@ -1381,14 +1440,31 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 				goto done;
 			}
 			exon_index = model->exons.exon_count;
+			region_length = 0;
+			circular = 0;
+			(void)duckvep_model_region_topology(model,
+			    model->seq_regions[transcript_index], &region_length,
+			    &circular);
 			if (exon_index > UINT32_MAX || starts[row] == 0 ||
-			    starts[row] > UINT32_MAX || ends[row] > UINT32_MAX ||
-			    ends[row] < starts[row] || cdna_starts[row] == 0 ||
+			    ends[row] == 0 || starts[row] > UINT32_MAX ||
+			    ends[row] > UINT32_MAX ||
+			    (region_length != 0 && (starts[row] > region_length ||
+			    ends[row] > region_length)) ||
+			    (starts[row] > ends[row] && (!circular || !region_length)) ||
+			    cdna_starts[row] == 0 ||
 			    cdna_starts[row] > UINT32_MAX ||
 			    cdna_ends[row] > UINT32_MAX ||
 			    cdna_ends[row] < cdna_starts[row] ||
-			    starts[row] < model->transcript_starts[transcript_index] ||
-			    ends[row] > model->transcript_ends[transcript_index] ||
+			    (model->transcript_starts[transcript_index] <=
+			    model->transcript_ends[transcript_index] &&
+			    (starts[row] < model->transcript_starts[transcript_index] ||
+			    ends[row] > model->transcript_ends[transcript_index])) ||
+			    (model->transcript_starts[transcript_index] >
+			    model->transcript_ends[transcript_index] &&
+			    ((starts[row] < model->transcript_starts[transcript_index] &&
+			    starts[row] > model->transcript_ends[transcript_index]) ||
+			    (ends[row] < model->transcript_starts[transcript_index] &&
+			    ends[row] > model->transcript_ends[transcript_index]))) ||
 			    phases[row] < -1 || phases[row] > 2 ||
 			    end_phases[row] < -1 || end_phases[row] > 2) {
 				duckvep_sql_set_error(error, error_size,
@@ -1403,12 +1479,15 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 				previous_exon = exon_index - 1;
 				ordered = cdna_starts[row] >
 				    model->exon_cdna_ends[previous_exon];
-				if (model->strands[transcript_index] > 0)
-					ordered = ordered && starts[row] >
-					    model->exon_ends[previous_exon];
-				else
-					ordered = ordered && ends[row] <
-					    model->exon_starts[previous_exon];
+				if (model->transcript_starts[transcript_index] <=
+				    model->transcript_ends[transcript_index]) {
+					if (model->strands[transcript_index] > 0)
+						ordered = ordered && starts[row] >
+						    model->exon_ends[previous_exon];
+					else
+						ordered = ordered && ends[row] <
+						    model->exon_starts[previous_exon];
+				}
 				if (!ordered) {
 					duckvep_sql_set_error(error, error_size,
 					    "exons must be non-overlapping and ordered on the transcript");
@@ -1425,6 +1504,8 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 			if (model->exon_counts[transcript_index] == 0)
 				model->exon_offsets[transcript_index] =
 				    (uint32_t)exon_index;
+			if (starts[row] > ends[row])
+				model->has_wrapped_coordinates = 1;
 			model->exon_starts[exon_index] = (uint32_t)starts[row];
 			model->exon_ends[exon_index] = (uint32_t)ends[row];
 			model->exon_cdna_starts[exon_index] =
@@ -1445,9 +1526,49 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 
 		for (transcript = 0; transcript < model->transcripts.transcript_count;
 		    transcript++) {
+			size_t first, count, e;
+			uint32_t length;
+			int circular, crossings;
 			if (model->exon_counts[transcript] == 0) {
 				duckvep_sql_set_error(error, error_size,
 				    "every transcript must have at least one exon");
+				goto done;
+			}
+			first = model->exon_offsets[transcript];
+			count = model->exon_counts[transcript];
+			length = 0;
+			circular = 0;
+			(void)duckvep_model_region_topology(model,
+			    model->seq_regions[transcript], &length, &circular);
+			if (!circular || !length) continue;
+			crossings = 0;
+			for (e = first; e < first + count; e++) {
+				uint64_t span = model->exon_starts[e] > model->exon_ends[e]
+				    ? (uint64_t)length - model->exon_starts[e] + 1u + model->exon_ends[e]
+				    : (uint64_t)model->exon_ends[e] - model->exon_starts[e] + 1u;
+				if ((uint64_t)model->exon_cdna_ends[e] -
+				    model->exon_cdna_starts[e] + 1u != span) {
+					duckvep_sql_set_error(error, error_size,
+					    "circular exon cDNA length does not match its genomic span");
+					goto done;
+				}
+				crossings += model->exon_starts[e] > model->exon_ends[e];
+				if (e == first) continue;
+				crossings += model->strands[transcript] == 1
+				    ? model->exon_ends[e - 1] > model->exon_starts[e]
+				    : model->exon_starts[e - 1] < model->exon_ends[e];
+			}
+			if (crossings != (model->transcript_starts[transcript] >
+			    model->transcript_ends[transcript] ? 1 : 0) ||
+			    (model->transcript_starts[transcript] >
+			    model->transcript_ends[transcript] &&
+			    (model->strands[transcript] == 1
+			    ? (model->exon_starts[first] != model->transcript_starts[transcript] ||
+			    model->exon_ends[first + count - 1] != model->transcript_ends[transcript])
+			    : (model->exon_ends[first] != model->transcript_ends[transcript] ||
+			    model->exon_starts[first + count - 1] != model->transcript_starts[transcript])))) {
+				duckvep_sql_set_error(error, error_size,
+				    "circular exon ranks must traverse the origin exactly once");
 				goto done;
 			}
 		}
@@ -1468,9 +1589,19 @@ duckvep_mature_mirna_segment_is_exonic(
 	offset = model->exon_offsets[transcript_index];
 	count = model->exon_counts[transcript_index];
 	for (exon = offset; exon < offset + count; exon++) {
-		if (start1 >= model->exon_starts[exon] &&
-		    end1 <= model->exon_ends[exon])
+		if (model->exon_starts[exon] <= model->exon_ends[exon]) {
+			if (start1 <= end1 &&
+			    start1 >= model->exon_starts[exon] &&
+			    end1 <= model->exon_ends[exon])
+				return 1;
+		} else if ((start1 > end1 &&
+		    start1 >= model->exon_starts[exon] &&
+		    end1 <= model->exon_ends[exon]) ||
+		    (start1 <= end1 &&
+		    (start1 >= model->exon_starts[exon] ||
+		    end1 <= model->exon_ends[exon]))) {
 			return 1;
+		}
 	}
 	return 0;
 }
@@ -1530,7 +1661,8 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 		starts = duckdb_vector_get_data(vectors[1]);
 		ends = duckdb_vector_get_data(vectors[2]);
 		for (row = 0; row < rows; row++) {
-			uint32_t transcript_index;
+			uint32_t transcript_index, region_length;
+			int circular;
 			size_t feature_index;
 
 			for (column = 0; column < 3; column++) {
@@ -1553,10 +1685,26 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			if (starts[row] == 0 || starts[row] > UINT32_MAX ||
-			    ends[row] > UINT32_MAX || ends[row] < starts[row] ||
-			    starts[row] < model->transcript_starts[transcript_index] ||
-			    ends[row] > model->transcript_ends[transcript_index] ||
+			region_length = 0;
+			circular = 0;
+			(void)duckvep_model_region_topology(model,
+			    model->seq_regions[transcript_index], &region_length,
+			    &circular);
+			if (starts[row] == 0 || ends[row] == 0 ||
+			    starts[row] > UINT32_MAX || ends[row] > UINT32_MAX ||
+			    (region_length != 0 &&
+			    (starts[row] > region_length || ends[row] > region_length)) ||
+			    (starts[row] > ends[row] && !circular) ||
+			    (model->transcript_starts[transcript_index] <=
+			    model->transcript_ends[transcript_index] &&
+			    (starts[row] < model->transcript_starts[transcript_index] ||
+			    ends[row] > model->transcript_ends[transcript_index])) ||
+			    (model->transcript_starts[transcript_index] >
+			    model->transcript_ends[transcript_index] &&
+			    ((starts[row] < model->transcript_starts[transcript_index] &&
+			    starts[row] > model->transcript_ends[transcript_index]) ||
+			    (ends[row] < model->transcript_starts[transcript_index] &&
+			    ends[row] > model->transcript_ends[transcript_index]))) ||
 			    (model->transcript_flags[transcript_index] &
 			    (uint64_t)DUCKVEP_TX_BIOTYPE_MIRNA) == 0u ||
 			    !duckvep_mature_mirna_segment_is_exonic(model,
@@ -1732,31 +1880,6 @@ done:
 }
 
 static int
-duckvep_model_region_length(const duckvep_owned_model_t *model,
-	uint32_t seq_region, uint32_t *sequence_length)
-{
-	size_t begin, end;
-
-	begin = 0u;
-	end = model->known_seq_region_count;
-	while (begin < end) {
-		size_t middle;
-
-		middle = begin + (end - begin) / 2u;
-		if ((uint32_t)model->known_seq_regions[middle] < seq_region)
-			begin = middle + 1u;
-		else
-			end = middle;
-	}
-	if (begin >= model->known_seq_region_count ||
-	    (uint32_t)model->known_seq_regions[begin] != seq_region)
-		return 0;
-	if (sequence_length != NULL)
-		*sequence_length = model->sequence_lengths[begin];
-	return 1;
-}
-
-static int
 duckvep_load_interval_features(duckdb_connection connection,
 	const char *query, duckvep_owned_model_t *model, char *error,
 	size_t error_size)
@@ -1804,6 +1927,7 @@ duckvep_load_interval_features(duckdb_connection connection,
 		for (row = 0; row < rows; row++) {
 			size_t index;
 			uint32_t sequence_length;
+			int circular;
 
 			for (column = 0u; column < 5u; column++) {
 				if (duckvep_row_is_null(vectors[column], row)) {
@@ -1816,17 +1940,20 @@ duckvep_load_interval_features(duckdb_connection connection,
 			}
 			index = model->interval_feature_count;
 			sequence_length = 0u;
+			circular = 0;
 			if ((uint64_t)index > UINT32_MAX ||
 			    indices[row] != (uint32_t)index ||
 			    seq_regions[row] > UINT16_MAX || starts[row] == 0u ||
-			    ends[row] < starts[row] ||
+			    ends[row] == 0u ||
 			    (kinds[row] !=
 			    (uint8_t)DUCKVEP_INTERVAL_FEATURE_REGULATORY_REGION &&
 			    kinds[row] !=
 			    (uint8_t)DUCKVEP_INTERVAL_FEATURE_TF_BINDING_SITE) ||
-			    !duckvep_model_region_length(model, seq_regions[row],
-			    &sequence_length) ||
-			    (sequence_length != 0u && ends[row] > sequence_length)) {
+			    !duckvep_model_region_topology(model, seq_regions[row],
+			    &sequence_length, &circular) ||
+			    (sequence_length != 0u && (starts[row] > sequence_length ||
+			    ends[row] > sequence_length)) ||
+			    (starts[row] > ends[row] && (!circular || !sequence_length))) {
 				duckvep_sql_set_error(error, error_size,
 				    "interval-feature row has an invalid dense index, region, coordinate, or kind");
 				duckdb_destroy_data_chunk(&chunk);
@@ -1848,6 +1975,8 @@ duckvep_load_interval_features(duckdb_connection connection,
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
+			if (starts[row] > ends[row])
+				model->has_wrapped_coordinates = 1;
 			model->interval_feature_seq_regions[index] =
 			    (uint16_t)seq_regions[row];
 			model->interval_feature_starts[index] = starts[row];
@@ -1963,6 +2092,10 @@ duckvep_model_load_queries(duckdb_connection connection,
 			return 0;
 		}
 	}
+	/* Wrapped coordinates remain in the resident contract until circular
+	 * interval projection is available to the annotation kernel. */
+	if (model->has_wrapped_coordinates)
+		return 1;
 	memset(&kernel_error, 0, sizeof(kernel_error));
 	if (duckvep_model_open(&model->transcripts,
 	    &model->exons, &model->sequences, &model->interval_features,
@@ -2034,6 +2167,8 @@ duckvep_registry_pin(duckvep_registry_t *registry, const char *name)
 
 	pthread_mutex_lock(&registry->mutex);
 	entry = duckvep_registry_find_locked(registry, name);
+	if (entry != NULL && entry->model.has_wrapped_coordinates)
+		entry = NULL;
 	if (entry != NULL)
 		entry->pins++;
 	pthread_mutex_unlock(&registry->mutex);

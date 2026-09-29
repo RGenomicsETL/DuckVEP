@@ -32,6 +32,8 @@ typedef struct duckvep_owned_model {
 	duckvep_model_t *kernel;
 	uint16_t *known_seq_regions;
 	uint32_t *sequence_lengths;
+	uint8_t *region_circular;
+	int has_wrapped_coordinates;
 	char **sequence_names;
 	char *reference_fasta_path;
 	char *reference_fai_path;

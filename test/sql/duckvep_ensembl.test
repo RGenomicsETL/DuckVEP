@@ -1015,6 +1015,14 @@ FROM (
 GRCh37	de042a5650929ba7dca9c64b487e45463e71a0492b3df686f9365e40b6bda4e9	all current transcripts on MT and GL000201.1
 GRCh38	6d9f79077e8dfcca418ef82fffcc49f7c44f939eea83045a49bc1139e66b037b	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
 
+query II
+SELECT (SELECT count(*) FROM duckvep_grch38_transcripts
+        WHERE seq_region_name = 'MT' AND origin_crossing),
+       (SELECT count(*) FROM duckvep_grch37_transcripts
+        WHERE seq_region_name = 'MT' AND origin_crossing);
+----
+0	0
+
 query IIII
 SELECT (SELECT circular_region_count FROM duckvep_grch38_receipt),
        (SELECT circular_region_count FROM duckvep_grch37_receipt),
