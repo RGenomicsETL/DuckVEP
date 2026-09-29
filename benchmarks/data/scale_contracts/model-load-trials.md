@@ -8,3 +8,14 @@ Input: `/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb` (SHA-256
 | exact-capacity | `7b114ce738735aaa94fb0df7bde61bbacd786f6ef78d52f569b6917b573bd86e` | local commit `9747bf3b1b550e91894c48e5e2a2b81ca5daa45e` | 4.656 | 5,461,964–5,462,700 |
 
 Individual observations are in `model-load-trials.tsv`. The exact-capacity loader performs additional source scans; observed median load time increased by 1.103 s and process peak RSS increased by at least 177,548 KiB. VmHWM includes DuckDB and R allocations; it cannot substitute for model/index reservation or native owner counters. No owner-specific reserved/used measurements, 4 GiB budget admission, 32 MiB page cap or 2 GiB model/index certification is available from these trials.
+
+## Unordered scatter loader (`scale-slice3`, commit `096b945`)
+
+Same setup (fresh R process, one thread, 8 GB limit, immutable binary copies, a copy of the read-only model file). `origin-main-rerun` is the origin/main-equivalent binary `5e77dc2c175901afc635121b0958729e8b6a59ae880e82a4ffe5e77fb191b61e` loading the **ordered** queries; `scatter-unordered` is `b831bd915f138d2b3fb0d267663b8ddb02c3ab72c4916b56d6ed1394def0fc11` loading the same tables **without ORDER BY** (`benchmarks/scale_model_load.R EXTENSION MODEL unordered`).
+
+| Build | Median load (s) | Peak RSS (KiB), 3 runs |
+|---|---:|---:|
+| origin-main-rerun | 3.438 | 5,285,120 / 5,285,404 / 5,285,564 |
+| scatter-unordered | 3.299 | 5,232,852 / 5,232,888 / 5,233,200 |
+
+Load time improved by 0.139 s (4.0%); peak RSS fell by about 52,500 KiB (1.0%, 51 MiB). The peak is not materially reduced: the stable v1 C API has no streaming result (`duckdb_execute_prepared_streaming` is unstable-only), so every query result is still fully materialized by DuckDB before rows are scanned; only the sort buffers are gone. The earlier 2.8 GiB pre-array figure therefore reflects result materialization and the attached model's buffer cache, not mainly the sort.

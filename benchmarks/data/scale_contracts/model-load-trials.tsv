@@ -5,3 +5,9 @@ origin-main	3	3.519	5284020	NA	NA	NA	NA	NA
 exact-capacity	1	4.057	5462700	NA	NA	NA	NA	NA
 exact-capacity	2	4.656	5462168	NA	NA	NA	NA	NA
 exact-capacity	3	5.038	5461964	NA	NA	NA	NA	NA
+origin-main-rerun	1	3.438	5285120	NA	NA	NA	NA	NA
+origin-main-rerun	2	3.444	5285404	NA	NA	NA	NA	NA
+origin-main-rerun	3	3.423	5285564	NA	NA	NA	NA	NA
+scatter-unordered	1	3.299	5232852	NA	NA	NA	NA	NA
+scatter-unordered	2	3.319	5233200	NA	NA	NA	NA	NA
+scatter-unordered	3	3.275	5232888	NA	NA	NA	NA	NA
