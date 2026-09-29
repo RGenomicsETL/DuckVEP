@@ -41,7 +41,8 @@ flank <- 'CTAGGATCCTAGCATG'
 
 # ---- scenarios: edits are (pos, ref, alt) in transcript orientation; lanes 0/1 --------------------
 v <- function(pos, ref, alt, lane = 0L) list(pos = pos, ref = ref, alt = alt, lane = lane)
-# slice 3 = decided by the same-codon classifier; slice 5 = start/stop effects (pending until then).
+# slice 3 = decided by the same-codon classifier; slice 4 = a new stop before the terminator (decided by the
+# frame/stop-gain classifier); slice 5 = start/terminal effects (pending until then).
 scenarios <- list(
   cis_syn_pair_only_together = list(slice = 3L, edits = list(v(46, 'A', 'T'), v(47, 'G', 'C'))),
   trans_control_of_syn_pair = list(slice = 3L, edits = list(v(46, 'A', 'T', 0L), v(47, 'G', 'C', 1L))),
@@ -62,7 +63,7 @@ scenarios <- list(
   two_far_insertions = list(slice = 3L, edits = list(v(12, 'G', 'GTCT'), v(39, 'G', 'GACT'))),
   insertion_and_deletion_far = list(slice = 3L, edits = list(v(12, 'G', 'GTCT'), v(54, 'GGAG', 'G'))),
   two_far_deletions = list(slice = 3L, edits = list(v(12, 'GAAA', 'G'), v(54, 'GGAG', 'G'))),
-  stop_created_by_pair = list(slice = 5L, edits = list(v(29, 'T', 'A'), v(30, 'C', 'A'))),
+  stop_created_by_pair = list(slice = 4L, edits = list(v(29, 'T', 'A'), v(30, 'C', 'A'))),
   start_lost_by_pair = list(slice = 5L, edits = list(v(1, 'A', 'C'), v(2, 'T', 'C'))),
   stop_lost_by_pair = list(slice = 5L, edits = list(v(70, 'T', 'C'), v(71, 'A', 'G'))),
   stop_retained_single = list(slice = 5L, edits = list(v(72, 'A', 'G'))))

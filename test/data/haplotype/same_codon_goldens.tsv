@@ -37,8 +37,8 @@ plus_1exon__insertion_and_deletion_far	plus_1exon	insertion_and_deletion_far	0	p
 plus_1exon__insertion_and_deletion_far	plus_1exon	insertion_and_deletion_far	1				3
 plus_1exon__two_far_deletions	plus_1exon	two_far_deletions	0	inframe_deletion	MODERATE	MAELRSGPFDHWTVSIQYCLA*	3
 plus_1exon__two_far_deletions	plus_1exon	two_far_deletions	1				3
-plus_1exon__stop_created_by_pair	plus_1exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	5
-plus_1exon__stop_created_by_pair	plus_1exon	stop_created_by_pair	1				5
+plus_1exon__stop_created_by_pair	plus_1exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	4
+plus_1exon__stop_created_by_pair	plus_1exon	stop_created_by_pair	1				4
 plus_1exon__start_lost_by_pair	plus_1exon	start_lost_by_pair	0	start_lost	HIGH	PAELKRSGPFDHWTVSIQEYCLA*	5
 plus_1exon__start_lost_by_pair	plus_1exon	start_lost_by_pair	1				5
 plus_1exon__stop_lost_by_pair	plus_1exon	stop_lost_by_pair	0	stop_lost	HIGH	MAELKRSGPFDHWTVSIQEYCLAR	5
@@ -83,8 +83,8 @@ plus_2exon__insertion_and_deletion_far	plus_2exon	insertion_and_deletion_far	0	p
 plus_2exon__insertion_and_deletion_far	plus_2exon	insertion_and_deletion_far	1				3
 plus_2exon__two_far_deletions	plus_2exon	two_far_deletions	0	inframe_deletion	MODERATE	MAELRSGPFDHWTVSIQYCLA*	3
 plus_2exon__two_far_deletions	plus_2exon	two_far_deletions	1				3
-plus_2exon__stop_created_by_pair	plus_2exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	5
-plus_2exon__stop_created_by_pair	plus_2exon	stop_created_by_pair	1				5
+plus_2exon__stop_created_by_pair	plus_2exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	4
+plus_2exon__stop_created_by_pair	plus_2exon	stop_created_by_pair	1				4
 plus_2exon__start_lost_by_pair	plus_2exon	start_lost_by_pair	0	start_lost	HIGH	PAELKRSGPFDHWTVSIQEYCLA*	5
 plus_2exon__start_lost_by_pair	plus_2exon	start_lost_by_pair	1				5
 plus_2exon__stop_lost_by_pair	plus_2exon	stop_lost_by_pair	0	stop_lost	HIGH	MAELKRSGPFDHWTVSIQEYCLAR	5
@@ -129,8 +129,8 @@ plus_3exon__insertion_and_deletion_far	plus_3exon	insertion_and_deletion_far	0	p
 plus_3exon__insertion_and_deletion_far	plus_3exon	insertion_and_deletion_far	1				3
 plus_3exon__two_far_deletions	plus_3exon	two_far_deletions	0	inframe_deletion	MODERATE	MAELRSGPFDHWTVSIQYCLA*	3
 plus_3exon__two_far_deletions	plus_3exon	two_far_deletions	1				3
-plus_3exon__stop_created_by_pair	plus_3exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	5
-plus_3exon__stop_created_by_pair	plus_3exon	stop_created_by_pair	1				5
+plus_3exon__stop_created_by_pair	plus_3exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	4
+plus_3exon__stop_created_by_pair	plus_3exon	stop_created_by_pair	1				4
 plus_3exon__start_lost_by_pair	plus_3exon	start_lost_by_pair	0	start_lost	HIGH	PAELKRSGPFDHWTVSIQEYCLA*	5
 plus_3exon__start_lost_by_pair	plus_3exon	start_lost_by_pair	1				5
 plus_3exon__stop_lost_by_pair	plus_3exon	stop_lost_by_pair	0	stop_lost	HIGH	MAELKRSGPFDHWTVSIQEYCLAR	5
@@ -175,8 +175,8 @@ minus_1exon__insertion_and_deletion_far	minus_1exon	insertion_and_deletion_far	0
 minus_1exon__insertion_and_deletion_far	minus_1exon	insertion_and_deletion_far	1				3
 minus_1exon__two_far_deletions	minus_1exon	two_far_deletions	0	inframe_deletion	MODERATE	MAELRSGPFDHWTVSIQYCLA*	3
 minus_1exon__two_far_deletions	minus_1exon	two_far_deletions	1				3
-minus_1exon__stop_created_by_pair	minus_1exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	5
-minus_1exon__stop_created_by_pair	minus_1exon	stop_created_by_pair	1				5
+minus_1exon__stop_created_by_pair	minus_1exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	4
+minus_1exon__stop_created_by_pair	minus_1exon	stop_created_by_pair	1				4
 minus_1exon__start_lost_by_pair	minus_1exon	start_lost_by_pair	0	start_lost	HIGH	PAELKRSGPFDHWTVSIQEYCLA*	5
 minus_1exon__start_lost_by_pair	minus_1exon	start_lost_by_pair	1				5
 minus_1exon__stop_lost_by_pair	minus_1exon	stop_lost_by_pair	0	stop_lost	HIGH	MAELKRSGPFDHWTVSIQEYCLAR	5
@@ -221,8 +221,8 @@ minus_2exon__insertion_and_deletion_far	minus_2exon	insertion_and_deletion_far	0
 minus_2exon__insertion_and_deletion_far	minus_2exon	insertion_and_deletion_far	1				3
 minus_2exon__two_far_deletions	minus_2exon	two_far_deletions	0	inframe_deletion	MODERATE	MAELRSGPFDHWTVSIQYCLA*	3
 minus_2exon__two_far_deletions	minus_2exon	two_far_deletions	1				3
-minus_2exon__stop_created_by_pair	minus_2exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	5
-minus_2exon__stop_created_by_pair	minus_2exon	stop_created_by_pair	1				5
+minus_2exon__stop_created_by_pair	minus_2exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	4
+minus_2exon__stop_created_by_pair	minus_2exon	stop_created_by_pair	1				4
 minus_2exon__start_lost_by_pair	minus_2exon	start_lost_by_pair	0	start_lost	HIGH	PAELKRSGPFDHWTVSIQEYCLA*	5
 minus_2exon__start_lost_by_pair	minus_2exon	start_lost_by_pair	1				5
 minus_2exon__stop_lost_by_pair	minus_2exon	stop_lost_by_pair	0	stop_lost	HIGH	MAELKRSGPFDHWTVSIQEYCLAR	5
@@ -267,8 +267,8 @@ minus_3exon__insertion_and_deletion_far	minus_3exon	insertion_and_deletion_far	0
 minus_3exon__insertion_and_deletion_far	minus_3exon	insertion_and_deletion_far	1				3
 minus_3exon__two_far_deletions	minus_3exon	two_far_deletions	0	inframe_deletion	MODERATE	MAELRSGPFDHWTVSIQYCLA*	3
 minus_3exon__two_far_deletions	minus_3exon	two_far_deletions	1				3
-minus_3exon__stop_created_by_pair	minus_3exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	5
-minus_3exon__stop_created_by_pair	minus_3exon	stop_created_by_pair	1				5
+minus_3exon__stop_created_by_pair	minus_3exon	stop_created_by_pair	0	stop_gained	HIGH	MAELKRSGP*	4
+minus_3exon__stop_created_by_pair	minus_3exon	stop_created_by_pair	1				4
 minus_3exon__start_lost_by_pair	minus_3exon	start_lost_by_pair	0	start_lost	HIGH	PAELKRSGPFDHWTVSIQEYCLA*	5
 minus_3exon__start_lost_by_pair	minus_3exon	start_lost_by_pair	1				5
 minus_3exon__stop_lost_by_pair	minus_3exon	stop_lost_by_pair	0	stop_lost	HIGH	MAELKRSGPFDHWTVSIQEYCLAR	5

@@ -1,0 +1,204 @@
+require duckvep
+
+# Frame opening/restoration and stop-gain classifier (slice 4 of #2, contract design/duckvep_haplotype_contract.md).
+# The model, calls and expectations are the committed fixtures of test/scripts/generate_frame_goldens.R: 30 scenarios
+# on six layouts (plus/minus strand, one/two/three exons, introns inside codons 12 and 18), 180 transcripts, 324 VCF
+# records. Goldens are base R with no DuckVEP code; frame_csq_expected.tsv is the pinned bcftools csq output mapped
+# through csq_so_map_v1.tsv, with each divergence declared (test/data/haplotype/README.md), checked offline by
+# check_frame_goldens.R.
+
+statement ok
+CREATE TABLE fr_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region,
+ transcript_start::UBIGINT transcript_start,transcript_end::UBIGINT transcript_end,strand::TINYINT strand,
+ seq_region::UINTEGER gene_index,3::UBIGINT transcript_flags,transcript_start::UBIGINT cds_start,
+ transcript_end::UBIGINT cds_end,cds_sequence::BLOB cds_sequence,1::UTINYINT codon_table,
+ ''::BLOB pre_cds_sequence,''::BLOB post_cds_sequence,"case" AS case_name
+ FROM read_csv('test/data/haplotype/frame_transcripts.tsv',delim='\t',header=true);
+
+statement ok
+CREATE TABLE fr_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start::UBIGINT exon_start,
+ exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,exon_cdna_end::UBIGINT exon_cdna_end,
+ phase::TINYINT phase,end_phase::TINYINT end_phase
+ FROM read_csv('test/data/haplotype/frame_exons.tsv',delim='\t',header=true);
+
+query I
+SELECT loaded FROM duckvep_model_load('fr','SELECT i::UINTEGER seq_region FROM range(180) t(i)',
+ 'SELECT * EXCLUDE(case_name) FROM fr_tx ORDER BY transcript_index',
+ 'SELECT * FROM fr_exons ORDER BY transcript_index,exon_cdna_start');
+----
+1
+
+statement ok
+CREATE TABLE fr_vcf AS SELECT string_split(line,chr(9)) f FROM (SELECT unnest(string_split(content,chr(10))) line
+ FROM read_text('test/data/haplotype/frame.vcf')) WHERE line<>'' AND NOT starts_with(line,'#');
+
+statement ok
+CREATE TABLE fr_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq_region::INT seq_region,
+ v.f[2]::BIGINT AS position,v.f[4] AS reference,v.f[5] AS alternate,1 AS alt_index,t.transcript_index::INT transcript_index,
+ 0 sample_index,(CASE v.f[10] WHEN '1|0' THEN [1,0] WHEN '0|1' THEN [0,1] ELSE [1,1] END)::INTEGER[] alleles,
+ [false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set
+ FROM fr_vcf v JOIN fr_tx t ON t.case_name=v.f[1];
+
+query I
+SELECT count(*) FROM fr_calls;
+----
+324
+
+statement ok
+CREATE TABLE fr_gold AS SELECT g."case" AS case_name,g.scenario,t.transcript_index,g.lane,g.so_terms,g.impact,
+ g.classifier_slice,g.protein,e.csq_so_terms,e.declared_divergence
+ FROM read_csv('test/data/haplotype/frame_goldens.tsv',delim='\t',header=true,nullstr='<none>',
+  types={'so_terms':'VARCHAR','impact':'VARCHAR','protein':'VARCHAR'}) g
+ JOIN fr_tx t ON t.case_name=g."case"
+ JOIN read_csv('test/data/haplotype/frame_csq_expected.tsv',delim='\t',header=true,nullstr='<none>',
+  types={'csq_so_terms':'VARCHAR'}) e ON e."case"=g."case" AND e.lane=g.lane;
+
+query I
+SELECT count(*) FROM fr_gold;
+----
+360
+
+# One row per distinct edit path; one carrier per (sample, phase set, lane).
+
+statement ok
+CREATE TABLE fr_out AS SELECT h.transcript_index,c.haplotype_lane-1 AS lane,c.prediction_status carrier_status,
+ c.haplotype_consequences carrier_consequences,c.haplotype_impact carrier_impact,h.prediction_status,
+ h.prediction_reason,h.haplotype_consequences,h.haplotype_impact,h.protein,h.sequence_status,
+ h.carrier_count,h.contributor_provenance,h.normalized_edits
+ FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes('SELECT * FROM fr_calls','fr')) h;
+
+# Lanes carrying at least one ALT: one per transcript, plus the extra lane of the trans and hom-alt scenarios.
+
+query II
+SELECT count(*),count(DISTINCT transcript_index) FROM fr_out;
+----
+192	180
+
+# Gate (i): every slice-4 lane with an ALT is decided and equals the independent base-R golden exactly:
+# whole-haplotype SO set, IMPACT and edited protein, both at the row and per carrier.
+
+query IIIIIIII
+SELECT count(*),
+ count(*) FILTER (WHERE o.prediction_status='predicted' AND o.prediction_reason='supported_domain'),
+ count(*) FILTER (WHERE list_sort(o.haplotype_consequences)=list_sort(string_split(g.so_terms,','))),
+ count(*) FILTER (WHERE o.haplotype_impact=g.impact),
+ count(*) FILTER (WHERE list_sort(o.carrier_consequences)=list_sort(string_split(g.so_terms,','))),
+ count(*) FILTER (WHERE o.carrier_impact=g.impact),
+ count(*) FILTER (WHERE o.carrier_status='predicted'),
+ count(*) FILTER (WHERE o.protein=g.protein)
+FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.classifier_slice=4 AND g.so_terms<>'';
+----
+186	186	186	186	186	186	186	186
+
+# Reference-only lanes (empty golden set) have no carrier row, so no consequence is invented for them.
+
+query II
+SELECT count(*) FILTER (WHERE g.so_terms=''),
+ count(*) FILTER (WHERE g.so_terms='' AND o.lane IS NOT NULL)
+FROM fr_gold g LEFT JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane;
+----
+168	0
+
+# Gate (ii): the pinned csq output mapped through csq_so_map_v1 agrees on every slice-4 lane outside the 20
+# declared divergences (README.md), on both strands and every exon layout; each divergent lane equals the
+# declared csq set on the csq side and the golden on the DuckVEP side.
+
+query IIII
+SELECT count(*) FILTER (WHERE g.declared_divergence='.'),
+ count(*) FILTER (WHERE g.declared_divergence='.' AND
+  array_to_string(list_sort(o.haplotype_consequences),',')=g.csq_so_terms),
+ count(*) FILTER (WHERE g.declared_divergence<>'.'),
+ count(*) FILTER (WHERE g.declared_divergence<>'.' AND
+  array_to_string(list_sort(o.haplotype_consequences),',')<>g.csq_so_terms)
+FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.classifier_slice=4 AND g.so_terms<>'';
+----
+60	60	126	126
+
+# The start-codon effect is slice 5: eligible, no SO set or IMPACT invented, edited protein still exact.
+
+query IIIII
+SELECT count(*),
+ count(*) FILTER (WHERE o.prediction_status='eligible_classifier_pending' AND
+  o.prediction_reason='start_stop_classifier_pending'),
+ count(*) FILTER (WHERE o.haplotype_consequences IS NULL AND o.carrier_consequences IS NULL),
+ count(*) FILTER (WHERE o.haplotype_impact IS NULL AND o.carrier_impact IS NULL),
+ count(*) FILTER (WHERE o.protein=g.protein)
+FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.classifier_slice=5 AND g.so_terms<>'';
+----
+6	6	6	6	6
+
+# The counterexample of the contract appendix: the same nominal +1/-1 history is rescued when the edits sit
+# where the displaced frame has no stop, and ends in an earlier stop when the displaced frame reads a stop
+# before the restoring deletion. The classification follows the translated sequence, not the nominal offset.
+
+query TTTT
+SELECT g.scenario,string_agg(DISTINCT array_to_string(list_sort(o.haplotype_consequences),','),' ; '),
+ string_agg(DISTINCT list_aggregate(list_transform(o.normalized_edits,lambda e: length(e.alternate)-length(e.reference)),'string_agg','/'),' ; '),
+ count(DISTINCT g.case_name)
+FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.scenario IN ('restored_rescued','restored_early_stop','restored_rescued_wide','restored_early_stop_wide')
+GROUP BY 1 ORDER BY 1;
+----
+restored_early_stop	frameshift_variant,stop_gained	1/-1	6
+restored_early_stop_wide	frameshift_variant,stop_gained	1/-1	6
+restored_rescued	protein_altering_variant	1/-1	6
+restored_rescued_wide	protein_altering_variant	1/-1	6
+
+# A frame edit after the first stop is a contributor (its own block after the stop, role post_stop), not an
+# expressed effect: the row carries stop_gained without a frame term, and the frame-shifting insertion stays
+# attributed.
+
+query TTTTT
+SELECT g.scenario,array_to_string(list_sort(o.haplotype_consequences),','),o.haplotype_impact,
+ string_agg(x.role||':'||x.edit_count,' ' ORDER BY x.role),count(DISTINCT g.case_name)
+FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane,
+ unnest(o.contributor_provenance) t(x)
+WHERE g.scenario='stop_gained_post_stop_frame' GROUP BY g.scenario,o.haplotype_consequences,o.haplotype_impact,g.case_name
+ORDER BY g.case_name LIMIT 2;
+----
+stop_gained_post_stop_frame	stop_gained	HIGH	applied:1 post_stop:1	1
+stop_gained_post_stop_frame	stop_gained	HIGH	applied:1 post_stop:1	1
+
+# A frame restored after a stop that lies in the displaced frame: the stop is expressed (frameshift plus
+# stop_gained) and the restoring deletion stays attached as a contributor with its own normalized edit.
+# Roles are per interaction block (the slice-2 contract): both edits share the block that opens before the
+# stop, so both are applied; only a whole block after the stop is post_stop.
+
+query TIITI
+SELECT array_to_string(list_sort(o.haplotype_consequences),','),len(o.contributor_provenance),
+ len(o.normalized_edits),list_aggregate(list_sort(list_transform(o.contributor_provenance,lambda x: x.role)),'string_agg',','),
+ count(*) OVER ()
+FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.scenario='restored_early_stop' ORDER BY g.case_name LIMIT 2;
+----
+frameshift_variant,stop_gained	2	2	applied,applied	6
+frameshift_variant,stop_gained	2	2	applied,applied	6
+
+# Trans control: a +1 on lane 1 and a -1 on lane 2 are separate frame openings, each decided per carrier with
+# its own set; the hom-alt +1 puts the same decided set on both lanes.
+
+query TITT
+SELECT g.scenario,o.lane,array_to_string(list_sort(o.carrier_consequences),','),o.carrier_impact
+FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.case_name IN ('minus_2exon__trans_control_of_pair','minus_2exon__hom_alt_frame_open') ORDER BY 1,2;
+----
+hom_alt_frame_open	0	frameshift_variant,stop_gained	HIGH
+hom_alt_frame_open	1	frameshift_variant,stop_gained	HIGH
+trans_control_of_pair	0	frameshift_variant,stop_gained	HIGH
+trans_control_of_pair	1	frameshift_variant	HIGH
+
+# Carriers: consequence sets are ordered by severity rank (stop_gained before frameshift_variant), each with
+# IMPACT the maximum severity of its terms; 186 predicted carriers in all.
+
+query TTI
+SELECT array_to_string(carrier_consequences,','),carrier_impact,count(*)
+FROM fr_out WHERE carrier_status='predicted' GROUP BY ALL ORDER BY ALL;
+----
+frameshift_variant	HIGH	24
+protein_altering_variant	MODERATE	60
+stop_gained	HIGH	30
+stop_gained,frameshift_variant	HIGH	60
+synonymous_variant	LOW	12

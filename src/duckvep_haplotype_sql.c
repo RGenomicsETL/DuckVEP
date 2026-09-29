@@ -31,7 +31,7 @@ enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
     HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 22, HAPLOTYPE_CONSEQUENCES_COLUMN = 23,
     HAPLOTYPE_IMPACT_COLUMN = 24, HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 25,
     HAPLOTYPE_OUTPUT_COLUMNS = 26 };
-enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 5 };
+enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 7 };
 #define HAPLOTYPE_POLICY_VERSION "duckvep-coding-v1"
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10 };
 static const char *const limit_names[] = {"max_active_events", "max_active_transcripts",
@@ -225,11 +225,13 @@ static void haplotype_bind(duckdb_bind_info info) {
         HAPLOTYPE_PROVENANCE_FIELDS, 0);
     bind_record_list(info, "normalized_edits", edit_names, edit_ids, HAPLOTYPE_EDIT_FIELDS, 0);
     const char *const carrier_prediction_names[] = {"sample_index", "phase_set", "haplotype_lane",
-        "prediction_status", "prediction_reason"};
+        "prediction_status", "prediction_reason", "haplotype_impact", "haplotype_consequences"};
     const duckdb_type carrier_prediction_ids[] = {DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_BIGINT,
-        DUCKDB_TYPE_USMALLINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR};
+        DUCKDB_TYPE_USMALLINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR};
+    /* Slice 4: the consequence set and IMPACT of the shared edited sequence, decided per carrier so an
+     * ineligible carrier of the row (for example a triploid call) never hides an eligible one. */
     bind_record_list(info, "carrier_predictions", carrier_prediction_names, carrier_prediction_ids,
-        HAPLOTYPE_CARRIER_PREDICTION_FIELDS, 0);
+        HAPLOTYPE_CARRIER_PREDICTION_FIELDS, 1);
     /* Slice 3: whole-haplotype reduced SO set and IMPACT of the same-codon classifier. */
     duckdb_logical_type so_element = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
     duckdb_logical_type so_list = duckdb_create_list_type(so_element);
@@ -915,7 +917,6 @@ static const char *reason_name(duckvep_prediction_reason_t reason, duckvep_cds_e
     case DUCKVEP_REASON_INTERNAL_STOP: return "internal_stop";
     case DUCKVEP_REASON_NON_LITERAL_ALLELE: return "non_literal_allele";
     case DUCKVEP_REASON_ALLELE_OVER_50: return "allele_over_50_bases";
-    case DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING: return "frame_classifier_pending";
     case DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING: return "start_stop_classifier_pending";
     default: return "invalid_sequence";
     }
@@ -943,6 +944,17 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
     duckdb_vector_assign_string_element(v[HAPLOTYPE_POLICY_COLUMN], row, HAPLOTYPE_POLICY_VERSION);
     duckdb_vector_assign_string_element(v[HAPLOTYPE_STATUS_COLUMN], row, status_name(leaf->prediction_status));
     duckdb_vector_assign_string_element(v[HAPLOTYPE_REASON_COLUMN], row, reason_name(leaf->prediction_reason, leaf->prediction_projection));
+    /* The shared edited sequence has one reduced SO set, ordered by severity rank; it is emitted for
+     * every carrier whose own keyed status is predicted, and for the row only when all are. */
+    unsigned bits[DUCKVEP_SO_BIT_COUNT], n = 0u;
+    if (leaf->path_status == DUCKVEP_PREDICTION_PREDICTED) {
+        for (unsigned bit = 0u; bit < DUCKVEP_SO_BIT_COUNT; bit++)
+            if (leaf->haplotype_so_mask & DUCKVEP_SO(bit)) {
+                unsigned at = n++;
+                while (at && duckvep_so_rank(bits[at - 1u]) > duckvep_so_rank(bit)) { bits[at] = bits[at - 1u]; at--; }
+                bits[at] = bit;
+            }
+    }
     const size_t counts[] = {leaf->contributor_count, leaf->listed_edit_count, leaf->carriers.call_count};
     const unsigned field_counts[] = {HAPLOTYPE_PROVENANCE_FIELDS, HAPLOTYPE_EDIT_FIELDS,
         HAPLOTYPE_CARRIER_PREDICTION_FIELDS};
@@ -959,6 +971,19 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
             duckdb_vector_ensure_validity_writable(fields[j]);
         }
         size_t block = 0u;
+        duckdb_list_entry carrier_terms = {0u, 0u};
+        duckdb_vector carrier_term_values = NULL;
+        if (list == 2u && n) {
+            /* One copy of the shared term list serves every predicted carrier of this leaf. */
+            if (!duckvep_list_extend(fields[6], n, &carrier_terms)) return 0;
+            carrier_term_values = duckdb_list_vector_get_child(fields[6]);
+            duckdb_vector_ensure_validity_writable(carrier_term_values);
+            for (unsigned k = 0u; k < n; k++) {
+                duckdb_validity_set_row_valid(duckdb_vector_get_validity(carrier_term_values), carrier_terms.offset + k);
+                duckdb_vector_assign_string_element(carrier_term_values, carrier_terms.offset + k,
+                    duckvep_so_name((duckvep_so_bit_t)bits[k]));
+            }
+        }
         for (size_t i = 0u; i < counts[list]; i++) {
             idx_t at = entry.offset + i;
             duckdb_validity_set_row_valid(duckdb_vector_get_validity(records), at);
@@ -989,6 +1014,18 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
                 ((uint16_t *)duckdb_vector_get_data(fields[2]))[at] = call->key.lane;
                 duckdb_vector_assign_string_element(fields[3], at, status_name(cs));
                 duckdb_vector_assign_string_element(fields[4], at, reason_name(cr, leaf->prediction_projection));
+                /* An empty list with NULL IMPACT is a lane equal to the reference; NULL both when the
+                 * carrier itself is not predicted. */
+                if (cs == DUCKVEP_PREDICTION_PREDICTED) {
+                    if (n) duckdb_vector_assign_string_element(fields[5], at,
+                        duckvep_impact_name(duckvep_so_impact(leaf->haplotype_so_mask)));
+                    else null_cell(fields[5], at);
+                    ((duckdb_list_entry *)duckdb_vector_get_data(fields[6]))[at] = carrier_terms;
+                } else {
+                    null_cell(fields[5], at);
+                    ((duckdb_list_entry *)duckdb_vector_get_data(fields[6]))[at] = (duckdb_list_entry){0u, 0u};
+                    null_cell(fields[6], at);
+                }
                 call_id = call->next_leaf;
             } else {
                 const duckvep_haplotype_edit_t *e = &s->buffers.edits[i];
@@ -1014,15 +1051,6 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
     duckdb_vector impact = duckdb_data_chunk_get_vector(output, HAPLOTYPE_IMPACT_COLUMN);
     duckdb_list_entry entry = {0u, 0u};
     int decided = leaf->prediction_status == DUCKVEP_PREDICTION_PREDICTED;
-    unsigned bits[DUCKVEP_SO_BIT_COUNT], n = 0u;
-    if (decided) {
-        for (unsigned bit = 0u; bit < DUCKVEP_SO_BIT_COUNT; bit++)
-            if (leaf->haplotype_so_mask & DUCKVEP_SO(bit)) {
-                unsigned at = n++;
-                while (at && duckvep_so_rank(bits[at - 1u]) > duckvep_so_rank(bit)) { bits[at] = bits[at - 1u]; at--; }
-                bits[at] = bit;
-            }
-    }
     if (!duckvep_list_extend(consequences, decided ? n : 0u, &entry)) return 0;
     ((duckdb_list_entry *)duckdb_vector_get_data(consequences))[row] = entry;
     if (!decided) null_cell(consequences, row);
@@ -1317,6 +1345,11 @@ static void haplotype_scan(duckdb_function_info info, duckdb_data_chunk output) 
         if (duckdb_list_vector_set_size(duckdb_data_chunk_get_vector(output, i), 0u) != DuckDBSuccess) {
             duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset output list"); return;
         }
+    duckdb_vector carrier_records = duckdb_list_vector_get_child(
+        duckdb_data_chunk_get_vector(output, HAPLOTYPE_CARRIER_PREDICTION_COLUMN));
+    if (duckdb_list_vector_set_size(duckdb_struct_vector_get_child(carrier_records, 6u), 0u) != DuckDBSuccess) {
+        duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset carrier consequence list"); return;
+    }
     duckdb_vector blocks = duckdb_list_vector_get_child(duckdb_data_chunk_get_vector(output, 11u));
     if (duckdb_list_vector_set_size(duckdb_struct_vector_get_child(blocks, HAPLOTYPE_BLOCK_EVENT_FIELD), 0u) != DuckDBSuccess) {
         duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset block event list"); return;

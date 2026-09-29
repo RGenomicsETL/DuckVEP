@@ -1845,7 +1845,8 @@ static char haplo_class_amino(const char *codon) {
 struct haplo_class_edit { unsigned pos; const char *ref, *alt; }; /* transcript orientation, 1-based */
 
 /* Independent expectation for frame-preserving substitutions: 0 synonymous, 1 missense, 2 pending
- * start/stop. Edits are equal-length substitutions; everything is decided on the edited cDNA. */
+ * (an edit in the start or terminal codon), 3 stop_gained (a new first stop before the terminator).
+ * Edits are equal-length substitutions; everything is decided on the edited cDNA. */
 static int haplo_class_expect_substitutions(const struct haplo_class_edit *edits, size_t count) {
     char alt[sizeof(haplo_class_cds)];
     memcpy(alt, haplo_class_cds, sizeof(alt));
@@ -1857,13 +1858,13 @@ static int haplo_class_expect_substitutions(const struct haplo_class_edit *edits
             touches |= pos <= 3u || pos >= 22u;
         }
     }
-    int same = 1;
+    int same = 1, stop = 0;
     for (unsigned codon = 0u; codon < 8u; codon++) {
         char a = haplo_class_amino(alt + 3u * codon), r = haplo_class_amino(haplo_class_cds + 3u * codon);
-        if (a == '*' && codon != 7u) touches = 1;
+        if (a == '*' && codon != 7u) stop = 1;
         same &= a == r;
     }
-    return touches ? 2 : same ? 0 : 1;
+    return touches ? 2 : stop ? 3 : same ? 0 : 1;
 }
 
 /* Runs one lane of records (transcript-orientation edits) through the stream and returns the leaf. */
@@ -1911,10 +1912,11 @@ static duckvep_haplotype_stream_status_t haplo_class_run(struct haplotype_stream
 
 TEST haplotype_same_codon_classifier_matches_independent_translation(void) {
     /* Every single and pair of substitutions over all 24 CDS positions, on both strands: identical peptide
-     * is synonymous, a changed peptide missense, and any start/terminal-codon edit or created stop is
-     * left pending. The combined sequence is classified, never a member alone. */
+     * is synonymous, a changed peptide missense, a new first stop before the terminator stop_gained, and
+     * any start/terminal-codon edit is left pending. The combined sequence is classified, never a member
+     * alone. */
     static const char bases[] = "ACGT";
-    unsigned decided[3] = {0u, 0u, 0u}, seen_cis_syn_of_missense = 0u;
+    unsigned decided[4] = {0u, 0u, 0u, 0u}, seen_cis_syn_of_missense = 0u;
     for (int reverse = 0; reverse < 2; reverse++) {
         for (unsigned p1 = 1u; p1 <= 24u; p1++) for (unsigned b1 = 0u; b1 < 4u; b1++) {
             if (bases[b1] == haplo_class_cds[p1 - 1u]) continue;
@@ -1937,9 +1939,10 @@ TEST haplotype_same_codon_classifier_matches_independent_translation(void) {
                 } else {
                     ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.path_status);
                     ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.prediction_status);
-                    ASSERT_EQ(DUCKVEP_SO(expected ? DUCKVEP_SO_MISSENSE : DUCKVEP_SO_SYNONYMOUS), leaf.haplotype_so_mask);
-                    ASSERT_EQ((int)(expected ? DUCKVEP_IMPACT_MODERATE : DUCKVEP_IMPACT_LOW),
-                              (int)duckvep_so_impact(leaf.haplotype_so_mask));
+                    ASSERT_EQ(DUCKVEP_SO(expected == 3 ? DUCKVEP_SO_STOP_GAINED :
+                        expected ? DUCKVEP_SO_MISSENSE : DUCKVEP_SO_SYNONYMOUS), leaf.haplotype_so_mask);
+                    ASSERT_EQ((int)(expected == 3 ? DUCKVEP_IMPACT_HIGH : expected ? DUCKVEP_IMPACT_MODERATE :
+                        DUCKVEP_IMPACT_LOW), (int)duckvep_so_impact(leaf.haplotype_so_mask));
                 }
                 decided[expected]++;
                 /* A pair whose members are each missense but whose combination is synonymous. */
@@ -1951,40 +1954,200 @@ TEST haplotype_same_codon_classifier_matches_independent_translation(void) {
             }
         }
     }
-    ASSERT(decided[0] > 0u && decided[1] > 0u && decided[2] > 0u);
+    ASSERT(decided[0] > 0u && decided[1] > 0u && decided[2] > 0u && decided[3] > 0u);
     ASSERT(seen_cis_syn_of_missense > 0u);
     PASS();
 }
 
-TEST haplotype_same_codon_classifier_names_pure_and_mixed_indels_and_defers_frames(void) {
-    const struct { const char *name; size_t count; struct haplo_class_edit edits[3]; int status; int reason;
-        unsigned so; } cases[] = {
-        {"insertion at a codon boundary", 1u, {{12u, "G", "GTCT"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_INSERTION},
-        {"insertion inside a codon", 1u, {{4u, "G", "GAAA"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_INSERTION},
-        {"whole-codon deletion", 1u, {{12u, "GAAA", "G"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_DELETION},
-        {"two insertions", 2u, {{6u, "T", "TGGG"}, {18u, "C", "CGGG"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_INSERTION},
-        {"two deletions", 2u, {{6u, "TGAA", "T"}, {15u, "ACGC", "A"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_DELETION},
-        {"insertion and deletion", 2u, {{12u, "G", "GTCT"}, {15u, "ACGC", "A"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_PROTEIN_ALTERING},
-        {"insertion and substitution", 2u, {{5u, "C", "G"}, {12u, "G", "GTCT"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_PROTEIN_ALTERING},
-        {"in-frame replacement", 1u, {{7u, "GAACTG", "GGG"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_PROTEIN_ALTERING},
-        {"one-base insertion", 1u, {{12u, "G", "GT"}}, DUCKVEP_PREDICTION_ELIGIBLE, DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING, 0},
-        {"frame restored by a later edit", 2u, {{12u, "G", "GT"}, {17u, "GC", "G"}}, DUCKVEP_PREDICTION_ELIGIBLE, DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING, 0},
-        {"insertion before the stop codon", 1u, {{21u, "C", "CCCC"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_INSERTION},
-        {"insertion inside the stop codon", 1u, {{22u, "T", "TGGG"}}, DUCKVEP_PREDICTION_ELIGIBLE, DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING, 0},
-        {"start codon deletion", 1u, {{1u, "ATGG", "A"}}, DUCKVEP_PREDICTION_ELIGIBLE, DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING, 0}};
+TEST haplotype_same_codon_classifier_names_pure_and_mixed_indels_and_frames(void) {
+    /* CDS ATG GCT GAA CTG AAA CGC AGC TAA. mask 0 with status PREDICTED never occurs; a nonzero mask is the
+     * expected whole-haplotype SO set, PENDING the leaf stays eligible for slice 5. */
+    enum { PENDING = 0 };
+    const uint64_t FS = DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT), SG = DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED);
+    const struct { const char *name; size_t count; struct haplo_class_edit edits[3]; uint64_t mask; } cases[] = {
+        {"insertion at a codon boundary", 1u, {{12u, "G", "GTCT"}}, DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION)},
+        {"insertion inside a codon", 1u, {{4u, "G", "GAAA"}}, DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION)},
+        {"whole-codon deletion", 1u, {{12u, "GAAA", "G"}}, DUCKVEP_SO(DUCKVEP_SO_INFRAME_DELETION)},
+        {"two insertions", 2u, {{6u, "T", "TGGG"}, {18u, "C", "CGGG"}}, DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION)},
+        {"two deletions", 2u, {{6u, "TGAA", "T"}, {15u, "ACGC", "A"}}, DUCKVEP_SO(DUCKVEP_SO_INFRAME_DELETION)},
+        {"insertion and deletion", 2u, {{12u, "G", "GTCT"}, {15u, "ACGC", "A"}}, DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING)},
+        {"insertion and substitution", 2u, {{5u, "C", "G"}, {12u, "G", "GTCT"}}, DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING)},
+        {"in-frame replacement", 1u, {{7u, "GAACTG", "GGG"}}, DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING)},
+        /* Frame opening: the displaced frame reads T AAA (stop at alt codon 5) inside the interval. */
+        {"one-base insertion, early stop", 1u, {{12u, "G", "GT"}}, SG | FS},
+        {"frame restored after that stop", 2u, {{12u, "G", "GT"}, {17u, "GC", "G"}}, SG | FS},
+        /* One base deleted: the -1 frame has no stop before the CDS ends. */
+        {"one-base deletion runs off the CDS", 1u, {{15u, "AC", "A"}}, FS},
+        /* Deletion then insertion: restored before any stop, peptide changed. */
+        {"restored before termination", 2u, {{5u, "CT", "C"}, {8u, "A", "AG"}}, DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING)},
+        /* A stop outside every displaced interval is stop_gained alone; the later frame edit is post-stop. */
+        {"stop gained, frame edit after it", 2u, {{7u, "G", "T"}, {15u, "AC", "A"}}, SG},
+        {"insertion before the stop codon", 1u, {{21u, "C", "CCCC"}}, DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION)},
+        {"insertion inside the stop codon", 1u, {{22u, "T", "TGGG"}}, PENDING},
+        {"start codon deletion", 1u, {{1u, "ATGG", "A"}}, PENDING},
+        {"frame edit in the terminal codon", 1u, {{22u, "T", "TA"}}, PENDING}};
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); i++) {
         struct haplotype_stream_scene f;
         duckvep_haplotype_leaf_t leaf;
         ASSERT_EQ_FMT(DUCKVEP_HAPLOTYPE_STREAM_OK, haplo_class_run(&f, 0, cases[i].edits, cases[i].count, 2u, &leaf), "%d");
-        ASSERT_EQ_FMT(cases[i].status, (int)leaf.path_status, "%d");
-        if (cases[i].status == DUCKVEP_PREDICTION_PREDICTED) {
-            ASSERT_EQ((long long)DUCKVEP_SO(cases[i].so), (long long)leaf.haplotype_so_mask);
-            ASSERT_EQ((int)DUCKVEP_IMPACT_MODERATE, (int)duckvep_so_impact(leaf.haplotype_so_mask));
+        if (cases[i].mask) {
+            ASSERT_EQ_FMT((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.path_status, "%d");
+            ASSERT_EQ((long long)cases[i].mask, (long long)leaf.haplotype_so_mask);
+            ASSERT_EQ((int)(cases[i].mask & (FS | SG) ? DUCKVEP_IMPACT_HIGH : DUCKVEP_IMPACT_MODERATE),
+                      (int)duckvep_so_impact(leaf.haplotype_so_mask));
         } else {
-            ASSERT_EQ_FMT(cases[i].reason, (int)leaf.path_reason, "%d");
+            ASSERT_EQ_FMT((int)DUCKVEP_PREDICTION_ELIGIBLE, (int)leaf.path_status, "%d");
+            ASSERT_EQ_FMT((int)DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING, (int)leaf.path_reason, "%d");
             ASSERT_EQ(0u, leaf.haplotype_so_mask);
         }
+        /* Every contributor stays attached, whatever its role. */
+        ASSERT_EQ(cases[i].count, leaf.contributor_count);
     }
+    PASS();
+}
+
+/* Frame classifier oracle: edits are single-base deletions, single-base insertions and substitutions on the
+ * 24-base CDS. The expectation edits the cDNA, translates it with the standard code and walks the edits
+ * base by base to flag displaced bases; it uses no production structure. */
+enum { HF_DEL, HF_INS, HF_SUB };
+struct hf_edit { int kind; unsigned p; char base; }; /* DEL: base p; INS: base after p; SUB: base p */
+
+static int hf_expect(const struct hf_edit *edits, size_t count, uint64_t *mask) {
+    /* Returns 1 when the policy decides, 0 when the path stays pending (start/terminal region). */
+    char alt[64]; int displaced[64]; size_t n = 0u; int offset = 0; unsigned at = 1u;
+    bool net_frame = false;
+    for (size_t i = 0u; i < count; i++) {
+        const struct hf_edit *e = &edits[i];
+        unsigned start = e->kind == HF_INS ? e->p + 1u : e->p;
+        for (; at < start; at++) { alt[n] = haplo_class_cds[at - 1u]; displaced[n++] = offset % 3 != 0; }
+        if (e->kind == HF_INS) {
+            alt[n] = e->base; displaced[n++] = offset % 3 != 0 || (offset + 1) % 3 != 0; offset++; net_frame = true;
+        } else if (e->kind == HF_DEL) {
+            offset--; at = e->p + 1u; net_frame = true;
+        } else {
+            alt[n] = e->base; displaced[n++] = offset % 3 != 0; at = e->p + 1u;
+        }
+    }
+    for (; at <= 24u; at++) { alt[n] = haplo_class_cds[at - 1u]; displaced[n++] = offset % 3 != 0; }
+    /* An insertion between two codons touches neither; inside the start or terminal codon it does. */
+    for (size_t i = 0u; i < count; i++)
+        if (edits[i].kind == HF_INS ? (edits[i].p <= 2u || edits[i].p >= 22u) : (edits[i].p <= 3u || edits[i].p >= 22u)) return 0;
+    size_t codons = n / 3u, first = 0u;
+    for (size_t c = 1u; c <= codons && !first; c++) if (haplo_class_amino(alt + 3u * (c - 1u)) == '*') first = c;
+    if (!first) {
+        if (n % 3u == 0u) return 0;
+        *mask = DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT); return 1;
+    }
+    size_t last = 3u * first;
+    if (last == n && n % 3u == 0u) {
+        bool same = n == 24u;
+        for (size_t c = 0u; same && c + 1u < 8u; c++) same = haplo_class_amino(alt + 3u * c) == haplo_class_amino(haplo_class_cds + 3u * c);
+        bool in_displaced = displaced[last - 3u] || displaced[last - 2u] || displaced[last - 1u];
+        *mask = in_displaced ? DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT) : same ? DUCKVEP_SO(DUCKVEP_SO_SYNONYMOUS) :
+            net_frame ? DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING) : DUCKVEP_SO(DUCKVEP_SO_MISSENSE);
+        return 1;
+    }
+    if (last + 3u <= n) {
+        *mask = DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED);
+        if (displaced[last - 3u] || displaced[last - 2u] || displaced[last - 1u]) *mask |= DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT);
+        return 1;
+    }
+    return 0;
+}
+
+/* An indel next to a repeated base has several equivalent placements (VCF left alignment differs by strand
+ * orientation), and the frame SO is normalized-edit-path-sensitive by contract. The exhaustive oracle uses only
+ * edits with a unique placement: a deleted base differs from both neighbours, an inserted base from both flanks. */
+static int hf_unambiguous(const struct hf_edit *e) {
+    if (e->kind == HF_SUB) return 1;
+    if (e->kind == HF_DEL) return haplo_class_cds[e->p - 1u] != haplo_class_cds[e->p - 2u] &&
+        haplo_class_cds[e->p - 1u] != haplo_class_cds[e->p];
+    return e->base != haplo_class_cds[e->p - 1u] && e->base != haplo_class_cds[e->p];
+}
+
+static void hf_to_stream(const struct hf_edit *e, char ref[3], char alt[3], struct haplo_class_edit *out) {
+    char cds_base = haplo_class_cds[e->p - 1u];
+    if (e->kind == HF_DEL) {
+        ref[0] = haplo_class_cds[e->p - 2u]; ref[1] = cds_base; ref[2] = 0; alt[0] = ref[0]; alt[1] = 0;
+        out->pos = e->p - 1u;
+    } else if (e->kind == HF_INS) {
+        ref[0] = cds_base; ref[1] = 0; alt[0] = cds_base; alt[1] = e->base; alt[2] = 0; out->pos = e->p;
+    } else {
+        ref[0] = cds_base; ref[1] = 0; alt[0] = e->base; alt[1] = 0; out->pos = e->p;
+    }
+    out->ref = ref; out->alt = alt;
+}
+
+static int hf_check(const struct hf_edit *edits, size_t count, int reverse, unsigned long *decided, unsigned long *pending,
+                    unsigned long *seen_masks) {
+    char ref[4][3], alt[4][3];
+    struct haplo_class_edit stream[4];
+    for (size_t i = 0u; i < count; i++) hf_to_stream(&edits[i], ref[i], alt[i], &stream[i]);
+    struct haplotype_stream_scene f;
+    duckvep_haplotype_leaf_t leaf;
+    if (haplo_class_run(&f, reverse, stream, count, 2u, &leaf) != DUCKVEP_HAPLOTYPE_STREAM_OK) return 0;
+    uint64_t mask = 0u;
+    int decides = hf_expect(edits, count, &mask);
+    if (leaf.contributor_count != count) return 0;
+    if (decides) {
+        if (leaf.path_status != DUCKVEP_PREDICTION_PREDICTED || leaf.haplotype_so_mask != mask) return 0;
+        (*decided)++;
+        if (mask & DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT)) *seen_masks |= mask & DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED) ? 1u : 2u;
+        else if (mask & DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING)) *seen_masks |= 4u;
+        else if (mask & DUCKVEP_SO(DUCKVEP_SO_SYNONYMOUS)) *seen_masks |= 8u;
+        else if (mask & DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED)) *seen_masks |= 16u;
+    } else {
+        if (leaf.path_status != DUCKVEP_PREDICTION_ELIGIBLE || leaf.haplotype_so_mask != 0u ||
+            leaf.path_reason != DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING) return 0;
+        (*pending)++;
+    }
+    return 1;
+}
+
+TEST haplotype_frame_classifier_matches_independent_translation_and_frame_walk(void) {
+    /* Every single edit and every pair of edits (at least two bases apart) drawn from single-base deletions,
+     * insertions and substitutions over CDS positions 2-22, on both strands, plus every triple of one
+     * insertion/deletion family. The classification follows the translated edited sequence and the
+     * displaced-frame walk, never the nominal net offset: the same +1/-1 history is rescued (protein
+     * altering), terminates early (frameshift with stop_gained) or is a stop outside the displaced frame. */
+    struct hf_edit universe[96];
+    size_t n = 0u;
+    for (unsigned p = 2u; p <= 22u; p++) {
+        if (p >= 3u) universe[n++] = (struct hf_edit){HF_DEL, p, 0};
+        universe[n++] = (struct hf_edit){HF_INS, p, "GT"[p & 1u]};
+        char pick = "ACGT"[(p * 7u) & 3u];
+        universe[n++] = (struct hf_edit){HF_SUB, p, pick == haplo_class_cds[p - 1u] ? "CGTA"[(p * 7u) & 3u] : pick};
+        if (p > 2u && p < 22u) universe[n++] = (struct hf_edit){HF_INS, p, "AC"[p & 1u]};
+    }
+    size_t kept = 0u;
+    for (size_t i = 0u; i < n; i++) if (hf_unambiguous(&universe[i])) universe[kept++] = universe[i];
+    n = kept;
+    unsigned long decided = 0u, pending = 0u, seen = 0u;
+    for (int reverse = 0; reverse < 2; reverse++) {
+        for (size_t a = 0u; a < n; a++) {
+            ASSERT(hf_check(&universe[a], 1u, reverse, &decided, &pending, &seen));
+            for (size_t b = 0u; b < n; b++) {
+                const struct hf_edit pair[2] = {universe[a], universe[b]};
+                /* Ascending order, at least three positions apart (closer indels at one site are the slice-2 overlap cases). */
+                unsigned lo = pair[0].p, hi = pair[1].p;
+                if (hi < lo + 3u) continue;
+                ASSERT(hf_check(pair, 2u, reverse, &decided, &pending, &seen));
+            }
+        }
+        for (unsigned a = 4u; a <= 20u; a += 2u) for (unsigned b = a + 3u; b <= 20u; b += 2u)
+            for (unsigned c = b + 3u; c <= 20u; c += 2u) for (unsigned k = 0u; k < 27u; k++) {
+                struct hf_edit triple[3];
+                unsigned kinds[3] = {k % 3u, (k / 3u) % 3u, k / 9u}, pos[3] = {a, b, c};
+                for (unsigned i = 0u; i < 3u; i++)
+                    triple[i] = (struct hf_edit){(int)kinds[i], pos[i], kinds[i] == HF_SUB ? (haplo_class_cds[pos[i] - 1u] == 'T' ? 'G' : 'T') : "GC"[(a + i) & 1u]};
+                if (!hf_unambiguous(&triple[0]) || !hf_unambiguous(&triple[1]) || !hf_unambiguous(&triple[2])) continue;
+                ASSERT(hf_check(triple, 3u, reverse, &decided, &pending, &seen));
+            }
+    }
+    /* Both outcomes of the counterexample, stop outside displaced intervals, and synonymous must all occur. */
+    ASSERT_EQ(31u, (unsigned)seen);
+    ASSERT(decided > 1000u && pending > 0u);
+    fprintf(stderr, "[frame classifier coverage] decided=%lu pending=%lu\n", decided, pending);
     PASS();
 }
 

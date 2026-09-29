@@ -107,8 +107,8 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 12	NULL	1	unsupported_context	outside_cds
 13	NULL	1	unsupported_context	outside_cds
 14	NULL	1	unsupported_context	allele_over_50_bases
-15	NULL	1	eligible_classifier_pending	frame_classifier_pending
-16	NULL	1	eligible_classifier_pending	start_stop_classifier_pending
+15	NULL	1	predicted	supported_domain
+16	NULL	1	predicted	supported_domain
 17	NULL	1	unsupported_context	non_diploid_call
 18	NULL	1	unsupported_context	invalid_allele
 21	NULL	1	unsupported_context	noncanonical_start
@@ -120,6 +120,40 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 30	NULL	1	predicted	supported_domain
 40	NULL	1	predicted	supported_domain
 40	NULL	2	predicted	supported_domain
+
+# Per-carrier consequences (slice 4): the edited sequence is shared by the carriers of a row, so its SO set and IMPACT
+# are decided per carrier from the carrier's own keyed status. A row with one ineligible carrier keeps NULL row-level
+# haplotype_consequences/haplotype_impact but does not hide the eligible carriers' set. The path of event 1 alone
+# (a missense SNV) is shared by samples 2 and 3 (eligible), 4 (unphased), 5 (cross-PS) and the haploid sample 17.
+
+query IITTTTT
+SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason,
+ array_to_string(c.haplotype_consequences,','),c.haplotype_impact,
+ CASE WHEN haplotype_consequences IS NULL THEN 'row NULL' ELSE array_to_string(haplotype_consequences,',') END
+FROM (SELECT haplotype_consequences,unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT * FROM hap_elig_calls WHERE sample_index IN (2,3,17,4,5)','hap_elig')) ORDER BY 1,2;
+----
+2	1	predicted	supported_domain	missense_variant	MODERATE	row NULL
+2	2	predicted	supported_domain	missense_variant	MODERATE	missense_variant
+3	1	predicted	supported_domain	missense_variant	MODERATE	row NULL
+3	2	incomplete_input	missing_call	NULL	NULL	row NULL
+4	1	incomplete_input	unphased_heterozygous	NULL	NULL	row NULL
+4	2	incomplete_input	unphased_heterozygous	NULL	NULL	row NULL
+5	1	incomplete_input	unresolved_cross_ps_phase	NULL	NULL	row NULL
+5	1	incomplete_input	unresolved_cross_ps_phase	NULL	NULL	row NULL
+17	1	unsupported_context	non_diploid_call	NULL	NULL	row NULL
+
+# The same with a triploid call (ploidy 3): non_diploid_call for that carrier only, the diploid carrier keeps its set.
+
+query IITTTT
+SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason,
+ array_to_string(c.haplotype_consequences,','),CASE WHEN haplotype_consequences IS NULL THEN 'row NULL' ELSE 'row set' END
+FROM (SELECT haplotype_consequences,unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT * FROM hap_elig_calls WHERE sample_index=2 AND event_index=1 UNION ALL SELECT 1,0,103,''G'',''A'',1,0,50,[1,0,0]::INTEGER[],[false,true,true],NULL::BIGINT',
+ 'hap_elig')) ORDER BY 1,2;
+----
+2	1	predicted	supported_domain	missense_variant	row NULL
+50	1	unsupported_context	non_diploid_call	NULL	row NULL
 
 # carrier_predictions is parallel to carriers, and the policy version is constant.
 
@@ -153,10 +187,8 @@ FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index NOT IN 
 GROUP BY ALL ORDER BY ALL
 ----
 edit_conflict	contradictory_edits	edit_conflict	1
-eligible_classifier_pending	frame_classifier_pending	ok	1
-eligible_classifier_pending	start_stop_classifier_pending	ok	1
 incomplete_input	unphased_heterozygous	incomplete_input	1
-predicted	supported_domain	ok	4
+predicted	supported_domain	ok	6
 unsupported_context	allele_over_50_bases	ok	1
 unsupported_context	curated_transcript	ok	1
 unsupported_context	incomplete_cds	ok	1
@@ -190,8 +222,8 @@ GROUP BY ALL ORDER BY ALL
 12	1	NULL	unsupported_context	3/1:unapplied 11/1:omitted
 13	1	NULL	unsupported_context	12/1:omitted
 14	1	NULL	unsupported_context	13/1:applied
-15	1	NULL	eligible_classifier_pending	14/1:applied
-16	1	NULL	eligible_classifier_pending	3/1:post_stop 10/1:applied
+15	1	NULL	predicted	14/1:applied
+16	1	NULL	predicted	3/1:post_stop 10/1:applied
 18	1	NULL	unsupported_context	15/1:omitted
 21	1	NULL	unsupported_context	101/1:applied
 22	1	NULL	unsupported_context	102/1:applied
