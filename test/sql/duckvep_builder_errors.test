@@ -1,0 +1,373 @@
+# name: test/sql/duckvep_builder_errors.test
+# description: Error recovery for the STR, SV geometry, BND identity, BND fusion and structural HGVS builders
+# group: [duckvep]
+
+require duckvep
+
+# Every failure below must be an explicit error and leave the session usable.
+
+# ---- Relation names: NULL, empty, missing, oversized ------------------------------------
+statement error
+SELECT duckvep_prepare_sv_geometry_sql(NULL);
+----
+invalid relation name or allocation failure
+
+statement error
+SELECT duckvep_prepare_sv_geometry_sql('');
+----
+invalid relation name or allocation failure
+
+statement error
+SELECT duckvep_prepare_breakend_pairs_sql(NULL);
+----
+duckvep_prepare_breakend_pairs_sql: invalid relation name
+
+statement error
+SELECT duckvep_prepare_breakend_fusion_sql(NULL, 'x');
+----
+duckvep_prepare_breakend_fusion_sql: invalid relation name
+
+statement error
+SELECT duckvep_prepare_breakend_fusion_sql('x', NULL);
+----
+duckvep_prepare_breakend_fusion_sql: invalid relation name
+
+statement error
+SELECT duckvep_prepare_structural_hgvs_sql(NULL, 'x');
+----
+duckvep_prepare_structural_hgvs_sql: invalid relation name
+
+statement error
+SELECT duckvep_prepare_structural_hgvs_sql('x', NULL);
+----
+duckvep_prepare_structural_hgvs_sql: invalid relation name
+
+statement error
+SELECT duckvep_prepare_expansionhunter_sql(NULL, 'x');
+----
+duckvep_prepare_expansionhunter_sql: invalid relation name
+
+statement error
+SELECT duckvep_prepare_expansionhunter_sql('x', NULL);
+----
+duckvep_prepare_expansionhunter_sql: invalid relation name
+
+# A NULL name in one row of a vector fails the statement, not the process.
+statement error
+SELECT duckvep_prepare_sv_geometry_sql(CASE WHEN i = 2 THEN NULL ELSE 'x' END) FROM range(4) t(i);
+----
+invalid relation name or allocation failure
+
+# A one-megabyte relation name is quoted, then rejected by the catalog.
+statement error
+SELECT * FROM query(duckvep_prepare_sv_geometry_sql(repeat('x', 1000000)));
+----
+does not exist
+
+query I
+SELECT length(duckvep_prepare_breakend_pairs_sql(repeat('x', 1000000))) > 1000000;
+----
+1
+
+# Missing relations reach the catalog error, one per builder.
+statement error
+SELECT * FROM query(duckvep_prepare_sv_geometry_sql('no_such_relation'));
+----
+no_such_relation
+
+statement error
+SELECT * FROM query(duckvep_prepare_breakend_pairs_sql('no_such_relation'));
+----
+no_such_relation
+
+statement error
+SELECT * FROM query(duckvep_prepare_expansionhunter_sql('no_such_relation', 'also_missing'));
+----
+no_such_relation
+
+statement error
+SELECT * FROM query(duckvep_prepare_structural_hgvs_sql('no_such_relation', 'also_missing'));
+----
+no_such_relation
+
+statement error
+SELECT * FROM query(duckvep_prepare_breakend_fusion_sql('no_such_relation', 'also_missing'));
+----
+no_such_relation
+
+# ---- Options -----------------------------------------------------------------------------
+statement error
+SELECT duckvep_prepare_sv_geometry_sql('x', 5);
+----
+options must be a STRUCT
+
+statement error
+SELECT duckvep_prepare_breakend_pairs_sql('x', {bogus: 1});
+----
+unknown option 'bogus'
+
+statement error
+SELECT duckvep_prepare_structural_hgvs_sql('x', 'y', {max_span: 'many'});
+----
+max_span
+
+statement error
+SELECT duckvep_prepare_structural_hgvs_sql('x', 'y', {max_span: 1, max_span: 2});
+----
+max_span
+
+# ---- Wrong columns and wrong column types -----------------------------------------------
+statement ok
+CREATE TEMP TABLE only_index (event_index INTEGER);
+
+statement error
+SELECT * FROM query(duckvep_prepare_sv_geometry_sql('only_index'));
+----
+"pos" not found
+
+statement error
+SELECT * FROM query(duckvep_prepare_breakend_pairs_sql('only_index'));
+----
+not found
+
+statement error
+SELECT * FROM query(duckvep_prepare_structural_hgvs_sql('only_index', 'only_index'));
+----
+not found
+
+statement error
+SELECT * FROM query(duckvep_prepare_expansionhunter_sql('only_index', 'only_index'));
+----
+not found
+
+statement ok
+CREATE TEMP TABLE wrong_types (event_index VARCHAR, pos VARCHAR, ref INTEGER, alt DOUBLE, info BOOLEAN);
+
+statement ok
+INSERT INTO wrong_types VALUES ('x', 'y', 1, 2.5, true), (NULL, NULL, NULL, NULL, NULL);
+
+statement error
+SELECT * FROM query(duckvep_prepare_sv_geometry_sql('wrong_types'));
+----
+string_split
+
+# ---- NULL and empty rows produce explicit non-ok rows ------------------------------------
+statement ok
+CREATE TEMP TABLE sv_null (event_index BIGINT, pos BIGINT, ref VARCHAR, alt VARCHAR, info VARCHAR);
+
+statement ok
+INSERT INTO sv_null VALUES (0, NULL, NULL, NULL, NULL), (1, 100, '', '', ''),
+  (2, NULL, 'N', '<DEL>', 'END=5'), (3, 100, 'N', '<DEL>', 'END=200;END=300'),
+  (4, 100, 'N', '<DEL>', 'END=200;CIPOS=1,2,3'), (NULL, 100, 'N', '<DEL>', 'END=200');
+
+query IT
+SELECT event_index, status FROM query(duckvep_prepare_sv_geometry_sql('sv_null')) ORDER BY event_index NULLS FIRST;
+----
+NULL	ok
+0	unsupported_geometry
+1	unsupported_geometry
+2	unsupported_geometry
+3	unsupported_geometry
+4	unsupported_geometry
+
+# ---- Extreme values never overflow the whole statement -----------------------------------
+statement ok
+CREATE TEMP TABLE sv_extreme (event_index BIGINT, pos BIGINT, ref VARCHAR, alt VARCHAR, info VARCHAR);
+
+statement ok
+INSERT INTO sv_extreme VALUES
+  (0, 9223372036854775807, 'N', '<DEL>', 'END=9223372036854775807'),
+  (1, -9223372036854775808, 'N', '<DEL>', 'END=5'),
+  (2, -9223372036854775808, '', '<DEL>', 'END=5'),
+  (3, 100, 'N', '<DEL>', 'END=99999999999999999999999999'),
+  (4, 100, 'N', '<DEL>', 'END=200;CIPOS=-9223372036854775808,9223372036854775807'),
+  (5, 100, 'N', '<DEL>', 'END=2147483647;CIEND=0,9223372036854775807'),
+  (6, 2147483647, 'N', '<DEL>', 'END=2147483647'),
+  (7, 100, repeat('A', 100000), repeat('C', 100000), repeat('X=1;', 100000)),
+  (8, 1, 'N', '<INS>', 'END=1;SEQ=' || repeat('A', 1000000));
+
+query IT
+SELECT event_index, status FROM query(duckvep_prepare_sv_geometry_sql('sv_extreme')) ORDER BY event_index;
+----
+0	unsupported_geometry
+1	unsupported_geometry
+2	unsupported_geometry
+3	unsupported_geometry
+4	unsupported_geometry
+5	unsupported_geometry
+6	unsupported_geometry
+7	unsupported_geometry
+8	ok
+
+query I
+SELECT length(source_sequence) FROM query(duckvep_prepare_sv_geometry_sql('sv_extreme')) WHERE event_index = 8;
+----
+1000000
+
+# ---- BND identity ----------------------------------------------------------------------------
+statement ok
+CREATE TEMP TABLE bnd_extreme (event_index BIGINT, chrom VARCHAR, pos BIGINT, id VARCHAR,
+  ref VARCHAR, alt VARCHAR, info VARCHAR);
+
+statement ok
+INSERT INTO bnd_extreme VALUES
+  (0, NULL, NULL, NULL, NULL, NULL, NULL),
+  (1, '1', 9223372036854775807, 'a', 'N', 'N[1:9223372036854775807[', 'MATEID=b'),
+  (2, '1', 1, 'b', 'N', ']1:9223372036854775807]N', 'MATEID=a'),
+  (3, '1', 5, 'c', 'N', 'N[1:' || repeat('9', 1000) || '[', 'MATEID=c'),
+  (4, '1', 5, repeat('i', 100000), 'N', 'N[[', 'MATEID='),
+  (5, '1', 5, 'q', 'N', '[[[[[', 'MATEID=q;MATEID=q'),
+  (6, '1', -5, 'r', 'N', 'N[1:-5[', ''),
+  (NULL, '1', 5, 'z', 'N', 'N[1:5[', 'MATEID=z');
+
+query IT
+SELECT event_index, status FROM query(duckvep_prepare_breakend_pairs_sql('bnd_extreme')) ORDER BY event_index NULLS FIRST;
+----
+NULL	conflict
+0	not_applicable
+1	conflict
+2	conflict
+3	invalid
+4	invalid
+5	invalid
+6	invalid
+
+statement ok
+CREATE TEMP TABLE bnd_pairs_extreme AS SELECT * FROM query(duckvep_prepare_breakend_pairs_sql('bnd_extreme'));
+
+statement ok
+CREATE TEMP TABLE bnd_genes_extreme (event_index BIGINT, gene_id VARCHAR);
+
+statement ok
+INSERT INTO bnd_genes_extreme VALUES (NULL, NULL), (1, NULL), (2, 'g'), (1, 'g'), (1, 'g'),
+  (9999999999, repeat('g', 100000));
+
+query IT
+SELECT event_index, status FROM query(duckvep_prepare_breakend_fusion_sql('bnd_pairs_extreme',
+  'bnd_genes_extreme')) ORDER BY event_index NULLS FIRST;
+----
+NULL	identity_unproven
+0	identity_unproven
+1	identity_unproven
+2	identity_unproven
+3	identity_unproven
+4	identity_unproven
+5	identity_unproven
+6	identity_unproven
+
+query I
+SELECT count(*) FILTER (WHERE fusion_asserted) FROM query(duckvep_prepare_breakend_fusion_sql(
+  'bnd_pairs_extreme', 'bnd_genes_extreme'));
+----
+0
+
+# ---- Structural HGVS ----------------------------------------------------------------------------
+statement ok
+CREATE TEMP TABLE hg_events (event_index BIGINT, chrom VARCHAR, pos BIGINT, ref VARCHAR,
+  alt VARCHAR, info VARCHAR);
+
+statement ok
+CREATE TEMP TABLE hg_refs (event_index BIGINT, reference_sequence VARCHAR);
+
+statement ok
+INSERT INTO hg_events VALUES
+  (0, NULL, NULL, NULL, NULL, NULL),
+  (1, '1', 9223372036854775807, 'N', '<DEL>', 'END=9223372036854775807'),
+  (2, '1', -9223372036854775808, 'N', '<DEL>', 'END=5'),
+  (3, '1', 100, 'N', '<DEL>', 'END=99999999999999999999999999'),
+  (4, '1', 100, 'N', '<DUP>', 'END=200'),
+  (5, '1', 100, 'N', '<INV>', 'END=101'),
+  (6, '1', 1, 'N', '<DEL>', 'END=2147483647'),
+  (7, '1', 100, repeat('A', 100000), repeat('C', 100000), repeat('X=1;', 100000)),
+  (NULL, '1', 100, 'N', '<DEL>', 'END=101'),
+  (9, '1', 100, '', '', ''),
+  (10, '1', 100, 'N', '<DEL>', 'END=101;END=102'),
+  (11, '1', 100, 'N', '<DEL>', 'END=101');
+
+statement ok
+INSERT INTO hg_refs VALUES (0, NULL), (1, 'ACGT'), (3, repeat('A', 10000000)), (4, repeat('A', 10)),
+  (5, 'ACGT'), (7, NULL), (NULL, 'AC'), (9, ''), (11, 'AC'), (11, 'AC');
+
+query IT
+SELECT event_index, hgvs_status FROM query(duckvep_prepare_structural_hgvs_sql('hg_events', 'hg_refs'))
+ORDER BY event_index NULLS FIRST;
+----
+NULL	unavailable
+0	unavailable
+1	unavailable
+2	unavailable
+3	unavailable
+4	unavailable
+5	unavailable
+6	unsupported
+7	unsupported
+9	unsupported
+10	unavailable
+11	unavailable
+
+query I
+SELECT count(*) FILTER (WHERE hgvs_g IS NOT NULL) FROM query(
+  duckvep_prepare_structural_hgvs_sql('hg_events', 'hg_refs'));
+----
+0
+
+# ---- ExpansionHunter ------------------------------------------------------------------------------
+statement ok
+CREATE TEMP TABLE eh_extreme (event_index BIGINT, info VARCHAR, format VARCHAR, "sample" VARCHAR,
+  ref VARCHAR, alt VARCHAR, alt_index DOUBLE);
+
+statement ok
+CREATE TEMP TABLE eh_refs (event_index BIGINT, reference_sequence VARCHAR);
+
+statement ok
+INSERT INTO eh_extreme VALUES
+  (0, NULL, NULL, NULL, NULL, NULL, NULL),
+  (1, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10',
+     'C', '<STR2>,<STR10>', 1),
+  (2, 'REF=1e308;RL=3;RU=CAG', 'GT:REPCN', '1/2:2/10', 'C', '<STR2>,<STR99999999999999999999>', 2),
+  (3, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:REPCN', '1/2:2/10', 'C', '<STR2>,<STR10>', 1e300),
+  (4, 'END=2008;REF=1;RL=3;RU=' || repeat('CAG', 1000000), 'GT:REPCN', '1/2:2/10', 'C',
+     '<STR2>,<STR10>', -1),
+  (5, 'REF=1;RL=3;RU=CAG', 'GT:REPCN', '1/2:2/10', 'C', '<STR2>,<STR10>', 'NaN'::DOUBLE),
+  (6, 'REF=1;RL=3;RU=CAG', 'GT:REPCN', '1/2:2/10', 'C', '<STR2>,<STR10>', 9223372036854775807),
+  (7, 'REF=1;RL=3;RU=CAG', 'GT:CN:REPCN:CI', '1/2', 'C', '<STR1000000000>,<STR10>', 2),
+  (NULL, 'REF=1;RL=3;RU=CAG', 'GT:REPCN', '1/2:2/10', 'C', '<STR2>,<STR10>', 1),
+  (8, 'REF=1;RL=3;RU=CAG;REF=2', 'GT:REPCN', '1/2:2/10', 'C', '<STR2>,<STR10>', 1),
+  (9, '', '', '', '', '', 1);
+
+statement ok
+INSERT INTO eh_refs VALUES (0, NULL), (1, 'CAG'), (2, repeat('A', 10000000)), (NULL, 'A');
+
+query IT
+SELECT event_index, status FROM query(duckvep_prepare_expansionhunter_sql('eh_extreme', 'eh_refs'))
+ORDER BY event_index NULLS FIRST;
+----
+NULL	incomplete
+0	incomplete
+1	ok
+2	incomplete
+3	incomplete
+4	incomplete
+5	incomplete
+6	incomplete
+7	incomplete
+8	incomplete
+9	incomplete
+
+# ---- Recovery: the failures above left every builder usable --------------------------------------
+statement ok
+CREATE TEMP TABLE recover_sv (event_index INTEGER, pos INTEGER, ref VARCHAR, alt VARCHAR, info VARCHAR);
+
+statement ok
+INSERT INTO recover_sv VALUES (0, 100, 'N', '<DEL>', 'END=200;CIPOS=-2,3');
+
+query IIIII
+SELECT status, nominal_start, nominal_end, outer_start, inner_start
+FROM query(duckvep_prepare_sv_geometry_sql('recover_sv'));
+----
+ok	101	200	99	104
+
+query I
+SELECT count(*) FROM (SELECT duckvep_prepare_breakend_pairs_sql('recover_sv') FROM range(1000));
+----
+1000
