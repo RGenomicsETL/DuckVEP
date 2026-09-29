@@ -385,6 +385,95 @@ local({
   expect_false(identical(circular_receipt$topology_sha256, ensembl_receipt$topology_sha256))
   expect_equal(circular_receipt$circular_region_count, 1)
   expect_identical(circular_receipt$circular_regions, "1")
+
+  dbExecute(con, "CREATE SCHEMA duckvep_r_circular_core")
+  for (table in c(
+    "coord_system", "seq_region", "seq_region_attrib", "attrib_type",
+    "gene", "transcript", "exon", "exon_transcript", "translation",
+    "transcript_attrib", "translation_attrib"
+  )) {
+    dbExecute(con, sprintf(
+      "CREATE TABLE duckvep_r_circular_core.%s AS FROM duckvep_r_core.%s",
+      table, table
+    ))
+  }
+  dbExecute(con, paste(
+    "INSERT INTO duckvep_r_circular_core.seq_region_attrib",
+    "VALUES (1, 3, '1')"
+  ))
+  dbExecute(con, paste(
+    "UPDATE duckvep_r_circular_core.transcript",
+    "SET seq_region_start = 9, seq_region_end = 3, biotype = 'lncRNA'",
+    "WHERE transcript_id = 2"
+  ))
+  dbExecute(con, paste(
+    "DELETE FROM duckvep_r_circular_core.transcript_attrib",
+    "WHERE transcript_id = 2 AND attrib_type_id = 2"
+  ))
+  dbExecute(con, paste(
+    "UPDATE duckvep_r_circular_core.exon",
+    "SET seq_region_start = 9, seq_region_end = 3 WHERE exon_id = 2"
+  ))
+  dbExecute(con, paste(
+    "CREATE TABLE duckvep_r_wrapped_regions AS FROM",
+    "query(duckvep_ensembl_regions_sql(",
+    "'duckvep_r_circular_core', 'duckvep_r_reference', 'GRCh38'))"
+  ))
+  dbExecute(con, paste(
+    "CREATE TABLE duckvep_r_wrapped_transcripts AS FROM",
+    "query(duckvep_ensembl_transcripts_sql(",
+    "'duckvep_r_circular_core', 'duckvep_r_reference', 'GRCh38'))"
+  ))
+  wrapped <- dbGetQuery(con, paste(
+    "SELECT transcript_start, transcript_end, exons[1].exon_start AS exon_start,",
+    "exons[1].exon_end AS exon_end, origin_crossing FROM",
+    "duckvep_r_wrapped_transcripts WHERE transcript_stable_id = 'ENST_R_MIRNA'"
+  ))
+  expect_equal(unname(unlist(wrapped[1, 1:4])), c(9, 3, 9, 3))
+  expect_identical(wrapped$origin_crossing, TRUE)
+  wrapped_query <- paste(
+    "SELECT transcript_index, seq_region, transcript_start, transcript_end,",
+    "strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence,",
+    "codon_table, pre_cds_sequence, post_cds_sequence FROM",
+    "duckvep_r_wrapped_transcripts ORDER BY seq_region, transcript_start, transcript_index"
+  )
+  wrapped_exon_query <- paste(
+    "SELECT transcript_index, exon.exon_start, exon.exon_end,",
+    "exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase",
+    "FROM duckvep_r_wrapped_transcripts, LATERAL unnest(exons) AS u(exon)",
+    "ORDER BY transcript_index, exon.exon_cdna_start"
+  )
+  wrapped_regions_query <- paste(
+    "SELECT seq_region, sequence_length, seq_region_name, circular",
+    "FROM duckvep_r_wrapped_regions ORDER BY seq_region"
+  )
+  expect_true(dbGetQuery(con, sprintf(
+    "SELECT loaded FROM duckvep_model_load('r-wrapped', %s, %s, %s)",
+    dbQuoteString(con, wrapped_regions_query),
+    dbQuoteString(con, wrapped_query),
+    dbQuoteString(con, wrapped_exon_query)
+  ))$loaded)
+  expect_error(
+    dbGetQuery(con, sprintf(
+      "SELECT loaded FROM duckvep_model_load('r-linear-wrap', %s, %s, %s)",
+      dbQuoteString(con, paste(
+        "SELECT seq_region, sequence_length, seq_region_name,",
+        "false AS circular FROM duckvep_r_wrapped_regions"
+      )), dbQuoteString(con, wrapped_query), dbQuoteString(con, wrapped_exon_query)
+    )),
+    pattern = "transcript row has an invalid region, span, or strand"
+  )
+  dbExecute(con, paste(
+    "UPDATE duckvep_r_circular_core.exon SET seq_region_start = 13",
+    "WHERE exon_id = 2"
+  ))
+  expect_error(
+    dbGetQuery(con, paste(
+      "SELECT * FROM query(duckvep_ensembl_transcripts_sql(",
+      "'duckvep_r_circular_core', 'duckvep_r_reference', 'GRCh38'))"
+    )),
+    pattern = "exon coordinates, strand, or phase are invalid"
+  )
   expect_identical(
     names(ensembl_receipt)[1:6],
     c(
