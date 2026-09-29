@@ -44,3 +44,4 @@ test/sql/linear_*.fa
 test/sql/linear_*.fa.fai
 test/sql/mt.fa
 test/sql/mt.fa.fai
+__pycache__/
