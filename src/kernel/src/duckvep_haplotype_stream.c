@@ -740,14 +740,22 @@ static void nmd_ejc50(const duckvep_haplotype_stream_t *s, duckvep_haplotype_lea
         return;
     }
     uint32_t tx = leaf->carriers.transcript_index;
-    if (!m || !x || !m->cds_cdna_start1 || !m->cds_cdna_end1 || !m->exon_offset || !m->exon_count ||
-        !x->cdna_start1 || !x->cdna_end1 || !m->cds_cdna_start1[tx]) return;
-    uint64_t origin = m->cds_cdna_start1[tx];
+    if (!m || !x || !m->exon_offset || !m->exon_count || !x->cdna_start1 || !x->cdna_end1 || !x->start1 ||
+        !x->end1 || !m->strand || !m->cds_start1 || !m->cds_end1) return;
     size_t ref_length = s->sequences->cds_length[tx];
-    if ((uint64_t)m->cds_cdna_end1[tx] + 1u != origin + ref_length) return;
-    uint64_t stop = origin + (uint64_t)first_stop * 3u - 1u;
     size_t n = m->exon_count[tx], first = m->exon_offset[tx];
     if (!n || first > x->exon_count || n > x->exon_count - first) return;
+    /* cDNA position of the first CDS base: the model's cache when present, else from the exon holding it. */
+    uint64_t origin = m->cds_cdna_start1 ? m->cds_cdna_start1[tx] : 0u;
+    if (!origin) {
+        uint32_t coding_first = m->strand[tx] < 0 ? m->cds_end1[tx] : m->cds_start1[tx];
+        for (size_t i = first; i < first + n && !origin; i++)
+            if (coding_first >= x->start1[i] && coding_first <= x->end1[i])
+                origin = (uint64_t)x->cdna_start1[i] + (m->strand[tx] < 0 ? x->end1[i] - coding_first
+                                                                            : coding_first - x->start1[i]);
+    }
+    if (!origin) return;
+    uint64_t stop = origin + (uint64_t)first_stop * 3u - 1u;
     uint64_t total = 0u, last_start = 0u, pen_start = 0u, last_end = 0u, pen_end = 0u;
     for (size_t i = first; i < first + n; i++) {
         uint64_t a = x->cdna_start1[i], z = x->cdna_end1[i];
@@ -758,7 +766,7 @@ static void nmd_ejc50(const duckvep_haplotype_stream_t *s, duckvep_haplotype_lea
     }
     /* Exons tile the spliced transcript from cDNA 1 without gaps or overlaps, and hold the CDS. */
     if (total != last_end || (n > 1u && (!pen_start || pen_end + 1u != last_start)) ||
-        (uint64_t)m->cds_cdna_end1[tx] > last_end) return;
+        origin + ref_length - 1u > last_end) return;
     leaf->nmd_stop_position1 = stop;
     leaf->nmd_stop_valid = 1u;
     if (n == 1u) {                                                  /* intronless: no junction, always escapes */
