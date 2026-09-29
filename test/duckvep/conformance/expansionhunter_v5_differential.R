@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+source("r/Rduckvep/R/builders.R")
 source("r/Rduckvep/R/expansionhunter.R")
 vcf <- readLines("test/duckvep/conformance/data/expansionhunter_v5_example.vcf")
 record <- strsplit(tail(vcf, 1L), "\t", fixed = TRUE)[[1L]]
@@ -10,8 +11,21 @@ stopifnot(identical(substr(fasta, 2005L, 2005L), record[4L]))
 info <- record[8L]
 stopifnot(grepl("END=2008", info, fixed = TRUE))
 reference <- substr(fasta, 2006L, 2008L)
-prepare <- function(info, i) rduckvep_prepare_expansionhunter(info, record[9L],
-  record[10L], record[4L], record[5L], reference, alt_index = i)
+directory <- tempfile("duckvep-receipt-")
+dir.create(directory)
+binary <- file.path(directory, "duckvep.duckdb_extension")
+stopifnot(file.copy("build/release/duckvep.duckdb_extension", binary))
+con <- dbConnect(duckdb(shared_home = FALSE,
+                        config = list(allow_unsigned_extensions = "true")))
+dbExecute(con, paste("LOAD", as.character(dbQuoteString(con, binary))))
+prepare <- function(info, i, row = record, literal = reference) {
+  dbWriteTable(con, "eh_input", data.frame(event_index = 1L, info,
+    format = row[9L], sample = row[10L], ref = row[4L], alt = row[5L],
+    alt_index = i), temporary = TRUE, overwrite = TRUE)
+  dbWriteTable(con, "eh_reference", data.frame(event_index = 1L,
+    reference_sequence = literal), temporary = TRUE, overwrite = TRUE)
+  as.list(rduckvep_prepare_expansionhunter(con, "eh_input", "eh_reference")[1L, ])
+}
 # The upstream fixture reports RL=1 despite a three-base literal interval.
 stopifnot(identical(reference, "CAG"),
           identical(prepare(info, 1L)$reason, "reference_mismatch"),
@@ -20,15 +34,7 @@ stopifnot(identical(reference, "CAG"),
 corrected <- sub("RL=1;", "RL=3;", info, fixed = TRUE)
 stopifnot(!identical(corrected, info))
 local({
-directory <- tempfile("duckvep-receipt-")
-dir.create(directory)
-binary <- file.path(directory, "duckvep.duckdb_extension")
-stopifnot(file.copy("build/release/duckvep.duckdb_extension", binary))
-on.exit(unlink(directory, recursive = TRUE), add = TRUE)
-con <- dbConnect(duckdb(shared_home = FALSE,
-                        config = list(allow_unsigned_extensions = "true")))
-on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
-dbExecute(con, paste("LOAD", as.character(dbQuoteString(con, binary))))
+on.exit({dbDisconnect(con, shutdown = TRUE); unlink(directory, recursive = TRUE)}, add = TRUE)
 for (i in 1:2) {
   prepared <- prepare(corrected, i)
   stopifnot(identical(prepared$status, "ok"), prepared$sequence_exact)
@@ -57,8 +63,7 @@ anchor <- tail(system2("samtools", c("faidx", fasta37,
 literal <- tail(system2("samtools", c("faidx", fasta37,
   "9:27573527-27573544"), stdout = TRUE), 1L)
 stopifnot(identical(anchor, als[4L]), identical(literal, strrep("GGCCCC", 3L)))
-call <- function(i) rduckvep_prepare_expansionhunter(als[8L], als[9L], als[10L],
-  als[4L], als[5L], literal, alt_index = i)
+call <- function(i) prepare(als[8L], i, als, literal)
 exact <- call(1L)
 stopifnot(identical(exact$status, "ok"),
   identical(call(2L)$reason, "estimated_count"))

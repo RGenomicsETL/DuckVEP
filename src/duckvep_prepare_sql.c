@@ -99,7 +99,7 @@ static const char str_tail[] =
 "string_split(coalesce(list_extract(entries,list_position(fields,ci_key)),''),'/') ranges, "
 "string_split(coalesce(list_extract(entries,list_position(fields,'SO')),''),'/') support "
 "FROM counts), calls AS (SELECT *, "
-"list_filter(range(1,length(gt)+1),lambda i: gt[i]=cast(alt_index AS VARCHAR)) selected_calls "
+"list_filter(range(1,length(gt)+1),lambda i: gt[i]=cast(try_cast(alt_index AS BIGINT) AS VARCHAR)) selected_calls "
 "FROM samples), ";
 
 static const char str_tail2[] =
