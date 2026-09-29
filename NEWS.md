@@ -9,6 +9,13 @@
 - `benchmarks/duckvep_circular_origin.py` records one- and multi-thread throughput, output equality and peak memory on an origin-focused workload: lifting costs about 17-20% of one-thread throughput and the output checksum is identical across threads and rotations.
 - `make test_properties` builds and runs the native theft/greatest properties (`test_properties_sanitized` adds ASan and UBSan).
 
+## Enforced native budget and bounded execution (issue #3)
+
+- Every native owner (model arrays, interval indexes, reference readers, workspaces, per-worker result and text arenas, SQL builders) allocates through one process-wide atomic budget, default **4 GiB**. Blocks are charged before allocation, with page-rounded capacity for large blocks and the old block still charged while a `realloc` grows. A refusal is an explicit `capacity error: ... budget exceeded (requested N bytes, M in use, limit L)`; nothing is truncated. A model load that exceeds the budget publishes nothing and leaves every loaded model usable.
+- `duckvep_native_budget()` reports current and high-water bytes per owner; `duckvep_native_budget_set(bytes)` sets the ceiling (it cannot go below the bytes already charged); `duckvep_native_budget_reset_high_water()` restarts the high-water marks.
+- Annotation admits at most **6** concurrent workers; each holds a **128 MiB** native scratch lease and a **64 MiB** emitted-output allowance, charged before growth, and an idle worker keeps at most **64 MiB**. `duckvep_worker_limits_set(workers, scratch_bytes, emit_bytes, idle_bytes)` changes them. An allele or vector over its lease is a capacity error.
+- `make test_fault_injection` builds an AddressSanitizer + LeakSanitizer extension whose allocator can fail the Nth allocation and fails every allocation of model load and annotation in turn. htslib's own buffers are not routed through the budget; a fixed reservation stands in for each open FASTA index.
+
 ## Breaking change: native SQL builders
 
 DuckVEP registers functions without modifying the database catalog during `LOAD`. Preparation, annotation and projection run SQL emitted by native scalar builders in the caller's connection. Existing macro invocations must be migrated; `LOAD` does not install compatibility macros.
