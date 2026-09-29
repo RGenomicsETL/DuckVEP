@@ -1,0 +1,442 @@
+require duckvep
+
+# Coding-v1 eligibility and provenance (slice 2 of #2, contract design/duckvep_haplotype_contract.md).
+# prediction_status/prediction_reason only say whether a leaf is inside the supported domain; no SO, IMPACT or
+# NMD is predicted yet. The keyed result per sample/phase/lane is carrier_predictions. The row summary is
+# eligible_classifier_pending only when every carrier is.
+# Fixture transcript 0 is + strand with two coding exons: exon 1 = 100-108 (ATGGCTGCT), exon 2 = 120-128
+# (GAAGGTTAA); codons are Met Ala Ala Glu Gly Stop. Transcripts 1-6 are single-exon variants of it that each
+# break one v1 CDS requirement.
+
+query T
+SELECT loaded FROM duckvep_model_load('hap_elig',
+ 'SELECT i::UINTEGER seq_region FROM range(8) t(i)',
+ 'SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,100::UBIGINT transcript_start,
+  CASE WHEN i=0 THEN 128 ELSE 117 END::UBIGINT transcript_end,1::TINYINT strand,i::UINTEGER gene_index,
+  CASE i WHEN 4 THEN 259 WHEN 5 THEN 19 ELSE 3 END::UBIGINT transcript_flags,100::UBIGINT cds_start,
+  CASE WHEN i=0 THEN 128 ELSE 117 END::UBIGINT cds_end,
+  CASE i WHEN 1 THEN ''CTGGCTGCTGAAGGTTAA'' WHEN 2 THEN ''ATGGCTTAAGAAGGTTAA''
+   WHEN 3 THEN ''ATGGCTGCTGAAGGTGGT'' ELSE ''ATGGCTGCTGAAGGTTAA'' END::BLOB cds_sequence,
+  CASE WHEN i=6 THEN 2 ELSE 1 END::UTINYINT codon_table,''''::BLOB pre_cds_sequence,
+  ''''::BLOB post_cds_sequence FROM range(8) t(i)',
+ 'SELECT * FROM (SELECT i::UINTEGER transcript_index,100::UBIGINT exon_start,
+  (CASE WHEN i=0 THEN 108 ELSE 117 END)::UBIGINT exon_end,1::UBIGINT exon_cdna_start,
+  (CASE WHEN i=0 THEN 9 ELSE 18 END)::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase
+  FROM range(8) t(i) UNION ALL SELECT 0::UINTEGER,120::UBIGINT,128::UBIGINT,10::UBIGINT,18::UBIGINT,
+  0::TINYINT,0::TINYINT) ORDER BY transcript_index,exon_start')
+----
+true
+
+statement ok
+CREATE TABLE hap_elig_events(event_index BIGINT, seq_region INT, position BIGINT, reference VARCHAR,
+ alternate VARCHAR, alt_index INT, transcript_index INT)
+
+statement ok
+INSERT INTO hap_elig_events VALUES
+ (1,0,103,'G','A',1,0),(2,0,104,'C','T',1,0),(3,0,123,'G','C',1,0),(5,0,102,'GGCT','G',1,0),
+ (6,0,103,'G','T',1,0),(71,0,105,'T','TAAA',1,0),(72,0,105,'T','TCCC',1,0),(8,0,103,'G','A',1,0),
+ (9,0,106,'A','T',1,0),(10,0,103,'GCT','TAG',1,0),(11,0,112,'A','G',1,0),(12,0,108,'TACGT','T',1,0),
+ (13,0,105,'T','T'||repeat('ACG',17),1,0),(14,0,105,'T','T'||repeat('ACG',16)||'AC',1,0),
+ (15,0,106,'G','N',1,0),(16,0,103,'GC','AT',1,0),(20,0,106,'G','T',2,0),(21,0,106,'G','A',1,0)
+
+statement ok
+INSERT INTO hap_elig_events SELECT 100+i,i,103,'G','A',1,i FROM range(1,7) t(i)
+
+statement ok
+CREATE TABLE hap_elig_gt(event_index BIGINT, sample_index INT, alleles INTEGER[],
+ phase_before BOOLEAN[], phase_set BIGINT)
+
+statement ok
+INSERT INTO hap_elig_gt VALUES
+ (1,1,[1,0],[false,true],NULL),(2,1,[1,0],[false,true],NULL),
+ (1,2,[1,0],[false,true],NULL),(2,2,[0,1],[false,true],NULL),
+ (1,3,[1,NULL],[false,true],NULL),
+ (1,4,[0,1],[false,false],NULL),
+ (1,5,[1,0],[false,true],10),(3,5,[1,0],[false,true],20),
+ (1,6,[1,1],[false,false],NULL),(3,6,[1,0],[false,true],10),
+ (1,7,[1,0],[false,true],NULL),(5,7,[1,0],[false,true],NULL),
+ (1,8,[1,0],[false,true],NULL),(6,8,[1,0],[false,true],NULL),
+ (71,9,[1,0],[false,true],NULL),(72,9,[1,0],[false,true],NULL),
+ (1,10,[1,0],[false,true],NULL),(8,10,[1,0],[false,true],NULL),
+ (9,11,[1,0],[false,true],NULL),
+ (11,12,[1,0],[false,true],NULL),(3,12,[1,0],[false,true],NULL),
+ (12,13,[1,0],[false,true],NULL),
+ (13,14,[1,0],[false,true],NULL),(14,15,[1,0],[false,true],NULL),
+ (10,16,[1,0],[false,true],NULL),(3,16,[1,0],[false,true],NULL),
+ (1,17,[1],[false],NULL),
+ (15,18,[1,0],[false,true],NULL),
+ (16,30,[1,0],[false,true],NULL),
+ (20,40,[2,0],[false,true],NULL),(21,40,[0,1],[false,true],NULL)
+
+statement ok
+INSERT INTO hap_elig_gt SELECT 100+i,20+i,[1,0],[false,true],NULL FROM range(1,7) t(i)
+
+statement ok
+CREATE TABLE hap_elig_calls AS SELECT e.event_index,e.seq_region,e.position,e.reference,e.alternate,
+ e.alt_index,e.transcript_index,g.sample_index,g.alleles,g.phase_before,g.phase_set
+ FROM hap_elig_events e JOIN hap_elig_gt g USING(event_index)
+
+# Keyed eligibility per sample/phase/lane. Samples: 1 cis pair, 2 trans control, 3 missing allele,
+# 4 unphased heterozygous, 5 heterozygous in PS 10 and PS 20 (cross-PS), 6 hom-alt plus one het PS, 7 SNV inside a
+# deletion, 8 contradictory SNVs, 9 two insertions in one gap, 10 duplicated record, 11 REF mismatch,
+# 12 intronic plus exonic, 13 deletion across an exon boundary, 14 51-base and 15 50-base insertions,
+# 16 stop-creating MNV with a later SNV, 17 haploid call, 18 N allele, 30 MNV, 40 multiallelic ALT 2,
+# 21-26 transcripts 1-6 outside the CDS domain.
+
+query ITITT
+SELECT c.sample_index,c.phase_set,c.haplotype_lane,c.prediction_status,c.prediction_reason
+FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT * FROM hap_elig_calls','hap_elig')) ORDER BY 1,2 NULLS FIRST,3
+----
+1	NULL	1	eligible_classifier_pending	supported_domain
+2	NULL	1	eligible_classifier_pending	supported_domain
+2	NULL	2	eligible_classifier_pending	supported_domain
+3	NULL	1	eligible_classifier_pending	supported_domain
+3	NULL	2	incomplete_input	missing_call
+4	NULL	1	incomplete_input	unphased_heterozygous
+4	NULL	2	incomplete_input	unphased_heterozygous
+5	10	1	incomplete_input	unresolved_cross_ps_phase
+5	20	1	incomplete_input	unresolved_cross_ps_phase
+6	10	1	eligible_classifier_pending	supported_domain
+6	10	2	eligible_classifier_pending	supported_domain
+7	NULL	1	unsupported_overlap	overlapping_edits
+8	NULL	1	edit_conflict	contradictory_edits
+9	NULL	1	unsupported_overlap	ambiguous_same_gap_insertions
+10	NULL	1	unsupported_overlap	duplicate_edits
+11	NULL	1	unsupported_context	reference_mismatch
+12	NULL	1	unsupported_context	outside_cds
+13	NULL	1	unsupported_context	outside_cds
+14	NULL	1	unsupported_context	allele_over_50_bases
+15	NULL	1	eligible_classifier_pending	supported_domain
+16	NULL	1	eligible_classifier_pending	supported_domain
+17	NULL	1	unsupported_context	non_diploid_call
+18	NULL	1	unsupported_context	invalid_allele
+21	NULL	1	unsupported_context	noncanonical_start
+22	NULL	1	unsupported_context	internal_stop
+23	NULL	1	unsupported_context	noncanonical_stop
+24	NULL	1	unsupported_context	curated_transcript
+25	NULL	1	unsupported_context	incomplete_cds
+26	NULL	1	unsupported_context	non_standard_codon_table
+30	NULL	1	eligible_classifier_pending	supported_domain
+40	NULL	1	eligible_classifier_pending	supported_domain
+40	NULL	2	eligible_classifier_pending	supported_domain
+
+# carrier_predictions is parallel to carriers, and the policy version is constant.
+
+query IIIT
+SELECT count(*),count(*) FILTER (WHERE len(carriers)<>len(carrier_predictions) OR
+ list_transform(carriers,lambda c: (c.sample_index,c.phase_set,c.haplotype_lane)) IS DISTINCT FROM
+ list_transform(carrier_predictions,lambda c: (c.sample_index,c.phase_set,c.haplotype_lane))),
+ count(DISTINCT prediction_policy),min(prediction_policy)
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
+----
+27	0	1	duckvep-coding-v1
+
+# The row summary is eligible_classifier_pending only when every carrier is; otherwise it is the first
+# ineligible carrier's keyed result.
+
+query II
+SELECT count(*) FILTER (WHERE prediction_status='eligible_classifier_pending' AND
+ list_bool_or(list_transform(carrier_predictions,lambda c: c.prediction_status<>'eligible_classifier_pending'))),
+ count(*) FILTER (WHERE prediction_status<>'eligible_classifier_pending' AND
+ NOT list_bool_or(list_transform(carrier_predictions,lambda c: c.prediction_status<>'eligible_classifier_pending')))
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
+----
+0	0
+
+# Row-level status vocabulary, each with a stable reason, and NULL/known sequence status alongside it.
+# Existing columns keep their meaning: sequence_status and projection_status are unchanged.
+
+query TTTI
+SELECT prediction_status,prediction_reason,sequence_status,count(*)
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index NOT IN (2,3,5,6,17)','hap_elig')
+GROUP BY ALL ORDER BY ALL
+----
+edit_conflict	contradictory_edits	edit_conflict	1
+eligible_classifier_pending	supported_domain	ok	6
+incomplete_input	unphased_heterozygous	incomplete_input	1
+unsupported_context	allele_over_50_bases	ok	1
+unsupported_context	curated_transcript	ok	1
+unsupported_context	incomplete_cds	ok	1
+unsupported_context	internal_stop	ok	1
+unsupported_context	invalid_allele	unavailable_projection	1
+unsupported_context	non_standard_codon_table	ok	1
+unsupported_context	noncanonical_start	ok	1
+unsupported_context	noncanonical_stop	ok	1
+unsupported_context	outside_cds	unavailable_projection	2
+unsupported_context	reference_mismatch	unavailable_projection	1
+unsupported_overlap	ambiguous_same_gap_insertions	edit_conflict	1
+unsupported_overlap	duplicate_edits	edit_conflict	1
+unsupported_overlap	overlapping_edits	edit_conflict	1
+
+# Contributor conservation: single-carrier leaves, keyed by their carrier. Every source keeps its ALT ordinal
+# and role. Omitted, unapplied (conflicting) and post-stop sources are retained, not dropped.
+
+query IITTT
+SELECT carriers[1].sample_index AS sample,carriers[1].haplotype_lane AS lane,carriers[1].phase_set AS ps,prediction_status,
+ string_agg(x.event_index||'/'||x.alt_index||':'||x.role,' ' ORDER BY x.event_index) AS provenance
+FROM (SELECT *,unnest(contributor_provenance) x FROM duckvep_haplotypes(
+ 'SELECT * FROM hap_elig_calls WHERE sample_index NOT IN (2,3,5,6,17)','hap_elig') WHERE len(carriers)=1)
+GROUP BY ALL ORDER BY ALL
+----
+1	1	NULL	eligible_classifier_pending	1/1:applied 2/1:applied
+7	1	NULL	unsupported_overlap	1/1:unapplied 5/1:unapplied
+8	1	NULL	edit_conflict	1/1:unapplied 6/1:unapplied
+9	1	NULL	unsupported_overlap	71/1:unapplied 72/1:unapplied
+10	1	NULL	unsupported_overlap	1/1:unapplied 8/1:unapplied
+11	1	NULL	unsupported_context	9/1:omitted
+12	1	NULL	unsupported_context	3/1:unapplied 11/1:omitted
+13	1	NULL	unsupported_context	12/1:omitted
+14	1	NULL	unsupported_context	13/1:applied
+15	1	NULL	eligible_classifier_pending	14/1:applied
+16	1	NULL	eligible_classifier_pending	3/1:post_stop 10/1:applied
+18	1	NULL	unsupported_context	15/1:omitted
+21	1	NULL	unsupported_context	101/1:applied
+22	1	NULL	unsupported_context	102/1:applied
+23	1	NULL	unsupported_context	103/1:applied
+24	1	NULL	unsupported_context	104/1:applied
+25	1	NULL	unsupported_context	105/1:applied
+26	1	NULL	unsupported_context	106/1:applied
+30	1	NULL	eligible_classifier_pending	16/1:applied
+40	1	NULL	eligible_classifier_pending	20/2:applied
+40	2	NULL	eligible_classifier_pending	21/1:applied
+
+# Original operands, evidence and identity match the existing contributors list for every row, and
+# every normalized edit belongs to a listed contributor.
+
+query IIIII
+SELECT count(*),count(*) FILTER (WHERE
+ list_sort(list_transform(contributors,lambda c: (c.event_index,c.seq_region,c.position,c.reference,c.alternate,
+  c.evidence_flags,c.projection_status))) IS DISTINCT FROM
+ list_sort(list_transform(contributor_provenance,lambda c: (c.event_index,c.seq_region,c.position,c.reference,
+  c.alternate,c.evidence_flags,c.projection_status)))),
+ count(*) FILTER (WHERE len(contributors)<>len(contributor_provenance)),
+ count(*) FILTER (WHERE list_bool_or(list_transform(normalized_edits,lambda e:
+  NOT list_contains(list_transform(contributor_provenance,lambda c: c.event_index),e.event_index)))),
+ count(*) FILTER (WHERE len(normalized_edits)<>edit_count)
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
+----
+27	0	0	0	0
+
+# Normalized edits: ascending CDS order with their source event and block. Failed leaves keep them too,
+# without a block: sample 8 conflicts, sample 7 overlaps, sample 16 has an MNV plus a post-stop SNV.
+
+query IIT
+SELECT carriers[1].sample_index AS sample,carriers[1].haplotype_lane AS lane,
+ string_agg(e.edit_index||':'||e.event_index||':'||coalesce(e.block_index::VARCHAR,'-')||':'||e.cds_start||':'||
+  e.reference||'>'||e.alternate||'/'||e.variant_strand,' ' ORDER BY e.edit_index) AS edits
+FROM (SELECT *,unnest(normalized_edits) e FROM duckvep_haplotypes(
+ 'SELECT * FROM hap_elig_calls WHERE sample_index IN (1,7,8,9,10,12,16,30,40)','hap_elig')
+ WHERE len(carriers)=1) GROUP BY ALL ORDER BY ALL
+----
+1	1	0:1:0:4:G>A/1 1:2:0:5:C>T/1
+7	1	0:5:-:4:GCT>/1 1:1:-:4:G>A/1
+8	1	0:6:-:4:G>T/1 1:1:-:4:G>A/1
+9	1	0:72:-:7:>CCC/1 1:71:-:7:>AAA/1
+10	1	0:8:-:4:G>A/1 1:1:-:4:G>A/1
+12	1	0:3:-:13:G>C/1
+16	1	0:10:0:4:GCT>TAG/1 1:3:1:13:G>C/1
+30	1	0:16:0:4:GC>AT/1
+40	1	0:20:0:7:G>T/1
+40	2	0:21:0:7:G>A/1
+
+# Sequence deduplication cannot erase contributors: the cis SNV pair of sample 1 and the MNV of sample 30
+# rebuild the same CDS in different leaves, and each keeps its own sources and edits.
+
+query TIIT
+SELECT cds,carriers[1].sample_index,len(contributor_provenance),
+ string_agg(DISTINCT x.event_index::VARCHAR,',' ORDER BY x.event_index::VARCHAR) AS sources
+FROM (SELECT *,unnest(contributor_provenance) x FROM duckvep_haplotypes(
+ 'SELECT * FROM hap_elig_calls WHERE sample_index IN (1,30)','hap_elig')) GROUP BY ALL ORDER BY ALL
+----
+ATGATTGCTGAAGGTTAA	1	2	1,2
+ATGATTGCTGAAGGTTAA	30	1	16
+
+# Reference lanes: the reference lane of a heterozygous call is not a leaf in strict decoded input, and
+# samples with the same edit path share one leaf whose contributors are listed once.
+
+query II
+SELECT count(*) FILTER (WHERE c.sample_index=1 AND c.haplotype_lane=1),
+ count(*) FILTER (WHERE c.sample_index=1 AND c.haplotype_lane=2)
+FROM (SELECT unnest(carriers) c FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig'))
+----
+1	0
+
+query III
+SELECT count(*),sum(len(contributor_provenance)),max(len(carriers))
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index IN (1,10,40) AND event_index=1
+ UNION ALL SELECT * REPLACE (sample_index+100 AS sample_index) FROM hap_elig_calls WHERE sample_index=1 AND event_index=1','hap_elig')
+----
+1	1	3
+
+# Source-record replay (vep116_compat) is a compatibility interpretation, outside the strict v1 domain:
+# reference-only lanes (the 0|0 record, whose nonmutating REF contributor is not emitted) and shadowed/duplicate
+# sources keep provenance but get non_strict_phase_policy.
+
+statement ok
+CREATE TABLE hap_elig_raw AS SELECT * FROM (VALUES
+ (1::UBIGINT,0::UINTEGER,103::UBIGINT,'G',['A'],0::UINTEGER,0::UINTEGER,'1|0'),
+ (2,0,104,'C',['T'],0,0,'1|0'),
+ (3,0,123,'G',['C'],0,1,'0|1'),
+ (4,0,103,'G',['A'],0,1,'0|0'),
+ (5,0,103,'G',['A'],0,2,'1|0'),
+ (6,0,103,'G',['A'],0,2,'1|0')) t(event_index,seq_region,position,reference,alternates,transcript_index,sample_index,gt)
+
+query TTIIIII
+SELECT prediction_status,prediction_reason,count(*),sum(len(contributors)),sum(len(contributor_provenance)),
+ count(*) FILTER (WHERE list_bool_or(list_transform(carrier_predictions,lambda c: c.prediction_status<>prediction_status))),
+ count(*) FILTER (WHERE edit_count=0 AND len(contributor_provenance)=0)
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_raw','hap_elig',input_mode:='source_records',
+ phase_policy:='vep116_compat') GROUP BY ALL ORDER BY ALL
+----
+unsupported_context	non_strict_phase_policy	6	5	5	0	3
+
+query IITTI
+SELECT x.event_index,x.alt_index,x.role,x.projection_status,x.evidence_flags
+FROM (SELECT unnest(contributor_provenance) x FROM duckvep_haplotypes('SELECT * FROM hap_elig_raw',
+ 'hap_elig',input_mode:='source_records',phase_policy:='vep116_compat')) ORDER BY ALL
+----
+1	1	shadowed	shadowed_duplicate	1
+2	1	applied	ok	1
+3	1	applied	ok	1
+5	1	applied	ok	1
+6	1	shadowed	shadowed_duplicate	1
+
+statement ok
+DROP TABLE hap_elig_raw
+
+# The vep116_compat policy on decoded calls is likewise outside the strict domain, but missing calls stay
+# incomplete_input.
+
+query IITT
+SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason
+FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT * FROM hap_elig_calls WHERE sample_index IN (1,2,3,4)','hap_elig',phase_policy:='vep116_compat'))
+ORDER BY 1,2,3
+----
+1	1	unsupported_context	non_strict_phase_policy
+2	1	unsupported_context	non_strict_phase_policy
+2	2	unsupported_context	non_strict_phase_policy
+3	1	incomplete_input	missing_call
+3	2	incomplete_input	missing_call
+4	2	unsupported_context	non_strict_phase_policy
+
+statement ok
+DROP TABLE hap_elig_calls
+
+statement ok
+DROP TABLE hap_elig_gt
+
+statement ok
+DROP TABLE hap_elig_events
+
+# Failures are explicit, never truncated: malformed identities and exhausted budgets error out.
+
+statement ok
+CREATE TABLE hap_elig_bad AS SELECT 1 event_index,0 seq_region,103 AS position,'G' AS reference,'A' AS alternate,
+ 1 alt_index,0 transcript_index,0 sample_index,[1,0] alleles,[false,true] phase_before,NULL::BIGINT phase_set
+
+statement error
+SELECT * FROM duckvep_haplotypes('SELECT * REPLACE (NULL AS alt_index) FROM hap_elig_bad','hap_elig')
+----
+required input column 6 is NULL
+
+statement error
+SELECT * FROM duckvep_haplotypes('SELECT * REPLACE (0 AS alt_index) FROM hap_elig_bad','hap_elig')
+----
+invalid input or candidate
+
+statement error
+SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_elig_bad UNION ALL SELECT * REPLACE (104 AS position) FROM hap_elig_bad','hap_elig')
+----
+inconsistent event identity
+
+statement ok
+DROP TABLE hap_elig_bad
+
+statement ok
+CREATE TABLE hap_elig_budget AS SELECT * FROM (VALUES
+ (1,0,103,'G','A',1,0,0,[1,0],[false,true],NULL::BIGINT),
+ (2,0,104,'C','T',1,0,0,[1,0],[false,true],NULL::BIGINT)) t(event_index,seq_region,position,reference,alternate,
+ alt_index,transcript_index,sample_index,alleles,phase_before,phase_set)
+
+query I
+SELECT count(*) FROM duckvep_haplotypes('SELECT * FROM hap_elig_budget','hap_elig',max_leaf_events:=2)
+----
+1
+
+statement error
+SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_elig_budget','hap_elig',max_leaf_events:=1)
+----
+max_leaf_events=1 exhausted
+
+statement error
+SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_elig_budget','hap_elig',max_leaf_edits:=1)
+----
+max_leaf_edits=1 exhausted
+
+statement ok
+DROP TABLE hap_elig_budget
+
+query T
+SELECT duckvep_model_drop('hap_elig')
+----
+true
+
+# DuckDB vector boundaries: 2,100 transcripts with two SNVs each give 4,200 input rows and 2,800 output rows,
+# so the input, the output chunks, and every provenance/edit/carrier list child cross 2,048. Transcript i mod 3:
+# 0 cis pair (eligible, one leaf), 1 unphased heterozygous pair (incomplete_input, one leaf with 2 carriers),
+# 2 trans pair (eligible, two leaves).
+
+query T
+SELECT loaded FROM duckvep_model_load('hap_elig_wide',
+ 'SELECT 0::UINTEGER seq_region',
+ 'SELECT i::UINTEGER transcript_index,0::UINTEGER seq_region,(100+30*i)::UBIGINT transcript_start,
+  (117+30*i)::UBIGINT transcript_end,1::TINYINT strand,i::UINTEGER gene_index,3::UBIGINT transcript_flags,
+  (100+30*i)::UBIGINT cds_start,(117+30*i)::UBIGINT cds_end,''ATGGCTGCTGAAGGTTAA''::BLOB cds_sequence,
+  1::UTINYINT codon_table,''''::BLOB pre_cds_sequence,''''::BLOB post_cds_sequence FROM range(2100) t(i)',
+ 'SELECT i::UINTEGER transcript_index,(100+30*i)::UBIGINT exon_start,(117+30*i)::UBIGINT exon_end,
+  1::UBIGINT exon_cdna_start,18::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase
+  FROM range(2100) t(i)')
+----
+true
+
+statement ok
+CREATE TABLE hap_elig_wide_calls AS SELECT 2*i+j+1 AS event_index,0 AS seq_region,
+ 103+30*i+j AS position,CASE WHEN j=0 THEN 'G' ELSE 'C' END AS reference,
+ CASE WHEN j=0 THEN 'A' ELSE 'T' END AS alternate,1 AS alt_index,i AS transcript_index,0 AS sample_index,
+ CASE WHEN i%3=1 THEN [0,1] WHEN i%3=2 AND j=1 THEN [0,1] ELSE [1,0] END AS alleles,
+ CASE WHEN i%3=1 THEN [false,false] ELSE [false,true] END AS phase_before,NULL::BIGINT AS phase_set
+ FROM range(2100) t(i) CROSS JOIN range(2) e(j)
+
+query ITTIIIIIIIII
+SELECT transcript_index%3 AS kind,prediction_status,prediction_reason,count(*),sum(len(carriers)),
+ sum(len(contributor_provenance)),sum(len(normalized_edits)),sum(len(carrier_predictions)),
+ count(*) FILTER (WHERE list_sort(list_transform(contributor_provenance,lambda c: c.event_index))<>
+  list_sort(list_transform(contributors,lambda c: c.event_index))),
+ count(*) FILTER (WHERE list_bool_or(list_transform(contributor_provenance,lambda c:
+  c.event_index NOT IN (2*transcript_index+1,2*transcript_index+2)))),
+ count(*) FILTER (WHERE list_bool_or(list_transform(normalized_edits,lambda e:
+  e.event_index NOT IN (2*transcript_index+1,2*transcript_index+2) OR e.cds_start NOT IN (4,5)))),
+ count(*) FILTER (WHERE list_bool_or(list_transform(carrier_predictions,lambda c:
+  c.prediction_status<>prediction_status)))
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_wide_calls','hap_elig_wide')
+GROUP BY ALL ORDER BY ALL
+----
+0	eligible_classifier_pending	supported_domain	700	700	1400	1400	700	0	0	0	0
+1	incomplete_input	unphased_heterozygous	700	1400	1400	0	1400	0	0	0	0
+2	eligible_classifier_pending	supported_domain	1400	1400	1400	1400	1400	0	0	0	0
+
+query IIII
+SELECT count(*),count(DISTINCT transcript_index),min(transcript_index),max(transcript_index)
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_wide_calls','hap_elig_wide')
+----
+2800	2100	0	2099
+
+statement ok
+DROP TABLE hap_elig_wide_calls
+
+query T
+SELECT duckvep_model_drop('hap_elig_wide')
+----
+true
