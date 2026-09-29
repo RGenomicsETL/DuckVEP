@@ -20,7 +20,7 @@ endif
 include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
 include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
 
-.PHONY: all test test_debug test_release test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme
+.PHONY: all test test_debug test_release test_haplotype_contract test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme
 all: configure release
 configure: venv platform extension_version
 platform: venv
@@ -43,6 +43,11 @@ test_release: test_extension_release test-extension-symbols test-sql-lambda-synt
 test_mane_grch37:
 	Rscript test/scripts/test_mane_grch37_policy.R
 	@if test -n "$(MANE_GRCH37_OUTPUT)"; then $(MAKE) test_mane_grch37_receipt MANE_GRCH37_OUTPUT="$(MANE_GRCH37_OUTPUT)"; else echo 'Full-release receipt needs MANE_GRCH37_OUTPUT'; fi
+
+test_haplotype_contract:
+	Rscript --vanilla test/scripts/check_haplotype_csq_map.R test/data/haplotype/csq_so_map_v1.tsv
+	Rscript --vanilla test/scripts/check_haplotype_goldens.R
+	Rscript --vanilla test/scripts/test_haplotype_accounting.R
 
 test_mane_grch37_receipt:
 	@test -n "$(MANE_GRCH37_OUTPUT)" || { echo 'Set MANE_GRCH37_OUTPUT to the full-release output directory' >&2; exit 1; }

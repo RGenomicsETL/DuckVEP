@@ -1,0 +1,32 @@
+name: Haplotype contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'test/data/haplotype/**'
+      - 'test/scripts/*haplotype*'
+      - 'src/kernel/src/duckvep_so_metadata.inc'
+      - 'Makefile'
+      - '.github/workflows/haplotype-contract.yml'
+  pull_request:
+    paths:
+      - 'test/data/haplotype/**'
+      - 'test/scripts/*haplotype*'
+      - 'src/kernel/src/duckvep_so_metadata.inc'
+      - 'Makefile'
+      - '.github/workflows/haplotype-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: r-lib/actions/setup-r@v2
+      - name: Check the csq mapping, goldens and accounting (offline, base R)
+        run: make test_haplotype_contract
