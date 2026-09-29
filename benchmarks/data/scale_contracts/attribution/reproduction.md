@@ -7,3 +7,7 @@ The frozen `inputs.tsv`, `eligibility.tsv`, `schemas.tsv`, and `receipts.tsv` ch
 ## Scatter loader reproduction
 
 The unordered scatter loader (`096b945`, binary SHA-256 `b831bd915f138d2b3fb0d267663b8ddb02c3ab72c4916b56d6ed1394def0fc11`, run from an immutable copy) passed the same `benchmarks/scale_contracts.R` check unchanged: compact, compact_regulation, complete17, 41,942 retained cells, model SHA-256 `0301905915b038b6b1f5db04d7dda1041ac5e30a7732ec700dd82b1616402c1b`. No new publishable receipt was produced.
+
+## Scatter loader rebased onto circular-topology main
+
+After rebasing `scale-slice3` onto origin/main (which carries the #19 circular contract), the merged loader (immutable copy, SHA-256 `4907665be5961850d2e70c1f18c035a3a20bab38b70c9b61762d5ce87b42f813`) again passed `benchmarks/scale_contracts.R` unchanged: compact, compact_regulation, complete17, 41,942 retained cells, model SHA-256 `0301905915b038b6b1f5db04d7dda1041ac5e30a7732ec700dd82b1616402c1b`. No new publishable receipt was produced.
