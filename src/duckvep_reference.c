@@ -68,6 +68,14 @@ int duckvep_reference_reader_windows(duckvep_reference_reader_t *reader,
     }
     uint32_t shift_start1, shift_end1, fetch_start1, fetch_end1;
     uint32_t sequence_length = model->sequence_lengths[begin];
+    /* A circular region with wrapped objects executes on lifted coordinates:
+     * event windows may run past the sequence end or before its start, and
+     * lifted position x reads source base ((x - 1) mod L) + 1. The virtual
+     * length only bounds the lifted interval. */
+    uint32_t lift_length = 0u, lift_base = 0u, lift_virtual = 0u;
+    if (duckvep_model_region_lift(model, event->chrom_id, &lift_length, &lift_base, &lift_virtual))
+        sequence_length = lift_virtual;
+    (void)lift_base;
     if (duckvep_hgvs_genomic_search_interval(event, sequence_length, &shift_start1, &shift_end1) !=
             DUCKVEP_HGVS_OK ||
         duckvep_hgvs_reference_fetch_interval(event, sequence_length, &fetch_start1, &fetch_end1) !=
@@ -89,6 +97,48 @@ int duckvep_reference_reader_windows(duckvep_reference_reader_t *reader,
             ? sequence_length : fetch_end1 + DUCKVEP_REFERENCE_READ_AHEAD;
         hts_pos_t fetched_length = -1;
         size_t required = 0u;
+        if (lift_length) {
+            /* Lifted interval [start, end] is fetched as source runs
+             * [start, L], [1, L] ..., [1, end] into the one scratch. */
+            uint64_t want = (uint64_t)cache_end1 - fetch_start1 + 1u;
+            if (want + 1u > reader->capacity && cache_end1 != fetch_end1) {
+                cache_end1 = fetch_end1;
+                want = (uint64_t)cache_end1 - fetch_start1 + 1u;
+            }
+            if (want + 1u > reader->capacity) {
+                snprintf(error, error_size,
+                    "DuckVEP: reference workspace bytes=%zu, required=%llu at %s:%u-%u in %s",
+                    reader->capacity, (unsigned long long)want + 1u, name, fetch_start1, fetch_end1,
+                    model->reference_fasta_path);
+                return 0;
+            }
+            reader->length = 0u;
+            uint64_t at = fetch_start1, written = 0u;
+            while (at <= cache_end1) {
+                uint64_t source1 = (at - 1u) % lift_length + 1u;
+                uint64_t run = lift_length - source1 + 1u;
+                if (run > (uint64_t)cache_end1 - at + 1u) run = (uint64_t)cache_end1 - at + 1u;
+                if (faidx_fetch_seq64_into(reader->fai, name, (hts_pos_t)source1 - 1,
+                        (hts_pos_t)(source1 + run - 1u) - 1, reader->bases + written,
+                        reader->capacity - written, &fetched_length, &required) != 0 ||
+                    fetched_length < 0 || (uint64_t)fetched_length != run) {
+                    duckvep_sql_set_error(error, error_size,
+                        "DuckVEP: reference FASTA fetch did not return the requested interval");
+                    return 0;
+                }
+                written += run;
+                at += run;
+            }
+            fetched_length = (hts_pos_t)written;
+            if (!duckvep_model_reference_identity_matches(model)) {
+                duckvep_sql_set_error(error, error_size,
+                    "DuckVEP: pinned reference FASTA or index changed during fetch");
+                return 0;
+            }
+            reader->length = (size_t)fetched_length;
+            reader->start1 = fetch_start1; reader->chrom_id = event->chrom_id;
+            goto fetched;
+        }
         int status = faidx_fetch_seq64_into(reader->fai, name, fetch_start1 - 1,
             cache_end1 - 1, NULL, 0u, &fetched_length, &required);
         if (status != -1 || errno != ENOSPC) {
@@ -128,6 +178,7 @@ int duckvep_reference_reader_windows(duckvep_reference_reader_t *reader,
         reader->length = (size_t)fetched_length;
         reader->start1 = fetch_start1; reader->chrom_id = event->chrom_id;
     }
+fetched:;
     *lookup = (duckvep_hgvs_reference_window_t){(const uint8_t *)reader->bases,
         reader->length, reader->start1, reader->chrom_id};
     *shift = (duckvep_hgvs_reference_window_t){(const uint8_t *)reader->bases + (shift_start1 - reader->start1),

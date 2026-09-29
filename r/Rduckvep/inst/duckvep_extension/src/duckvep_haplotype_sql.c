@@ -125,6 +125,10 @@ static void haplotype_bind(duckdb_bind_info info) {
     duckdb_destroy_value(&value);
     if (name) b->entry = duckvep_registry_pin(b->registry, name);
     duckdb_free(name);
+    if (b->entry && b->entry->model.lifted) {
+        duckdb_bind_set_error(info, "duckvep_haplotypes: phased edit sets are not supported for models with wrapped circular objects");
+        haplotype_bind_destroy(b); return;
+    }
     if (!b->entry || !b->query || !b->query[0]) {
         duckdb_bind_set_error(info, "duckvep_haplotypes: require a nonempty calls query and loaded model name");
         haplotype_bind_destroy(b); return;

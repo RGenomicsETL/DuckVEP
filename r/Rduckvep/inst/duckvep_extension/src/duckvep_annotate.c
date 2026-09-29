@@ -91,6 +91,11 @@ typedef struct duckvep_scalar_state {
 	uint8_t *transcript_coverage_complete;
 	uint8_t *allele_bytes;
 	size_t variant_capacity;
+	/* Lifted copies of the event span for circular execution, indexed like
+	 * positions and ends. Allocated on first use. */
+	uint32_t *lift_positions;
+	uint32_t *lift_ends;
+	size_t lift_capacity;
 	size_t allele_capacity;
 	uint32_t *pair_variant_indices;
 	uint32_t *pair_object_indices;
@@ -361,6 +366,8 @@ duckvep_scalar_state_destroy(void *pointer)
 	duckvep_registry_unpin(state->registry, state->entry);
 	free(state->interval_hits);
 	free(state->seed_transcripts);
+	free(state->lift_positions);
+	free(state->lift_ends);
 	free(state->seq_regions);
 	free(state->positions);
 	free(state->ends);
@@ -1496,7 +1503,8 @@ duckvep_scalar_build_hgvs_pair(duckvep_scalar_state_t *state,
 	if (consequence->overlap_object_kind !=
 	    (uint8_t)DUCKVEP_OVERLAP_OBJECT_TRANSCRIPT)
 		return 1;
-	model = &state->entry->model;
+	model = (duckvep_owned_model_t *)duckvep_model_active(
+	    &state->entry->model);
 	scratch = duckvep_workspace_delta_scratch(state->workspace);
 	if (scratch == NULL) {
 		duckvep_sql_set_error(error, error_size,
@@ -1713,7 +1721,8 @@ duckvep_scalar_projection_store(duckvep_scalar_hgvs_observer_t *observer,
 		    "duckvep_annotate: transcript projection is missing its live pair facts");
 		return 0;
 	}
-	model = &observer->state->entry->model;
+	model = (duckvep_owned_model_t *)duckvep_model_active(
+	    &observer->state->entry->model);
 	coding_context = pair_facts->coding_context;
 	if (coding_context == NULL && observer->state->workspace != NULL) {
 		scratch = duckvep_workspace_delta_scratch(
@@ -2010,7 +2019,8 @@ duckvep_scalar_seed_cursor(duckvep_scalar_state_t *state,
 {
 	duckvep_owned_model_t *model;
 
-	model = &state->entry->model;
+	model = (duckvep_owned_model_t *)duckvep_model_active(
+	    &state->entry->model);
 	if (!duckvep_scalar_seed_index(state, model->interval_index,
 	    model->interval_index_complete, seq_region, position, halo_distance,
 	    cursor, 0, error, error_size))
@@ -2052,6 +2062,92 @@ duckvep_scalar_batch_slice(const duckvep_variant_batch_t *batch,
 }
 
 static int
+duckvep_scalar_lift_reserve(duckvep_scalar_state_t *state, size_t needed)
+{
+	size_t capacity;
+
+	if (needed <= state->lift_capacity)
+		return 1;
+	capacity = duckvep_sql_next_capacity(state->lift_capacity, needed);
+	if (!duckvep_sql_resize((void **)&state->lift_positions,
+	    sizeof(*state->lift_positions), capacity) ||
+	    !duckvep_sql_resize((void **)&state->lift_ends,
+	    sizeof(*state->lift_ends), capacity))
+		return 0;
+	state->lift_capacity = capacity;
+	return 1;
+}
+
+/* Collapse the rows of one lifted run to one row per (event, source object)
+ * through the kernel's resolver, then gather the parallel HGVS and projection
+ * streams into the same order. */
+static int
+duckvep_scalar_lift_resolve(duckvep_scalar_state_t *state, size_t first_row,
+	const duckvep_lifted_model_t *lifted, int with_hgvs, int with_projection,
+	char *error, size_t error_size)
+{
+	duckvep_error_t kernel_error;
+	size_t *order, count, index, kept;
+
+	count = state->result_count - first_row;
+	if (count == 0)
+		return 1;
+	order = malloc(count * sizeof(*order));
+	if (order == NULL) {
+		duckvep_sql_set_error(error, error_size,
+		    "duckvep_annotate: out of memory resolving lifted rows");
+		return 0;
+	}
+	memset(&kernel_error, 0, sizeof(kernel_error));
+	if (duckvep_lift_resolve(lifted->lift, state->results + first_row, count,
+	    state->lift_positions, state->lift_ends, order, &kept,
+	    &kernel_error) != DUCKVEP_OK) {
+		free(order);
+		(void)snprintf(error, error_size, "duckvep_annotate: %s",
+		    kernel_error.message);
+		return 0;
+	}
+	if (with_hgvs || with_projection) {
+		duckvep_hgvs_scalar_result_t *hgvs = NULL;
+		duckvep_projection_scalar_result_t *projection = NULL;
+
+		if (with_hgvs) {
+			hgvs = malloc(count * sizeof(*hgvs));
+			if (hgvs != NULL)
+				memcpy(hgvs, state->hgvs_results + first_row,
+				    count * sizeof(*hgvs));
+		}
+		if (with_projection) {
+			projection = malloc(count * sizeof(*projection));
+			if (projection != NULL)
+				memcpy(projection, state->projection_results + first_row,
+				    count * sizeof(*projection));
+		}
+		if ((with_hgvs && hgvs == NULL) ||
+		    (with_projection && projection == NULL)) {
+			free(hgvs);
+			free(projection);
+			free(order);
+			duckvep_sql_set_error(error, error_size,
+			    "duckvep_annotate: out of memory resolving lifted rows");
+			return 0;
+		}
+		for (index = 0; index < kept; index++) {
+			if (with_hgvs)
+				state->hgvs_results[first_row + index] = hgvs[order[index]];
+			if (with_projection)
+				state->projection_results[first_row + index] =
+				    projection[order[index]];
+		}
+		free(hgvs);
+		free(projection);
+	}
+	state->result_count = first_row + kept;
+	free(order);
+	return 1;
+}
+
+static int
 duckvep_scalar_run(duckvep_scalar_state_t *state,
 	const duckvep_variant_batch_t *batch, size_t begin, size_t count,
 	uint64_t upstream_distance, uint64_t downstream_distance,
@@ -2064,7 +2160,10 @@ duckvep_scalar_run(duckvep_scalar_state_t *state,
 	duckvep_status_t status;
 	uint32_t halo_distance;
 	uint32_t sequence_length;
-	size_t variant;
+	uint32_t lift_length, lift_base;
+	int region_lifted;
+	const duckvep_lifted_model_t *lift;
+	size_t variant, first_row;
 	duckvep_scalar_hgvs_observer_t hgvs_observer;
 
 	if (upstream_distance > UINT32_MAX || downstream_distance > UINT32_MAX) {
@@ -2080,13 +2179,43 @@ duckvep_scalar_run(duckvep_scalar_state_t *state,
 		    "duckvep_annotate: seq_region is absent from the loaded model");
 		return 0;
 	}
+	/* A model with any lifted region executes every region on the lifted
+	 * kernel, so every run's rows carry lifted object indices and pass through
+	 * the resolver. Only a lifted region also shifts its events. */
+	lift = state->entry->model.lifted;
+	lift_length = lift_base = 0;
+	region_lifted = lift != NULL && duckvep_model_region_lift(
+	    &state->entry->model, batch->chrom_id[begin], &lift_length, &lift_base,
+	    NULL);
 	for (variant = begin; variant < begin + count; variant++) {
 		state->transcript_coverage_complete[variant] = (uint8_t)
 		    state->entry->model.transcript_coverage_complete;
-		if (sequence_length != 0 && batch->end1[variant] > sequence_length) {
+		if (region_lifted) {
+			/* Circular: a reference span may run past the last base and
+			 * wrap to the first, but never around the whole sequence. */
+			if (batch->pos1[variant] > lift_length ||
+			    batch->end1[variant] - batch->pos1[variant] >= lift_length) {
+				duckvep_sql_set_error(error, error_size,
+				    "duckvep_annotate: variant span exceeds sequence-region length");
+				return 0;
+			}
+		} else if (sequence_length != 0 &&
+		    batch->end1[variant] > sequence_length) {
 			duckvep_sql_set_error(error, error_size,
 			    "duckvep_annotate: variant span exceeds sequence-region length");
 			return 0;
+		}
+	}
+	if (lift != NULL) {
+		if (!duckvep_scalar_lift_reserve(state, begin + count)) {
+			duckvep_sql_set_error(error, error_size,
+			    "duckvep_annotate: out of memory lifting events");
+			return 0;
+		}
+		for (variant = begin; variant < begin + count; variant++) {
+			state->lift_positions[variant] =
+			    batch->pos1[variant] + lift_base;
+			state->lift_ends[variant] = batch->end1[variant] + lift_base;
 		}
 	}
 	if (state->workspace == NULL) {
@@ -2120,9 +2249,16 @@ duckvep_scalar_run(duckvep_scalar_state_t *state,
 		state->options_downstream_distance = (uint32_t)downstream_distance;
 		state->have_options_distances = 1;
 	}
+	first_row = state->result_count;
 	slice = duckvep_scalar_batch_slice(batch, begin, count);
+	if (lift != NULL) {
+		/* The kernel reads the lifted span. Slices index from `begin`. */
+		slice.pos1 = state->lift_positions + begin;
+		slice.end1 = state->lift_ends + begin;
+	}
 	cursor = NULL;
-	if (duckvep_annotate_cursor_open(state->entry->model.kernel, &slice,
+	if (duckvep_annotate_cursor_open(
+	    duckvep_model_active(&state->entry->model)->kernel, &slice,
 	    state->options, state->workspace, &cursor,
 	    &kernel_error) != DUCKVEP_OK) {
 		(void)snprintf(error, error_size, "duckvep_annotate: %s",
@@ -2130,7 +2266,8 @@ duckvep_scalar_run(duckvep_scalar_state_t *state,
 		return 0;
 	}
 	if (!duckvep_scalar_seed_cursor(state, batch->chrom_id[begin],
-	    batch->pos1[begin], halo_distance, cursor, error, error_size)) {
+	    lift != NULL ? state->lift_positions[begin] : batch->pos1[begin],
+	    halo_distance, cursor, error, error_size)) {
 		duckvep_annotate_cursor_close(cursor);
 		return 0;
 	}
@@ -2173,8 +2310,8 @@ duckvep_scalar_run(duckvep_scalar_state_t *state,
 			row->variant_idx += (uint32_t)begin;
 			if (row->overlap_object_kind ==
 			    (uint8_t)DUCKVEP_OVERLAP_OBJECT_TRANSCRIPT)
-				row->gene_idx =
-				    state->entry->model.gene_indices[row->tx_idx];
+				row->gene_idx = duckvep_model_active(
+				    &state->entry->model)->gene_indices[row->tx_idx];
 		}
 		state->result_count = old_count + builder.count;
 		if (with_hgvs &&
@@ -2202,6 +2339,9 @@ duckvep_scalar_run(duckvep_scalar_state_t *state,
 		}
 	}
 	duckvep_annotate_cursor_close(cursor);
+	if (lift != NULL && !duckvep_scalar_lift_resolve(state, first_row, lift,
+	    with_hgvs, with_projection, error, error_size))
+		return 0;
 	return 1;
 }
 
@@ -3448,6 +3588,12 @@ duckvep_annotate_scalar_execute(duckdb_function_info info,
 		if (!duckvep_scalar_select_model(state, model_vector, (idx_t)begin,
 		    error, sizeof(error)))
 			goto failed;
+		if (event_family != DUCKVEP_SCALAR_SMALL &&
+		    state->entry->model.lifted != NULL) {
+			duckvep_sql_set_error(error, sizeof(error),
+			    "duckvep_annotate: structural and breakend annotation is not supported for models with wrapped circular objects");
+			goto failed;
+		}
 		if (positions[begin] == 0 ||
 		    (upstream_distance_vector != NULL &&
 		    duckvep_validity_is_null(upstream_distance_validity,
