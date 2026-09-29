@@ -1,0 +1,172 @@
+# name: test/sql/duckvep_scatter_load.test
+# description: Model loading scatters unordered query rows into dense slots
+# group: [duckvep]
+
+require duckvep
+
+# 4,500 transcripts span several DuckDB result chunks and vectors. Each has two
+# exons, a distinct CDS, and sits in one of three dense regions; a fraction have
+# peptide edits.
+statement ok
+CREATE TABLE sc_regions AS SELECT r::UINTEGER seq_region, 20000::UBIGINT sequence_length
+FROM range(3) t(r);
+
+statement ok
+CREATE TABLE sc_transcripts AS SELECT
+  i::UINTEGER transcript_index, (i // 1500)::UINTEGER seq_region,
+  (11 + (i % 1500))::UBIGINT transcript_start,
+  (22 + (i % 1500))::UBIGINT transcript_end,
+  1::TINYINT strand, i::UINTEGER gene_index, 3::UBIGINT transcript_flags,
+  (11 + (i % 1500))::UBIGINT cds_start, (22 + (i % 1500))::UBIGINT cds_end,
+  (CASE i % 3 WHEN 0 THEN 'ATGAAAGCCTAA' WHEN 1 THEN 'ATGAACGCCTAA' ELSE 'ATGCGTGCCTAA' END)::BLOB cds_sequence,
+  1::UTINYINT codon_table, ''::BLOB pre_cds_sequence, ''::BLOB post_cds_sequence
+FROM range(4500) t(i);
+
+statement ok
+CREATE TABLE sc_exons AS
+SELECT transcript_index, (transcript_start + 6 * e)::UBIGINT exon_start,
+  (transcript_start + 5 + 6 * e)::UBIGINT exon_end,
+  (1 + 6 * e)::UBIGINT exon_cdna_start, (6 + 6 * e)::UBIGINT exon_cdna_end,
+  0::TINYINT phase, 0::TINYINT end_phase
+FROM sc_transcripts, range(2) x(e);
+
+statement ok
+CREATE TABLE sc_edits AS
+SELECT transcript_index, (1 + e)::UINTEGER protein_position, 'W'::VARCHAR alternate_amino_acid
+FROM sc_transcripts, range(3) x(e) WHERE transcript_index % 7 = 0;
+
+statement ok
+CREATE TABLE sc_events AS SELECT
+  (transcript_index * 4 + 1)::UBIGINT event_index, seq_region,
+  (transcript_start + 1)::UBIGINT AS position, 'T' reference, 'G' alternate,
+  NULL::UBIGINT end_position, NULL::VARCHAR structural_type,
+  NULL::VARCHAR copy_change, NULL::UINTEGER mate_seq_region,
+  NULL::UBIGINT mate_position
+FROM sc_transcripts;
+
+# Ordered load: the reference model.
+query I
+SELECT loaded FROM duckvep_model_load('sc-ordered',
+  'SELECT * FROM sc_regions ORDER BY seq_region',
+  'SELECT * FROM sc_transcripts ORDER BY transcript_index',
+  'SELECT * FROM sc_exons ORDER BY transcript_index, exon_cdna_start',
+  peptide_edit_query := 'SELECT * FROM sc_edits ORDER BY transcript_index, protein_position',
+  transcript_coverage_complete := TRUE);
+----
+1
+
+# Shuffled, interleaved and reversed input must yield the same model.
+query I
+SELECT loaded FROM duckvep_model_load('sc-shuffled',
+  'SELECT * FROM sc_regions ORDER BY seq_region DESC',
+  'SELECT * FROM sc_transcripts ORDER BY hash(transcript_index)',
+  'SELECT * FROM sc_exons ORDER BY hash(transcript_index, exon_cdna_start) DESC',
+  peptide_edit_query := 'SELECT * FROM sc_edits ORDER BY hash(transcript_index, protein_position)',
+  transcript_coverage_complete := TRUE);
+----
+1
+
+statement ok
+CREATE TABLE sc_ordered_out AS SELECT *
+FROM query(duckvep_annotate_sql('sc_events', 'sc-ordered', struct_pack(upstream_distance := 0, downstream_distance := 0)));
+
+statement ok
+CREATE TABLE sc_shuffled_out AS SELECT *
+FROM query(duckvep_annotate_sql('sc_events', 'sc-shuffled', struct_pack(upstream_distance := 0, downstream_distance := 0)));
+
+query I
+SELECT count(DISTINCT transcript_index) FROM sc_ordered_out;
+----
+4500
+
+query I
+SELECT count(DISTINCT (alternate_amino_acid_code, consequence_mask)) > 1 FROM sc_ordered_out;
+----
+1
+
+query I
+SELECT count(*) FROM (
+  (SELECT * FROM sc_ordered_out EXCEPT SELECT * FROM sc_shuffled_out)
+  UNION ALL
+  (SELECT * FROM sc_shuffled_out EXCEPT SELECT * FROM sc_ordered_out));
+----
+0
+
+query I
+SELECT duckvep_model_drop('sc-ordered');
+----
+1
+
+query I
+SELECT duckvep_model_drop('sc-shuffled');
+----
+1
+
+# A duplicate ordinal is rejected even though the row count matches.
+statement error
+SELECT loaded FROM duckvep_model_load('sc-duplicate',
+  'SELECT * FROM sc_regions',
+  'SELECT * REPLACE (CASE transcript_index WHEN 4499 THEN 4498 ELSE transcript_index END AS transcript_index) FROM sc_transcripts',
+  'SELECT * FROM sc_exons');
+----
+transcript_index is duplicated or outside the dense zero-based range
+
+# A gap (the last ordinal shifted past the dense range) is out of range.
+statement error
+SELECT loaded FROM duckvep_model_load('sc-gap',
+  'SELECT * FROM sc_regions',
+  'SELECT * REPLACE (CASE transcript_index WHEN 4499 THEN 4600 ELSE transcript_index END AS transcript_index) FROM sc_transcripts',
+  'SELECT * FROM sc_exons');
+----
+transcript_index is duplicated or outside the dense zero-based range
+
+# A missing ordinal with a matching count is a duplicate; a short table is a gap.
+statement error
+SELECT loaded FROM duckvep_model_load('sc-short',
+  'SELECT * FROM sc_regions',
+  'SELECT * FROM sc_transcripts WHERE transcript_index <> 17',
+  'SELECT * FROM sc_exons WHERE transcript_index <> 17');
+----
+transcript_index is duplicated or outside the dense zero-based range
+
+# Side relations must reference loaded transcripts, be unique, and cover all.
+statement error
+SELECT loaded FROM duckvep_model_load('sc-exon-range',
+  'SELECT * FROM sc_regions',
+  'SELECT * FROM sc_transcripts',
+  'SELECT * REPLACE (CASE transcript_index WHEN 0 THEN 4500 ELSE transcript_index END AS transcript_index) FROM sc_exons');
+----
+exon transcript_index is outside the loaded transcript range
+
+statement error
+SELECT loaded FROM duckvep_model_load('sc-exon-missing',
+  'SELECT * FROM sc_regions',
+  'SELECT * FROM sc_transcripts',
+  'SELECT * FROM sc_exons WHERE transcript_index <> 5');
+----
+every transcript must have at least one exon
+
+statement error
+SELECT loaded FROM duckvep_model_load('sc-exon-overlap',
+  'SELECT * FROM sc_regions',
+  'SELECT * FROM sc_transcripts',
+  'SELECT * FROM sc_exons UNION ALL SELECT * FROM sc_exons WHERE transcript_index = 9');
+----
+exons must be non-overlapping and ordered on the transcript
+
+statement error
+SELECT loaded FROM duckvep_model_load('sc-edit-duplicate',
+  'SELECT * FROM sc_regions',
+  'SELECT * FROM sc_transcripts',
+  'SELECT * FROM sc_exons',
+  peptide_edit_query := 'SELECT * FROM sc_edits UNION ALL SELECT * FROM sc_edits WHERE transcript_index = 0');
+----
+peptide-edit query must be unique
+
+statement error
+SELECT loaded FROM duckvep_model_load('sc-region-duplicate',
+  'SELECT * FROM sc_regions UNION ALL SELECT * FROM sc_regions WHERE seq_region = 1',
+  'SELECT * FROM sc_transcripts',
+  'SELECT * FROM sc_exons');
+----
+seq_region query contains a duplicate region
