@@ -1,4 +1,5 @@
 #include "duckdb_extension.h"
+#include "kernel/src/duckvep_budget.h"
 #include "duckvep_builder.h"
 DUCKDB_EXTENSION_EXTERN
 
@@ -134,7 +135,7 @@ static bool dna(duckdb_string_t unit) {
 }
 
 static void set_error(duckdb_function_info info, const char *message) {
-    duckdb_scalar_function_set_error(info, message);
+    duckvep_builder_set_error(info, message);
 }
 
 static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -225,7 +226,7 @@ static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, du
         for (idx_t axis = 0; axis < 2; axis++) {
             repeat_axis *part = &axes[axis];
             size_t length = (size_t)required[axis];
-            char *text = malloc(length + 1);
+            char *text = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
             if (!text) {
                 set_error(info, "duckvep_repeat_alleles: allocation failed");
                 if (cap_type) duckdb_destroy_logical_type(&cap_type);
@@ -248,7 +249,7 @@ static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, du
             }
             text[written] = '\0';
             duckdb_vector_assign_string_element_len(fields[axis], row, text, written);
-            free(text);
+            duckvep_budget_free(text);
         }
         ((uint64_t *)duckdb_vector_get_data(fields[2]))[row] = (uint64_t)required[0];
         ((uint64_t *)duckdb_vector_get_data(fields[3]))[row] = (uint64_t)required[1];

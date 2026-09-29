@@ -14,6 +14,7 @@
 #include "duckvep_kernel.h"
 #include "duckvep_model_internal.h"
 
+#include "duckvep_budget.h"
 #include "duckvep_classify.h"
 #include "duckvep_annotation_internal.h"
 #include "duckvep_compat.h"
@@ -729,7 +730,7 @@ duckvep_status_t duckvep_model_open(
         }
     }
 
-    m = (struct duckvep_model *)calloc(1u, sizeof *m);
+    m = (struct duckvep_model *)duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, 1u, sizeof *m);
     if (m == NULL) {
         return fail(error, DUCKVEP_ERR_INTERNAL, DVW_MODEL_OOM, "model alloc failed");
     }
@@ -751,7 +752,7 @@ duckvep_status_t duckvep_model_open(
         m->seq = *seq;
         m->has_seq = 1;
         if (seq->transcript_count != 0u) {
-            m->first_stop_position1 = (uint32_t *)calloc(
+            m->first_stop_position1 = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
                 seq->transcript_count, sizeof *m->first_stop_position1);
             if (m->first_stop_position1 == NULL) {
                 duckvep_model_close(m);
@@ -787,14 +788,14 @@ duckvep_status_t duckvep_model_open(
 
 void duckvep_model_close(duckvep_model_t *model) {
     if (model != NULL) {
-        free(model->first_stop_position1);
-        free(model->has_frameshift_intron);
-        free(model->point_ordered);
-        free(model->cds_phase_offset);
-        free(model->cds_start_exon_index);
-        free(model->cds_cdna_end1);
-        free(model->cds_cdna_start1);
-        free(model);
+        duckvep_budget_free(model->first_stop_position1);
+        duckvep_budget_free(model->has_frameshift_intron);
+        duckvep_budget_free(model->point_ordered);
+        duckvep_budget_free(model->cds_phase_offset);
+        duckvep_budget_free(model->cds_start_exon_index);
+        duckvep_budget_free(model->cds_cdna_end1);
+        duckvep_budget_free(model->cds_cdna_start1);
+        duckvep_budget_free(model);
     }
 }
 
@@ -838,13 +839,13 @@ duckvep_status_t duckvep_options_open(
                     "out_options is NULL");
     }
     *out_options = NULL;
-    o = (struct duckvep_options *)calloc(1u, sizeof *o);
+    o = (struct duckvep_options *)duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, 1u, sizeof *o);
     if (o == NULL) {
         return fail(error, DUCKVEP_ERR_INTERNAL, DVW_OPTIONS_OOM, "options alloc failed");
     }
     if (init != NULL && !duckvep_compat_profile_valid(
             (duckvep_compat_profile_t)init->compatibility_profile)) {
-        free(o);
+        duckvep_budget_free(o);
         return fail(error, DUCKVEP_ERR_INVALID_ARG, DVW_OPTIONS_PROFILE,
                     "compatibility profile is invalid");
     }
@@ -876,7 +877,7 @@ duckvep_status_t duckvep_options_open(
 }
 
 void duckvep_options_close(duckvep_options_t *options) {
-    free(options);
+    duckvep_budget_free(options);
 }
 
 /* --------------------------------------------------------------- workspace --
@@ -1046,10 +1047,10 @@ static int size_mul_checked(size_t a, size_t b, size_t *out) {
 
 static void workspace_delta_scratch_free(duckvep_delta_scratch_t *s) {
     if (s == NULL) return;
-    free(s->edits);
-    free(s->alt_cds);
-    free(s->ref_peptide);
-    free(s->alt_peptide);
+    duckvep_budget_free(s->edits);
+    duckvep_budget_free(s->alt_cds);
+    duckvep_budget_free(s->ref_peptide);
+    duckvep_budget_free(s->alt_peptide);
     memset(s, 0, sizeof *s);
 }
 
@@ -1091,10 +1092,10 @@ static duckvep_status_t workspace_delta_scratch_open(
                     "workspace delta scratch capacity overflow");
     }
 
-    s->edits = (duckvep_haplotype_edit_t *)calloc(s->edits_cap, sizeof *s->edits);
-    s->alt_cds = (uint8_t *)calloc(s->alt_cds_cap, sizeof *s->alt_cds);
-    s->ref_peptide = (uint8_t *)calloc(s->ref_peptide_cap, sizeof *s->ref_peptide);
-    s->alt_peptide = (uint8_t *)calloc(s->alt_peptide_cap, sizeof *s->alt_peptide);
+    s->edits = (duckvep_haplotype_edit_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, s->edits_cap, sizeof *s->edits);
+    s->alt_cds = (uint8_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, s->alt_cds_cap, sizeof *s->alt_cds);
+    s->ref_peptide = (uint8_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, s->ref_peptide_cap, sizeof *s->ref_peptide);
+    s->alt_peptide = (uint8_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, s->alt_peptide_cap, sizeof *s->alt_peptide);
     if (s->edits == NULL || s->alt_cds == NULL ||
         s->ref_peptide == NULL || s->alt_peptide == NULL) {
         workspace_delta_scratch_free(s);
@@ -1135,44 +1136,44 @@ duckvep_status_t duckvep_workspace_open(
                     "workspace point cursor capacity overflow");
     }
 
-    w = (struct duckvep_workspace *)calloc(1u, sizeof *w);
+    w = (struct duckvep_workspace *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, 1u, sizeof *w);
     if (w == NULL) {
         return fail(error, DUCKVEP_ERR_INTERNAL, DVW_WS_OOM, "workspace alloc failed");
     }
-    w->active = (uint32_t *)calloc(cap, sizeof *w->active);
-    w->candidates = (uint32_t *)calloc(cap, sizeof *w->candidates);
-    w->interval_feature_active = (uint32_t *)calloc(
+    w->active = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, cap, sizeof *w->active);
+    w->candidates = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, cap, sizeof *w->candidates);
+    w->interval_feature_active = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE,
         interval_feature_cap, sizeof *w->interval_feature_active);
-    w->interval_feature_candidates = (uint32_t *)calloc(
+    w->interval_feature_candidates = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE,
         interval_feature_cap, sizeof *w->interval_feature_candidates);
     if (model->transcripts.transcript_count > 0u) {
-        w->point_exon_rank = (uint16_t *)malloc(point_bytes);
-        w->span_exon_rank = (uint16_t *)malloc(point_bytes);
+        w->point_exon_rank = (uint16_t *)duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, point_bytes);
+        w->span_exon_rank = (uint16_t *)duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, point_bytes);
     }
     if (w->active == NULL || w->candidates == NULL ||
         w->interval_feature_active == NULL ||
         w->interval_feature_candidates == NULL ||
         (model->transcripts.transcript_count > 0u &&
          (w->point_exon_rank == NULL || w->span_exon_rank == NULL))) {
-        free(w->active);
-        free(w->candidates);
-        free(w->interval_feature_active);
-        free(w->interval_feature_candidates);
-        free(w->point_exon_rank);
-        free(w->span_exon_rank);
-        free(w);
+        duckvep_budget_free(w->active);
+        duckvep_budget_free(w->candidates);
+        duckvep_budget_free(w->interval_feature_active);
+        duckvep_budget_free(w->interval_feature_candidates);
+        duckvep_budget_free(w->point_exon_rank);
+        duckvep_budget_free(w->span_exon_rank);
+        duckvep_budget_free(w);
         return fail(error, DUCKVEP_ERR_INTERNAL, DVW_WS_OOM,
                     "workspace sweep scratch alloc failed");
     }
     st = workspace_delta_scratch_open(model, &w->delta_scratch, error);
     if (st != DUCKVEP_OK) {
-        free(w->active);
-        free(w->candidates);
-        free(w->interval_feature_active);
-        free(w->interval_feature_candidates);
-        free(w->point_exon_rank);
-        free(w->span_exon_rank);
-        free(w);
+        duckvep_budget_free(w->active);
+        duckvep_budget_free(w->candidates);
+        duckvep_budget_free(w->interval_feature_active);
+        duckvep_budget_free(w->interval_feature_candidates);
+        duckvep_budget_free(w->point_exon_rank);
+        duckvep_budget_free(w->span_exon_rank);
+        duckvep_budget_free(w);
         return st;
     }
     w->model = model;
@@ -1187,14 +1188,14 @@ duckvep_status_t duckvep_workspace_open(
 
 void duckvep_workspace_close(duckvep_workspace_t *workspace) {
     if (workspace != NULL) {
-        free(workspace->active);
-        free(workspace->candidates);
-        free(workspace->interval_feature_active);
-        free(workspace->interval_feature_candidates);
-        free(workspace->point_exon_rank);
-        free(workspace->span_exon_rank);
+        duckvep_budget_free(workspace->active);
+        duckvep_budget_free(workspace->candidates);
+        duckvep_budget_free(workspace->interval_feature_active);
+        duckvep_budget_free(workspace->interval_feature_candidates);
+        duckvep_budget_free(workspace->point_exon_rank);
+        duckvep_budget_free(workspace->span_exon_rank);
         workspace_delta_scratch_free(&workspace->delta_scratch);
-        free(workspace);
+        duckvep_budget_free(workspace);
     }
 }
 
@@ -2686,7 +2687,7 @@ duckvep_status_t duckvep_annotate_cursor_open(
                     "annotate cursor event storage overflow");
     }
     if (variants == NULL) cursor_bytes = sizeof *cursor;
-    cursor = (duckvep_annotate_cursor_t *)calloc(1u, cursor_bytes);
+    cursor = (duckvep_annotate_cursor_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, 1u, cursor_bytes);
     if (cursor == NULL) {
         return fail(error, DUCKVEP_ERR_INTERNAL, DVW_CURSOR_OOM,
                     "annotate cursor allocation failed");
@@ -2694,7 +2695,7 @@ duckvep_status_t duckvep_annotate_cursor_open(
     st = validate_common_annotate_args(model, variants, options, workspace,
                                        cursor->events, 0, error);
     if (st != DUCKVEP_OK) {
-        free(cursor);
+        duckvep_budget_free(cursor);
         return st;
     }
     cursor->model = model;
@@ -2732,7 +2733,7 @@ duckvep_status_t duckvep_annotate_cursor_open(
             : cursor->interval_feature_sweep.status;
         st = fail(error, sweep_status, DVW_ANN_SWEEP,
                   "candidate sweep initialization failed");
-        free(cursor);
+        duckvep_budget_free(cursor);
         return st;
     }
     *out_cursor = cursor;
@@ -2744,7 +2745,7 @@ int duckvep_annotate_cursor_done(const duckvep_annotate_cursor_t *cursor) {
 }
 
 void duckvep_annotate_cursor_close(duckvep_annotate_cursor_t *cursor) {
-    free(cursor);
+    duckvep_budget_free(cursor);
 }
 
 void duckvep_annotate_cursor_set_observer(
@@ -2996,7 +2997,7 @@ static duckvep_status_t annotate_explicit_pairs(
             return fail(error, DUCKVEP_ERR_OUT_OF_RANGE, DVW_CURSOR_OOM,
                         "candidate-pair event storage overflow");
         }
-        events = (duckvep_event_t *)calloc(1u, event_bytes);
+        events = (duckvep_event_t *)duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, 1u, event_bytes);
         if (events == NULL) {
             return fail(error, DUCKVEP_ERR_INTERNAL, DVW_CURSOR_OOM,
                         "candidate-pair event allocation failed");
@@ -3005,7 +3006,7 @@ static duckvep_status_t annotate_explicit_pairs(
     status = validate_common_annotate_args(
         model, variants, options, workspace, events, 1, error);
     if (status != DUCKVEP_OK) {
-        free(events);
+        duckvep_budget_free(events);
         return status;
     }
     object_count = interval_features
@@ -3021,7 +3022,7 @@ static duckvep_status_t annotate_explicit_pairs(
              (variant_idx < pair_variant_idx[pair - 1u] ||
               (variant_idx == pair_variant_idx[pair - 1u] &&
                object_idx <= pair_object_idx[pair - 1u])))) {
-            free(events);
+            duckvep_budget_free(events);
             return fail(error, DUCKVEP_ERR_INVALID_ARG, order_where,
                         interval_features
                             ? "interval-feature pairs are out of range, unsorted, or duplicated"
@@ -3062,11 +3063,11 @@ static duckvep_status_t annotate_explicit_pairs(
                        interval_features
                            ? "interval-feature candidate annotation failed"
                            : "candidate-pair annotation failed");
-            free(events);
+            duckvep_budget_free(events);
             return status;
         }
     }
-    free(events);
+    duckvep_budget_free(events);
     return DUCKVEP_OK;
 }
 
@@ -3121,17 +3122,17 @@ static DUCKVEP_NOINLINE duckvep_status_t model_prepare_derived_layout(
     size_t t;
 
     if (transcripts->transcript_count == 0u) return DUCKVEP_OK;
-    model->cds_cdna_start1 = (uint32_t *)calloc(
+    model->cds_cdna_start1 = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
         transcripts->transcript_count, sizeof *model->cds_cdna_start1);
-    model->cds_cdna_end1 = (uint32_t *)calloc(
+    model->cds_cdna_end1 = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
         transcripts->transcript_count, sizeof *model->cds_cdna_end1);
-    model->cds_start_exon_index = (uint32_t *)calloc(
+    model->cds_start_exon_index = (uint32_t *)duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
         transcripts->transcript_count, sizeof *model->cds_start_exon_index);
-    model->cds_phase_offset = (uint8_t *)calloc(
+    model->cds_phase_offset = (uint8_t *)duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
         transcripts->transcript_count, sizeof *model->cds_phase_offset);
-    model->point_ordered = (uint8_t *)calloc(
+    model->point_ordered = (uint8_t *)duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
         transcripts->transcript_count, sizeof *model->point_ordered);
-    model->has_frameshift_intron = (uint8_t *)calloc(
+    model->has_frameshift_intron = (uint8_t *)duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
         transcripts->transcript_count, sizeof *model->has_frameshift_intron);
     if (model->cds_cdna_start1 == NULL || model->cds_cdna_end1 == NULL ||
         model->cds_start_exon_index == NULL ||

@@ -1,10 +1,25 @@
 #include "duckvep_builder.h"
+#include "kernel/src/duckvep_budget.h"
 DUCKDB_EXTENSION_EXTERN
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+/* Reports a builder failure; if the native budget refused an allocation on this
+ * thread the message becomes an explicit capacity error. */
+void
+duckvep_builder_set_error(duckdb_function_info info, const char *message)
+{
+    char capacity[192], text[768];
+
+    if (duckvep_budget_take_failure(capacity, sizeof capacity)) {
+        (void)snprintf(text, sizeof text, "%s (%s)", capacity, message);
+        message = text;
+    }
+    duckdb_scalar_function_set_error(info, message);
+}
 
 static bool reserve(duckvep_sql_text *text, size_t extra) {
     if (extra > SIZE_MAX - text->length - 1) return false;
@@ -15,7 +30,7 @@ static bool reserve(duckvep_sql_text *text, size_t extra) {
         if (capacity > SIZE_MAX / 2) { capacity = needed; break; }
         capacity *= 2;
     }
-    char *data = realloc(text->data, capacity);
+    char *data = duckvep_budget_realloc(DUCKVEP_OWNER_CONTROL, text->data, capacity);
     if (!data) return false;
     text->data = data;
     text->capacity = capacity;
@@ -52,7 +67,7 @@ bool duckvep_sql_literal(duckvep_sql_text *text, const char *value) {
     return quoted(text, value, '\'');
 }
 void duckvep_sql_free(duckvep_sql_text *text) {
-    free(text->data);
+    duckvep_budget_free(text->data);
     *text = (duckvep_sql_text){0};
 }
 
@@ -62,12 +77,12 @@ bool duckvep_sql_relation(duckvep_sql_text *sql, const char *name) {
     if (!*name || (dot && (!dot[1] || dot == name || strchr(dot + 1, '.')))) return false;
     if (!dot) return duckvep_sql_identifier(sql, name);
     size_t size = (size_t)(dot - name);
-    char *schema = malloc(size + 1);
+    char *schema = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, size + 1);
     if (!schema) return false;
     memcpy(schema, name, size); schema[size] = 0;
     bool ok = duckvep_sql_identifier(sql, schema) && duckvep_sql_append(sql, ".") &&
         duckvep_sql_identifier(sql, dot + 1);
-    free(schema);
+    duckvep_budget_free(schema);
     return ok;
 }
 
@@ -75,7 +90,7 @@ char *duckvep_builder_string(duckdb_string_t string) {
     size_t length = duckdb_string_t_length(string);
     const char *data = duckdb_string_t_data(&string);
     if (memchr(data, 0, length)) return NULL;
-    char *copy = malloc(length + 1);
+    char *copy = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
     if (copy) {
         memcpy(copy, data, length);
         copy[length] = '\0';
@@ -138,11 +153,11 @@ bool duckvep_builder_option_vectors(duckdb_function_info info, duckdb_vector vec
 bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
                              idx_t row, const char *const *names, size_t count,
                              char **values) {
-    duckvep_option_kind *kinds = calloc(count, sizeof(*kinds));
-    duckdb_vector *fields = calloc(count, sizeof(*fields));
+    duckvep_option_kind *kinds = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, count, sizeof(*kinds));
+    duckdb_vector *fields = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, count, sizeof(*fields));
     if (!kinds || !fields) {
-        free(kinds); free(fields);
-        duckdb_scalar_function_set_error(info, "DuckVEP builder: allocation failed");
+        duckvep_budget_free(kinds); duckvep_budget_free(fields);
+        duckvep_builder_set_error(info, "DuckVEP builder: allocation failed");
         return false;
     }
     for (size_t i = 0; i < count; i++) kinds[i] = DUCKVEP_OPTION_TEXT;
@@ -157,11 +172,11 @@ bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
         if (!string_field) continue;
         values[i] = duckvep_builder_string(((duckdb_string_t *)duckdb_vector_get_data(fields[i]))[row]);
         if (!values[i]) {
-            duckdb_scalar_function_set_error(info, "DuckVEP builder: invalid option string or allocation failure");
+            duckvep_builder_set_error(info, "DuckVEP builder: invalid option string or allocation failure");
             ok = false;
         }
     }
-    free(kinds); free(fields);
+    duckvep_budget_free(kinds); duckvep_budget_free(fields);
     return ok;
 }
 

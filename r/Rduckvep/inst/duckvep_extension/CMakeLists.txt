@@ -49,6 +49,7 @@ set(EXTENSION_SOURCES
     src/duckvep_structural_sql.c
     src/duckvep_repeat.c
     src/duckvep_annotate.c
+    src/duckvep_budget_sql.c
     src/duckvep_ensembl.c
     src/duckvep_haplotype_sql.c
     src/duckvep_model.c
