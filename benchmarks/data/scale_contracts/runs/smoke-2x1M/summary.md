@@ -53,4 +53,3 @@ Aggregate alleles/s is the sum of the jobs' panel rows over the slowest job's an
 | 2 | complete17 | 13518845 | 124697337108154286232220601 | 7186442940544995373 |
 
 The checksum is the row count with the sum and XOR of DuckDB `hash()` over every output row, independent of row order.
-

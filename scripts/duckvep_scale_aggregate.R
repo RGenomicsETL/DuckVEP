@@ -122,9 +122,9 @@ lines <- c(paste0("# DuckVEP scale run ", info[["run_id"]]), "",
   "## Checksums", "",
   tbl(data.frame(job = receipt$job, mode = receipt$mode, out_rows = receipt$out_rows,
     hash_sum = receipt$hash_sum, hash_xor = receipt$hash_xor, stringsAsFactors = FALSE)), "",
-  "The checksum is the row count with the sum and XOR of DuckDB `hash()` over every output row, independent of row order.", "")
+  "The checksum is the row count with the sum and XOR of DuckDB `hash()` over every output row, independent of row order.")
 bad <- receipt[receipt$outcome != "ok", ]
 if (nrow(bad)) lines <- c(lines, "## Non-ok jobs", "",
-  paste0("- job ", bad$job, " ", bad$mode, ": **", bad$outcome, "**: ", bad$reason), "")
+  paste0("- job ", bad$job, " ", bad$mode, ": **", bad$outcome, "**: ", bad$reason))
 writeLines(lines, file.path(dir, "summary.md"))
 quit(save = "no", status = if (all_met) 0L else 3L)

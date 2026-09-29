@@ -87,7 +87,8 @@ if (file.exists(avail_path)) {
 is_genome <- startsWith(receipts$panel, "genomes-")
 receipts$source_alleles <- ifelse(is_genome, counts$source_alts, "")
 receipts$distinct_alleles <- ifelse(is_genome, counts$distinct_alts, "")
-write.table(receipts, file.path(out_dir, "panel-receipts.tsv"), sep = "\t", row.names = FALSE, quote = FALSE, na = "")
+receipts[] <- lapply(receipts, function(x) { x <- as.character(x); x[is.na(x) | x == ""] <- "-"; x })
+write.table(receipts, file.path(out_dir, "panel-receipts.tsv"), sep = "\t", row.names = FALSE, quote = FALSE)
 
 # One row per source shard that fed a panel.
 shard_rows <- do.call(rbind, lapply(c(genome_dir, exome_dir), function(dir) {

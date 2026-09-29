@@ -58,4 +58,3 @@ The checksum is the row count with the sum and XOR of DuckDB `hash()` over every
 
 - job 1 complete17: **capacity_error**: Invalid Error: Invalid Input Error: capacity error: per-worker emitted-output lease budget exceeded (requested 27262976 bytes, 57683968 in use, limit 67108864) (duckvep_annotate: fused projection stream diverged) ℹ Context: rapi_execute ℹ Error type: INVALID
 - job 2 complete17: **capacity_error**: Invalid Error: Invalid Input Error: capacity error: per-worker emitted-output lease budget exceeded (requested 27262976 bytes, 57683968 in use, limit 67108864) (duckvep_annotate: fused projection stream diverged) ℹ Context: rapi_execute ℹ Error type: INVALID
-
