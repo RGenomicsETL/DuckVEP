@@ -103,8 +103,6 @@ typedef struct duckvep_owned_model {
 	size_t cds_sequence_capacity;
 	size_t flank_sequence_capacity;
 	size_t interval_feature_capacity;
-	int exact_capacity;
-	int capacity_locked;
 } duckvep_owned_model_t;
 
 typedef struct duckvep_workspace_cache {
