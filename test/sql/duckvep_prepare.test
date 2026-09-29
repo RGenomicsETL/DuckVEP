@@ -84,3 +84,26 @@ statement error
 SELECT duckvep_prepare_expansionhunter_sql('eh";λ','lit";λ', {bogus: 1});
 ----
 unknown option 'bogus'
+
+# Duplicate reference rows never duplicate output rows: one row per input record,
+# invalid/ambiguous_reference_sequence, with no arbitrary reference chosen.
+statement ok
+CREATE TEMP TABLE eh_dup_refs (event_index INTEGER, reference_sequence VARCHAR);
+
+statement ok
+INSERT INTO eh_dup_refs VALUES (0, 'CAG'), (0, 'CAG'), (1, 'CAG'), (2, 'CAG'), (2, 'TTT');
+
+query IIIII
+SELECT event_index, status, reason, sequence_exact, "source".reference_sequence
+FROM query(duckvep_prepare_expansionhunter_sql('eh";λ', 'eh_dup_refs')) WHERE event_index <= 3
+ORDER BY event_index;
+----
+0	invalid	ambiguous_reference_sequence	0	NULL
+1	ok	exact	1	CAG
+2	invalid	ambiguous_reference_sequence	0	NULL
+3	incomplete	missing_field	0	NULL
+
+query I
+SELECT count(*) = (SELECT count(*) FROM "eh"";λ") FROM query(duckvep_prepare_expansionhunter_sql('eh";λ', 'eh_dup_refs'));
+----
+1
