@@ -125,20 +125,22 @@ WHERE g.classifier_slice=4 AND g.so_terms<>'';
 ----
 6	6	6	6	6	6
 
-# Start/terminal-codon effects are eligible but not decided: no SO set and no IMPACT are invented, and
-# the reason names the pending classifier. Their edited proteins still match the goldens.
+# Slice 5 transition: start_lost_by_pair, stop_lost_by_pair and stop_retained_single were eligible_classifier_pending
+# (start_stop_classifier_pending) at slices 3 and 4 and are now decided, equal to the goldens, their IMPACT, the edited
+# protein and the mapped csq set, on every layout.
 
-query IIIII
+query IIIIIII
 SELECT count(*),
- count(*) FILTER (WHERE o.prediction_status='eligible_classifier_pending' AND
-  o.prediction_reason='start_stop_classifier_pending'),
- count(*) FILTER (WHERE o.haplotype_consequences IS NULL),
- count(*) FILTER (WHERE o.haplotype_impact IS NULL),
- count(*) FILTER (WHERE o.protein=g.protein)
+ count(*) FILTER (WHERE o.prediction_status='predicted' AND o.prediction_reason='supported_domain'),
+ count(*) FILTER (WHERE list_sort(o.haplotype_consequences)=list_sort(string_split(g.so_terms,','))),
+ count(*) FILTER (WHERE o.haplotype_impact=g.impact),
+ count(*) FILTER (WHERE array_to_string(list_sort(o.haplotype_consequences),',')=g.csq_so_terms),
+ count(*) FILTER (WHERE o.protein=g.protein),
+ count(DISTINCT g.so_terms)
 FROM sc_gold g JOIN sc_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
 WHERE g.classifier_slice=5 AND g.so_terms<>'';
 ----
-18	18	18	18	18
+18	18	18	18	18	18	3
 
 # The trans control: the combined syn pair is synonymous only in cis; on separate lanes each SNP is
 # classified alone, and both are missense.
@@ -154,6 +156,7 @@ minus_2exon__trans_control_of_syn_pair	0	missense_variant	missense_variant	MODER
 minus_2exon__trans_control_of_syn_pair	1	missense_variant	missense_variant	MODERATE
 
 # Classified rows carry exactly one term of the reduced set here (no frame effect); IMPACT is the maximum severity.
+# Slice 5 adds start_lost, stop_lost and stop_retained_variant (6 layouts each) to the counts.
 
 query TTI
 SELECT array_to_string(haplotype_consequences,','),haplotype_impact,count(*)
@@ -163,5 +166,8 @@ inframe_deletion	MODERATE	18
 inframe_insertion	MODERATE	24
 missense_variant	MODERATE	54
 protein_altering_variant	MODERATE	12
+start_lost	HIGH	6
 stop_gained	HIGH	6
+stop_lost	HIGH	6
+stop_retained_variant	LOW	6
 synonymous_variant	LOW	18

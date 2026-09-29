@@ -87,6 +87,8 @@ single_frameshift <- paste('csq reports a single frameshift record as frameshift
                            'stop_gained of the early stop it creates; the policy reports both HIGH terms')
 restored <- paste('csq adds the per-record lower-severity missense to inframe_altering when the frame is',
                   'restored; the policy reports the one whole-protein category protein_altering_variant')
+run_off <- paste('csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has',
+                 'the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost')
 declared <- list(
   frame_open_early_stop = list(lane = 0L, csq = 'frameshift_variant', why = single_frameshift),
   frame_open_late_stop = list(lane = 0L, csq = 'frameshift_variant', why = single_frameshift),
@@ -94,6 +96,10 @@ declared <- list(
   early_stop_then_missense = list(lane = 0L, csq = 'frameshift_variant', why = single_frameshift),
   trans_control_of_pair = list(lane = 0L, csq = 'frameshift_variant', why = single_frameshift),
   hom_alt_frame_open = list(lane = 0:1, csq = 'frameshift_variant', why = single_frameshift),
+  frame_open_runs_off = list(lane = 0L, csq = 'frameshift_variant', why = run_off),
+  frame_open_plus2_runs_off = list(lane = 0L, csq = 'frameshift_variant', why = run_off),
+  frame_open_before_terminal = list(lane = 0L, csq = 'frameshift_variant', why = run_off),
+  `trans_control_of_pair:run_off` = list(lane = 1L, csq = 'frameshift_variant', why = run_off),
   restored_rescued = list(lane = 0L, csq = 'missense_variant,protein_altering_variant', why = restored),
   restored_rescued_wide = list(lane = 0L, csq = 'missense_variant,protein_altering_variant', why = restored),
   restored_near_introns = list(lane = 0L, csq = 'missense_variant,protein_altering_variant', why = restored),
@@ -124,15 +130,20 @@ declared <- list(
 differs <- csq_so != policy_so
 carrying <- policy_so != '' | csq_so != ''
 divergent <- unique(gold$scenario[differs])
-stopifnot(setequal(divergent, names(declared)))
+scenario_of <- function(name) sub(':.*$', '', name)
+stopifnot(setequal(divergent, unique(scenario_of(names(declared)))))
 declared_text <- rep('.', nrow(gold))
 for (name in names(declared)) {
     d <- declared[[name]]
-    lanes <- gold$scenario == name & gold$lane %in% d$lane
-    stopifnot(all(differs[lanes]), all(csq_so[lanes] == d$csq),
-              all(!differs[gold$scenario == name & !(gold$lane %in% d$lane)]))
+    scenario <- scenario_of(name)
+    lanes <- gold$scenario == scenario & gold$lane %in% d$lane
+    stopifnot(all(differs[lanes]), all(csq_so[lanes] == d$csq))
     declared_text[lanes] <- d$why
 }
+# Every divergent lane must be covered by a declaration (a scenario may carry several, one per lane group).
+covered <- rep(FALSE, nrow(gold))
+for (name in names(declared)) covered <- covered | (gold$scenario == scenario_of(name) & gold$lane %in% declared[[name]]$lane)
+stopifnot(all(covered[differs]))
 
 # Every csq amino-acid change must describe the base-R peptides (reference at its position, alternate in
 # the edited protein), so the SO comparison cannot pass on a mislabelled change. Declared csq quirk: for
@@ -169,7 +180,7 @@ lines <- capture.output(write.table(expected, sep = '\t', row.names = FALSE, quo
 path <- paste0(root, 'frame_csq_expected.tsv')
 if (nzchar(Sys.getenv('HAPLOTYPE_CSQ_REFRESH'))) writeLines(lines, path)
 stopifnot(identical(readLines(path), lines))
-decided <- gold$classifier_slice == 4L & gold$so_terms != ''
+decided <- gold$classifier_slice %in% 4:5 & gold$so_terms != ''
 stopifnot(sum(decided) > 0L, all(csq_so[decided & !differs] == policy_so[decided & !differs]))
 cat(sprintf(paste('%d lane goldens over %d layouts; %d ALT-carrying lanes mapped from csq; %d agree exactly,',
                   '%d in %d declared divergences; %d csq amino-acid changes checked (%d alternate sides)\n'),

@@ -1,15 +1,15 @@
 case	lane	csq_so_terms	declared_divergence
 plus_1exon__frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_1exon__frame_open_early_stop	1		.
-plus_1exon__frame_open_runs_off	0	frameshift_variant	.
+plus_1exon__frame_open_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_1exon__frame_open_runs_off	1		.
 plus_1exon__frame_open_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_1exon__frame_open_late_stop	1		.
-plus_1exon__frame_open_plus2_runs_off	0	frameshift_variant	.
+plus_1exon__frame_open_plus2_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_1exon__frame_open_plus2_runs_off	1		.
 plus_1exon__frame_open_minus2_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_1exon__frame_open_minus2_late_stop	1		.
-plus_1exon__frame_open_before_terminal	0	frameshift_variant	.
+plus_1exon__frame_open_before_terminal	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_1exon__frame_open_before_terminal	1		.
 plus_1exon__restored_rescued	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
 plus_1exon__restored_rescued	1		.
@@ -54,22 +54,22 @@ plus_1exon__stop_gained_after_restoration	1		.
 plus_1exon__early_stop_then_missense	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_1exon__early_stop_then_missense	1		.
 plus_1exon__trans_control_of_pair	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
-plus_1exon__trans_control_of_pair	1	frameshift_variant	.
+plus_1exon__trans_control_of_pair	1	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_1exon__hom_alt_frame_open	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_1exon__hom_alt_frame_open	1	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_1exon__start_codon_insertion	0	start_lost	.
 plus_1exon__start_codon_insertion	1		.
 plus_2exon__frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_2exon__frame_open_early_stop	1		.
-plus_2exon__frame_open_runs_off	0	frameshift_variant	.
+plus_2exon__frame_open_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_2exon__frame_open_runs_off	1		.
 plus_2exon__frame_open_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_2exon__frame_open_late_stop	1		.
-plus_2exon__frame_open_plus2_runs_off	0	frameshift_variant	.
+plus_2exon__frame_open_plus2_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_2exon__frame_open_plus2_runs_off	1		.
 plus_2exon__frame_open_minus2_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_2exon__frame_open_minus2_late_stop	1		.
-plus_2exon__frame_open_before_terminal	0	frameshift_variant	.
+plus_2exon__frame_open_before_terminal	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_2exon__frame_open_before_terminal	1		.
 plus_2exon__restored_rescued	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
 plus_2exon__restored_rescued	1		.
@@ -114,22 +114,22 @@ plus_2exon__stop_gained_after_restoration	1		.
 plus_2exon__early_stop_then_missense	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_2exon__early_stop_then_missense	1		.
 plus_2exon__trans_control_of_pair	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
-plus_2exon__trans_control_of_pair	1	frameshift_variant	.
+plus_2exon__trans_control_of_pair	1	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_2exon__hom_alt_frame_open	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_2exon__hom_alt_frame_open	1	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_2exon__start_codon_insertion	0	start_lost	.
 plus_2exon__start_codon_insertion	1		.
 plus_3exon__frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_3exon__frame_open_early_stop	1		.
-plus_3exon__frame_open_runs_off	0	frameshift_variant	.
+plus_3exon__frame_open_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_3exon__frame_open_runs_off	1		.
 plus_3exon__frame_open_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_3exon__frame_open_late_stop	1		.
-plus_3exon__frame_open_plus2_runs_off	0	frameshift_variant	.
+plus_3exon__frame_open_plus2_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_3exon__frame_open_plus2_runs_off	1		.
 plus_3exon__frame_open_minus2_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_3exon__frame_open_minus2_late_stop	1		.
-plus_3exon__frame_open_before_terminal	0	frameshift_variant	.
+plus_3exon__frame_open_before_terminal	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_3exon__frame_open_before_terminal	1		.
 plus_3exon__restored_rescued	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
 plus_3exon__restored_rescued	1		.
@@ -174,22 +174,22 @@ plus_3exon__stop_gained_after_restoration	1		.
 plus_3exon__early_stop_then_missense	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_3exon__early_stop_then_missense	1		.
 plus_3exon__trans_control_of_pair	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
-plus_3exon__trans_control_of_pair	1	frameshift_variant	.
+plus_3exon__trans_control_of_pair	1	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 plus_3exon__hom_alt_frame_open	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_3exon__hom_alt_frame_open	1	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 plus_3exon__start_codon_insertion	0	start_lost	.
 plus_3exon__start_codon_insertion	1		.
 minus_1exon__frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_1exon__frame_open_early_stop	1		.
-minus_1exon__frame_open_runs_off	0	frameshift_variant	.
+minus_1exon__frame_open_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_1exon__frame_open_runs_off	1		.
 minus_1exon__frame_open_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_1exon__frame_open_late_stop	1		.
-minus_1exon__frame_open_plus2_runs_off	0	frameshift_variant	.
+minus_1exon__frame_open_plus2_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_1exon__frame_open_plus2_runs_off	1		.
 minus_1exon__frame_open_minus2_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_1exon__frame_open_minus2_late_stop	1		.
-minus_1exon__frame_open_before_terminal	0	frameshift_variant	.
+minus_1exon__frame_open_before_terminal	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_1exon__frame_open_before_terminal	1		.
 minus_1exon__restored_rescued	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
 minus_1exon__restored_rescued	1		.
@@ -234,22 +234,22 @@ minus_1exon__stop_gained_after_restoration	1		.
 minus_1exon__early_stop_then_missense	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_1exon__early_stop_then_missense	1		.
 minus_1exon__trans_control_of_pair	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
-minus_1exon__trans_control_of_pair	1	frameshift_variant	.
+minus_1exon__trans_control_of_pair	1	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_1exon__hom_alt_frame_open	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_1exon__hom_alt_frame_open	1	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_1exon__start_codon_insertion	0	start_lost	.
 minus_1exon__start_codon_insertion	1		.
 minus_2exon__frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_2exon__frame_open_early_stop	1		.
-minus_2exon__frame_open_runs_off	0	frameshift_variant	.
+minus_2exon__frame_open_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_2exon__frame_open_runs_off	1		.
 minus_2exon__frame_open_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_2exon__frame_open_late_stop	1		.
-minus_2exon__frame_open_plus2_runs_off	0	frameshift_variant	.
+minus_2exon__frame_open_plus2_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_2exon__frame_open_plus2_runs_off	1		.
 minus_2exon__frame_open_minus2_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_2exon__frame_open_minus2_late_stop	1		.
-minus_2exon__frame_open_before_terminal	0	frameshift_variant	.
+minus_2exon__frame_open_before_terminal	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_2exon__frame_open_before_terminal	1		.
 minus_2exon__restored_rescued	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
 minus_2exon__restored_rescued	1		.
@@ -294,22 +294,22 @@ minus_2exon__stop_gained_after_restoration	1		.
 minus_2exon__early_stop_then_missense	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_2exon__early_stop_then_missense	1		.
 minus_2exon__trans_control_of_pair	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
-minus_2exon__trans_control_of_pair	1	frameshift_variant	.
+minus_2exon__trans_control_of_pair	1	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_2exon__hom_alt_frame_open	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_2exon__hom_alt_frame_open	1	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_2exon__start_codon_insertion	0	start_lost	.
 minus_2exon__start_codon_insertion	1		.
 minus_3exon__frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_3exon__frame_open_early_stop	1		.
-minus_3exon__frame_open_runs_off	0	frameshift_variant	.
+minus_3exon__frame_open_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_3exon__frame_open_runs_off	1		.
 minus_3exon__frame_open_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_3exon__frame_open_late_stop	1		.
-minus_3exon__frame_open_plus2_runs_off	0	frameshift_variant	.
+minus_3exon__frame_open_plus2_runs_off	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_3exon__frame_open_plus2_runs_off	1		.
 minus_3exon__frame_open_minus2_late_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_3exon__frame_open_minus2_late_stop	1		.
-minus_3exon__frame_open_before_terminal	0	frameshift_variant	.
+minus_3exon__frame_open_before_terminal	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_3exon__frame_open_before_terminal	1		.
 minus_3exon__restored_rescued	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
 minus_3exon__restored_rescued	1		.
@@ -354,7 +354,7 @@ minus_3exon__stop_gained_after_restoration	1		.
 minus_3exon__early_stop_then_missense	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_3exon__early_stop_then_missense	1		.
 minus_3exon__trans_control_of_pair	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
-minus_3exon__trans_control_of_pair	1	frameshift_variant	.
+minus_3exon__trans_control_of_pair	1	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
 minus_3exon__hom_alt_frame_open	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_3exon__hom_alt_frame_open	1	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
 minus_3exon__start_codon_insertion	0	start_lost	.

@@ -100,9 +100,12 @@ FROM fr_gold g LEFT JOIN fr_out o ON o.transcript_index=g.transcript_index AND o
 ----
 168	0
 
-# Gate (ii): the pinned csq output mapped through csq_so_map_v1 agrees on every slice-4 lane outside the 20
+# Gate (ii): the pinned csq output mapped through csq_so_map_v1 agrees on every slice-4 lane outside the 24
 # declared divergences (README.md), on both strands and every exon layout; each divergent lane equals the
-# declared csq set on the csq side and the golden on the DuckVEP side.
+# declared csq set on the csq side and the golden on the DuckVEP side. Slice 5 added four declarations: the frames
+# that run off the CDS (frame_open_runs_off, frame_open_plus2_runs_off, frame_open_before_terminal and lane 1 of
+# trans_control_of_pair) now carry stop_lost next to frameshift_variant, which csq does not report (36 lanes agree
+# and 150 diverge, of 186).
 
 query IIII
 SELECT count(*) FILTER (WHERE g.declared_divergence='.'),
@@ -114,21 +117,23 @@ SELECT count(*) FILTER (WHERE g.declared_divergence='.'),
 FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
 WHERE g.classifier_slice=4 AND g.so_terms<>'';
 ----
-60	60	126	126
+36	36	150	150
 
-# The start-codon effect is slice 5: eligible, no SO set or IMPACT invented, edited protein still exact.
+# Slice 5 transition: the start-codon insertion (inside codon 1) was eligible_classifier_pending
+# (start_stop_classifier_pending); it is now decided as start_lost/HIGH, equal to the golden, the mapped csq set and
+# the edited protein, on every layout.
 
-query IIIII
+query IIIIII
 SELECT count(*),
- count(*) FILTER (WHERE o.prediction_status='eligible_classifier_pending' AND
-  o.prediction_reason='start_stop_classifier_pending'),
- count(*) FILTER (WHERE o.haplotype_consequences IS NULL AND o.carrier_consequences IS NULL),
- count(*) FILTER (WHERE o.haplotype_impact IS NULL AND o.carrier_impact IS NULL),
+ count(*) FILTER (WHERE o.prediction_status='predicted' AND o.prediction_reason='supported_domain'),
+ count(*) FILTER (WHERE array_to_string(o.haplotype_consequences,',')='start_lost' AND o.haplotype_impact='HIGH'),
+ count(*) FILTER (WHERE array_to_string(o.carrier_consequences,',')='start_lost' AND o.carrier_impact='HIGH'),
+ count(*) FILTER (WHERE array_to_string(o.haplotype_consequences,',')=g.csq_so_terms),
  count(*) FILTER (WHERE o.protein=g.protein)
 FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
 WHERE g.classifier_slice=5 AND g.so_terms<>'';
 ----
-6	6	6	6	6
+6	6	6	6	6	6
 
 # The counterexample of the contract appendix: the same nominal +1/-1 history is rescued when the edits sit
 # where the displaced frame has no stop, and ends in an earlier stop when the displaced frame reads a stop
@@ -164,8 +169,9 @@ stop_gained_post_stop_frame	stop_gained	HIGH	applied:1 post_stop:1	1
 
 # A frame restored after a stop that lies in the displaced frame: the stop is expressed (frameshift plus
 # stop_gained) and the restoring deletion stays attached as a contributor with its own normalized edit.
-# Roles are per interaction block (the slice-2 contract): both edits share the block that opens before the
-# stop, so both are applied; only a whole block after the stop is post_stop.
+# Slice 5 assigns the role per edit, by its position relative to the first stop of the edited sequence: the
+# insertion that opens the frame is applied and the restoring deletion, which lies after the stop although it
+# shares the interaction block, is post_stop (it was applied when roles were per block).
 
 query TIITI
 SELECT array_to_string(list_sort(o.haplotype_consequences),','),len(o.contributor_provenance),
@@ -174,8 +180,28 @@ SELECT array_to_string(list_sort(o.haplotype_consequences),','),len(o.contributo
 FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
 WHERE g.scenario='restored_early_stop' ORDER BY g.case_name LIMIT 2;
 ----
-frameshift_variant,stop_gained	2	2	applied,applied	6
-frameshift_variant,stop_gained	2	2	applied,applied	6
+frameshift_variant,stop_gained	2	2	applied,post_stop	6
+frameshift_variant,stop_gained	2	2	applied,post_stop	6
+
+# Role per edit on both strands and every layout: in the appendix counterexample the restoring deletion lies after
+# the early stop (post_stop) while, when the pair rescues the frame, both edits stay applied, and a restoring
+# insertion that itself creates the stop is applied.
+
+query TTI
+SELECT scenario,roles,count(*) FROM (
+ SELECT g.scenario,(SELECT string_agg(e.cds_start||':'||p.role,' ' ORDER BY e.cds_start)
+   FROM unnest(o.normalized_edits) a(e),unnest(o.contributor_provenance) b(p) WHERE e.event_index=p.event_index) roles
+ FROM fr_gold g JOIN fr_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+ WHERE g.scenario IN ('restored_early_stop','restored_early_stop_wide','restored_rescued','restoring_insertion_creates_stop',
+  'stop_gained_post_stop_frame','early_stop_then_missense'))
+GROUP BY ALL ORDER BY ALL;
+----
+early_stop_then_missense	11:applied 64:post_stop	6
+restored_early_stop	11:applied 61:post_stop	6
+restored_early_stop_wide	11:applied 91:post_stop	6
+restored_rescued	31:applied 61:applied	6
+restoring_insertion_creates_stop	31:applied 61:applied	6
+stop_gained_post_stop_frame	40:applied 81:post_stop	6
 
 # Trans control: a +1 on lane 1 and a -1 on lane 2 are separate frame openings, each decided per carrier with
 # its own set; the hom-alt +1 puts the same decided set on both lanes.
@@ -188,17 +214,19 @@ WHERE g.case_name IN ('minus_2exon__trans_control_of_pair','minus_2exon__hom_alt
 hom_alt_frame_open	0	frameshift_variant,stop_gained	HIGH
 hom_alt_frame_open	1	frameshift_variant,stop_gained	HIGH
 trans_control_of_pair	0	frameshift_variant,stop_gained	HIGH
-trans_control_of_pair	1	frameshift_variant	HIGH
+trans_control_of_pair	1	frameshift_variant,stop_lost	HIGH
 
 # Carriers: consequence sets are ordered by severity rank (stop_gained before frameshift_variant), each with
-# IMPACT the maximum severity of its terms; 186 predicted carriers in all.
+# IMPACT the maximum severity of its terms; 192 predicted carriers in all (slice 5: the 24 run-off carriers gain
+# stop_lost, and the 6 start-codon carriers are decided).
 
 query TTI
 SELECT array_to_string(carrier_consequences,','),carrier_impact,count(*)
 FROM fr_out WHERE carrier_status='predicted' GROUP BY ALL ORDER BY ALL;
 ----
-frameshift_variant	HIGH	24
+frameshift_variant,stop_lost	HIGH	24
 protein_altering_variant	MODERATE	60
+start_lost	HIGH	6
 stop_gained	HIGH	30
 stop_gained,frameshift_variant	HIGH	60
 synonymous_variant	LOW	12
