@@ -2,6 +2,7 @@
  * input materialization, phase-domain aggregation, sorting and output vectors.
  * The C workspace is allocated at init and retains only the active window. */
 #include "duckdb_extension.h"
+#include "kernel/src/duckvep_budget.h"
 DUCKDB_EXTENSION_EXTERN
 #include "duckvep_list.h"
 
@@ -83,7 +84,7 @@ static void haplotype_bind_destroy(void *pointer) {
     duckvep_registry_unpin(b->registry, b->entry);
     duckvep_registry_release(b->registry);
     duckdb_free(b->query);
-    free(b);
+    duckvep_budget_free(b);
 }
 
 static duckdb_logical_type record_type(const char *const *names, const duckdb_type *ids,
@@ -113,7 +114,7 @@ static void bind_record_list(duckdb_bind_info info, const char *name,
 }
 
 static void haplotype_bind(duckdb_bind_info info) {
-    haplotype_bind_t *b = calloc(1u, sizeof(*b));
+    haplotype_bind_t *b = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, 1u, sizeof(*b));
     if (!b) { duckdb_bind_set_error(info, "duckvep_haplotypes: bind allocation failed"); return; }
     b->registry = duckdb_bind_get_extra_info(info);
     duckvep_registry_retain(b->registry);
@@ -253,22 +254,22 @@ static void haplotype_state_destroy(void *pointer) {
     if (s->chunk) duckdb_destroy_data_chunk(&s->chunk);
     if (s->have_result) duckdb_destroy_result(&s->input);
     duckvep_haplotype_stream_buffers_t *b = &s->buffers;
-    free(b->carriers.transcripts); free(b->carriers.calls); free(b->carriers.prefixes);
-    free(b->carriers.active_transcripts); free(b->carriers.transcript_index);
-    free(b->carriers.call_index); free(b->carriers.prefix_index);
-    free(b->events); free(b->projections); free(b->alleles); free(b->leaf_events);
-    free(b->contributors); free(b->edits); free(b->blocks); free(b->cds); free(b->protein);
-    free(b->edit_event_ids);
-    free(s->difference_scratch.scores); free(s->difference_scratch.trace); free(s->differences);
-    free(s->difference_reference); free(b->reference_protein);
-    free(b->reference_coding_protein);
-    free(s->protein_operations); free(s->hgvsp);
-    if (s->reference.fai) fai_destroy(s->reference.fai);
-    free(s->reference.bases);
-    free(s->hgvs_scratch.edits); free(s->hgvs_scratch.alt_cds);
-    free(s->hgvs_scratch.ref_peptide); free(s->hgvs_scratch.alt_peptide);
-    free(s->hgvs_shifted_allele);
-    free(s->gt); free(s->phase); free(s->sets); free(s);
+    duckvep_budget_free(b->carriers.transcripts); duckvep_budget_free(b->carriers.calls); duckvep_budget_free(b->carriers.prefixes);
+    duckvep_budget_free(b->carriers.active_transcripts); duckvep_budget_free(b->carriers.transcript_index);
+    duckvep_budget_free(b->carriers.call_index); duckvep_budget_free(b->carriers.prefix_index);
+    duckvep_budget_free(b->events); duckvep_budget_free(b->projections); duckvep_budget_free(b->alleles); duckvep_budget_free(b->leaf_events);
+    duckvep_budget_free(b->contributors); duckvep_budget_free(b->edits); duckvep_budget_free(b->blocks); duckvep_budget_free(b->cds); duckvep_budget_free(b->protein);
+    duckvep_budget_free(b->edit_event_ids);
+    duckvep_budget_free(s->difference_scratch.scores); duckvep_budget_free(s->difference_scratch.trace); duckvep_budget_free(s->differences);
+    duckvep_budget_free(s->difference_reference); duckvep_budget_free(b->reference_protein);
+    duckvep_budget_free(b->reference_coding_protein);
+    duckvep_budget_free(s->protein_operations); duckvep_budget_free(s->hgvsp);
+    duckvep_reference_reader_close(&s->reference);
+    duckvep_budget_free(s->reference.bases);
+    duckvep_budget_free(s->hgvs_scratch.edits); duckvep_budget_free(s->hgvs_scratch.alt_cds);
+    duckvep_budget_free(s->hgvs_scratch.ref_peptide); duckvep_budget_free(s->hgvs_scratch.alt_peptide);
+    duckvep_budget_free(s->hgvs_shifted_allele);
+    duckvep_budget_free(s->gt); duckvep_budget_free(s->phase); duckvep_budget_free(s->sets); duckvep_budget_free(s);
 }
 
 static uint32_t bucket_count(uint32_t capacity) {
@@ -344,7 +345,7 @@ static int workspace_allocate(haplotype_state_t *s, const haplotype_bind_t *bind
     if (s->workspace_bytes > n[LIMIT_WORKSPACE]) return 0;
     ARRAYS(COUNT)
 #undef COUNT
-#define ALLOCATE(p, count) if ((count) && !((p) = malloc((count) * sizeof(*(p))))) return 0;
+#define ALLOCATE(p, count) if ((count) && !((p) = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, (count) * sizeof(*(p))))) return 0;
     ARRAYS(ALLOCATE)
 #undef ALLOCATE
 #undef ARRAYS
@@ -524,16 +525,16 @@ static int input_open(haplotype_state_t *s, const haplotype_bind_t *b, char *err
         duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: workspace_limit exceeded by calls query text");
         return 0;
     }
-    char *sql = malloc(qlen + overhead);
+    char *sql = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, qlen + overhead);
     if (!sql) return 0;
     snprintf(sql, qlen + overhead, "%s%s%s%s%s", prefix, b->query, middle, domain, suffix);
     duckdb_prepared_statement statement = NULL;
-    if (!duckvep_registry_query_acquire(b->registry, error, error_size)) { free(sql); return 0; }
+    if (!duckvep_registry_query_acquire(b->registry, error, error_size)) { duckvep_budget_free(sql); return 0; }
     duckdb_extracted_statements extracted = NULL;
     idx_t statements = duckdb_extract_statements(b->registry->query_connection, sql, &extracted);
     int ok = statements == 1u && duckdb_prepare_extracted_statement(
         b->registry->query_connection, extracted, 0u, &statement) == DuckDBSuccess;
-    free(sql);
+    duckvep_budget_free(sql);
     if (!ok) {
         const char *message = statement ? duckdb_prepare_error(statement) :
             extracted ? duckdb_extract_statements_error(extracted) : NULL;
@@ -554,9 +555,10 @@ static int input_open(haplotype_state_t *s, const haplotype_bind_t *b, char *err
 
 static void haplotype_init(duckdb_init_info info) {
     const haplotype_bind_t *bind = duckdb_init_get_bind_data(info);
-    haplotype_state_t *s = calloc(1u, sizeof(*s));
+    haplotype_state_t *s = duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, 1u, sizeof(*s));
     char error[DUCKVEP_SQL_ERROR_SIZE] = "duckvep_haplotypes: workspace allocation or configured limit exceeded";
     duckdb_init_set_max_threads(info, 1u);
+    duckvep_budget_clear_failure();
     if (!s || !workspace_allocate(s, bind)) goto failed;
     duckvep_owned_model_t *m = &bind->entry->model;
     if (bind->hgvs && !duckvep_reference_reader_init(&s->reference, m,
@@ -569,7 +571,9 @@ static void haplotype_init(duckdb_init_info info) {
     duckdb_init_set_init_data(info, s, haplotype_state_destroy);
     return;
 failed:
-    duckdb_init_set_error(info, error); haplotype_state_destroy(s);
+    { char final_error[DUCKVEP_SQL_ERROR_SIZE + 256];
+      duckdb_init_set_error(info, duckvep_sql_final_error(final_error, sizeof final_error, error, error)); }
+    haplotype_state_destroy(s);
 }
 
 static const char *projection_name(duckvep_cds_edit_status_t status) {

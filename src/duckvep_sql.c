@@ -1,5 +1,6 @@
 /* Relation-oriented DuckVEP SQL surface and static annotation metadata. */
 #include "duckdb_extension.h"
+#include "kernel/src/duckvep_budget.h"
 DUCKDB_EXTENSION_EXTERN
 
 #include <stdbool.h>
@@ -200,7 +201,7 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
         }
         if (ok && projected && names[1][0] == '\0') {
             duckdb_scalar_function_set_error(info, "duckvep_annotate_projected: model_name must be non-empty");
-            for (idx_t i = 0; i < 2; i++) free(names[i]);
+            for (idx_t i = 0; i < 2; i++) duckvep_budget_free(names[i]);
             return;
         }
         duckdb_vector fields[4] = {0};
@@ -208,7 +209,7 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
             ok = projected ? duckvep_builder_option_vectors(info, args[2], row,
                 projected_keys, projected_kinds, 2, fields) :
                 duckvep_builder_option_vectors(info, args[2], row, keys, kinds, 4, fields);
-            if (!ok) { for (idx_t i = 0; i < 2; i++) free(names[i]); return; }
+            if (!ok) { for (idx_t i = 0; i < 2; i++) duckvep_budget_free(names[i]); return; }
         }
         duckvep_sql_text values[6] = {{0}};
         if (ok) ok = duckvep_projection_table(&values[0], names[0]) &&
@@ -234,10 +235,10 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
                 const char *mark = strstr(part, "__DUCKVEP_");
                 if (!mark) { ok = duckvep_sql_append(&sql, part); break; }
                 size_t length = (size_t)(mark - part);
-                char *prefix = malloc(length + 1);
+                char *prefix = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
                 if (!prefix) { ok = false; break; }
                 memcpy(prefix, part, length); prefix[length] = 0;
-                ok = duckvep_sql_append(&sql, prefix); free(prefix);
+                ok = duckvep_sql_append(&sql, prefix); duckvep_budget_free(prefix);
                 size_t index = 0;
                 while (index < 6 && strncmp(mark, tokens[index], strlen(tokens[index])) != 0) index++;
                 if (index == 6) { ok = false; break; }
@@ -246,10 +247,10 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
             }
         }
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
-        else duckdb_scalar_function_set_error(info, "duckvep_annotate_sql: invalid input or allocation failure");
+        else duckvep_builder_set_error(info, "duckvep_annotate_sql: invalid input or allocation failure");
         duckvep_sql_free(&sql);
         for (size_t i = 0; i < 6; i++) duckvep_sql_free(&values[i]);
-        for (idx_t i = 0; i < 2; i++) free(names[i]);
+        for (idx_t i = 0; i < 2; i++) duckvep_budget_free(names[i]);
         if (!ok) return;
     }
 }
@@ -347,13 +348,13 @@ duckvep_projection_table(duckvep_sql_text *sql, const char *name)
     const char *dot = strchr(name, '.');
     if (dot) {
         size_t length = (size_t)(dot - name);
-        char *schema = malloc(length + 1);
+        char *schema = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
         if (!schema) return false;
         memcpy(schema, name, length);
         schema[length] = 0;
         bool ok = duckvep_sql_identifier(sql, schema) && duckvep_sql_append(sql, ".") &&
             duckvep_sql_identifier(sql, dot + 1);
-        free(schema);
+        duckvep_budget_free(schema);
         return ok;
     }
     return duckvep_sql_identifier(sql, name);
@@ -382,7 +383,7 @@ duckvep_projection_builder(duckdb_function_info info, duckdb_data_chunk input, d
             const duckvep_option_kind kinds[] = {DUCKVEP_OPTION_TEXT};
             ok = duckvep_builder_option_vectors(info, args[3], row, keys, kinds, 0, &field);
             if (!ok) {
-                for (idx_t i = 0; i < 3; i++) free(names[i]);
+                for (idx_t i = 0; i < 3; i++) duckvep_budget_free(names[i]);
                 return;
             }
         }
@@ -393,10 +394,10 @@ duckvep_projection_builder(duckdb_function_info info, duckdb_data_chunk input, d
                 const char *mark = strstr(part, "__DUCKVEP_");
                 if (!mark) { ok = duckvep_sql_append(&sql, part); break; }
                 size_t length = (size_t)(mark - part);
-                char *prefix = malloc(length + 1);
+                char *prefix = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
                 if (!prefix) { ok = false; break; }
                 memcpy(prefix, part, length); prefix[length] = 0;
-                ok = duckvep_sql_append(&sql, prefix); free(prefix);
+                ok = duckvep_sql_append(&sql, prefix); duckvep_budget_free(prefix);
                 const char *token = NULL; idx_t which = 0;
                 if (!strncmp(mark, "__DUCKVEP_EVENTS_TABLE__", strlen("__DUCKVEP_EVENTS_TABLE__"))) token = "__DUCKVEP_EVENTS_TABLE__";
                 else if (!strncmp(mark, "__DUCKVEP_ANNOTATIONS_TABLE__", strlen("__DUCKVEP_ANNOTATIONS_TABLE__"))) { token = "__DUCKVEP_ANNOTATIONS_TABLE__"; which = 1; }
@@ -407,9 +408,9 @@ duckvep_projection_builder(duckdb_function_info info, duckdb_data_chunk input, d
             }
         }
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
-        else duckdb_scalar_function_set_error(info, "duckvep_transcript_projection_sql: invalid table name, options, or allocation failure");
+        else duckvep_builder_set_error(info, "duckvep_transcript_projection_sql: invalid table name, options, or allocation failure");
         duckvep_sql_free(&sql);
-        for (idx_t i = 0; i < 3; i++) free(names[i]);
+        for (idx_t i = 0; i < 3; i++) duckvep_budget_free(names[i]);
         if (!ok) return;
     }
 }

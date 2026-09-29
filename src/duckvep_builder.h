@@ -29,6 +29,7 @@ bool duckvep_builder_options(duckdb_function_info info, duckdb_vector vector,
                              idx_t row, const char *const *names, size_t count,
                              char **values);
 char *duckvep_builder_string(duckdb_string_t string);
+void duckvep_builder_set_error(duckdb_function_info info, const char *message);
 bool duckvep_register_builder(duckdb_connection connection, const char *name,
                               idx_t required, duckdb_scalar_function_t callback);
 

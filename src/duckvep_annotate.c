@@ -3,6 +3,7 @@
 DUCKDB_EXTENSION_EXTERN
 
 #include "duckvep_model.h"
+#include "kernel/src/duckvep_budget.h"
 #include "kernel/src/duckvep_delta.h"
 #include "kernel/src/duckvep_annotation_internal.h"
 #include "kernel/src/duckvep_effect.h"
@@ -22,6 +23,8 @@ DUCKDB_EXTENSION_EXTERN
 #include <string.h>
 
 #define DUCKVEP_HGVS_INITIAL_RENDER_CAPACITY 256u
+
+bool duckvep_register_budget(duckdb_connection connection);
 
 typedef enum duckvep_hgvs_adapter_reason {
 	DUCKVEP_HGVS_ADAPTER_NONE = 0,
@@ -96,6 +99,14 @@ typedef struct duckvep_scalar_state {
 	uint32_t *lift_positions;
 	uint32_t *lift_ends;
 	size_t lift_capacity;
+	/* Scratch of the lifted-row resolver: kept-row order and copies of the
+	 * parallel HGVS and projection streams (worker scratch lease). */
+	size_t *lift_order;
+	size_t lift_order_capacity;
+	duckvep_hgvs_scalar_result_t *lift_hgvs_copy;
+	size_t lift_hgvs_capacity;
+	duckvep_projection_scalar_result_t *lift_projection_copy;
+	size_t lift_projection_capacity;
 	size_t allele_capacity;
 	uint32_t *pair_variant_indices;
 	uint32_t *pair_object_indices;
@@ -119,8 +130,117 @@ typedef struct duckvep_scalar_state {
 	char *hgvs_text;
 	size_t hgvs_text_size;
 	size_t hgvs_text_capacity;
+	/* Bytes charged to this worker's scratch and emitted-buffer leases. */
+	uint64_t scratch_used;
+	uint64_t emit_used;
 	struct duckvep_scalar_state *next_free;
 } duckvep_scalar_state_t;
+
+/* Grows one worker buffer to width * count bytes. The per-worker lease
+ * (scratch or emitted allowance) is checked before the process-wide native
+ * budget is charged, and both are checked before any memory is requested. A
+ * refusal records a capacity report for the error path and changes nothing. */
+#if defined(__GNUC__) || defined(__clang__)
+#define DUCKVEP_COLD_GROWTH __attribute__((noinline, cold))
+#else
+#define DUCKVEP_COLD_GROWTH
+#endif
+static DUCKVEP_COLD_GROWTH int
+duckvep_scalar_grow(duckvep_scalar_state_t *state, int emitted,
+	void **pointer, size_t width, size_t count)
+{
+	duckvep_budget_worker_limits_t limits;
+	uint64_t *used, allowance, before, after;
+	size_t bytes;
+	void *grown;
+	char what[64];
+
+	if (width != 0 && count > SIZE_MAX / width)
+		return 0;
+	bytes = width * count;
+	duckvep_budget_worker_limits(&limits);
+	used = emitted ? &state->emit_used : &state->scratch_used;
+	allowance = emitted ? limits.emit_bytes : limits.scratch_bytes;
+	before = duckvep_budget_charged(*pointer);
+	after = duckvep_budget_charge_for(bytes);
+	if (after > before && (after - before > allowance ||
+	    *used > allowance - (after - before))) {
+		(void)snprintf(what, sizeof(what), "per-worker %s lease",
+		    emitted ? "emitted-output" : "scratch");
+		duckvep_budget_note_failure(what, after - before, *used,
+		    allowance);
+		return 0;
+	}
+	grown = duckvep_budget_realloc(emitted ? DUCKVEP_OWNER_EMIT :
+	    DUCKVEP_OWNER_SCRATCH, *pointer, bytes);
+	if (grown == NULL)
+		return 0;
+	*pointer = grown;
+	*used = *used - before + after;
+	return 1;
+}
+
+/* Releases every growable buffer of an idle worker and resets its lease. */
+static DUCKVEP_COLD_GROWTH void
+duckvep_scalar_state_trim(duckvep_scalar_state_t *state)
+{
+#define DUCKVEP_TRIM(member) do { \
+	duckvep_budget_free(state->member); state->member = NULL; } while (0)
+	DUCKVEP_TRIM(interval_hits);
+	DUCKVEP_TRIM(seed_transcripts);
+	DUCKVEP_TRIM(lift_positions);
+	DUCKVEP_TRIM(lift_ends);
+	DUCKVEP_TRIM(lift_order);
+	DUCKVEP_TRIM(lift_hgvs_copy);
+	DUCKVEP_TRIM(lift_projection_copy);
+	DUCKVEP_TRIM(seq_regions);
+	DUCKVEP_TRIM(positions);
+	DUCKVEP_TRIM(ends);
+	DUCKVEP_TRIM(mate_seq_regions);
+	DUCKVEP_TRIM(mate_positions);
+	DUCKVEP_TRIM(reference_offsets);
+	DUCKVEP_TRIM(reference_lengths);
+	DUCKVEP_TRIM(alternate_offsets);
+	DUCKVEP_TRIM(alternate_lengths);
+	DUCKVEP_TRIM(variant_kinds);
+	DUCKVEP_TRIM(sv_types);
+	DUCKVEP_TRIM(copy_changes);
+	DUCKVEP_TRIM(transcript_coverage_complete);
+	DUCKVEP_TRIM(allele_bytes);
+	DUCKVEP_TRIM(pair_variant_indices);
+	DUCKVEP_TRIM(pair_object_indices);
+	DUCKVEP_TRIM(results);
+	DUCKVEP_TRIM(result_merge);
+	DUCKVEP_TRIM(hgvs_results);
+	DUCKVEP_TRIM(projection_results);
+	DUCKVEP_TRIM(projection_text);
+	DUCKVEP_TRIM(hgvs_allele_scratch);
+	DUCKVEP_TRIM(hgvs_render_scratch);
+	DUCKVEP_TRIM(hgvs_text);
+#undef DUCKVEP_TRIM
+	state->interval_hit_capacity = 0;
+	state->seed_capacity = 0;
+	state->lift_capacity = 0;
+	state->lift_order_capacity = 0;
+	state->lift_hgvs_capacity = 0;
+	state->lift_projection_capacity = 0;
+	state->variant_capacity = 0;
+	state->allele_capacity = 0;
+	state->pair_capacity = 0;
+	state->result_count = 0;
+	state->result_capacity = 0;
+	state->result_merge_capacity = 0;
+	state->hgvs_result_capacity = 0;
+	state->projection_result_capacity = 0;
+	state->projection_text_size = 0;
+	state->projection_text_capacity = 0;
+	state->hgvs_allele_capacity = 0;
+	state->hgvs_render_capacity = 0;
+	state->hgvs_text_size = 0;
+	state->hgvs_text_capacity = 0;
+	state->scratch_used = 0;
+	state->emit_used = 0;
+}
 
 static int
 duckvep_scalar_variant_reserve(duckvep_scalar_state_t *state, size_t needed)
@@ -131,7 +251,7 @@ duckvep_scalar_variant_reserve(duckvep_scalar_state_t *state, size_t needed)
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->variant_capacity, needed);
 #define DUCKVEP_SCALAR_VARIANT_RESIZE(member) \
-	if (!duckvep_sql_resize((void **)&state->member, \
+	if (!duckvep_scalar_grow(state, 0, (void **)&state->member, \
 	    sizeof(*state->member), capacity)) \
 		return 0
 	DUCKVEP_SCALAR_VARIANT_RESIZE(seq_regions);
@@ -160,9 +280,9 @@ duckvep_scalar_pair_reserve(duckvep_scalar_state_t *state, size_t needed)
 	if (needed <= state->pair_capacity)
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->pair_capacity, needed);
-	if (!duckvep_sql_resize((void **)&state->pair_variant_indices,
+	if (!duckvep_scalar_grow(state, 0, (void **)&state->pair_variant_indices,
 	    sizeof(*state->pair_variant_indices), capacity) ||
-	    !duckvep_sql_resize((void **)&state->pair_object_indices,
+	    !duckvep_scalar_grow(state, 0, (void **)&state->pair_object_indices,
 	    sizeof(*state->pair_object_indices), capacity))
 		return 0;
 	state->pair_capacity = capacity;
@@ -177,7 +297,7 @@ duckvep_scalar_allele_reserve(duckvep_scalar_state_t *state, size_t needed)
 	if (needed <= state->allele_capacity)
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->allele_capacity, needed);
-	if (!duckvep_sql_resize((void **)&state->allele_bytes,
+	if (!duckvep_scalar_grow(state, 0, (void **)&state->allele_bytes,
 	    sizeof(*state->allele_bytes), capacity))
 		return 0;
 	state->allele_capacity = capacity;
@@ -192,7 +312,7 @@ duckvep_scalar_seed_reserve(duckvep_scalar_state_t *state, size_t needed)
 	if (needed <= state->seed_capacity)
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->seed_capacity, needed);
-	if (!duckvep_sql_resize((void **)&state->seed_transcripts,
+	if (!duckvep_scalar_grow(state, 0, (void **)&state->seed_transcripts,
 	    sizeof(*state->seed_transcripts), capacity))
 		return 0;
 	state->seed_capacity = capacity;
@@ -207,7 +327,7 @@ duckvep_scalar_result_reserve(duckvep_scalar_state_t *state, size_t needed)
 	if (needed <= state->result_capacity)
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->result_capacity, needed);
-	if (!duckvep_sql_resize((void **)&state->results,
+	if (!duckvep_scalar_grow(state, 1, (void **)&state->results,
 	    sizeof(*state->results), capacity))
 		return 0;
 	state->result_capacity = capacity;
@@ -224,7 +344,7 @@ duckvep_scalar_result_merge_reserve(duckvep_scalar_state_t *state,
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->result_merge_capacity,
 	    needed);
-	if (!duckvep_sql_resize((void **)&state->result_merge,
+	if (!duckvep_scalar_grow(state, 0, (void **)&state->result_merge,
 	    sizeof(*state->result_merge), capacity))
 		return 0;
 	state->result_merge_capacity = capacity;
@@ -241,7 +361,7 @@ duckvep_scalar_hgvs_result_reserve(duckvep_scalar_state_t *state,
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->hgvs_result_capacity,
 	    needed);
-	if (!duckvep_sql_resize((void **)&state->hgvs_results,
+	if (!duckvep_scalar_grow(state, 1, (void **)&state->hgvs_results,
 	    sizeof(*state->hgvs_results), capacity))
 		return 0;
 	state->hgvs_result_capacity = capacity;
@@ -258,7 +378,7 @@ duckvep_scalar_projection_result_reserve(duckvep_scalar_state_t *state,
 		return 1;
 	capacity = duckvep_sql_next_capacity(
 	    state->projection_result_capacity, needed);
-	if (!duckvep_sql_resize((void **)&state->projection_results,
+	if (!duckvep_scalar_grow(state, 1, (void **)&state->projection_results,
 	    sizeof(*state->projection_results), capacity))
 		return 0;
 	state->projection_result_capacity = capacity;
@@ -280,7 +400,7 @@ duckvep_scalar_projection_text_append(duckvep_scalar_state_t *state,
 	if (needed > state->projection_text_capacity) {
 		capacity = duckvep_sql_next_capacity(
 		    state->projection_text_capacity, needed);
-		if (!duckvep_sql_resize((void **)&state->projection_text,
+		if (!duckvep_scalar_grow(state, 1, (void **)&state->projection_text,
 		    sizeof(*state->projection_text), capacity))
 			return NULL;
 		state->projection_text_capacity = capacity;
@@ -301,7 +421,7 @@ duckvep_scalar_hgvs_allele_reserve(duckvep_scalar_state_t *state,
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->hgvs_allele_capacity,
 	    needed);
-	if (!duckvep_sql_resize((void **)&state->hgvs_allele_scratch,
+	if (!duckvep_scalar_grow(state, 0, (void **)&state->hgvs_allele_scratch,
 	    sizeof(*state->hgvs_allele_scratch), capacity))
 		return 0;
 	state->hgvs_allele_capacity = capacity;
@@ -318,7 +438,7 @@ duckvep_scalar_hgvs_render_reserve(duckvep_scalar_state_t *state,
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->hgvs_render_capacity,
 	    needed);
-	if (!duckvep_sql_resize((void **)&state->hgvs_render_scratch,
+	if (!duckvep_scalar_grow(state, 0, (void **)&state->hgvs_render_scratch,
 	    sizeof(*state->hgvs_render_scratch), capacity))
 		return 0;
 	state->hgvs_render_capacity = capacity;
@@ -339,7 +459,7 @@ duckvep_scalar_hgvs_text_append(duckvep_scalar_state_t *state,
 	if (needed > state->hgvs_text_capacity) {
 		capacity = duckvep_sql_next_capacity(state->hgvs_text_capacity,
 		    needed);
-		if (!duckvep_sql_resize((void **)&state->hgvs_text,
+		if (!duckvep_scalar_grow(state, 1, (void **)&state->hgvs_text,
 		    sizeof(*state->hgvs_text), capacity))
 			return 0;
 		state->hgvs_text_capacity = capacity;
@@ -364,35 +484,38 @@ duckvep_scalar_state_destroy(void *pointer)
 		duckvep_workspace_close(state->workspace);
 	duckvep_options_close(state->options);
 	duckvep_registry_unpin(state->registry, state->entry);
-	free(state->interval_hits);
-	free(state->seed_transcripts);
-	free(state->lift_positions);
-	free(state->lift_ends);
-	free(state->seq_regions);
-	free(state->positions);
-	free(state->ends);
-	free(state->mate_seq_regions);
-	free(state->mate_positions);
-	free(state->reference_offsets);
-	free(state->reference_lengths);
-	free(state->alternate_offsets);
-	free(state->alternate_lengths);
-	free(state->variant_kinds);
-	free(state->sv_types);
-	free(state->copy_changes);
-	free(state->transcript_coverage_complete);
-	free(state->allele_bytes);
-	free(state->pair_variant_indices);
-	free(state->pair_object_indices);
-	free(state->results);
-	free(state->result_merge);
-	free(state->hgvs_results);
-	free(state->projection_results);
-	free(state->projection_text);
-	free(state->hgvs_allele_scratch);
-	free(state->hgvs_render_scratch);
-	free(state->hgvs_text);
-	free(state);
+	duckvep_budget_free(state->interval_hits);
+	duckvep_budget_free(state->seed_transcripts);
+	duckvep_budget_free(state->lift_positions);
+	duckvep_budget_free(state->lift_ends);
+	duckvep_budget_free(state->lift_order);
+	duckvep_budget_free(state->lift_hgvs_copy);
+	duckvep_budget_free(state->lift_projection_copy);
+	duckvep_budget_free(state->seq_regions);
+	duckvep_budget_free(state->positions);
+	duckvep_budget_free(state->ends);
+	duckvep_budget_free(state->mate_seq_regions);
+	duckvep_budget_free(state->mate_positions);
+	duckvep_budget_free(state->reference_offsets);
+	duckvep_budget_free(state->reference_lengths);
+	duckvep_budget_free(state->alternate_offsets);
+	duckvep_budget_free(state->alternate_lengths);
+	duckvep_budget_free(state->variant_kinds);
+	duckvep_budget_free(state->sv_types);
+	duckvep_budget_free(state->copy_changes);
+	duckvep_budget_free(state->transcript_coverage_complete);
+	duckvep_budget_free(state->allele_bytes);
+	duckvep_budget_free(state->pair_variant_indices);
+	duckvep_budget_free(state->pair_object_indices);
+	duckvep_budget_free(state->results);
+	duckvep_budget_free(state->result_merge);
+	duckvep_budget_free(state->hgvs_results);
+	duckvep_budget_free(state->projection_results);
+	duckvep_budget_free(state->projection_text);
+	duckvep_budget_free(state->hgvs_allele_scratch);
+	duckvep_budget_free(state->hgvs_render_scratch);
+	duckvep_budget_free(state->hgvs_text);
+	duckvep_budget_free(state);
 }
 
 static void
@@ -407,15 +530,27 @@ duckvep_scalar_state_pool_destroy(void *pointer)
 	}
 }
 
+/* Admission: at most max_workers annotation chunks run at once. A worker holds
+ * its slot only while it executes one chunk, so waiting cannot deadlock, and
+ * at most max_workers states (and therefore leases) ever exist. */
 static duckvep_scalar_state_t *
 duckvep_scalar_state_acquire(duckvep_registry_t *registry)
 {
+	duckvep_budget_worker_limits_t limits;
 	duckvep_scalar_state_t *state;
 
 	pthread_mutex_lock(&registry->mutex);
+	for (;;) {
+		duckvep_budget_worker_limits(&limits);
+		if (registry->admitted < limits.max_workers)
+			break;
+		pthread_cond_wait(&registry->admission, &registry->mutex);
+	}
+	registry->admitted++;
 	state = registry->annotation_state_pool;
 	if (state != NULL) {
 		registry->annotation_state_pool = state->next_free;
+		registry->annotation_state_pool_count--;
 		state->next_free = NULL;
 	}
 	if (registry->annotation_state_pool_destroy == NULL)
@@ -423,9 +558,16 @@ duckvep_scalar_state_acquire(duckvep_registry_t *registry)
 		    duckvep_scalar_state_pool_destroy;
 	pthread_mutex_unlock(&registry->mutex);
 	if (state == NULL)
-		state = calloc(1, sizeof(*state));
-	if (state != NULL)
+		state = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, 1,
+		    sizeof(*state));
+	if (state != NULL) {
 		state->registry = registry;
+	} else {
+		pthread_mutex_lock(&registry->mutex);
+		registry->admitted--;
+		pthread_cond_signal(&registry->admission);
+		pthread_mutex_unlock(&registry->mutex);
+	}
 	return state;
 }
 
@@ -442,22 +584,38 @@ duckvep_scalar_release_model(duckvep_scalar_state_t *state)
 	state->entry = NULL;
 }
 
+/* Runs on success, error and cancellation alike: the model pin and workspace
+ * go back, the slot is freed, and an idle worker keeps at most idle_bytes. */
 static void
 duckvep_scalar_state_release(duckvep_scalar_state_t *state)
 {
+	duckvep_budget_worker_limits_t limits;
 	duckvep_registry_t *registry;
+	int retain;
 
 	if (state == NULL)
 		return;
 	registry = state->registry;
 	duckvep_scalar_release_model(state);
+	duckvep_budget_worker_limits(&limits);
+	if (state->scratch_used + state->emit_used +
+	    duckvep_budget_charged(state->interval_hits) > limits.idle_bytes)
+		duckvep_scalar_state_trim(state);
 	state->result_count = 0;
 	state->hgvs_text_size = 0;
 	state->projection_text_size = 0;
 	pthread_mutex_lock(&registry->mutex);
-	state->next_free = registry->annotation_state_pool;
-	registry->annotation_state_pool = state;
+	registry->admitted--;
+	retain = registry->annotation_state_pool_count < limits.max_workers;
+	if (retain) {
+		state->next_free = registry->annotation_state_pool;
+		registry->annotation_state_pool = state;
+		registry->annotation_state_pool_count++;
+	}
+	pthread_cond_signal(&registry->admission);
 	pthread_mutex_unlock(&registry->mutex);
+	if (!retain)
+		duckvep_scalar_state_destroy(state);
 }
 
 static int
@@ -490,18 +648,23 @@ duckvep_scalar_select_model(duckvep_scalar_state_t *state,
 	char *name;
 
 	name = duckvep_vector_string(model_vector, row);
+	if (name == NULL && duckvep_vector_string_wellformed(model_vector, row)) {
+		duckvep_sql_set_error(error, error_size,
+		    "duckvep_annotate: out of memory copying the model name");
+		return 0;
+	}
 	if (name == NULL || *name == '\0') {
-		free(name);
+		duckvep_budget_free(name);
 		duckvep_sql_set_error(error, error_size,
 		    "duckvep_annotate: model name must be non-empty");
 		return 0;
 	}
 	if (state->entry != NULL && strcmp(state->entry->name, name) == 0) {
-		free(name);
+		duckvep_budget_free(name);
 		return 1;
 	}
 	entry = duckvep_registry_pin(state->registry, name);
-	free(name);
+	duckvep_budget_free(name);
 	if (entry == NULL) {
 		duckvep_sql_set_error(error, error_size,
 		    "duckvep_annotate: unknown model name");
@@ -1231,7 +1394,8 @@ duckvep_scalar_reference_windows(duckvep_scalar_state_t *state,
 	duckvep_reference_reader_t *reader = &state->workspace_cache->reference;
 	if (!reader->model || (model->reference_fasta_path && !reader->fai)) {
 		if (model->reference_fasta_path && !reader->bases) {
-			reader->bases = malloc(DUCKVEP_REFERENCE_DEFAULT_BYTES);
+			reader->bases = duckvep_budget_malloc(DUCKVEP_OWNER_REFERENCE,
+			    DUCKVEP_REFERENCE_DEFAULT_BYTES);
 			if (!reader->bases) {
 				duckvep_sql_set_error(error, error_size,
 				    "duckvep_annotate: out of memory allocating reference workspace");
@@ -2069,9 +2233,9 @@ duckvep_scalar_lift_reserve(duckvep_scalar_state_t *state, size_t needed)
 	if (needed <= state->lift_capacity)
 		return 1;
 	capacity = duckvep_sql_next_capacity(state->lift_capacity, needed);
-	if (!duckvep_sql_resize((void **)&state->lift_positions,
+	if (!duckvep_scalar_grow(state, 0, (void **)&state->lift_positions,
 	    sizeof(*state->lift_positions), capacity) ||
-	    !duckvep_sql_resize((void **)&state->lift_ends,
+	    !duckvep_scalar_grow(state, 0, (void **)&state->lift_ends,
 	    sizeof(*state->lift_ends), capacity))
 		return 0;
 	state->lift_capacity = capacity;
@@ -2092,17 +2256,20 @@ duckvep_scalar_lift_resolve(duckvep_scalar_state_t *state, size_t first_row,
 	count = state->result_count - first_row;
 	if (count == 0)
 		return 1;
-	order = malloc(count * sizeof(*order));
-	if (order == NULL) {
-		duckvep_sql_set_error(error, error_size,
-		    "duckvep_annotate: out of memory resolving lifted rows");
-		return 0;
+	if (count > state->lift_order_capacity) {
+		if (!duckvep_scalar_grow(state, 0, (void **)&state->lift_order,
+		    sizeof(*state->lift_order), count)) {
+			duckvep_sql_set_error(error, error_size,
+			    "duckvep_annotate: out of memory resolving lifted rows");
+			return 0;
+		}
+		state->lift_order_capacity = count;
 	}
+	order = state->lift_order;
 	memset(&kernel_error, 0, sizeof(kernel_error));
 	if (duckvep_lift_resolve(lifted->lift, state->results + first_row, count,
 	    state->lift_positions, state->lift_ends, order, &kept,
 	    &kernel_error) != DUCKVEP_OK) {
-		free(order);
 		(void)snprintf(error, error_size, "duckvep_annotate: %s",
 		    kernel_error.message);
 		return 0;
@@ -2112,25 +2279,34 @@ duckvep_scalar_lift_resolve(duckvep_scalar_state_t *state, size_t first_row,
 		duckvep_projection_scalar_result_t *projection = NULL;
 
 		if (with_hgvs) {
-			hgvs = malloc(count * sizeof(*hgvs));
-			if (hgvs != NULL)
-				memcpy(hgvs, state->hgvs_results + first_row,
-				    count * sizeof(*hgvs));
+			if (count > state->lift_hgvs_capacity) {
+				if (!duckvep_scalar_grow(state, 0,
+				    (void **)&state->lift_hgvs_copy,
+				    sizeof(*state->lift_hgvs_copy), count)) {
+					duckvep_sql_set_error(error, error_size,
+					    "duckvep_annotate: out of memory resolving lifted rows");
+					return 0;
+				}
+				state->lift_hgvs_capacity = count;
+			}
+			hgvs = state->lift_hgvs_copy;
+			memcpy(hgvs, state->hgvs_results + first_row,
+			    count * sizeof(*hgvs));
 		}
 		if (with_projection) {
-			projection = malloc(count * sizeof(*projection));
-			if (projection != NULL)
-				memcpy(projection, state->projection_results + first_row,
-				    count * sizeof(*projection));
-		}
-		if ((with_hgvs && hgvs == NULL) ||
-		    (with_projection && projection == NULL)) {
-			free(hgvs);
-			free(projection);
-			free(order);
-			duckvep_sql_set_error(error, error_size,
-			    "duckvep_annotate: out of memory resolving lifted rows");
-			return 0;
+			if (count > state->lift_projection_capacity) {
+				if (!duckvep_scalar_grow(state, 0,
+				    (void **)&state->lift_projection_copy,
+				    sizeof(*state->lift_projection_copy), count)) {
+					duckvep_sql_set_error(error, error_size,
+					    "duckvep_annotate: out of memory resolving lifted rows");
+					return 0;
+				}
+				state->lift_projection_capacity = count;
+			}
+			projection = state->lift_projection_copy;
+			memcpy(projection, state->projection_results + first_row,
+			    count * sizeof(*projection));
 		}
 		for (index = 0; index < kept; index++) {
 			if (with_hgvs)
@@ -2139,11 +2315,8 @@ duckvep_scalar_lift_resolve(duckvep_scalar_state_t *state, size_t first_row,
 				state->projection_results[first_row + index] =
 				    projection[order[index]];
 		}
-		free(hgvs);
-		free(projection);
 	}
 	state->result_count = first_row + kept;
-	free(order);
 	return 1;
 }
 
@@ -2757,6 +2930,24 @@ duckvep_scalar_prepare_output_list(duckvep_scalar_state_t *state,
 		return 0;
 	}
 	output_capacity = state->result_count + (size_t)input_rows;
+	/* Charge the emitted vector before DuckDB reserves it. */
+	{
+		duckvep_budget_worker_limits_t limits;
+		uint64_t emitted;
+
+		duckvep_budget_worker_limits(&limits);
+		emitted = (uint64_t)output_capacity *
+		    sizeof(duckvep_consequence_t) +
+		    state->hgvs_text_size + state->projection_text_size;
+		if (emitted > limits.emit_bytes) {
+			duckvep_budget_note_failure(
+			    "per-worker emitted-vector allowance", emitted, 0,
+			    limits.emit_bytes);
+			duckvep_sql_set_error(error, error_size,
+			    "duckvep_annotate: emitted list exceeds the allowance");
+			return 0;
+		}
+	}
 	if (duckdb_list_vector_reserve(output, (idx_t)output_capacity) ==
 	    DuckDBError) {
 		duckvep_sql_set_error(error, error_size,
@@ -3528,6 +3719,7 @@ duckvep_annotate_scalar_execute(duckdb_function_info info,
 	idx_t distance_column;
 	size_t begin;
 	char error[DUCKVEP_SQL_ERROR_SIZE];
+	char final_error[DUCKVEP_SQL_ERROR_SIZE + 256];
 
 	rows = duckdb_data_chunk_get_size(input);
 	if (rows == 0) {
@@ -3535,11 +3727,13 @@ duckvep_annotate_scalar_execute(duckdb_function_info info,
 		return;
 	}
 	memset(error, 0, sizeof(error));
+	duckvep_budget_clear_failure();
 	state = duckvep_scalar_state_acquire(
 	    duckdb_scalar_function_get_extra_info(info));
 	if (state == NULL) {
 		duckdb_scalar_function_set_error(info,
-		    "duckvep_annotate: out of memory");
+		    duckvep_sql_final_error(final_error, sizeof(final_error),
+		    NULL, "duckvep_annotate: out of memory"));
 		return;
 	}
 	if (!duckvep_scalar_result_reserve(state,
@@ -3663,7 +3857,8 @@ duckvep_annotate_scalar_execute(duckdb_function_info info,
 failed:
 	duckvep_scalar_state_release(state);
 	duckdb_scalar_function_set_error(info,
-	    error[0] != '\0' ? error : "duckvep_annotate failed");
+	    duckvep_sql_final_error(final_error, sizeof(final_error), error,
+	    "duckvep_annotate failed"));
 }
 
 static void
@@ -4067,6 +4262,8 @@ register_duckvep_functions(duckdb_connection connection,
 
 	registry = duckvep_registry_create(database);
 	if (registry == NULL)
+		return false;
+	if (!duckvep_register_budget(connection))
 		return false;
 	duckvep_register_model_functions(connection, registry);
 	duckvep_register_haplotypes(connection, registry);

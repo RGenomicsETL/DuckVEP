@@ -1,5 +1,6 @@
 /* DuckDB-native preparation of the resident DuckVEP transcript model. */
 #include "duckdb_extension.h"
+#include "kernel/src/duckvep_budget.h"
 DUCKDB_EXTENSION_EXTERN
 
 #include <stdbool.h>
@@ -588,7 +589,7 @@ static bool ensembl_template(duckvep_sql_text *out, const char *const *parts, si
                              const char *species, const char *funcgen, const char *regions);
 
 static char *ensembl_slice(const char *text, size_t length) {
-    char *copy = malloc(length + 1);
+    char *copy = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
     if (copy) {
         memcpy(copy, text, length);
         copy[length] = '\0';
@@ -605,7 +606,7 @@ static bool ensembl_table(duckvep_sql_text *out, const char *table) {
     if (!schema) return false;
     bool ok = duckvep_sql_identifier(out, schema) && duckvep_sql_append(out, ".") &&
         duckvep_sql_identifier(out, dot + 1);
-    free(schema);
+    duckvep_budget_free(schema);
     return ok;
 }
 
@@ -629,7 +630,7 @@ static bool ensembl_piece(duckvep_sql_text *out, const char *piece, const char *
         char *prefix = ensembl_slice(piece, (size_t)(at - piece));
         if (!prefix) return false;
         bool ok = duckvep_sql_append(out, prefix);
-        free(prefix);
+        duckvep_budget_free(prefix);
         if (!ok) return false;
         if (at == region_call) {
             if (!duckvep_sql_append(out, "(") ||
@@ -661,7 +662,7 @@ static bool ensembl_piece(duckvep_sql_text *out, const char *piece, const char *
             if (!suffix) return false;
             ok = duckvep_sql_identifier(out, name) && duckvep_sql_append(out, ".") &&
                 duckvep_sql_identifier(out, suffix);
-            free(suffix);
+            duckvep_budget_free(suffix);
         } else ok = ensembl_table(out, name);
         if (!ok) return false;
         piece = end + 1;
@@ -745,7 +746,7 @@ static void ensembl_builder(duckdb_function_info info, duckdb_data_chunk input,
             duckdb_vector_assign_string_element(output, row, sql.data);
         } else if (building) duckdb_scalar_function_set_error(info, label);
         duckvep_sql_free(&sql);
-        for (idx_t i = 0; i < required; i++) free(values[i]);
+        for (idx_t i = 0; i < required; i++) duckvep_budget_free(values[i]);
         if (!ok) return;
     }
 }
@@ -905,8 +906,8 @@ static void duckvep_model_receipt_sql(duckdb_function_info info,
             duckdb_string_t *strings = duckdb_vector_get_data(args[i]);
             values[i] = duckvep_builder_string(strings[row]);
             if (!values[i]) {
-                duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: invalid argument string or allocation failure");
-                for (idx_t j = 0; j <= i; j++) free(values[j]);
+                duckvep_builder_set_error(info, "duckvep_model_receipt_sql: invalid argument string or allocation failure");
+                for (idx_t j = 0; j <= i; j++) duckvep_budget_free(values[j]);
                 return;
             }
         }
@@ -915,8 +916,8 @@ static void duckvep_model_receipt_sql(duckdb_function_info info,
         if (options_ok && (!values[0] || !values[1]))
             duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: region and transcript table names are required");
         if (!options_ok || !values[0] || !values[1]) {
-            for (idx_t i = 0; i < 8; i++) free(values[i]);
-            free(option_values[0]);
+            for (idx_t i = 0; i < 8; i++) duckvep_budget_free(values[i]);
+            duckvep_budget_free(option_values[0]);
             return;
         }
         duckvep_sql_text sql = {0};
@@ -940,15 +941,15 @@ static void duckvep_model_receipt_sql(duckdb_function_info info,
         if (ok) ok = duckvep_sql_append(&sql, "), ");
         for (size_t i = 0; ok && i < sizeof(receipt_body) / sizeof(receipt_body[0]); i++)
             ok = duckvep_sql_append(&sql, receipt_body[i]);
-        if (!ok) duckdb_scalar_function_set_error(info, "duckvep_model_receipt_sql: allocation failed");
+        if (!ok) duckvep_builder_set_error(info, "duckvep_model_receipt_sql: allocation failed");
         else {
             duckdb_vector_ensure_validity_writable(output);
             duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
             duckdb_vector_assign_string_element(output, row, sql.data);
         }
         duckvep_sql_free(&sql);
-        for (idx_t i = 0; i < 8; i++) free(values[i]);
-        free(option_values[0]);
+        for (idx_t i = 0; i < 8; i++) duckvep_budget_free(values[i]);
+        duckvep_budget_free(option_values[0]);
         if (!ok) return;
     }
 }

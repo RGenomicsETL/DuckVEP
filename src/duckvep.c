@@ -1,5 +1,6 @@
 #define DUCKDB_EXTENSION_NAME duckvep
 #include "duckdb_extension.h"
+#include "kernel/src/duckvep_budget.h"
 #include "duckvep_registration.h"
 #include "duckvep_sql.h"
 #include <stdio.h>
@@ -17,7 +18,7 @@ static void duckvep_revcomp(duckdb_function_info info, duckdb_data_chunk input,
     for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
         idx_t length = duckdb_string_t_length(values[row]);
         const char *sequence = duckdb_string_t_data(&values[row]);
-        char *reversed = malloc(length ? length : 1);
+        char *reversed = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length ? length : 1);
         if (!reversed) {
             duckdb_scalar_function_set_error(info, "_duckvep_revcomp: allocation failed");
             return;
@@ -39,7 +40,7 @@ static void duckvep_revcomp(duckdb_function_info info, duckdb_data_chunk input,
             end = first;
         }
         duckdb_vector_assign_string_element_len(output, row, reversed, length);
-        free(reversed);
+        duckvep_budget_free(reversed);
     }
 }
 

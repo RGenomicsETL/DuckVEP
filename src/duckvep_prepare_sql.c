@@ -1,4 +1,5 @@
 #include "duckvep_builder.h"
+#include "kernel/src/duckvep_budget.h"
 #include "duckvep_registration.h"
 #include <stdlib.h>
 #include <string.h>
@@ -57,9 +58,9 @@ static void prepare_sv(duckdb_function_info info, duckdb_data_chunk input, duckd
         bool ok = name && duckvep_sql_append(&sql, "WITH source AS (SELECT event_index, pos, ref, alt, info FROM ") &&
             duckvep_sql_relation(&sql, name) && duckvep_sql_append(&sql, sv_sql);
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
-        else duckdb_scalar_function_set_error(info, "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure");
+        else duckvep_builder_set_error(info, "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure");
         duckvep_sql_free(&sql);
-        free(name);
+        duckvep_budget_free(name);
         if (!ok) return;
     }
 }
@@ -161,9 +162,9 @@ static void prepare_str(duckdb_function_info info, duckdb_data_chunk input, duck
             duckvep_sql_relation(&sql, tables[1]) && duckvep_sql_append(&sql, str_tail) &&
             duckvep_sql_append(&sql, str_tail2);
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
-        else duckdb_scalar_function_set_error(info, "duckvep_prepare_expansionhunter_sql: invalid relation name or allocation failure");
+        else duckvep_builder_set_error(info, "duckvep_prepare_expansionhunter_sql: invalid relation name or allocation failure");
         duckvep_sql_free(&sql);
-        for (size_t i = 0; i < 2; i++) free(tables[i]);
+        for (size_t i = 0; i < 2; i++) duckvep_budget_free(tables[i]);
         if (!ok) return;
     }
 }
