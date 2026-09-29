@@ -1,0 +1,82 @@
+{
+ "target": "nanoarchaeum",
+ "species": "nanoarchaeum_equitans_kin4_m_gca_000008085",
+ "region": "Chromosome",
+ "region_length": 490885,
+ "extension_sha256": "6ab81a98689b664f9856900e6d52028ef50e49e0dc9c0d4fb1de310ebdf09da4",
+ "events": 6814,
+ "events_in_hgvs_run": 6493,
+ "vep_hgvs_run_succeeded": true,
+ "region_transcripts": 553,
+ "origin_crossing_transcripts": "AAR38856:-1",
+ "fasta_sha256": "5e9d04aff84f8cb925c0f9e6173e21c6fbc726fa8f77fc4abd7a963e03ee87e7",
+ "cache_sha256": "34078dab917e6236d124fa1b87e1b6025de2f75b6ccb92e47de42f99dacf6050",
+ "transcript_dump_sha256": "84d4b949054d44a53b2c89015e299231151faa4a5c46f558e741fa1de1d05843",
+ "unwrapped": {
+  "pairs": 80060,
+  "identical_terms": 78435,
+  "duckvep_only": 1624,
+  "vep_only": 0,
+  "different_terms": 1,
+  "hgvsc_pairs": 5918,
+  "hgvsc_identical": 5918,
+  "hgvsp_pairs": 5888,
+  "hgvsp_identical": 5884,
+  "duckvep_only_across_origin": 1624,
+  "hgvs_differences_near_origin_vs_interior": {
+   "hgvsc_near_origin": 0,
+   "hgvsc_interior": 0,
+   "hgvsp_near_origin": 0,
+   "hgvsp_interior": 4
+  }
+ },
+ "wrapped_transcript": {
+  "pairs": 781,
+  "identical_terms": 246,
+  "duckvep_only": 249,
+  "vep_only": 0,
+  "different_terms": 286,
+  "vep_terms_by_duckvep_terms": [
+   [
+    "(none)",
+    "downstream_gene_variant",
+    244
+   ],
+   [
+    "intergenic_variant",
+    "missense_variant",
+    144
+   ],
+   [
+    "intergenic_variant",
+    "frameshift_variant",
+    88
+   ],
+   [
+    "intergenic_variant",
+    "synonymous_variant",
+    24
+   ],
+   [
+    "intergenic_variant",
+    "stop_gained",
+    17
+   ],
+   [
+    "intergenic_variant",
+    "inframe_insertion",
+    6
+   ]
+  ]
+ },
+ "baseline_extension_sha256": "6087f9e9961f8743a5beb2232c330d4f80bcf07812cf84e8a5f50f86f7b7742d",
+ "lifted_vs_prelift_linear": {
+  "pairs": 80060,
+  "identical": 78436,
+  "different_interior": 0,
+  "different_near_origin": 0,
+  "lifted_only_rows_near_origin": 1624,
+  "prelift_only_rows": 0
+ },
+ "source_revision": "a88399998df62955f3e72ed57b71a9b99d3ff7c9"
+}

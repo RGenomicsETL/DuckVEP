@@ -1,5 +1,14 @@
 # DuckVEP
 
+## Circular sequence regions (issue #7, slice 2)
+
+- Models with origin-crossing transcripts, exons, regulatory or motif features can now be pinned and annotated. A circular region that carries such an object executes on a lifted linear interval: positions shift by a multiple of the region length, every object is admitted at three images, wrapped spans become `[s, e + L]`, and one row is kept per event and source object. Consequences, projected edits, peptides, NMD and HGVS are identical under rotation of reference, model and events, and equal an ordinary linear model. Reference windows that wrap are fetched from the existing worker scratch. `model_sha256` is unchanged; circular regions without a wrapped object, human MT included, produce byte-identical output.
+- Structural, breakend and phased edit-set entry points still refuse a model with a wrapped circular object, with an explicit error.
+- Circular coordinates are independent of the mitochondrial codon table: `codon_table` selects a translation rule and says nothing about topology.
+- Public origin-crossing transcripts exist (19 in Ensembl Genomes 63, 18 of them bacterial or archaeal) but VEP 116 models them as intervals with reversed bounds, so it is not an oracle for them. On three genomes with a VEP cache, DuckVEP equals VEP on every other transcript except flank rows that exist only through the origin; the crossing object is property-proved and linear-model-proved. See `benchmarks/data/circular_source_survey.md`, `ERRATA.md` and `scripts/circular_vep_differential.py`.
+- `benchmarks/duckvep_circular_origin.py` records one- and multi-thread throughput, output equality and peak memory on an origin-focused workload: lifting costs about 17-20% of one-thread throughput and the output checksum is identical across threads and rotations.
+- `make test_properties` builds and runs the native theft/greatest properties (`test_properties_sanitized` adds ASan and UBSan).
+
 ## Breaking change: native SQL builders
 
 DuckVEP registers functions without modifying the database catalog during `LOAD`. Preparation, annotation and projection run SQL emitted by native scalar builders in the caller's connection. Existing macro invocations must be migrated; `LOAD` does not install compatibility macros.

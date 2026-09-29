@@ -1,0 +1,7 @@
+core databases: 359
+databases with circular_seq=1 regions: 2
+databases that failed: 0
+database	circular_regions	transcripts_on_them	inverted_transcripts
+drosophila_melanogaster_core_63_116_11	1	38	0
+saccharomyces_cerevisiae_core_63_116_4	1	55	0
+total inverted transcripts: 0

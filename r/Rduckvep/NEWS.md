@@ -1,5 +1,9 @@
 # Rduckvep
 
+- The bundled extension annotates models that contain origin-crossing transcripts, exons or
+  regulation features on circular sequence regions (lifted-interval execution); see the project
+  NEWS.md. Structural, breakend and phased entry points still refuse such models.
+
 - `rduckvep_prepare_breakend_pairs()`, `rduckvep_prepare_breakend_fusion()` and
   `rduckvep_prepare_structural_hgvs()` wrap the native BND identity, endpoint-gene
   and structural HGVS builders. No parsing or HGVS logic lives in R.
