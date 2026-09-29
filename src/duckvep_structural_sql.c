@@ -163,7 +163,7 @@ static const char pairs_body_0[] =
 "m.local_join_after AS m_join, m.mate_extends_right AS m_right, m.inserted_length AS m_ins, "
 "m.record_kind AS m_kind, m.mate_token_count AS m_mate_count, m.event_token_count AS m_event_count FROM records r "
 "LEFT JOIN ids own ON own.id = r.id LEFT JOIN ids mi ON mi.id = r.mate_id "
-"LEFT JOIN records m ON m.event_index = mi.first_index AND mi.n = 1), "
+"LEFT JOIN records m ON m.event_index = CASE WHEN mi.n = 1 THEN mi.first_index END), "
 "checks AS (SELECT *, "
 "coalesce(m_kind = 'paired_breakend' AND m_mate_id = id AND m_index <> event_index, false) AS id_reciprocal, "
 "coalesce(m_kind = 'paired_breakend' AND declared_mate_chrom = m_chrom AND "
