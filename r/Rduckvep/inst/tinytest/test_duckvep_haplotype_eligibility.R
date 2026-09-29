@@ -1,8 +1,9 @@
 library(tinytest)
 library(DBI)
 
-# Coding-v1 eligibility and provenance (slice 2 of #2). prediction_status only says
-# whether a path is inside the supported domain; no SO/IMPACT/NMD is predicted yet.
+# Coding-v1 eligibility and provenance (slice 2 of #2) plus the same-codon classifier (slice 3).
+# prediction_status says whether a path is inside the supported domain and whether the classifier
+# decided it (`predicted`) or the frame/start-stop classifiers still must (`eligible_classifier_pending`).
 # Transcript 0 is + strand with exons 100-108 (ATGGCTGCT) and 120-128 (GAAGGTTAA).
 # Transcripts 1-6 are single-exon variants that each break one v1 CDS requirement.
 local({
@@ -31,7 +32,7 @@ local({
   dbExecute(con, paste("INSERT INTO elig_events VALUES",
     "(1,0,103,'G','A',1,0),(2,0,104,'C','T',1,0),(3,0,123,'G','C',1,0),(5,0,102,'GGCT','G',1,0),",
     "(6,0,103,'G','T',1,0),(10,0,103,'GCT','TAG',1,0),(11,0,112,'A','G',1,0),",
-    "(16,0,103,'GC','AT',1,0),(20,0,106,'G','T',2,0)"))
+    "(16,0,103,'GC','AT',1,0),(20,0,106,'G','T',2,0),(50,0,108,'T','C',1,0)"))
   dbExecute(con, "INSERT INTO elig_events SELECT 100+i,i,103,'G','A',1,i FROM range(1,7) t(i)")
   dbExecute(con, paste("CREATE TABLE elig_gt(event_index BIGINT, sample_index INT, alleles INTEGER[],",
     "phase_before BOOLEAN[], phase_set BIGINT)"))
@@ -45,7 +46,7 @@ local({
     "(11,12,[1,0],[false,true],NULL),(3,12,[1,0],[false,true],NULL),",
     "(10,16,[1,0],[false,true],NULL),(3,16,[1,0],[false,true],NULL),",
     "(1,17,[1],[false],NULL),(16,30,[1,0],[false,true],NULL),",
-    "(20,40,[2,0],[false,true],NULL)"))
+    "(20,40,[2,0],[false,true],NULL),(50,50,[1,0],[false,true],NULL)"))
   dbExecute(con, "INSERT INTO elig_gt SELECT 100+i,20+i,[1,0],[false,true],NULL FROM range(1,7) t(i)")
   dbExecute(con, paste("CREATE TABLE elig_calls AS SELECT e.event_index,e.seq_region,e.position,",
     "e.reference,e.alternate,e.alt_index,e.transcript_index,g.sample_index,g.alleles,",
@@ -54,42 +55,62 @@ local({
   result <- rduckvep_haplotypes(con, "SELECT * FROM elig_calls", "elig")
   # Existing columns keep their names and order; nominal_length_diff stays last.
   expect_identical(tail(names(result), 1L), "nominal_length_diff")
-  expect_identical(names(result)[18:23], c("prediction_policy", "prediction_status",
-    "prediction_reason", "contributor_provenance", "normalized_edits", "carrier_predictions"))
+  expect_identical(names(result)[18:25], c("prediction_policy", "prediction_status",
+    "prediction_reason", "contributor_provenance", "normalized_edits", "carrier_predictions",
+    "haplotype_consequences", "haplotype_impact"))
   expect_true(all(result$prediction_policy == "duckvep-coding-v1"))
 
   keyed <- do.call(rbind, lapply(result$carrier_predictions, function(x) x))
   keyed <- keyed[order(keyed$sample_index, keyed$phase_set, keyed$haplotype_lane), ]
   rownames(keyed) <- NULL
   keyed$phase_set <- as.numeric(keyed$phase_set)
-  status <- c(eligible = "eligible_classifier_pending", incomplete = "incomplete_input",
+  status <- c(eligible = "eligible_classifier_pending", predicted = "predicted", incomplete = "incomplete_input",
     conflict = "edit_conflict", overlap = "unsupported_overlap", context = "unsupported_context")
   expected <- data.frame(
-    sample_index = c(1, 2, 2, 3, 3, 4, 4, 5, 5, 7, 8, 12, 16, 17, 21:26, 30, 40),
-    phase_set = c(rep(NA, 7), 10, 20, rep(NA, 13)),
-    haplotype_lane = c(1, 1, 2, 1, 2, 1, 2, 1, 1, rep(1, 13)),
-    prediction_status = unname(status[c("eligible", "eligible", "eligible", "eligible", "incomplete",
+    sample_index = c(1, 2, 2, 3, 3, 4, 4, 5, 5, 7, 8, 12, 16, 17, 21:26, 30, 40, 50),
+    phase_set = c(rep(NA, 7), 10, 20, rep(NA, 14)),
+    haplotype_lane = c(1, 1, 2, 1, 2, 1, 2, 1, 1, rep(1, 14)),
+    prediction_status = unname(status[c("predicted", "predicted", "predicted", "predicted", "incomplete",
       "incomplete", "incomplete", "incomplete", "incomplete", "overlap", "conflict", "context",
-      "eligible", "context", rep("context", 6), "eligible", "eligible")]),
+      "eligible", "context", rep("context", 6), "predicted", "predicted", "predicted")]),
     prediction_reason = c("supported_domain", "supported_domain", "supported_domain",
       "supported_domain", "missing_call", "unphased_heterozygous", "unphased_heterozygous",
       "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "overlapping_edits",
-      "contradictory_edits", "outside_cds", "supported_domain", "non_diploid_call",
+      "contradictory_edits", "outside_cds", "start_stop_classifier_pending", "non_diploid_call",
       "noncanonical_start", "internal_stop", "noncanonical_stop", "curated_transcript",
-      "incomplete_cds", "non_standard_codon_table", "supported_domain", "supported_domain"),
+      "incomplete_cds", "non_standard_codon_table", "supported_domain", "supported_domain",
+      "supported_domain"),
     stringsAsFactors = FALSE)
   # Sample 40 carries ALT ordinal 2 on lane 1 only.
   expected$phase_set <- as.numeric(expected$phase_set)
   expect_equal(keyed[, names(expected)], expected, check.attributes = FALSE)
 
-  # Row summaries never claim eligibility for an ineligible carrier.
+  # Row summaries never claim eligibility or a classification for an ineligible carrier.
   for (i in seq_len(nrow(result))) {
     per_carrier <- result$carrier_predictions[[i]]
     expect_identical(nrow(per_carrier), nrow(result$carriers[[i]]))
     expect_identical(per_carrier$sample_index, result$carriers[[i]]$sample_index)
-    expect_identical(result$prediction_status[i] == "eligible_classifier_pending",
-      all(per_carrier$prediction_status == "eligible_classifier_pending"))
+    ok <- c("eligible_classifier_pending", "predicted")
+    expect_identical(result$prediction_status[i] %in% ok, all(per_carrier$prediction_status %in% ok))
   }
+
+  # Same-codon classifier: the combined haplotype is classified, and the SO set/IMPACT are NULL unless
+  # the row is predicted. A cis SNV pair and an MNV in one codon give the same missense; a trans pair
+  # is two paths; a wobble SNV is synonymous (LOW); a created stop stays pending with no SO or IMPACT.
+  so <- vapply(result$haplotype_consequences, function(x) if (is.null(x)) NA_character_ else
+    paste(x, collapse = ","), "")
+  expect_identical(is.na(so), result$prediction_status != "predicted")
+  expect_identical(is.na(result$haplotype_impact), result$prediction_status != "predicted")
+  expect_true(all(so[result$cds == "ATGATTGCTGAAGGTTAA" & !is.na(result$cds)] == "missense_variant"))
+  expect_true(all(result$haplotype_impact[!is.na(so) & so == "missense_variant"] == "MODERATE"))
+  syn <- which(so == "synonymous_variant")
+  expect_equal(length(syn), 1L)
+  expect_identical(result$cds[syn], "ATGGCTGCCGAAGGTTAA")
+  expect_identical(result$haplotype_impact[syn], "LOW")
+  pending <- which(result$prediction_status == "eligible_classifier_pending")
+  expect_equal(length(pending), 1L)
+  expect_identical(result$prediction_reason[pending], "start_stop_classifier_pending")
+  expect_true(is.na(result$haplotype_impact[pending]) && is.null(result$haplotype_consequences[[pending]]))
 
   # Every contributor keeps its operands, evidence, ALT ordinal, role and normalized edits.
   for (i in seq_len(nrow(result))) {
@@ -175,7 +196,10 @@ local({
   expect_equal(nrow(result), 2800L)
   kind <- result$transcript_index %% 3L
   expect_equal(as.vector(table(kind)), c(700L, 700L, 1400L))
-  expect_true(all(result$prediction_status[kind != 1L] == "eligible_classifier_pending"))
+  expect_true(all(result$prediction_status[kind != 1L] == "predicted"))
+  expect_true(all(is.na(result$haplotype_impact[kind == 1L])))
+  expect_true(all(result$haplotype_impact[kind != 1L] == "MODERATE"))
+  expect_true(all(vapply(result$haplotype_consequences[kind != 1L], identical, NA, "missense_variant")))
   expect_true(all(result$prediction_status[kind == 1L] == "incomplete_input"))
   expect_true(all(result$prediction_reason[kind == 1L] == "unphased_heterozygous"))
   for (i in seq_len(nrow(result))) {

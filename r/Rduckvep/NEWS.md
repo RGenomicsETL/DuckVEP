@@ -7,6 +7,11 @@
   `prediction_reason` (`duckvep-coding-v1` eligibility only; no SO/IMPACT/NMD yet),
   keyed `carrier_predictions`, `contributor_provenance` and `normalized_edits`. Existing
   columns are unchanged and `nominal_length_diff` stays last.
+- The same-codon classifier (coding-v1 slice 3) adds `haplotype_consequences` and `haplotype_impact`
+  before `nominal_length_diff`, and a `predicted` status. It classifies the combined haplotype for
+  eligible paths with no frame, start or stop effect: synonymous (LOW), missense, inframe insertion or
+  deletion, or protein-altering (MODERATE). Other eligible paths stay `eligible_classifier_pending`,
+  now with reason `frame_classifier_pending` or `start_stop_classifier_pending`.
 - The extension's SQL preparation and annotation entry points are native builders:
   `query(duckvep_annotate_sql('events', 'model', {hgvs: true}))` replaces
   direct annotation macro calls. `rduckvep_annotate_sql()` and the other

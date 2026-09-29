@@ -1,0 +1,151 @@
+require duckvep
+
+# Same-codon classifier (slice 3 of #2, contract design/duckvep_haplotype_contract.md). The model, calls and
+# expectations are the committed fixtures of test/scripts/generate_same_codon_goldens.R: 23 scenarios on six
+# layouts (plus/minus strand, one/two/three exons, codons straddling introns), 138 transcripts, 228 VCF
+# records. Goldens are base R with no DuckVEP code; same_codon_csq_expected.tsv is the pinned bcftools csq
+# output mapped through csq_so_map_v1.tsv (checked offline by check_same_codon_goldens.R).
+
+statement ok
+CREATE TABLE sc_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region,
+ transcript_start::UBIGINT transcript_start,transcript_end::UBIGINT transcript_end,strand::TINYINT strand,
+ seq_region::UINTEGER gene_index,3::UBIGINT transcript_flags,transcript_start::UBIGINT cds_start,
+ transcript_end::UBIGINT cds_end,cds_sequence::BLOB cds_sequence,1::UTINYINT codon_table,
+ ''::BLOB pre_cds_sequence,''::BLOB post_cds_sequence,"case" AS case_name
+ FROM read_csv('test/data/haplotype/same_codon_transcripts.tsv',delim='\t',header=true);
+
+statement ok
+CREATE TABLE sc_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start::UBIGINT exon_start,
+ exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,exon_cdna_end::UBIGINT exon_cdna_end,
+ phase::TINYINT phase,end_phase::TINYINT end_phase
+ FROM read_csv('test/data/haplotype/same_codon_exons.tsv',delim='\t',header=true);
+
+query I
+SELECT loaded FROM duckvep_model_load('sc','SELECT i::UINTEGER seq_region FROM range(138) t(i)',
+ 'SELECT * EXCLUDE(case_name) FROM sc_tx ORDER BY transcript_index',
+ 'SELECT * FROM sc_exons ORDER BY transcript_index,exon_cdna_start');
+----
+1
+
+statement ok
+CREATE TABLE sc_vcf AS SELECT string_split(line,chr(9)) f FROM (SELECT unnest(string_split(content,chr(10))) line
+ FROM read_text('test/data/haplotype/same_codon.vcf')) WHERE line<>'' AND NOT starts_with(line,'#');
+
+statement ok
+CREATE TABLE sc_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq_region::INT seq_region,
+ v.f[2]::BIGINT AS position,v.f[4] AS reference,v.f[5] AS alternate,1 AS alt_index,t.transcript_index::INT transcript_index,
+ 0 sample_index,(CASE v.f[10] WHEN '1|0' THEN [1,0] WHEN '0|1' THEN [0,1] ELSE [1,1] END)::INTEGER[] alleles,
+ [false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set
+ FROM sc_vcf v JOIN sc_tx t ON t.case_name=v.f[1];
+
+query I
+SELECT count(*) FROM sc_calls;
+----
+228
+
+statement ok
+CREATE TABLE sc_gold AS SELECT g."case" AS case_name,t.transcript_index,g.lane,g.so_terms,g.impact,g.classifier_slice,
+ g.protein,e.csq_so_terms,e.declared_divergence
+ FROM read_csv('test/data/haplotype/same_codon_goldens.tsv',delim='\t',header=true,nullstr='<none>',
+  types={'so_terms':'VARCHAR','impact':'VARCHAR','protein':'VARCHAR'}) g
+ JOIN sc_tx t ON t.case_name=g."case"
+ JOIN read_csv('test/data/haplotype/same_codon_csq_expected.tsv',delim='\t',header=true,nullstr='<none>',
+  types={'csq_so_terms':'VARCHAR'}) e ON e."case"=g."case" AND e.lane=g.lane;
+
+query I
+SELECT count(*) FROM sc_gold;
+----
+276
+
+# One row per distinct edit path; one carrier per (sample, phase set, lane).
+
+statement ok
+CREATE TABLE sc_out AS SELECT h.transcript_index,c.haplotype_lane-1 AS lane,h.prediction_policy,h.prediction_status,
+ h.prediction_reason,h.haplotype_consequences,h.haplotype_impact,h.protein,h.sequence_status,h.carrier_count
+ FROM (SELECT *,unnest(carriers) c FROM duckvep_haplotypes('SELECT * FROM sc_calls','sc')) h;
+
+# Lanes carrying at least one ALT: 138 transcripts; the trans and hom-alt scenarios put both lanes in play.
+
+query IIII
+SELECT count(*),count(DISTINCT transcript_index),count(DISTINCT prediction_policy),min(prediction_policy)='duckvep-coding-v1'
+FROM sc_out;
+----
+150	138	1	1
+
+# Gate (ii): every slice-3 lane with an ALT matches the independent base-R golden exactly:
+# status, whole-haplotype SO set, IMPACT and edited protein.
+
+query IIIII
+SELECT count(*),
+ count(*) FILTER (WHERE o.prediction_status='predicted' AND o.prediction_reason='supported_domain'),
+ count(*) FILTER (WHERE list_sort(o.haplotype_consequences)=list_sort(string_split(g.so_terms,','))),
+ count(*) FILTER (WHERE o.haplotype_impact=g.impact),
+ count(*) FILTER (WHERE o.protein=g.protein)
+FROM sc_gold g JOIN sc_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.classifier_slice=3 AND g.so_terms<>'';
+----
+126	126	126	126	126
+
+# Reference-only lanes (empty golden set) have no carrier row, so no consequence is invented for them.
+
+query II
+SELECT count(*) FILTER (WHERE g.so_terms=''),
+ count(*) FILTER (WHERE g.so_terms='' AND o.lane IS NOT NULL)
+FROM sc_gold g LEFT JOIN sc_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane;
+----
+126	0
+
+# Gate (i): the pinned csq output mapped through csq_so_map_v1 agrees on every slice-3 lane outside
+# the three declared divergences (README.md), on both strands and every exon layout.
+
+query IIII
+SELECT count(*) FILTER (WHERE g.declared_divergence='.'),
+ count(*) FILTER (WHERE g.declared_divergence='.' AND
+  array_to_string(list_sort(o.haplotype_consequences),',')=g.csq_so_terms),
+ count(*) FILTER (WHERE g.declared_divergence<>'.'),
+ count(*) FILTER (WHERE g.declared_divergence<>'.' AND
+  array_to_string(list_sort(o.haplotype_consequences),',')=g.csq_so_terms)
+FROM sc_gold g JOIN sc_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.classifier_slice=3 AND g.so_terms<>'';
+----
+108	108	18	0
+
+# Start/stop effects are eligible but not decided: no SO set and no IMPACT are invented, and the
+# reason names the pending classifier. Their edited proteins still match the goldens.
+
+query IIIII
+SELECT count(*),
+ count(*) FILTER (WHERE o.prediction_status='eligible_classifier_pending' AND
+  o.prediction_reason='start_stop_classifier_pending'),
+ count(*) FILTER (WHERE o.haplotype_consequences IS NULL),
+ count(*) FILTER (WHERE o.haplotype_impact IS NULL),
+ count(*) FILTER (WHERE o.protein=g.protein)
+FROM sc_gold g JOIN sc_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.classifier_slice=5 AND g.so_terms<>'';
+----
+24	24	24	24	24
+
+# The trans control: the combined syn pair is synonymous only in cis; on separate lanes each SNP is
+# classified alone, and both are missense.
+
+query TTTTT
+SELECT g.case_name,o.lane,g.so_terms,array_to_string(o.haplotype_consequences,','),o.haplotype_impact
+FROM sc_gold g JOIN sc_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.case_name IN ('minus_2exon__cis_syn_pair_only_together','minus_2exon__trans_control_of_syn_pair')
+ORDER BY 1,2;
+----
+minus_2exon__cis_syn_pair_only_together	0	synonymous_variant	synonymous_variant	LOW
+minus_2exon__trans_control_of_syn_pair	0	missense_variant	missense_variant	MODERATE
+minus_2exon__trans_control_of_syn_pair	1	missense_variant	missense_variant	MODERATE
+
+# Classified rows carry exactly one term of the reduced set; IMPACT is the maximum severity.
+
+query TTI
+SELECT array_to_string(haplotype_consequences,','),haplotype_impact,count(*)
+FROM sc_out WHERE prediction_status='predicted' GROUP BY ALL ORDER BY ALL;
+----
+inframe_deletion	MODERATE	18
+inframe_insertion	MODERATE	24
+missense_variant	MODERATE	54
+protein_altering_variant	MODERATE	12
+synonymous_variant	LOW	18
