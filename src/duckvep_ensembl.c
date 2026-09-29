@@ -260,7 +260,7 @@ static const char *const transcripts_sql[] = {
 		"last(exon_start ORDER BY rank) AS last_start, ",
 		"last(exon_end ORDER BY rank) AS last_end ",
 		"FROM exon_continuity GROUP BY source_transcript_id",
-		"), exons_with_cdna AS MATERIALIZED ("
+		"), exons_with_cdna AS MATERIALIZED (",
 		"SELECT *, CAST(exon_cdna_end - exon_length + 1 AS UBIGINT) AS exon_cdna_start FROM exons",
 		"), transcript_cdna_lengths AS MATERIALIZED (",
 		"SELECT source_transcript_id, max(exon_cdna_end) AS cdna_length ",
