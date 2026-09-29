@@ -32,6 +32,17 @@
   `eligible_classifier_pending` and the reason `start_stop_classifier_pending` no longer occurs. Contributor
   `role` is now assigned per edit: an edit that starts after the first stop is `post_stop` even when it shares an
   interaction block with an earlier edit (a restoring deletion after an early stop was `applied`).
+- NMD attribution (coding-v1 slice 6, rule `ejc50-v1`) adds `nmd_rule`, `nmd_prediction`, `nmd_stop_position`,
+  `nmd_junction_position` and `nmd_contributors` to `rduckvep_haplotypes()` (before `nominal_length_diff`, which stays
+  last), and `nmd_prediction`, `nmd_stop_position` and `nmd_junction_position` to each `carrier_predictions` row. For a newly
+  premature stop (`stop_gained`) the prediction is `trigger` when J - S > 50 and `escape` otherwise, with S the final
+  nucleotide of the first stop codon and J the final nucleotide of the penultimate exon, both in edited spliced-transcript
+  coordinates (indels upstream or inside the penultimate exon move J; a single-exon transcript always escapes and has no
+  J). Known termination without a new premature stop is `not_applicable`; `start_lost`, an edited CDS with no stop (a
+  frame that runs off the CDS, `stop_lost`), unresolved exon topology and every failed or ineligible path are `unknown`.
+  `nmd_contributors` lists the applied contributors (the edits up to and including the stop), never `post_stop` ones. The
+  prediction is decided on the whole haplotype, not per allele, and is an EJC-distance heuristic only: no reinitiation,
+  no long-exon exception, no `NMD_transcript_variant` biotype term. Existing columns and their values are unchanged.
 - The extension's SQL preparation and annotation entry points are native builders:
   `query(duckvep_annotate_sql('events', 'model', {hgvs: true}))` replaces
   direct annotation macro calls. `rduckvep_annotate_sql()` and the other

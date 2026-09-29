@@ -55,9 +55,11 @@ local({
   result <- rduckvep_haplotypes(con, "SELECT * FROM elig_calls", "elig")
   # Existing columns keep their names and order; nominal_length_diff stays last.
   expect_identical(tail(names(result), 1L), "nominal_length_diff")
-  expect_identical(names(result)[18:25], c("prediction_policy", "prediction_status",
+  expect_identical(names(result)[18:29], c("prediction_policy", "prediction_status",
     "prediction_reason", "contributor_provenance", "normalized_edits", "carrier_predictions",
-    "haplotype_consequences", "haplotype_impact"))
+    "haplotype_consequences", "haplotype_impact", "nmd_rule", "nmd_prediction", "nmd_stop_position",
+    "nmd_junction_position"))
+  expect_identical(names(result)[30:31], c("nmd_contributors", "nominal_length_diff"))
   expect_true(all(result$prediction_policy == "duckvep-coding-v1"))
 
   keyed <- do.call(rbind, lapply(result$carrier_predictions, function(x) x))
@@ -115,12 +117,31 @@ local({
   expect_equal(nrow(result$contributor_provenance[[stopped]]), 2L)
   expect_equal(sum(result$prediction_status == "eligible_classifier_pending"), 0L)
 
+  # NMD (slice 6, rule ejc50-v1). Transcript 0's exons are cDNA 1-9 and 10-18, so J = 9. The created stop TAG is
+  # codon 2 (S = 6): J - S = 3, escape, with the stop's own edit attributed. unknown is a row that is not predicted or
+  # a start loss; every decided row without a premature stop is not_applicable and has no positions or attribution.
+  expect_true(all(result$nmd_rule == "ejc50-v1"))
+  expect_identical(result$nmd_prediction[stopped], "escape")
+  expect_equal(c(result$nmd_stop_position[stopped], result$nmd_junction_position[stopped]), c(6, 9))
+  expect_equal(length(result$nmd_contributors[[stopped]]), 1L)
+  prov <- result$contributor_provenance[[stopped]]
+  expect_identical(prov$role[prov$event_index %in% result$nmd_contributors[[stopped]]], "applied")
+  expect_identical(result$nmd_prediction[result$prediction_status != "predicted"], rep("unknown", sum(result$prediction_status != "predicted")))
+  expect_identical(result$nmd_prediction[result$prediction_status == "predicted" & seq_len(nrow(result)) != stopped &
+    !grepl("stop_lost|start_lost", so)], rep("not_applicable", sum(result$prediction_status == "predicted" &
+    seq_len(nrow(result)) != stopped & !grepl("stop_lost|start_lost", so))))
+  expect_true(all(is.na(result$nmd_stop_position[-stopped])) && all(is.na(result$nmd_junction_position[-stopped])))
+  expect_true(all(vapply(result$nmd_contributors[-stopped], is.null, NA)))
+
   # Per-carrier consequences (slice 4): every carrier whose own keyed status is predicted carries the shared
   # edited sequence's set and IMPACT, so an ineligible carrier of a row does not hide it; other carriers are NULL.
   for (i in seq_len(nrow(result))) {
     per_carrier <- result$carrier_predictions[[i]]
     expect_true(all(c("haplotype_impact", "haplotype_consequences") %in% names(per_carrier)))
     ok <- per_carrier$prediction_status == "predicted"
+    expect_true(all(c("nmd_prediction", "nmd_stop_position", "nmd_junction_position") %in% names(per_carrier)))
+    expect_true(all(per_carrier$nmd_prediction[!ok] == "unknown") && all(is.na(per_carrier$nmd_stop_position[!ok])))
+    if (all(ok)) expect_true(all(per_carrier$nmd_prediction == result$nmd_prediction[i]))
     expect_identical(is.na(per_carrier$haplotype_impact), !ok) # every predicted path here has a non-empty set
     expect_identical(vapply(per_carrier$haplotype_consequences, is.null, NA), !ok)
     if (all(ok)) {
