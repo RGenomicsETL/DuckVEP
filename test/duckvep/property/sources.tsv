@@ -8,3 +8,4 @@ duckvep_prop_stream.c
 duckvep_prop_annotation.c
 duckvep_prop_coding.c
 duckvep_prop_haplotype_hgvs.c
+duckvep_prop_circular.c

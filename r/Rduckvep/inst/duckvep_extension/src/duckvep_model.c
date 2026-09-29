@@ -270,11 +270,17 @@ duckvep_model_reserve_interval_features(duckvep_owned_model_t *model,
 	return 1;
 }
 
+static void duckvep_lifted_destroy(duckvep_lifted_model_t *);
+
 static void
 duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 {
 	if (model == NULL)
 		return;
+	if (model->lifted != NULL) {
+		duckvep_lifted_destroy(model->lifted);
+		model->lifted = NULL;
+	}
 	if (model->kernel != NULL)
 		duckvep_model_close(model->kernel);
 	free(model->known_seq_regions);
@@ -2336,6 +2342,130 @@ duckvep_registry_query_acquire(duckvep_registry_t *registry, char *error, size_t
 	return 0;
 }
 
+/* ---------------------------------------------------------------- lifting --
+ * Circular regions carrying wrapped objects execute on a lifted linear copy of
+ * the model (kernel/src/duckvep_lift.c). The source arrays stay the contract
+ * for provenance, metadata ordinals and output; the facade below is the one
+ * execution authority for annotation. */
+
+int
+duckvep_model_region_lift(const duckvep_owned_model_t *model,
+	uint16_t seq_region, uint32_t *length, uint32_t *base,
+	uint32_t *virtual_length)
+{
+	if (model == NULL || model->lifted == NULL)
+		return 0;
+	return duckvep_lift_region(model->lifted->lift, seq_region, length, base,
+	    virtual_length);
+}
+
+static void
+duckvep_lifted_destroy(duckvep_lifted_model_t *lifted)
+{
+	duckvep_owned_model_t *lm;
+
+	if (lifted == NULL)
+		return;
+	lm = &lifted->model;
+	if (lm->kernel != NULL)
+		duckvep_model_close(lm->kernel);
+	free(lm->gene_indices);
+	if (lm->interval_index != NULL) {
+		free(lm->interval_index->r);
+		lm->interval_index->r = NULL;
+		cr_destroy(lm->interval_index);
+	}
+	if (lm->interval_feature_index != NULL) {
+		free(lm->interval_feature_index->r);
+		lm->interval_feature_index->r = NULL;
+		cr_destroy(lm->interval_feature_index);
+	}
+	duckvep_lift_close(lifted->lift);
+	free(lifted);
+}
+
+static int
+duckvep_lifted_build(duckvep_owned_model_t *src, char *error,
+	size_t error_size)
+{
+	duckvep_lifted_model_t *lifted;
+	duckvep_owned_model_t *lm;
+	duckvep_lift_regions_t regions;
+	duckvep_error_t kernel_error;
+	duckvep_status_t status;
+	size_t index;
+
+	regions.chrom_id = src->known_seq_regions;
+	regions.length = src->sequence_lengths;
+	regions.circular = src->region_circular;
+	regions.count = src->known_seq_region_count;
+	lifted = calloc(1, sizeof(*lifted));
+	if (lifted == NULL) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory building the lifted circular model");
+		return 0;
+	}
+	lm = &lifted->model;
+	memset(&kernel_error, 0, sizeof(kernel_error));
+	status = duckvep_lift_open(&regions, &src->transcripts, &src->exons,
+	    &src->sequences, &src->interval_features, &lifted->lift,
+	    &kernel_error);
+	if (status != DUCKVEP_OK) {
+		(void)snprintf(error, error_size, "circular model: %s",
+		    kernel_error.message[0] != '\0' ? kernel_error.message :
+		    "lifting failed");
+		free(lifted);
+		return 0;
+	}
+	lm->transcripts = lifted->lift->transcripts;
+	lm->exons = lifted->lift->exons;
+	lm->sequences = lifted->lift->sequences;
+	lm->interval_features = lifted->lift->interval_features;
+	lm->seq_regions = (uint16_t *)lifted->lift->transcripts.chrom_id;
+	lm->transcript_starts = (uint32_t *)lifted->lift->transcripts.start1;
+	lm->transcript_ends = (uint32_t *)lifted->lift->transcripts.end1;
+	lm->interval_feature_seq_regions =
+	    (uint16_t *)lifted->lift->interval_features.chrom_id;
+	lm->interval_feature_starts =
+	    (uint32_t *)lifted->lift->interval_features.start1;
+	lm->interval_feature_ends =
+	    (uint32_t *)lifted->lift->interval_features.end1;
+	lm->interval_feature_count =
+	    lifted->lift->interval_features.feature_count;
+	lm->transcript_coverage_complete = src->transcript_coverage_complete;
+	lm->transcript_flanks_complete = src->transcript_flanks_complete;
+	lm->gene_indices = calloc(lm->transcripts.transcript_count + 1u,
+	    sizeof(*lm->gene_indices));
+	if (lm->gene_indices == NULL) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory building the lifted circular model");
+		duckvep_lifted_destroy(lifted);
+		return 0;
+	}
+	for (index = 0; index < lm->transcripts.transcript_count; index++)
+		lm->gene_indices[index] =
+		    src->gene_indices[lifted->lift->transcript_source[index]];
+	memset(&kernel_error, 0, sizeof(kernel_error));
+	if (duckvep_model_open(&lm->transcripts, &lm->exons, &lm->sequences,
+	    &lm->interval_features, &lm->kernel, &kernel_error) != DUCKVEP_OK) {
+		(void)snprintf(error, error_size,
+		    "invalid lifted circular transcript model: %s",
+		    kernel_error.message[0] != '\0' ? kernel_error.message :
+		    "kernel validation failed");
+		duckvep_lifted_destroy(lifted);
+		return 0;
+	}
+	lm->transcripts = *duckvep_model_prepared_transcripts(lm->kernel);
+	lm->exons = *duckvep_model_prepared_exons(lm->kernel);
+	lm->sequences = *duckvep_model_prepared_sequences(lm->kernel);
+	if (!duckvep_owned_model_index(lm, error, error_size)) {
+		duckvep_lifted_destroy(lifted);
+		return 0;
+	}
+	src->lifted = lifted;
+	return 1;
+}
+
 static int
 duckvep_model_load_queries(duckdb_connection connection,
 	const char *region_query, const char *transcript_query,
@@ -2404,10 +2534,16 @@ duckvep_model_load_queries(duckdb_connection connection,
 			return 0;
 		}
 	}
-	/* Wrapped coordinates remain in the resident contract until circular
-	 * interval projection is available to the annotation kernel. */
-	if (model->has_wrapped_coordinates)
+	/* Wrapped coordinates cannot enter the linear kernel. Annotation executes
+	 * a lifted linear view of the model; the source arrays stay the contract
+	 * for provenance, metadata ordinals and output. */
+	if (model->has_wrapped_coordinates) {
+		if (!duckvep_lifted_build(model, error, error_size)) {
+			duckvep_owned_model_destroy(model);
+			return 0;
+		}
 		return 1;
+	}
 	memset(&kernel_error, 0, sizeof(kernel_error));
 	if (duckvep_model_open(&model->transcripts,
 	    &model->exons, &model->sequences, &model->interval_features,
@@ -2479,8 +2615,6 @@ duckvep_registry_pin(duckvep_registry_t *registry, const char *name)
 
 	pthread_mutex_lock(&registry->mutex);
 	entry = duckvep_registry_find_locked(registry, name);
-	if (entry != NULL && entry->model.has_wrapped_coordinates)
-		entry = NULL;
 	if (entry != NULL)
 		entry->pins++;
 	pthread_mutex_unlock(&registry->mutex);
@@ -2524,7 +2658,8 @@ duckvep_registry_workspace_take(duckvep_registry_t *registry,
 		return NULL;
 	}
 	memset(&kernel_error, 0, sizeof(kernel_error));
-	if (duckvep_workspace_open(entry->model.kernel, &cache->workspace,
+	if (duckvep_workspace_open(duckvep_model_active(&entry->model)->kernel,
+	    &cache->workspace,
 	    &kernel_error) != DUCKVEP_OK) {
 		(void)snprintf(error, error_size, "%s",
 		    kernel_error.message[0] != '\0' ? kernel_error.message :
