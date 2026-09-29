@@ -1,0 +1,147 @@
+# name: test/sql/duckvep_circular_mt.test
+# description: Human Ensembl 116 MT, a circular but non-wrapped region, annotates exactly as before lifting
+# group: [duckvep]
+#
+# The MT region of the committed GRCh38 fixture is flagged circular here, as in Ensembl, but
+# no transcript, exon or feature crosses the origin, so the model runs on the ordinary linear
+# kernel. The fingerprint below was recorded with the extension built from 5b6d195, the
+# revision before lifted-interval execution, and must not change. It does not exercise a wrapped
+# transcript and is not evidence for circular support; duckvep_circular_lifted.test is.
+
+require duckvep
+
+statement ok
+CREATE MACRO fx(t) AS TABLE SELECT * FROM read_parquet('__WORKING_DIRECTORY__/test/data/duckvep/ensembl_core/grch38/' || t || '.parquet');
+
+statement ok
+CREATE SCHEMA c;
+
+statement ok
+CREATE VIEW c.attrib_type AS FROM fx('attrib_type');
+
+statement ok
+CREATE VIEW c.coord_system AS FROM fx('coord_system');
+
+statement ok
+CREATE VIEW c.exon AS FROM fx('exon');
+
+statement ok
+CREATE VIEW c.exon_transcript AS FROM fx('exon_transcript');
+
+statement ok
+CREATE VIEW c.gene AS FROM fx('gene');
+
+statement ok
+CREATE VIEW c.seq_region AS FROM fx('seq_region');
+
+statement ok
+CREATE VIEW c.seq_region_attrib AS FROM fx('seq_region_attrib');
+
+statement ok
+CREATE VIEW c.transcript AS FROM fx('transcript');
+
+statement ok
+CREATE VIEW c.transcript_attrib AS FROM fx('transcript_attrib');
+
+statement ok
+CREATE VIEW c.translation AS FROM fx('translation');
+
+statement ok
+CREATE VIEW c.translation_attrib AS FROM fx('translation_attrib');
+
+statement ok
+CREATE VIEW ref AS FROM fx('reference_chunks');
+
+statement ok
+CREATE SCHEMA f;
+
+statement ok
+CREATE VIEW f.feature_type AS FROM fx('funcgen_feature_type');
+
+statement ok
+CREATE VIEW f.regulatory_feature AS FROM fx('funcgen_regulatory_feature');
+
+statement ok
+CREATE VIEW f.motif_feature AS FROM fx('funcgen_motif_feature');
+
+statement ok
+CREATE TABLE regions AS SELECT * FROM query(duckvep_ensembl_regions_sql('c', 'ref', 'GRCh38'));
+
+statement ok
+CREATE TABLE transcripts AS SELECT * FROM query(duckvep_ensembl_transcripts_sql('c', 'ref', 'GRCh38'));
+
+statement ok
+CREATE TABLE features AS SELECT * FROM query(duckvep_ensembl_regulation_features_sql('f', 'regions'));
+
+statement ok
+-- Real MT is circular in Ensembl; force the flag so the circular topology path is exercised.
+CREATE TABLE regions_circ AS SELECT * REPLACE (true AS circular) FROM regions;
+
+statement ok
+COPY (SELECT line FROM (SELECT 0 o, '>' || chrom line FROM ref WHERE chrom = 'MT' UNION ALL SELECT 1, seq FROM ref WHERE chrom = 'MT') ORDER BY o) TO '__TEST_DIR__/mt.fa' (FORMAT csv, HEADER false, QUOTE '', ESCAPE '');
+
+statement ok
+COPY (SELECT chrom, length(seq), length('>' || chrom) + 1, length(seq), length(seq) + 1 FROM ref WHERE chrom = 'MT') TO '__TEST_DIR__/mt.fa.fai' (FORMAT csv, HEADER false, DELIMITER '	', QUOTE '', ESCAPE '');
+
+query I
+SELECT loaded FROM duckvep_model_load('mt',
+  'SELECT seq_region, sequence_length, seq_region_name, circular FROM regions_circ WHERE seq_region_name = ''MT'' ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM transcripts WHERE seq_region_name = ''MT'' ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM transcripts, LATERAL unnest(exons) AS u(exon) WHERE seq_region_name = ''MT'' ORDER BY transcript_index, exon.exon_cdna_start',
+  peptide_edit_query := 'SELECT transcript_index, edit.protein_position, edit.alternate_amino_acid FROM transcripts, LATERAL unnest(peptide_edits) AS u(edit) WHERE seq_region_name = ''MT'' ORDER BY transcript_index, edit.protein_position',
+  interval_feature_query := 'SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM features WHERE seq_region = (SELECT seq_region FROM regions WHERE seq_region_name = ''MT'') ORDER BY regulation_feature_index',
+  transcript_coverage_complete := true,
+  reference_fasta := '__TEST_DIR__/mt.fa');
+----
+1
+
+statement ok
+CREATE TABLE mtseq AS SELECT seq FROM ref WHERE chrom = 'MT';
+
+statement ok
+CREATE TABLE mt_positions AS
+SELECT DISTINCT p::BIGINT AS p FROM (
+  SELECT unnest(range(1, 16570, 7)) AS p UNION ALL SELECT unnest(range(1, 61)) UNION ALL
+  SELECT unnest(range(16480, 16570))) WHERE p BETWEEN 1 AND 16569;
+
+statement ok
+CREATE TABLE mt_events AS
+SELECT e.event_index::UBIGINT AS event_index, (SELECT seq_region FROM regions WHERE seq_region_name = 'MT') AS seq_region,
+  e.p::UBIGINT AS position, e.reference, e.alternate, NULL::UBIGINT AS end_position,
+  NULL::VARCHAR AS structural_type, NULL::VARCHAR AS copy_change,
+  NULL::UINTEGER AS mate_seq_region, NULL::UBIGINT AS mate_position
+FROM (
+  SELECT p * 10 + k AS event_index, p, substr(seq, p, rl) AS reference,
+    CASE k WHEN 0 THEN CASE substr(seq, p, 1) WHEN 'A' THEN 'C' WHEN 'C' THEN 'G' WHEN 'G' THEN 'T' ELSE 'A' END
+           WHEN 1 THEN substr(seq, p, 1)
+           WHEN 2 THEN substr(seq, p, 1) || 'GT'
+           WHEN 3 THEN 'AC' || substr(seq, p, 1)
+           WHEN 4 THEN substr(seq, p, 1) END AS alternate
+  FROM mt_positions, mtseq, (VALUES (0, 1), (1, 4), (2, 1), (3, 1), (4, 9)) s(k, rl)
+  WHERE p + rl - 1 <= 16569) e
+WHERE e.reference <> e.alternate;
+
+statement ok
+CREATE TABLE mt_result AS
+SELECT a.event_index, a.transcript_index, a.regulation_feature_index, a.gene_index, a.consequence_mask,
+  a.region_mask, a.impact_code, a.status_code, a.reason_code, a.cdna_position, a.cds_position,
+  a.protein_position, a.reference_amino_acid_code, a.alternate_amino_acid_code,
+  a.nmd_prediction_code, a.nmd_escape_reasons, a.overlap_object_code, a.transcript_hgvs,
+  a.protein_hgvs, a.hgvs_shift, a.transcript_hgvs_status, a.transcript_hgvs_reason,
+  a.protein_hgvs_status, a.protein_hgvs_reason
+FROM query(duckvep_annotate_sql('mt_events', 'mt', struct_pack(hgvs := true))) a;
+
+query I
+SELECT count(*) AS events FROM mt_events;
+----
+12469
+
+query IIT
+SELECT count(*) AS result_rows, count(*) FILTER (WHERE transcript_hgvs IS NOT NULL) AS with_hgvs,
+  md5(string_agg(concat_ws('|', event_index, coalesce(transcript_index, -1), coalesce(regulation_feature_index, -1), consequence_mask, region_mask,
+    impact_code, status_code, reason_code, coalesce(cdna_position, -1), coalesce(cds_position, -1), coalesce(protein_position, -1),
+    coalesce(transcript_hgvs, '~'), coalesce(protein_hgvs, '~'), coalesce(hgvs_shift, 0), coalesce(nmd_prediction_code, 0),
+    coalesce(protein_hgvs_status, '~')), chr(10) ORDER BY event_index, transcript_index NULLS FIRST, regulation_feature_index NULLS FIRST)) AS fingerprint
+FROM mt_result;
+----
+248673	11027	64ed032e28ff0316a0a8c0ccb2411b0e
