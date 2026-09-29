@@ -138,6 +138,8 @@ SELECT transcript_index, carrier_count, sequence_status, length(contributors) AS
 FROM duckvep_haplotypes('SELECT * FROM demo_calls', 'demo');
 ```
 
+Which transcripts a call belongs to is a lookup in the resident interval index, not a per-record annotation. `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)` takes one VCF record and one ALT (with its shared anchor base) and returns the ascending model ordinals of the transcripts whose coding sequence the event overlaps, normalized exactly as the annotation builder normalizes it: the pairs are exactly those to which `duckvep_annotate_sql` assigns the CDS region bit, so an indel's anchor base alone never creates an overlap. A record in an intron, UTR, flank or intergenic sequence returns an empty list, so a whole-genome VCF reduces to its coding records before any per-record work: `SELECT ..., unnest(duckvep_coding_transcripts('demo', seq_region, position, reference, alternate)) AS transcript_index FROM records` builds the `transcript_index` column of the calls relation above (`Rduckvep::rduckvep_coding_transcripts()` wraps it). It is a separate function rather than part of `duckvep_haplotypes` because the builder consumes a relation the caller has already staged (genotypes, phase sets and sources are the caller's decoding), while discovery is the step that decides which records to decode further.
+
 ## R interface
 
 `Rduckvep` runs the same native builders on the caller's DuckDB connection. Builder functions return SQL; `rduckvep_annotate()` executes annotation and returns a data frame. The supplied relation names remain visible in that connection, including TEMP tables and uncommitted rows.

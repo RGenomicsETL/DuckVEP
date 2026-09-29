@@ -117,6 +117,10 @@ QUERIES = {
     # Whole-haplotype classifier over phased calls, with per-carrier consequence and impact lists.
     "haplotype": """SELECT 'RESULT haplotype ' || count(*) || ' ' || hash(list(h ORDER BY hash(h))) FROM
  duckvep_haplotypes('SELECT * FROM f_hcalls', 'fm') h;""",
+    # Transcript discovery for phased calls: model-name copy, hit buffer and result list.
+    "discovery": """SELECT 'RESULT discovery ' || count(*) || ' ' || hash(list(d ORDER BY hash(d))) FROM
+ (SELECT event_index, duckvep_coding_transcripts('fm', seq_region::BIGINT, position::BIGINT,
+  reference, alternate) AS transcripts FROM f_ev WHERE reference IS NOT NULL) d;""",
     # Circular model executed on a lifted copy: lift_resolve and its HGVS and projection copies.
     "lifted_hgvs": """SELECT 'RESULT lifted_hgvs ' || count(*) || ' ' || hash(list(a ORDER BY hash(a))) FROM
  query(duckvep_annotate_sql('f_cev_full', 'fc', struct_pack(hgvs := true, upstream_distance := 0, downstream_distance := 0))) a;""",
@@ -126,7 +130,7 @@ QUERIES = {
  query(duckvep_annotate_projected_sql('f_cev', 'fc')) a;""",
 }
 # The model each annotation phase runs on, and the query that proves a load published nothing.
-MODEL_OF = {"haplotype": "fm", "hgvs": "fm", "regulation": "fm", "projected": "fm",
+MODEL_OF = {"haplotype": "fm", "discovery": "fm", "hgvs": "fm", "regulation": "fm", "projected": "fm",
             "lifted_hgvs": "fc", "lifted": "fc", "lifted_projected": "fc"}
 LOAD_PHASES = {"load": ("fm", "hgvs"), "load_circular": ("fc", "lifted_hgvs")}
 
