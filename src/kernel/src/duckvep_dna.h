@@ -19,6 +19,15 @@ static inline char duckvep_dna_normalize(char base, int allow_n) {
     return (DUCKVEP_DNA_ASCII_MASK & bit) != 0u ? (char)upper : '\0';
 }
 
+/* duckvep_dna_normalize(base, 1) for hot loops over whole sequences: one table load, no branches. */
+static inline char duckvep_dna_normalize_n(char base) {
+    static const char canonical[256] = {
+        ['A'] = 'A', ['C'] = 'C', ['G'] = 'G', ['T'] = 'T', ['U'] = 'T', ['N'] = 'N',
+        ['a'] = 'A', ['c'] = 'C', ['g'] = 'G', ['t'] = 'T', ['u'] = 'T', ['n'] = 'N'
+    };
+    return canonical[(unsigned char)base];
+}
+
 static inline char duckvep_dna_complement(char base) {
     /* The caller supplies normalized A/C/G/T: A^21=T and C^4=G. */
     return (char)((unsigned char)base ^

@@ -9,7 +9,7 @@
 #include <string.h>
 
 static char haplo_norm_cds_base(uint8_t b) {
-    return duckvep_dna_normalize((char)b, 1);
+    return duckvep_dna_normalize_n((char)b);
 }
 
 static char haplo_complement(char b) {

@@ -135,8 +135,26 @@ duckvep_translation_status_t duckvep_translate_cds(
         return DUCKVEP_TRANSLATION_INVALID_ARG;
     duckvep_translation_t translated = {codons, 0u, 1u};
     static const uint8_t normalized_code[8] = {0u, 2u, 0u, 1u, 0u, 0u, 0u, 3u};
+    /* Fast path: a codon of three unambiguous bases (either case, U as T) indexes the table directly. Anything
+     * else takes the exact per-base path below, so invalid and N codons behave as before. */
+    static const uint8_t base_code[256] = {
+        ['T'] = 0u, ['C'] = 1u, ['A'] = 2u, ['G'] = 3u, ['U'] = 0u,
+        ['t'] = 0u, ['c'] = 1u, ['a'] = 2u, ['g'] = 3u, ['u'] = 0u
+    };
+    static const uint8_t plain[256] = {
+        ['T'] = 1u, ['C'] = 1u, ['A'] = 1u, ['G'] = 1u, ['U'] = 1u,
+        ['t'] = 1u, ['c'] = 1u, ['a'] = 1u, ['g'] = 1u, ['u'] = 1u
+    };
     for (size_t i = 0u; i < codons; i++) {
         uint8_t code = 0u, has_n = 0u;
+        const uint8_t *triple = cds + i * 3u;
+        if (plain[triple[0]] & plain[triple[1]] & plain[triple[2]]) {
+            uint8_t aa = (uint8_t)amino_acids[(base_code[triple[0]] << 4u) | (base_code[triple[1]] << 2u) |
+                                              base_code[triple[2]]];
+            peptide[i] = aa;
+            if (aa == '*' && !translated.first_stop_position1) translated.first_stop_position1 = i + 1u;
+            continue;
+        }
         for (size_t j = 0u; j < 3u; j++) {
             char base = duckvep_dna_normalize((char)cds[i * 3u + j], 1);
             if (!base) return DUCKVEP_TRANSLATION_INVALID_BASE;
@@ -249,6 +267,31 @@ int duckvep_cds_first_stop_position1(
         uint8_t code = 0u;
         uint32_t j;
         int has_n = 0;
+
+        /* Fast path: three unambiguous bases (either case, U as T) index the table directly. Anything else
+         * takes the exact per-base path below, so invalid and N codons behave as before. */
+        {
+            static const uint8_t base_code[256] = {
+                ['T'] = 0u, ['C'] = 1u, ['A'] = 2u, ['G'] = 3u, ['U'] = 0u,
+                ['t'] = 0u, ['c'] = 1u, ['a'] = 2u, ['g'] = 3u, ['u'] = 0u
+            };
+            static const uint8_t plain[256] = {
+                ['T'] = 1u, ['C'] = 1u, ['A'] = 1u, ['G'] = 1u, ['U'] = 1u,
+                ['t'] = 1u, ['c'] = 1u, ['a'] = 1u, ['g'] = 1u, ['u'] = 1u
+            };
+            const uint8_t *triple = cds + i * 3u;
+
+            if (plain[triple[0]] & plain[triple[1]] & plain[triple[2]]) {
+                code = (uint8_t)((base_code[triple[0]] << 4u) |
+                                 (base_code[triple[1]] << 2u) | base_code[triple[2]]);
+                if (amino_acids[code] == '*') {
+                    if (i >= (size_t)UINT32_MAX) return 0;
+                    *position1_out = (uint32_t)i + 1u;
+                    return 1;
+                }
+                continue;
+            }
+        }
 
         for (j = 0u; j < 3u; j++) {
             char base = duckvep_dna_normalize(
