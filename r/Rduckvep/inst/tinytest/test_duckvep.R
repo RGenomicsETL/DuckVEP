@@ -365,6 +365,26 @@ local({
   expect_equal(ensembl_receipt$regulatory_region_count, 1)
   expect_equal(ensembl_receipt$motif_feature_count, 1)
   expect_equal(nchar(ensembl_receipt$model_sha256), 64)
+  expect_equal(ensembl_receipt$circular_region_count, 0)
+  expect_true(is.na(ensembl_receipt$circular_regions))
+  dbExecute(con, paste(
+    "CREATE TEMP VIEW duckvep_r_circular_regions AS SELECT * EXCLUDE (circular),",
+    "true AS circular FROM duckvep_r_ensembl_regions"
+  ))
+  circular_receipt <- dbGetQuery(
+    con,
+    paste(
+      "SELECT * FROM query(duckvep_model_receipt_sql(",
+      "'duckvep_r_circular_regions', 'duckvep_r_ensembl_transcripts',",
+      "'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),",
+      "'all current transcripts on FASTA-covered assembly regions',",
+      "{regulation_features_table: 'duckvep_r_ensembl_regulation'}))"
+    )
+  )
+  expect_identical(circular_receipt$model_sha256, ensembl_receipt$model_sha256)
+  expect_false(identical(circular_receipt$topology_sha256, ensembl_receipt$topology_sha256))
+  expect_equal(circular_receipt$circular_region_count, 1)
+  expect_identical(circular_receipt$circular_regions, "1")
   expect_identical(
     names(ensembl_receipt)[1:6],
     c(

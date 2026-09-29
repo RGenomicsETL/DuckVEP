@@ -403,9 +403,11 @@ passing VEP 116 evidence does not validate another release.
 The prepared region relation contains `sequence_length` and a Boolean `circular` sourced
 from the same Ensembl core release as its `seq_region`. The builder accepts one
 `circular_seq` attribute with value `1` per circular region and rejects duplicate
-or invalid circular attributes; absence means linear. The model receipt includes
-this topology and length in its deterministic hash, so changing either changes
-model identity. Circular topology is a property of the reference sequence region;
+or invalid circular attributes; absence means linear. Model identity is `model_sha256`,
+whose hashed-row definition remains unchanged. `topology_sha256` separately hashes
+region name, length and circular flag, and the receipt lists circular regions. Any
+future change to hashed rows requires a versioned definition and re-recording every
+receipt in the same commit. Circular topology is a property of the reference sequence region;
 `codon_table` is an independently sourced translation rule. A mitochondrial
 codon table does not imply that a region is circular, and a circular region does
 not imply mitochondrial translation. Ordinary human Ensembl-116 MT transcripts
