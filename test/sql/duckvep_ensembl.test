@@ -130,7 +130,7 @@ statement ok
 INSERT INTO duckvep_core.attrib_type VALUES
   (60, 'MANE_Select'), (61, 'gencode_basic'), (62, 'ccds_transcript'),
   (63, 'gencode_primary'), (64, 'initial_met'), (65, '_rna_edit'),
-  (66, 'codon_table'), (68, 'amino_acid_sub');
+  (66, 'codon_table'), (68, 'amino_acid_sub'), (69, 'circular_seq');
 
 statement ok
 INSERT INTO duckvep_core.seq_region_attrib VALUES (10, 66, 2);
@@ -240,12 +240,38 @@ regulatory feature type is missing
 statement ok
 ROLLBACK;
 
-query ITIITI
+query ITIITII
 SELECT seq_region, seq_region_name, sequence_length, source_seq_region_id,
-       coord_system_name, coord_system_rank
+       coord_system_name, coord_system_rank, circular
 FROM duckvep_prepared_regions;
 ----
-0	1	40	10	chromosome	1
+0	1	40	10	chromosome	1	false
+
+statement ok
+BEGIN TRANSACTION;
+
+statement ok
+INSERT INTO duckvep_core.seq_region_attrib VALUES (10, 69, 1);
+
+query II
+SELECT sequence_length, circular FROM query(duckvep_ensembl_regions_sql(
+  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
+));
+----
+40	true
+
+statement ok
+INSERT INTO duckvep_core.seq_region_attrib VALUES (10, 69, 1);
+
+statement error
+SELECT * FROM query(duckvep_ensembl_regions_sql(
+  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
+));
+----
+circular_seq must have one value of 1 per region
+
+statement ok
+ROLLBACK;
 
 query I
 SELECT source_seq_region_id FROM query(duckvep_ensembl_regions_sql(
@@ -473,6 +499,22 @@ SELECT model_sha256 != (
 
 statement ok
 CREATE TEMP TABLE receipt_temp_regions AS SELECT * FROM duckvep_prepared_regions;
+
+statement ok
+UPDATE receipt_temp_regions SET circular = true;
+
+query I
+SELECT model_sha256 != (SELECT model_sha256 FROM query(duckvep_model_receipt_sql(
+  'receipt_temp_regions', 'duckvep_prepared_transcripts',
+  'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),
+  'all current transcripts on FASTA-covered assembly regions',
+  {regulation_features_table: 'duckvep_prepared_regulation'}
+))) FROM duckvep_prepared_receipt;
+----
+1
+
+statement ok
+UPDATE receipt_temp_regions SET circular = false;
 
 statement ok
 CREATE TEMP TABLE receipt_temp_transcripts AS SELECT * FROM duckvep_prepared_transcripts LIMIT 0;
@@ -965,8 +1007,8 @@ FROM (
   SELECT * FROM duckvep_grch37_receipt
 ) ORDER BY assembly;
 ----
-GRCh37	de042a5650929ba7dca9c64b487e45463e71a0492b3df686f9365e40b6bda4e9	all current transcripts on MT and GL000201.1
-GRCh38	6d9f79077e8dfcca418ef82fffcc49f7c44f939eea83045a49bc1139e66b037b	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
+GRCh37	a2a8f34f587b770adebf11fc60bbb798065dc8146a8147f26a7bea000e6640c6	all current transcripts on MT and GL000201.1
+GRCh38	a16d797bd97faf5a1c3bdc88ed3774ebdd56607c412b46e0e4c99f715565bb61	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
 
 query I
 SELECT loaded FROM duckvep_model_load(

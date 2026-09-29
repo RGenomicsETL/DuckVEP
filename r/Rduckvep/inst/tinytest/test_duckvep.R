@@ -229,6 +229,29 @@ local({
       "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38'))"
     )
   )
+  expect_identical(
+    dbGetQuery(con, "SELECT circular FROM duckvep_r_ensembl_regions")$circular,
+    FALSE
+  )
+  dbExecute(
+    con,
+    "INSERT INTO duckvep_r_core.attrib_type VALUES (3, 'circular_seq')"
+  )
+  dbExecute(
+    con,
+    "INSERT INTO duckvep_r_core.seq_region_attrib VALUES (1, 3, '1')"
+  )
+  expect_identical(
+    dbGetQuery(
+      con,
+      paste(
+        "SELECT circular FROM query(duckvep_ensembl_regions_sql(",
+        "'duckvep_r_core', 'duckvep_r_reference', 'GRCh38'))"
+      )
+    )$circular,
+    TRUE
+  )
+  dbExecute(con, "DELETE FROM duckvep_r_core.seq_region_attrib")
   dbExecute(
     con,
     paste(
