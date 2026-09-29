@@ -225,6 +225,44 @@ TEST haplotype_differences_bound_alignment_work_and_report_limits(void) {
     PASS();
 }
 
+/* Capacity follows the band the alignment needs, not the band of a feasible bound. A one-base deletion followed by a
+ * substitution 8000 bases downstream leaves a shifted, mostly mismatching middle for the positional bound (its band is
+ * thousands of columns wide, a trace of hundreds of millions of cells), yet the optimum lies within a few columns of the
+ * diagonal. It aligns in nine-cell rows, and the tie placement is that of the full matrix. A band that is still to be
+ * tried and does not fit is refused with its own cell count. */
+TEST haplotype_differences_capacity_follows_the_needed_band(void) {
+    enum { LENGTH = 20000 };
+    static uint8_t ref[LENGTH], alt[LENGTH - 1], trace[(LENGTH + 1) * 9], small[(LENGTH + 1) * 9 - 1];
+    static uint64_t scores[2 * LENGTH];
+    uint32_t state = 12345u;
+    for (size_t i = 0u; i < LENGTH; i++) {
+        state = state * 1664525u + 1013904223u;
+        ref[i] = (uint8_t)"ACGT"[state >> 30];
+    }
+    ref[6000] = ref[5999] == 'A' ? 'C' : 'A';   /* the deletion has one placement */
+    ref[6001] = ref[6000] == 'G' ? 'T' : 'G';
+    memcpy(alt, ref, 6000u); memcpy(alt + 6000u, ref + 6001u, LENGTH - 6001u);
+    alt[13999] = ref[14000] == 'T' ? 'A' : 'T';
+    duckvep_sequence_diff_scratch_t scratch = {scores, sizeof(scores) / sizeof(*scores), trace, sizeof(trace)};
+    duckvep_sequence_difference_t differences[3];
+    duckvep_sequence_diff_result_t result;
+    ASSERT_EQ(DUCKVEP_SEQUENCE_DIFF_OK, duckvep_sequence_differences(ref, LENGTH, alt, LENGTH - 1, 1, &scratch,
+        differences, 3u, &result));
+    ASSERT_EQ(2u, result.count); ASSERT_EQ((size_t)LENGTH, result.alignment_length);
+    ASSERT_EQ((size_t)(LENGTH + 1) * 9u, result.trace_cells);
+    ASSERT_EQ(6000u, differences[0].ref_start0); ASSERT_EQ(6000u, differences[0].alt_start0);
+    ASSERT_EQ(1u, differences[0].ref_length); ASSERT_EQ(0u, differences[0].alt_length);
+    ASSERT_EQ(6000u, differences[0].alignment_start0);
+    ASSERT_EQ(14000u, differences[1].ref_start0); ASSERT_EQ(13999u, differences[1].alt_start0);
+    ASSERT_EQ(1u, differences[1].ref_length); ASSERT_EQ(1u, differences[1].alt_length);
+    ASSERT_EQ(14000u, differences[1].alignment_start0);
+    scratch.trace = small; scratch.trace_capacity = sizeof(small);
+    ASSERT_EQ(DUCKVEP_SEQUENCE_DIFF_TRACE_FULL, duckvep_sequence_differences(ref, LENGTH, alt, LENGTH - 1, 1,
+        &scratch, differences, 3u, &result));
+    ASSERT_EQ((size_t)(LENGTH + 1) * 9u, result.trace_cells);
+    PASS();
+}
+
 TEST haplotype_full_translation_matches_every_supported_codon_table(void) {
     const char alphabet[] = "ACGTUNacgtun";
     uint8_t cds[] = {'A', 'T', 'G', 'T', 'G', 'C', 'T', 'A', 'A', 'G', 'C', 'C', 'N'};

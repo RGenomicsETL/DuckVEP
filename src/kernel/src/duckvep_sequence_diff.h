@@ -40,6 +40,12 @@ typedef struct {
  * Results borrow ungapped slices of the input; empty spans denote insertions or
  * deletions. Coordinates are zero-based on the two sequences and the alignment.
  *
+ * The alignment stores an exact band of traceback cells, (n+1) x stride: it starts at the
+ * length change and widens (never beyond a feasible-path bound) until the optimum is proved
+ * to lie inside it, so trace_capacity has to hold the band the alignment needs, not the
+ * bound. trace_cells reports the cells of the band being tried (on success, the band used);
+ * on TRACE_FULL it is the first band that did not fit, and the alignment needs at least that.
+ *
  * No allocation. All mutable spans and result storage must be distinct from one
  * another and from the inputs. Inputs may alias each other. Bytes must be nonzero
  * ASCII without '-' (the alignment gap). count reports the required difference
