@@ -30,9 +30,11 @@ enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
     HAPLOTYPE_POLICY_COLUMN = 17, HAPLOTYPE_STATUS_COLUMN = 18, HAPLOTYPE_REASON_COLUMN = 19,
     HAPLOTYPE_PROVENANCE_COLUMN = 20, HAPLOTYPE_EDITS_COLUMN = 21,
     HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 22, HAPLOTYPE_CONSEQUENCES_COLUMN = 23,
-    HAPLOTYPE_IMPACT_COLUMN = 24, HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 25,
-    HAPLOTYPE_OUTPUT_COLUMNS = 26 };
-enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 7 };
+    HAPLOTYPE_IMPACT_COLUMN = 24,
+    HAPLOTYPE_NMD_RULE_COLUMN = 25, HAPLOTYPE_NMD_COLUMN = 26, HAPLOTYPE_NMD_STOP_COLUMN = 27,
+    HAPLOTYPE_NMD_JUNCTION_COLUMN = 28, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN = 29,
+    HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 30, HAPLOTYPE_OUTPUT_COLUMNS = 31 };
+enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 10 };
 #define HAPLOTYPE_POLICY_VERSION "duckvep-coding-v1"
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10 };
 static const char *const limit_names[] = {"max_active_events", "max_active_transcripts",
@@ -88,12 +90,12 @@ static void haplotype_bind_destroy(void *pointer) {
 }
 
 static duckdb_logical_type record_type(const char *const *names, const duckdb_type *ids,
-    idx_t count, int last_field_is_list) {
+    idx_t count, int list_field) {
     duckdb_logical_type types[HAPLOTYPE_BLOCK_FIELDS];
     const char *field_names[HAPLOTYPE_BLOCK_FIELDS];
     for (idx_t i = 0u; i < count; i++) {
         types[i] = duckdb_create_logical_type(ids[i]); field_names[i] = names[i];
-        if (last_field_is_list && i == count - 1u) {
+        if (list_field >= 0 && i == (idx_t)list_field) {
             duckdb_logical_type element = types[i];
             types[i] = duckdb_create_list_type(element);
             duckdb_destroy_logical_type(&element);
@@ -105,8 +107,8 @@ static duckdb_logical_type record_type(const char *const *names, const duckdb_ty
 }
 
 static void bind_record_list(duckdb_bind_info info, const char *name,
-    const char *const *fields, const duckdb_type *ids, idx_t count, int last_field_is_list) {
-    duckdb_logical_type record = record_type(fields, ids, count, last_field_is_list);
+    const char *const *fields, const duckdb_type *ids, idx_t count, int list_field) {
+    duckdb_logical_type record = record_type(fields, ids, count, list_field);
     duckdb_logical_type list = duckdb_create_list_type(record);
     duckdb_bind_add_result_column(info, name, list);
     duckdb_destroy_logical_type(&list);
@@ -191,15 +193,15 @@ static void haplotype_bind(duckdb_bind_info info) {
     const duckdb_type block_ids[] = {DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR,
         DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_BIGINT, DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_VARCHAR,
         DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_BOOLEAN, DUCKDB_TYPE_UBIGINT};
-    bind_record_list(info, "carriers", carrier_names, carrier_ids, 4u, 0);
-    bind_record_list(info, "contributors", event_names, event_ids, b->source_records ? 8u : 7u, 0);
-    bind_record_list(info, "coding_blocks", block_names, block_ids, HAPLOTYPE_BLOCK_FIELDS, 1);
+    bind_record_list(info, "carriers", carrier_names, carrier_ids, 4u, -1);
+    bind_record_list(info, "contributors", event_names, event_ids, b->source_records ? 8u : 7u, -1);
+    bind_record_list(info, "coding_blocks", block_names, block_ids, HAPLOTYPE_BLOCK_FIELDS, HAPLOTYPE_BLOCK_EVENT_FIELD);
     const char *const difference_names[] = {"ref_start0", "alt_start0", "reference", "alternate",
         "alignment_start0"};
     const duckdb_type difference_ids[] = {DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_UBIGINT,
         DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_UBIGINT};
-    bind_record_list(info, "cds_differences", difference_names, difference_ids, 5u, 0);
-    bind_record_list(info, "protein_differences", difference_names, difference_ids, 5u, 0);
+    bind_record_list(info, "cds_differences", difference_names, difference_ids, 5u, -1);
+    bind_record_list(info, "protein_differences", difference_names, difference_ids, 5u, -1);
     duckdb_logical_type stop_in_frame_type = duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN);
     duckdb_bind_add_result_column(info, "stop_in_displaced_frame", stop_in_frame_type);
     duckdb_destroy_logical_type(&stop_in_frame_type);
@@ -223,16 +225,18 @@ static void haplotype_bind(duckdb_bind_info info) {
     const duckdb_type edit_ids[] = {DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_UBIGINT,
         DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_TINYINT};
     bind_record_list(info, "contributor_provenance", provenance_names, provenance_ids,
-        HAPLOTYPE_PROVENANCE_FIELDS, 0);
-    bind_record_list(info, "normalized_edits", edit_names, edit_ids, HAPLOTYPE_EDIT_FIELDS, 0);
+        HAPLOTYPE_PROVENANCE_FIELDS, -1);
+    bind_record_list(info, "normalized_edits", edit_names, edit_ids, HAPLOTYPE_EDIT_FIELDS, -1);
     const char *const carrier_prediction_names[] = {"sample_index", "phase_set", "haplotype_lane",
-        "prediction_status", "prediction_reason", "haplotype_impact", "haplotype_consequences"};
+        "prediction_status", "prediction_reason", "haplotype_impact", "haplotype_consequences",
+        "nmd_prediction", "nmd_stop_position", "nmd_junction_position"};
     const duckdb_type carrier_prediction_ids[] = {DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_BIGINT,
-        DUCKDB_TYPE_USMALLINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR};
+        DUCKDB_TYPE_USMALLINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR,
+        DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_UBIGINT};
     /* Slice 4: the consequence set and IMPACT of the shared edited sequence, decided per carrier so an
      * ineligible carrier of the row (for example a triploid call) never hides an eligible one. */
     bind_record_list(info, "carrier_predictions", carrier_prediction_names, carrier_prediction_ids,
-        HAPLOTYPE_CARRIER_PREDICTION_FIELDS, 1);
+        HAPLOTYPE_CARRIER_PREDICTION_FIELDS, 6);
     /* Slice 3: whole-haplotype reduced SO set and IMPACT of the same-codon classifier. */
     duckdb_logical_type so_element = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
     duckdb_logical_type so_list = duckdb_create_list_type(so_element);
@@ -242,7 +246,19 @@ static void haplotype_bind(duckdb_bind_info info) {
     string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
     duckdb_bind_add_result_column(info, "haplotype_impact", string_type);
     duckdb_destroy_logical_type(&string_type);
-    duckdb_logical_type length_type = duckdb_create_logical_type(DUCKDB_TYPE_BIGINT);
+    /* Slice 6: ejc50-v1 NMD of the shared edited transcript (row summary; per carrier in carrier_predictions). */
+    string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
+    duckdb_bind_add_result_column(info, "nmd_rule", string_type);
+    duckdb_bind_add_result_column(info, "nmd_prediction", string_type);
+    duckdb_destroy_logical_type(&string_type);
+    duckdb_logical_type length_type = duckdb_create_logical_type(DUCKDB_TYPE_UBIGINT);
+    duckdb_bind_add_result_column(info, "nmd_stop_position", length_type);
+    duckdb_bind_add_result_column(info, "nmd_junction_position", length_type);
+    duckdb_logical_type index_list = duckdb_create_list_type(length_type);
+    duckdb_bind_add_result_column(info, "nmd_contributors", index_list);
+    duckdb_destroy_logical_type(&index_list);
+    duckdb_destroy_logical_type(&length_type);
+    length_type = duckdb_create_logical_type(DUCKDB_TYPE_BIGINT);
     duckdb_bind_add_result_column(info, "nominal_length_diff", length_type);
     duckdb_destroy_logical_type(&length_type);
     duckdb_bind_set_bind_data(info, b, haplotype_bind_destroy);
@@ -936,6 +952,15 @@ static const char *role_name(uint8_t role) {
     }
 }
 
+static const char *nmd_name(duckvep_haplotype_nmd_t nmd) {
+    switch (nmd) {
+    case DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE: return "not_applicable";
+    case DUCKVEP_HAPLOTYPE_NMD_ESCAPE: return "escape";
+    case DUCKVEP_HAPLOTYPE_NMD_TRIGGER: return "trigger";
+    default: return "unknown";
+    }
+}
+
 /* Versioned coding-v1 status/reason plus complete contributor and normalized-edit
  * provenance. Every contributor of the leaf is listed, whatever its role. */
 static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_state_t *s,
@@ -1020,6 +1045,13 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
                 duckdb_vector_assign_string_element(fields[4], at, reason_name(cr, leaf->prediction_projection));
                 /* An empty list with NULL IMPACT is a lane equal to the reference; NULL both when the
                  * carrier itself is not predicted. */
+                int carrier_decided = cs == DUCKVEP_PREDICTION_PREDICTED;
+                duckdb_vector_assign_string_element(fields[7], at,
+                    nmd_name(carrier_decided ? leaf->nmd : DUCKVEP_HAPLOTYPE_NMD_UNKNOWN));
+                if (carrier_decided && leaf->nmd_stop_valid) ((uint64_t *)duckdb_vector_get_data(fields[8]))[at] = leaf->nmd_stop_position1;
+                else null_cell(fields[8], at);
+                if (carrier_decided && leaf->nmd_junction_valid) ((uint64_t *)duckdb_vector_get_data(fields[9]))[at] = leaf->nmd_junction_position1;
+                else null_cell(fields[9], at);
                 if (cs == DUCKVEP_PREDICTION_PREDICTED) {
                     if (n) duckdb_vector_assign_string_element(fields[5], at,
                         duckvep_impact_name(duckvep_so_impact(leaf->haplotype_so_mask)));
@@ -1071,6 +1103,37 @@ static int append_prediction(duckdb_data_chunk output, idx_t row, haplotype_stat
         duckdb_validity_set_row_valid(duckdb_vector_get_validity(impact), row);
         duckdb_vector_assign_string_element(impact, row, duckvep_impact_name(duckvep_so_impact(leaf->haplotype_so_mask)));
     } else null_cell(impact, row);
+    /* ejc50-v1 row summary, gated like the consequences: unknown unless every carrier is decided.
+     * The contributors that put the stop there are the APPLIED ones (the edits up to and including the stop),
+     * by event_index; post_stop, shadowed and omitted sources are not listed. */
+    duckdb_vector_assign_string_element(duckdb_data_chunk_get_vector(output, HAPLOTYPE_NMD_RULE_COLUMN), row,
+        DUCKVEP_HAPLOTYPE_NMD_RULE);
+    duckdb_vector_assign_string_element(duckdb_data_chunk_get_vector(output, HAPLOTYPE_NMD_COLUMN), row,
+        nmd_name(decided ? leaf->nmd : DUCKVEP_HAPLOTYPE_NMD_UNKNOWN));
+    duckdb_vector nmd_stop = duckdb_data_chunk_get_vector(output, HAPLOTYPE_NMD_STOP_COLUMN);
+    duckdb_vector nmd_junction = duckdb_data_chunk_get_vector(output, HAPLOTYPE_NMD_JUNCTION_COLUMN);
+    if (decided && leaf->nmd_stop_valid) ((uint64_t *)duckdb_vector_get_data(nmd_stop))[row] = leaf->nmd_stop_position1;
+    else null_cell(nmd_stop, row);
+    if (decided && leaf->nmd_junction_valid) ((uint64_t *)duckdb_vector_get_data(nmd_junction))[row] = leaf->nmd_junction_position1;
+    else null_cell(nmd_junction, row);
+    duckdb_vector attribution = duckdb_data_chunk_get_vector(output, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN);
+    size_t attributed = 0u;
+    if (decided && leaf->nmd_stop_valid)
+        for (size_t i = 0u; i < leaf->contributor_count; i++) attributed += leaf->contributors[i].role == DUCKVEP_ROLE_APPLIED;
+    duckdb_list_entry attribution_entry;
+    if (!duckvep_list_extend(attribution, attributed, &attribution_entry)) return 0;
+    ((duckdb_list_entry *)duckdb_vector_get_data(attribution))[row] = attribution_entry;
+    if (!(decided && leaf->nmd_stop_valid)) null_cell(attribution, row);
+    else {
+        duckdb_vector values = duckdb_list_vector_get_child(attribution);
+        duckdb_vector_ensure_validity_writable(values);
+        size_t at = 0u;
+        for (size_t i = 0u; i < leaf->contributor_count; i++) {
+            if (leaf->contributors[i].role != DUCKVEP_ROLE_APPLIED) continue;
+            duckdb_validity_set_row_valid(duckdb_vector_get_validity(values), attribution_entry.offset + at);
+            ((uint64_t *)duckdb_vector_get_data(values))[attribution_entry.offset + at++] = leaf->contributors[i].source.event_id;
+        }
+    }
     return 1;
 }
 
@@ -1353,6 +1416,9 @@ static void haplotype_scan(duckdb_function_info info, duckdb_data_chunk output) 
         duckdb_data_chunk_get_vector(output, HAPLOTYPE_CARRIER_PREDICTION_COLUMN));
     if (duckdb_list_vector_set_size(duckdb_struct_vector_get_child(carrier_records, 6u), 0u) != DuckDBSuccess) {
         duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset carrier consequence list"); return;
+    }
+    if (duckdb_list_vector_set_size(duckdb_data_chunk_get_vector(output, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN), 0u) != DuckDBSuccess) {
+        duckdb_function_set_error(info, "duckvep_haplotypes: cannot reset NMD contributor list"); return;
     }
     duckdb_vector blocks = duckdb_list_vector_get_child(duckdb_data_chunk_get_vector(output, 11u));
     if (duckdb_list_vector_set_size(duckdb_struct_vector_get_child(blocks, HAPLOTYPE_BLOCK_EVENT_FIELD), 0u) != DuckDBSuccess) {
