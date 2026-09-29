@@ -1827,6 +1827,187 @@ TEST haplotype_stream_prediction_is_keyed_and_retains_every_contributor(void) {
     PASS();
 }
 
+/* ---- same-codon classifier (coding-v1 slice 3) ------------------------------------------------ */
+
+static const char haplo_class_cds[] = "ATGGCTGAACTGAAACGCAGCTAA"; /* M A E L K R S *; codon 7 (AGC) has AGC->TCC pairs */
+
+static char haplo_class_complement(char c) { return c == 'A' ? 'T' : c == 'C' ? 'G' : c == 'G' ? 'C' : 'A'; }
+
+/* Standard code, TCAG order, written independently of the kernel's tables. */
+static char haplo_class_amino(const char *codon) {
+    static const char table[] = "FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG";
+    static const char order[] = "TCAG";
+    unsigned index = 0u;
+    for (unsigned i = 0u; i < 3u; i++) index = index * 4u + (unsigned)(strchr(order, codon[i]) - order);
+    return table[index];
+}
+
+struct haplo_class_edit { unsigned pos; const char *ref, *alt; }; /* transcript orientation, 1-based */
+
+/* Independent expectation for frame-preserving substitutions: 0 synonymous, 1 missense, 2 pending
+ * start/stop. Edits are equal-length substitutions; everything is decided on the edited cDNA. */
+static int haplo_class_expect_substitutions(const struct haplo_class_edit *edits, size_t count) {
+    char alt[sizeof(haplo_class_cds)];
+    memcpy(alt, haplo_class_cds, sizeof(alt));
+    int touches = 0;
+    for (size_t i = 0u; i < count; i++) {
+        memcpy(alt + edits[i].pos - 1u, edits[i].alt, strlen(edits[i].alt));
+        for (size_t j = 0u; j < strlen(edits[i].ref); j++) {
+            unsigned pos = edits[i].pos + (unsigned)j;
+            touches |= pos <= 3u || pos >= 22u;
+        }
+    }
+    int same = 1;
+    for (unsigned codon = 0u; codon < 8u; codon++) {
+        char a = haplo_class_amino(alt + 3u * codon), r = haplo_class_amino(haplo_class_cds + 3u * codon);
+        if (a == '*' && codon != 7u) touches = 1;
+        same &= a == r;
+    }
+    return touches ? 2 : same ? 0 : 1;
+}
+
+/* Runs one lane of records (transcript-orientation edits) through the stream and returns the leaf. */
+static duckvep_haplotype_stream_status_t haplo_class_run(struct haplotype_stream_scene *f, int reverse,
+    const struct haplo_class_edit *edits, size_t count, uint16_t ploidy, duckvep_haplotype_leaf_t *leaf) {
+    haplotype_stream_scene_prepare(f, 1u);
+    f->sequences.cds_bytes = (const uint8_t *)haplo_class_cds;
+    f->sequences.cds_bytes_len = 24u;
+    f->lengths[0] = f->cdna_ends[0] = 24u;
+    f->ends[0] = f->starts[0] + 23u;
+    f->strands[0] = reverse ? -1 : 1;
+    duckvep_haplotype_stream_t *s = &f->stream;
+    duckvep_haplotype_stream_status_t status = duckvep_haplotype_stream_init(
+        s, &f->model, &f->exons, &f->sequences, &f->buffers);
+    if (status != DUCKVEP_HAPLOTYPE_STREAM_OK) return status;
+    /* Genomic records ascend; a minus-strand transcript reverses the transcript-ordered list. */
+    char ref[4][64], alt[4][64];
+    unsigned pos[4], ref_len[4], alt_len[4];
+    if (count > 4u) return DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG;
+    for (size_t k = 0u; k < count; k++) {
+        const struct haplo_class_edit *e = &edits[reverse ? count - 1u - k : k];
+        size_t rl = strlen(e->ref), al = strlen(e->alt);
+        ref_len[k] = (unsigned)rl; alt_len[k] = (unsigned)al;
+        if (!reverse) {
+            memcpy(ref[k], e->ref, rl); memcpy(alt[k], e->alt, al); pos[k] = 99u + e->pos;
+        } else {
+            for (size_t i = 0u; i < rl; i++) ref[k][i] = haplo_class_complement(e->ref[rl - 1u - i]);
+            for (size_t i = 0u; i < al; i++) alt[k][i] = haplo_class_complement(e->alt[al - 1u - i]);
+            pos[k] = 124u - (e->pos + (unsigned)rl - 1u);
+        }
+    }
+    duckvep_carrier_key_t key = {0u, 10, 1u, ploidy, 1u, 0u};
+    uint32_t tx = 0u;
+    for (size_t k = 0u; k < count; k++) {
+        duckvep_haplotype_source_t source = {k + 1u, (const uint8_t *)ref[k], (const uint8_t *)alt[k],
+            pos[k], 0u, (uint16_t)ref_len[k], (uint16_t)alt_len[k], 0u, 0u, 0u, 1u};
+        status = haplotype_test_begin_candidates(s, &source, &tx, 1u);
+        if (status == DUCKVEP_HAPLOTYPE_STREAM_OK) status = haplotype_test_push_called(s, &key);
+        if (status != DUCKVEP_HAPLOTYPE_STREAM_OK) return status;
+    }
+    status = duckvep_haplotype_stream_finish(s);
+    if (status != DUCKVEP_HAPLOTYPE_STREAM_TRANSCRIPT_READY) return status;
+    return duckvep_haplotype_stream_next(s, leaf);
+}
+
+TEST haplotype_same_codon_classifier_matches_independent_translation(void) {
+    /* Every single and pair of substitutions over all 24 CDS positions, on both strands: identical peptide
+     * is synonymous, a changed peptide missense, and any start/terminal-codon edit or created stop is
+     * left pending. The combined sequence is classified, never a member alone. */
+    static const char bases[] = "ACGT";
+    unsigned decided[3] = {0u, 0u, 0u}, seen_cis_syn_of_missense = 0u;
+    for (int reverse = 0; reverse < 2; reverse++) {
+        for (unsigned p1 = 1u; p1 <= 24u; p1++) for (unsigned b1 = 0u; b1 < 4u; b1++) {
+            if (bases[b1] == haplo_class_cds[p1 - 1u]) continue;
+            char one[2] = {bases[b1], 0}, r1[2] = {haplo_class_cds[p1 - 1u], 0};
+            for (unsigned p2 = p1; p2 <= 24u; p2++) for (unsigned b2 = 0u; b2 < 4u; b2++) {
+                if (p2 == p1 && b2) break;
+                if (p2 > p1 && bases[b2] == haplo_class_cds[p2 - 1u]) continue;
+                char two[2] = {bases[b2], 0}, r2[2] = {haplo_class_cds[p2 - 1u], 0};
+                struct haplo_class_edit edits[2] = {{p1, r1, one}, {p2, r2, two}};
+                size_t count = p2 == p1 ? 1u : 2u;
+                struct haplotype_stream_scene f;
+                duckvep_haplotype_leaf_t leaf;
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, haplo_class_run(&f, reverse, edits, count, 2u, &leaf));
+                int expected = haplo_class_expect_substitutions(edits, count);
+                ASSERT_EQ(count, leaf.edit_count);
+                if (expected == 2) {
+                    ASSERT_EQ((int)DUCKVEP_PREDICTION_ELIGIBLE, (int)leaf.path_status);
+                    ASSERT_EQ((int)DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING, (int)leaf.path_reason);
+                    ASSERT_EQ(0u, leaf.haplotype_so_mask);
+                } else {
+                    ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.path_status);
+                    ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.prediction_status);
+                    ASSERT_EQ(DUCKVEP_SO(expected ? DUCKVEP_SO_MISSENSE : DUCKVEP_SO_SYNONYMOUS), leaf.haplotype_so_mask);
+                    ASSERT_EQ((int)(expected ? DUCKVEP_IMPACT_MODERATE : DUCKVEP_IMPACT_LOW),
+                              (int)duckvep_so_impact(leaf.haplotype_so_mask));
+                }
+                decided[expected]++;
+                /* A pair whose members are each missense but whose combination is synonymous. */
+                if (count == 2u && !expected && (p1 - 1u) / 3u == (p2 - 1u) / 3u) {
+                    struct haplo_class_edit solo[1] = {edits[0]};
+                    if (haplo_class_expect_substitutions(solo, 1u) == 1) seen_cis_syn_of_missense++;
+                }
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_DONE, duckvep_haplotype_stream_next(&f.stream, &leaf));
+            }
+        }
+    }
+    ASSERT(decided[0] > 0u && decided[1] > 0u && decided[2] > 0u);
+    ASSERT(seen_cis_syn_of_missense > 0u);
+    PASS();
+}
+
+TEST haplotype_same_codon_classifier_names_pure_and_mixed_indels_and_defers_frames(void) {
+    const struct { const char *name; size_t count; struct haplo_class_edit edits[3]; int status; int reason;
+        unsigned so; } cases[] = {
+        {"insertion at a codon boundary", 1u, {{12u, "G", "GTCT"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_INSERTION},
+        {"insertion inside a codon", 1u, {{4u, "G", "GAAA"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_INSERTION},
+        {"whole-codon deletion", 1u, {{12u, "GAAA", "G"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_DELETION},
+        {"two insertions", 2u, {{6u, "T", "TGGG"}, {18u, "C", "CGGG"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_INSERTION},
+        {"two deletions", 2u, {{6u, "TGAA", "T"}, {15u, "ACGC", "A"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_DELETION},
+        {"insertion and deletion", 2u, {{12u, "G", "GTCT"}, {15u, "ACGC", "A"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_PROTEIN_ALTERING},
+        {"insertion and substitution", 2u, {{5u, "C", "G"}, {12u, "G", "GTCT"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_PROTEIN_ALTERING},
+        {"in-frame replacement", 1u, {{7u, "GAACTG", "GGG"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_PROTEIN_ALTERING},
+        {"one-base insertion", 1u, {{12u, "G", "GT"}}, DUCKVEP_PREDICTION_ELIGIBLE, DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING, 0},
+        {"frame restored by a later edit", 2u, {{12u, "G", "GT"}, {17u, "GC", "G"}}, DUCKVEP_PREDICTION_ELIGIBLE, DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING, 0},
+        {"insertion before the stop codon", 1u, {{21u, "C", "CCCC"}}, DUCKVEP_PREDICTION_PREDICTED, 0, DUCKVEP_SO_INFRAME_INSERTION},
+        {"insertion inside the stop codon", 1u, {{22u, "T", "TGGG"}}, DUCKVEP_PREDICTION_ELIGIBLE, DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING, 0},
+        {"start codon deletion", 1u, {{1u, "ATGG", "A"}}, DUCKVEP_PREDICTION_ELIGIBLE, DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING, 0}};
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        struct haplotype_stream_scene f;
+        duckvep_haplotype_leaf_t leaf;
+        ASSERT_EQ_FMT(DUCKVEP_HAPLOTYPE_STREAM_OK, haplo_class_run(&f, 0, cases[i].edits, cases[i].count, 2u, &leaf), "%d");
+        ASSERT_EQ_FMT(cases[i].status, (int)leaf.path_status, "%d");
+        if (cases[i].status == DUCKVEP_PREDICTION_PREDICTED) {
+            ASSERT_EQ((long long)DUCKVEP_SO(cases[i].so), (long long)leaf.haplotype_so_mask);
+            ASSERT_EQ((int)DUCKVEP_IMPACT_MODERATE, (int)duckvep_so_impact(leaf.haplotype_so_mask));
+        } else {
+            ASSERT_EQ_FMT(cases[i].reason, (int)leaf.path_reason, "%d");
+            ASSERT_EQ(0u, leaf.haplotype_so_mask);
+        }
+    }
+    PASS();
+}
+
+TEST haplotype_same_codon_classifier_is_keyed_per_carrier(void) {
+    struct haplotype_stream_scene f;
+    duckvep_haplotype_leaf_t leaf;
+    struct haplo_class_edit edit = {5u, "C", "G"};
+    /* A triploid call: the shared path is decided, the carrier is outside the diploid domain and the
+     * row must not claim a classification. */
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, haplo_class_run(&f, 0, &edit, 1u, 3u, &leaf));
+    ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.path_status);
+    ASSERT_EQ((int)DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, (int)leaf.prediction_status);
+    ASSERT_EQ((int)DUCKVEP_REASON_NON_DIPLOID_CALL, (int)leaf.prediction_reason);
+    const duckvep_carrier_call_t *c = duckvep_carriers_call(&f.stream.carriers, leaf.carriers.first_call);
+    ASSERT(c != NULL);
+    duckvep_prediction_status_t status;
+    duckvep_prediction_reason_t reason;
+    duckvep_haplotype_carrier_prediction(&leaf, c, &status, &reason);
+    ASSERT_EQ((int)DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, (int)status);
+    ASSERT_EQ((int)DUCKVEP_REASON_NON_DIPLOID_CALL, (int)reason);
+    PASS();
+}
+
 TEST haplotype_stream_edit_provenance_survives_islands_sorting_and_blocks(void) {
     /* Exhaust eight genomic positions independently: unchanged, part of one
      * uploaded MNV, or a separate SNV. The direct digit/run oracle never uses

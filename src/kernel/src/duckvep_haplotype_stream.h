@@ -78,15 +78,18 @@ typedef struct {
     uint32_t alt_ordinal;
 } duckvep_haplotype_source_t;
 
-/* Versioned coding-v1 eligibility of one completed leaf. No consequence, IMPACT or
- * NMD is predicted here; ELIGIBLE means the leaf is inside the supported domain and
- * awaits the classifiers. Failures keep every contributor. */
+/* Versioned coding-v1 status of one completed leaf. ELIGIBLE means the leaf is inside
+ * the supported domain but its whole-haplotype consequence needs a classifier that has
+ * not landed (see the PENDING reasons); PREDICTED means the same-codon classifier
+ * decided it and leaf.haplotype_so_mask is authoritative. No NMD is predicted yet.
+ * Failures keep every contributor. */
 typedef enum {
     DUCKVEP_PREDICTION_ELIGIBLE = 0,
     DUCKVEP_PREDICTION_INCOMPLETE_INPUT,
     DUCKVEP_PREDICTION_EDIT_CONFLICT,
     DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP,
-    DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT
+    DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT,
+    DUCKVEP_PREDICTION_PREDICTED
 } duckvep_prediction_status_t;
 
 typedef enum {
@@ -112,7 +115,10 @@ typedef enum {
     DUCKVEP_REASON_NONCANONICAL_STOP,
     DUCKVEP_REASON_INTERNAL_STOP,
     DUCKVEP_REASON_NON_LITERAL_ALLELE,
-    DUCKVEP_REASON_ALLELE_OVER_50
+    DUCKVEP_REASON_ALLELE_OVER_50,
+    /* Eligible, not yet classified: slice 4 (frame/restoration) and slice 5 (start/stop). */
+    DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING,
+    DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING
 } duckvep_prediction_reason_t;
 
 /* Contributor role in the completed leaf. Every contributor is retained. */
@@ -235,6 +241,10 @@ typedef struct {
     duckvep_prediction_status_t prediction_status, path_status;
     duckvep_prediction_reason_t prediction_reason, path_reason;
     duckvep_cds_edit_status_t prediction_projection; /* Valid for DUCKVEP_REASON_PROJECTION. */
+    /* Same-codon classifier (coding-v1 slice 3). Set only when path_status is PREDICTED;
+     * the reduced whole-protein SO set as DUCKVEP_SO() bits, empty for a lane equal to the
+     * reference (which has no IMPACT). */
+    uint64_t haplotype_so_mask;
     /* Ascending-CDS edit islands with source IDs, in stream buffers edits/edit_event_ids.
      * Listed for known sequences and for failed decoded-call leaves, so conflicts and
      * omitted or post-stop sources stay attributable. */

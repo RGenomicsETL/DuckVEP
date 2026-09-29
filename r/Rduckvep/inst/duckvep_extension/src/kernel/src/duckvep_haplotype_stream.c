@@ -1,5 +1,6 @@
 #include "duckvep_haplotype_stream.h"
 #include "duckvep_classify.h"
+#include "duckvep_so.h"
 
 #include <string.h>
 
@@ -678,6 +679,67 @@ static duckvep_prediction_reason_t edit_relation(const duckvep_haplotype_edit_t 
     return overlap;
 }
 
+/* Same-codon classifier (coding-v1 slice 3). Runs only on a path that is inside the supported
+ * domain. It classifies the whole edited peptide against the uncurated reference peptide, never
+ * an edit alone, and decides only haplotypes with no frame, start or stop effect:
+ *   identical peptide                          -> synonymous_variant
+ *   substitutions only, changed peptide        -> missense_variant
+ *   every edit a pure insertion / pure deletion -> inframe_insertion / inframe_deletion
+ *   any other frame-preserving replacement     -> protein_altering_variant
+ * Purity is a property of the normalized edit path (differing islands), as the contract pins
+ * for frame SO; the peptide is compared only for the identical-peptide (synonymous) case.
+ * Any edit whose length change is not a multiple of three (even if a later edit restores the
+ * frame), any edit touching the first or terminal reference codon, and any first stop other than
+ * the terminal one, are left pending for the frame (slice 4) and start/stop (slice 5) classifiers. */
+static void classify_same_codon(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf) {
+    if (leaf->path_status != DUCKVEP_PREDICTION_ELIGIBLE || !leaf->cds || leaf->ordered_replacements) return;
+    const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
+    uint32_t tx = leaf->carriers.transcript_index;
+    size_t ref_length = s->sequences->cds_length[tx], alt_length = leaf->cds_length;
+    if (!leaf->edit_count) {
+        if (alt_length != ref_length || memcmp(leaf->cds, leaf->reference_cds, ref_length)) return;
+        leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
+        leaf->haplotype_so_mask = 0u;
+        return;
+    }
+    if (!leaf->reference_coding_protein || !leaf->reference_cds || ref_length % 3u || ref_length < 6u) return;
+    if (!leaf->translation.unambiguous || !leaf->reference_coding_translation.unambiguous) {
+        leaf->path_status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
+        leaf->path_reason = DUCKVEP_REASON_INVALID_BASE;
+        return;
+    }
+    int frame = 0, terminal = 0, substitutions = 1, insertions = 1, deletions = 1;
+    for (size_t i = 0u; i < leaf->edit_count; i++) {
+        const duckvep_haplotype_edit_t *e = &b->edits[i];
+        if ((e->alt_len % 3u) != (e->ref_len % 3u)) frame = 1;
+        if (e->cds_start <= 3u) terminal = 1;
+        if (e->ref_len ? (size_t)e->cds_start + e->ref_len - 1u >= ref_length - 2u
+                       : (size_t)e->cds_start + 1u >= ref_length) terminal = 1;
+        substitutions &= e->ref_len == e->alt_len;
+        insertions &= e->ref_len == 0u && e->alt_len != 0u;
+        deletions &= e->alt_len == 0u && e->ref_len != 0u;
+    }
+    if (frame || alt_length % 3u) {
+        leaf->path_reason = DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING;
+        return;
+    }
+    if (alt_length < 6u || terminal || leaf->translation.first_stop_position1 != alt_length / 3u ||
+        leaf->reference_coding_translation.first_stop_position1 != ref_length / 3u) {
+        leaf->path_reason = DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING;
+        return;
+    }
+    const uint8_t *ref = leaf->reference_coding_protein, *alt = b->protein;
+    size_t ref_n = ref_length / 3u - 1u, alt_n = alt_length / 3u - 1u;
+    uint64_t mask;
+    if (ref_n == alt_n && !memcmp(ref, alt, ref_n)) mask = DUCKVEP_SO(DUCKVEP_SO_SYNONYMOUS);
+    else if (substitutions) mask = DUCKVEP_SO(DUCKVEP_SO_MISSENSE);
+    else if (insertions) mask = DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION);
+    else if (deletions) mask = DUCKVEP_SO(DUCKVEP_SO_INFRAME_DELETION);
+    else mask = DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING);
+    leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
+    leaf->haplotype_so_mask = mask;
+}
+
 /* Runs on every leaf after sequence construction. It changes no existing field except
  * ordering the (already exposed) edit buffers of failed decoded-call leaves. */
 static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf) {
@@ -773,8 +835,9 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
     }
     leaf->path_status = status;
     leaf->path_reason = reason;
-    leaf->prediction_status = status;
-    leaf->prediction_reason = reason;
+    classify_same_codon(s, leaf);
+    leaf->prediction_status = leaf->path_status;
+    leaf->prediction_reason = leaf->path_reason;
     uint32_t id = leaf->carriers.first_call;
     for (uint32_t i = 0u; i < leaf->carriers.call_count; i++) {
         const duckvep_carrier_call_t *call = duckvep_carriers_call(&s->carriers, id);
@@ -782,7 +845,7 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
         duckvep_prediction_status_t cs;
         duckvep_prediction_reason_t cr;
         duckvep_haplotype_carrier_prediction(leaf, call, &cs, &cr);
-        if (cs != DUCKVEP_PREDICTION_ELIGIBLE) {
+        if (cs != DUCKVEP_PREDICTION_ELIGIBLE && cs != DUCKVEP_PREDICTION_PREDICTED) {
             leaf->prediction_status = cs;
             leaf->prediction_reason = cr;
             break;
@@ -800,7 +863,8 @@ void duckvep_haplotype_carrier_prediction(const duckvep_haplotype_leaf_t *leaf,
     if (call->key.domain_split) {
         *status = DUCKVEP_PREDICTION_INCOMPLETE_INPUT;
         *reason = DUCKVEP_REASON_CROSS_PS_UNRESOLVED;
-    } else if (leaf->path_status == DUCKVEP_PREDICTION_ELIGIBLE && call->key.ploidy != 2u) {
+    } else if ((leaf->path_status == DUCKVEP_PREDICTION_ELIGIBLE ||
+                leaf->path_status == DUCKVEP_PREDICTION_PREDICTED) && call->key.ploidy != 2u) {
         *status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
         *reason = DUCKVEP_REASON_NON_DIPLOID_CALL;
     }
