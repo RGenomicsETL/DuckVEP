@@ -38,4 +38,16 @@ expect_identical(als_call(1e20)$reason, "alt_index")
 expect_identical(prepare("END=6000;REF=6000;RL=6000;RU=A", "GT:SO:CN:CI",
   "1:SPANNING:2:2-2", "A", "<STR2>", strrep("A", 6000L))$reason,
   "allele_capacity")
+
+# Duplicate reference rows give one ambiguous row per input record, never extra rows.
+dbWriteTable(con, "eh_input", data.frame(event_index = 1:2, info = info, format = format,
+  sample = sample, ref = "C", alt = "<STR2>,<STR10>", alt_index = 1L),
+  temporary = TRUE, overwrite = TRUE)
+dbWriteTable(con, "eh_reference", data.frame(event_index = c(1L, 1L, 2L),
+  reference_sequence = c("CAG", "CAG", "CAG")), temporary = TRUE, overwrite = TRUE)
+dup <- rduckvep_prepare_expansionhunter(con, "eh_input", "eh_reference")
+dup <- dup[order(dup$event_index), ]
+expect_identical(nrow(dup), 2L)
+expect_identical(dup$reason, c("ambiguous_reference_sequence", "exact"))
+expect_identical(dup$status, c("invalid", "ok"))
 dbDisconnect(con, shutdown = TRUE)
