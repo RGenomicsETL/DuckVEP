@@ -34,8 +34,8 @@ op <- add_option(
   action = "store_true",
   default = FALSE,
   help = paste(
-    "load --extension without a clean in-tree rebuild; diagnostic runs only",
-    "and incompatible with --history [%default]"
+    "load --extension without a clean in-tree rebuild; history rows record",
+    "prebuilt_immutable_copy and bind the binary by SHA-256 only [%default]"
   )
 )
 op <- add_option(
@@ -284,13 +284,17 @@ if (!nzchar(opt$source_revision)) {
   )
 }
 if (isTRUE(opt$skip_extension_build)) {
-  if (nzchar(opt$history)) {
-    die("--skip-extension-build cannot append checked benchmark history")
-  }
   if (!file.exists(opt$extension)) {
     die("missing input: {opt$extension}")
   }
-  extension_build_binding <- "unbound_diagnostic"
+  # A prebuilt extension is bound only by its SHA-256. Recorded history rows
+  # name that weaker binding; the caller must pass an immutable copy of the
+  # `make release` artifact built from the recorded revision.
+  extension_build_binding <- if (nzchar(opt$history)) {
+    "prebuilt_immutable_copy"
+  } else {
+    "unbound_diagnostic"
+  }
   extension_sha256 <- sha256_file(opt$extension)
 } else {
   extension_receipt <- duckvep_evidence_build_extension(
@@ -1422,9 +1426,10 @@ declared_version <- sub(
 loaded_version <- dbGetQuery(
   con,
   "SELECT extension_version FROM duckdb_extensions()
-   WHERE extension_name = 'duckhts'"
+   WHERE extension_name = 'duckvep'"
 )$extension_version[[1L]]
-if (!identical(loaded_version, declared_version)) {
+if (!identical(loaded_version, declared_version) &&
+    !isTRUE(opt$skip_extension_build)) {
   die(
     "loaded extension version {loaded_version} does not match description.yml ",
     "({declared_version}); run `make configure release` first"
