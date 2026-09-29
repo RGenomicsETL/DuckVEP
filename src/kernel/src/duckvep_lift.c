@@ -1,5 +1,6 @@
 /* duckvep_lift.c — see duckvep_lift.h. Pure C over borrowed views. */
 #include "duckvep_lift.h"
+#include "duckvep_budget.h"
 #include "duckvep_hgvs.h"
 
 #include <stdlib.h>
@@ -115,12 +116,12 @@ static void *lift_take(lift_arena_t *arena, size_t count, size_t size) {
 
 void duckvep_lift_close(duckvep_lift_t *lift) {
     if (lift == NULL) return;
-    free(lift->region_chrom_id);
-    free(lift->region_length);
-    free(lift->region_base);
-    free(lift->region_virtual_length);
-    free(lift->storage);
-    free(lift);
+    duckvep_budget_free(lift->region_chrom_id);
+    duckvep_budget_free(lift->region_length);
+    duckvep_budget_free(lift->region_base);
+    duckvep_budget_free(lift->region_virtual_length);
+    duckvep_budget_free(lift->storage);
+    duckvep_budget_free(lift);
 }
 
 typedef struct lift_plan {
@@ -246,19 +247,19 @@ duckvep_status_t duckvep_lift_open(
                              "lift regions are not sorted and unique");
         }
     }
-    lift = calloc(1u, sizeof *lift);
-    wrapped_region = calloc(region_count + 1u, 1u);
-    bases = calloc(region_count + 1u, sizeof *bases);
+    lift = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, 1u, sizeof *lift);
+    wrapped_region = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, region_count + 1u, 1u);
+    bases = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, region_count + 1u, sizeof *bases);
     if (lift == NULL || wrapped_region == NULL || bases == NULL) {
         status = lift_fail(error, DUCKVEP_ERR_INTERNAL, DVW_LIFT_OOM,
                            "out of memory lifting circular regions");
         goto done;
     }
     lift->region_count = region_count;
-    lift->region_chrom_id = calloc(region_count + 1u, sizeof(uint16_t));
-    lift->region_length = calloc(region_count + 1u, sizeof(uint32_t));
-    lift->region_base = calloc(region_count + 1u, sizeof(uint32_t));
-    lift->region_virtual_length = calloc(region_count + 1u, sizeof(uint32_t));
+    lift->region_chrom_id = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, region_count + 1u, sizeof(uint16_t));
+    lift->region_length = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, region_count + 1u, sizeof(uint32_t));
+    lift->region_base = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, region_count + 1u, sizeof(uint32_t));
+    lift->region_virtual_length = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, region_count + 1u, sizeof(uint32_t));
     if (lift->region_chrom_id == NULL || lift->region_length == NULL ||
         lift->region_base == NULL || lift->region_virtual_length == NULL) {
         status = lift_fail(error, DUCKVEP_ERR_INTERNAL, DVW_LIFT_OOM,
@@ -348,8 +349,8 @@ duckvep_status_t duckvep_lift_open(
                           lift->region_length[region] != 0u)
             ? DUCKVEP_LIFT_IMAGES : 1u;
     }
-    plan.entries = calloc(total + 1u, sizeof *plan.entries);
-    plan.feature_entries = calloc(feature_total + 1u, sizeof *plan.feature_entries);
+    plan.entries = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, total + 1u, sizeof *plan.entries);
+    plan.feature_entries = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, feature_total + 1u, sizeof *plan.feature_entries);
     if (plan.entries == NULL || plan.feature_entries == NULL) {
         status = lift_fail(error, DUCKVEP_ERR_INTERNAL, DVW_LIFT_OOM,
                            "out of memory lifting circular regions");
@@ -430,7 +431,7 @@ duckvep_status_t duckvep_lift_open(
                       have_phase);
     arena.capacity = arena.used;
     arena.used = 0u;
-    arena.block = calloc(1u, arena.capacity != 0u ? arena.capacity : 16u);
+    arena.block = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, 1u, arena.capacity != 0u ? arena.capacity : 16u);
     if (arena.block == NULL) {
         status = lift_fail(error, DUCKVEP_ERR_INTERNAL, DVW_LIFT_OOM,
                            "out of memory lifting circular regions");
@@ -607,18 +608,18 @@ duckvep_status_t duckvep_lift_open(
     lift = NULL;
     status = DUCKVEP_OK;
 plan_done:
-    free(plan.entries);
-    free(plan.feature_entries);
+    duckvep_budget_free(plan.entries);
+    duckvep_budget_free(plan.feature_entries);
 done:
-    free(wrapped_region);
-    free(bases);
+    duckvep_budget_free(wrapped_region);
+    duckvep_budget_free(bases);
     if (lift != NULL) {
-        free(lift->region_chrom_id);
-        free(lift->region_length);
-        free(lift->region_base);
-        free(lift->region_virtual_length);
-        free(lift->storage);
-        free(lift);
+        duckvep_budget_free(lift->region_chrom_id);
+        duckvep_budget_free(lift->region_length);
+        duckvep_budget_free(lift->region_base);
+        duckvep_budget_free(lift->region_virtual_length);
+        duckvep_budget_free(lift->storage);
+        duckvep_budget_free(lift);
     }
     return status;
 }
@@ -669,11 +670,11 @@ duckvep_status_t duckvep_lift_resolve(
                          "lift resolve requires rows, spans and an order buffer");
     }
     if (count == 0u) return DUCKVEP_OK;
-    keys = malloc(count * sizeof *keys);
-    copy = malloc(count * sizeof *copy);
+    keys = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, count * sizeof *keys);
+    copy = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, count * sizeof *copy);
     if (keys == NULL || copy == NULL) {
-        free(keys);
-        free(copy);
+        duckvep_budget_free(keys);
+        duckvep_budget_free(copy);
         return lift_fail(error, DUCKVEP_ERR_INTERNAL, DVW_LIFT_OOM,
                          "out of memory resolving lifted rows");
     }
@@ -690,8 +691,8 @@ duckvep_status_t duckvep_lift_resolve(
 
         if (lifted >= (is_transcript ? lift->transcripts.transcript_count
                                      : lift->interval_features.feature_count)) {
-            free(keys);
-            free(copy);
+            duckvep_budget_free(keys);
+            duckvep_budget_free(copy);
             return lift_fail(error, DUCKVEP_ERR_OUT_OF_RANGE, DVW_LIFT_ROW,
                              "lifted row references an unknown object");
         }
@@ -740,8 +741,8 @@ duckvep_status_t duckvep_lift_resolve(
             row->interval_feature_idx = lift->feature_source[row->interval_feature_idx];
         }
     }
-    free(keys);
-    free(copy);
+    duckvep_budget_free(keys);
+    duckvep_budget_free(copy);
     *kept_out = kept;
     return DUCKVEP_OK;
 }

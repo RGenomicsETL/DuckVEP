@@ -156,15 +156,20 @@ typedef struct duckvep_registry {
 	duckdb_connection query_connection;
 	duckvep_model_entry_t *models;
 	void *annotation_state_pool;
+	size_t annotation_state_pool_count;
+	pthread_cond_t admission;
+	size_t admitted;
 	void (*annotation_state_pool_destroy)(void *);
 	size_t references;
 } duckvep_registry_t;
 
 void duckvep_sql_set_error(char *, size_t, const char *);
+const char *duckvep_sql_final_error(char *, size_t, const char *, const char *);
 int duckvep_sql_resize(void **, size_t, size_t);
 size_t duckvep_sql_next_capacity(size_t, size_t);
 int duckvep_row_is_null(duckdb_vector, idx_t);
 char *duckvep_vector_string(duckdb_vector, idx_t);
+int duckvep_vector_string_wellformed(duckdb_vector, idx_t);
 
 duckvep_registry_t *duckvep_registry_create(duckdb_database);
 void duckvep_registry_retain(duckvep_registry_t *);

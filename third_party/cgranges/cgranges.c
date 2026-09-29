@@ -1,6 +1,14 @@
 #include <stdio.h>
 #include <assert.h>
 #include "cgranges.h"
+/* DuckVEP: every allocation is charged to the process-wide native budget
+ * (owner: interval index). Allocation failure is reported to the caller
+ * (cr_init/cr_add return NULL) instead of dereferencing a NULL pointer. */
+#include "duckvep_budget.h"
+#define kcalloc(N,Z) duckvep_budget_calloc(DUCKVEP_OWNER_INDEX, (N), (Z))
+#define kmalloc(Z) duckvep_budget_malloc(DUCKVEP_OWNER_INDEX, (Z))
+#define krealloc(P,Z) duckvep_budget_realloc(DUCKVEP_OWNER_INDEX, (P), (Z))
+#define kfree(P) duckvep_budget_free(P)
 #include "khash.h"
 
 /**************
@@ -70,12 +78,15 @@
 #define kroundup32(x) (--(x), (x)|=(x)>>1, (x)|=(x)>>2, (x)|=(x)>>4, (x)|=(x)>>8, (x)|=(x)>>16, ++(x))
 #endif
 
-#define CALLOC(type, len) ((type*)calloc((len), sizeof(type)))
-#define REALLOC(ptr, len) ((ptr) = (__typeof__(ptr))realloc((ptr), (len) * sizeof(*(ptr))))
+#define CALLOC(type, len) ((type*)duckvep_budget_calloc(DUCKVEP_OWNER_INDEX, (len), sizeof(type)))
 
-#define EXPAND(a, m) do { \
-		(m) = (m)? (m) + ((m)>>1) : 16; \
-		REALLOC((a), (m)); \
+/* Grows a to m + m/2 elements and sets ok to 1; sets ok to 0, leaving a and m
+ * intact, when the budget or the system allocator refuses. */
+#define EXPAND(a, m, ok) EXPAND_OWNER(DUCKVEP_OWNER_INDEX, a, m, ok)
+#define EXPAND_OWNER(owner_, a, m, ok) do { \
+		int64_t want_ = (m)? (int64_t)(m) + ((m)>>1) : 16; \
+		void *grown_ = duckvep_budget_realloc((owner_), (a), (size_t)want_ * sizeof(*(a))); \
+		if (grown_) { (a) = grown_; (m) = (__typeof__(m))want_; (ok) = 1; } else (ok) = 0; \
 	} while (0)
 
 /********************
@@ -92,7 +103,9 @@ cgranges_t *cr_init(void)
 {
 	cgranges_t *cr;
 	cr = CALLOC(cgranges_t, 1);
+	if (cr == 0) return 0;
 	cr->hc = kh_init(str);
+	if (cr->hc == 0) { duckvep_budget_free(cr); return 0; }
 	return cr;
 }
 
@@ -101,10 +114,10 @@ void cr_destroy(cgranges_t *cr)
 	int32_t i;
 	if (cr == 0) return;
 	for (i = 0; i < cr->n_ctg; ++i)
-		free(cr->ctg[i].name);
-	free(cr->ctg);
+		duckvep_budget_free(cr->ctg[i].name);
+	duckvep_budget_free(cr->ctg);
 	kh_destroy(str, (strhash_t*)cr->hc);
-	free(cr);
+	duckvep_budget_free(cr);
 }
 
 int32_t cr_add_ctg(cgranges_t *cr, const char *ctg, int32_t len)
@@ -112,15 +125,21 @@ int32_t cr_add_ctg(cgranges_t *cr, const char *ctg, int32_t len)
 	int absent;
 	khint_t k;
 	strhash_t *h = (strhash_t*)cr->hc;
-	k = kh_put(str, h, ctg, &absent);
-	if (absent) {
+	char *name;
+	k = kh_get(str, h, ctg);
+	if (k == kh_end(h)) {
 		cr_ctg_t *p;
+		int ok = 1;
 		if (cr->n_ctg == cr->m_ctg)
-			EXPAND(cr->ctg, cr->m_ctg);
+			EXPAND(cr->ctg, cr->m_ctg, ok);
+		if (!ok) return -1;
+		name = duckvep_budget_strdup(DUCKVEP_OWNER_INDEX, ctg);
+		if (name == 0) return -1;
+		k = kh_put(str, h, name, &absent);
+		if (absent < 0) { duckvep_budget_free(name); return -1; }
 		kh_val(h, k) = cr->n_ctg;
 		p = &cr->ctg[cr->n_ctg++];
-		p->name = strdup(ctg);
-		kh_key(h, k) = p->name;
+		p->name = name;
 		p->len = len;
 		p->n = 0, p->off = -1;
 	}
@@ -142,9 +161,12 @@ cr_intv_t *cr_add(cgranges_t *cr, const char *ctg, int32_t st, int32_t en, int32
 	cr_intv_t *p;
 	int32_t k;
 	if (st > en) return 0;
+	int ok = 1;
 	k = cr_add_ctg(cr, ctg, 0);
+	if (k < 0) return 0;
 	if (cr->n_r == cr->m_r)
-		EXPAND(cr->r, cr->m_r);
+		EXPAND(cr->r, cr->m_r, ok);
+	if (!ok) return 0;
 	p = &cr->r[cr->n_r++];
 	p->x = (uint64_t)k << 32 | st;
 	p->y = en;
@@ -272,7 +294,7 @@ int64_t cr_overlap_int(const cgranges_t *cr, int32_t ctg_id, int32_t st, int32_t
 			if (i1 >= c->n) i1 = c->n;
 			for (i = i0; i < i1 && cr_st(&r[i]) < en; ++i)
 				if (st < cr_en(&r[i])) {
-					if (n == m_b) EXPAND(b, m_b);
+					if (n == m_b) { int ok; EXPAND_OWNER(DUCKVEP_OWNER_SCRATCH, b, m_b, ok); if (!ok) { *b_ = b, *m_b_ = m_b; return -1; } }
 					b[n++] = c->off + i;
 				}
 		} else if (z.w == 0) { // if left child not processed
@@ -285,7 +307,7 @@ int64_t cr_overlap_int(const cgranges_t *cr, int32_t ctg_id, int32_t st, int32_t
 			}
 		} else if (z.x < c->n && cr_st(&r[z.x]) < en) {
 			if (st < cr_en(&r[z.x])) { // then z.x overlaps the query; write to the output array
-				if (n == m_b) EXPAND(b, m_b);
+				if (n == m_b) { int ok; EXPAND_OWNER(DUCKVEP_OWNER_SCRATCH, b, m_b, ok); if (!ok) { *b_ = b, *m_b_ = m_b; return -1; } }
 				b[n++] = c->off + z.x;
 			}
 			p = &stack[t++];
@@ -306,7 +328,7 @@ int64_t cr_contain_int(const cgranges_t *cr, int32_t ctg_id, int32_t st, int32_t
 		const cr_intv_t *r = &cr->r[i];
 		if (cr_st(r) >= en) break;
 		if (cr_st(r) >= st && cr_en(r) <= en) {
-			if (n == m_b) EXPAND(b, m_b);
+			if (n == m_b) { int ok; EXPAND_OWNER(DUCKVEP_OWNER_SCRATCH, b, m_b, ok); if (!ok) { *b_ = b, *m_b_ = m_b; return -1; } }
 			b[n++] = i;
 		}
 	}
