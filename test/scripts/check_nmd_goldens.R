@@ -30,8 +30,8 @@ gff <- read.delim(paste0(root, 'nmd.gff3'), header = FALSE, comment.char = '#', 
 vcf <- read.delim(paste0(root, 'nmd.vcf'), header = FALSE, comment.char = '#', stringsAsFactors = FALSE,
     col.names = c('chrom', 'pos', 'id', 'ref', 'alt', 'qual', 'filter', 'info', 'format', 'gt'))
 gold <- read.delim(paste0(root, 'nmd_goldens.tsv'), stringsAsFactors = FALSE, na.strings = '.', colClasses = c(
-    stop_end = 'integer', junction = 'integer', distance = 'integer', applied_positions = 'character', post_stop_positions = 'character'))
-gold$applied_positions[is.na(gold$applied_positions)] <- '.'; gold$post_stop_positions[is.na(gold$post_stop_positions)] <- '.'
+    stop_end = 'integer', junction = 'integer', distance = 'integer', applied_positions = 'character', nmd_positions = 'character', post_stop_positions = 'character'))
+gold$applied_positions[is.na(gold$applied_positions)] <- '.'; gold$nmd_positions[is.na(gold$nmd_positions)] <- '.'; gold$post_stop_positions[is.na(gold$post_stop_positions)] <- '.'
 
 derive <- function(name, lane) {
     exon <- gff[gff$seq == name & gff$type == 'exon', ]; cds <- gff[gff$seq == name & gff$type == 'CDS', ]
@@ -49,6 +49,7 @@ derive <- function(name, lane) {
     # per-base state; an edit replaces genome bases [start, start + ref_len) by alt, in descending order so coordinates hold
     st <- list(base = g, exon = exon_no, cds = in_cds, origin = origin, tag = integer(n), after = integer(n))
     order_desc <- order(rows$pos, decreasing = TRUE)
+    rec_exon <- integer(nrow(rows)); rec_change <- integer(nrow(rows))   # exon (transcript order) and length change of each record
     for (i in order_desc) {
         r <- rows[i, ]; ref <- r$ref; alt <- r$alt; k <- 0L
         while (nchar(ref) > 0L && nchar(alt) > 0L && substr(ref, 1L, 1L) == substr(alt, 1L, 1L) && nchar(ref) != nchar(alt)) {
@@ -64,6 +65,7 @@ derive <- function(name, lane) {
         if (s + rl > length(st$base)) after <- integer()
         pick <- function(v, fill) c(v[before], rep(fill, m), v[after])
         e <- st$exon[anchor]; c_ <- st$cds[anchor]
+        rec_exon[i] <- e; rec_change[i] <- nchar(alt) - rl
         st <- list(base = c(st$base[before], new, st$base[after]), exon = pick(st$exon, e), cds = pick(st$cds, c_),
                    origin = pick(st$origin, NA_integer_), tag = pick(st$tag, i), after = c(st$after[before], rep(0L, m), st$after[after]))
         if (!m && rl) {                                            # a pure deletion tags both neighbours
@@ -79,7 +81,7 @@ derive <- function(name, lane) {
     protein <- translate(edited); first <- match('*', protein); ref_protein <- translate(ref_cds)
     n_exons <- nrow(ex)
     res <- list(carrier = TRUE, nmd = 'unknown', premature = FALSE, S = NA_integer_, J = NA_integer_, D = NA_integer_,
-                applied = '.', post = '.')
+                applied = '.', post = '.', attributed = '.')
     if (substr(edited, 1L, 3L) != 'ATG' || is.na(first)) return(res)
     term_bases <- which(!is.na(tx_origin[cds_at]) & tx_origin[cds_at] > nchar(ref_cds) - 3L)
     term_start <- if (length(term_bases)) min(term_bases) else nchar(edited) + 1L
@@ -96,6 +98,11 @@ derive <- function(name, lane) {
     }, numeric(1L))
     res$applied <- if (any(start < 3L * first)) paste(sort(rows$pos[start < 3L * first]), collapse = ';') else '.'
     res$post <- if (any(start >= 3L * first)) paste(sort(rows$pos[start >= 3L * first]), collapse = ';') else '.'
+    # Attribution: the applied edits plus the post-stop edits that changed length in an exon before the last one, i.e.
+    # at or before the penultimate exon's last base (no edit sits next to a boundary), exactly the edits that moved J.
+    moved <- n_exons > 1L & rec_change != 0L & rec_exon <= n_exons - 1L
+    keep <- start < 3L * first | moved
+    res$attributed <- if (any(keep)) paste(sort(rows$pos[keep]), collapse = ';') else '.'
     res
 }
 
@@ -111,12 +118,13 @@ for (i in seq_len(nrow(gold))) {
     ok <- r$has_carrier && identical(d$nmd, r$nmd) && identical(d$premature, r$premature) &&
         identical(as.integer(d$S), as.integer(r$stop_end)) && identical(as.integer(d$J), as.integer(r$junction)) &&
         identical(as.integer(d$D), as.integer(r$distance)) &&
-        (!d$premature || (identical(d$applied, r$applied_positions) && identical(d$post, r$post_stop_positions))) &&
-        (d$premature || (r$applied_positions == '.' && r$post_stop_positions == '.'))
+        (!d$premature || (identical(d$applied, r$applied_positions) && identical(d$post, r$post_stop_positions) &&
+                          identical(d$attributed, r$nmd_positions))) &&
+        (d$premature || (r$applied_positions == '.' && r$post_stop_positions == '.' && r$nmd_positions == '.'))
     if (!ok) bad <- c(bad, paste(r$case, r$lane))
 }
 if (length(bad)) stop('genome-derived NMD differs from the goldens: ', paste(head(bad, 10L), collapse = ', '))
-stopifnot(nrow(gold) == 468L, counts[['carriers']] == 250L, counts[['reference']] == 218L)
+stopifnot(nrow(gold) == 476L, counts[["carriers"]] == 254L, counts[["reference"]] == 222L)
 
 # ---- coverage of the slice 6 gate --------------------------------------------------------------
 car <- gold[gold$has_carrier, ]
@@ -138,5 +146,11 @@ stopifnot(identical(dist(c('d49')), 49L), identical(dist('d50'), 50L), identical
           setequal(unique(car$strand), c('+', '-')), setequal(unique(car$exons), 1:4), setequal(unique(car$utr), c('u0', 'u1')),
           setequal(unique(car$nmd), c('unknown', 'not_applicable', 'escape', 'trigger')),
           all(car$nmd[car$premature] %in% c('escape', 'trigger')), !any(car$premature[car$nmd %in% c('unknown', 'not_applicable')]),
-          all(car$applied_positions[car$premature] != '.'), any(car$post_stop_positions != '.'))
-cat('nmd goldens: 250 carrier lanes and 218 reference lanes re-derived from the genome; the slice 6 gate is covered\n')
+          all(car$applied_positions[car$premature] != '.'), any(car$post_stop_positions != '.'),
+          # a post-stop indel that moves J is attributed (and flips the prediction in post_ins/del_pen_shifts_j), one that does
+          # not (last exon, or a substitution) is not
+          all(car$nmd_positions[car$scenario %in% c('post_ins_pen_shifts_j', 'post_del_pen_shifts_j', 'post_ins_moves_j_no_flip')] !=
+              car$applied_positions[car$scenario %in% c('post_ins_pen_shifts_j', 'post_del_pen_shifts_j', 'post_ins_moves_j_no_flip')]),
+          all(car$nmd_positions[car$scenario %in% c('post_indel_last_exon_d49', 'post_indel_last_exon_d51', 'post_snv_after_stop', 'post_snv_last_exon')] ==
+              car$applied_positions[car$scenario %in% c('post_indel_last_exon_d49', 'post_indel_last_exon_d51', 'post_snv_after_stop', 'post_snv_last_exon')]))
+cat('nmd goldens: 254 carrier lanes and 222 reference lanes re-derived from the genome; the slice 6 gate is covered\n')

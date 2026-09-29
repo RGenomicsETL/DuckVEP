@@ -115,6 +115,10 @@
 ##contig=<ID=post_indel_last_exon_d51__plus__u1,length=262>
 ##contig=<ID=post_indel_last_exon_d51__minus__u0,length=232>
 ##contig=<ID=post_indel_last_exon_d51__minus__u1,length=262>
+##contig=<ID=post_ins_moves_j_no_flip__plus__u0,length=232>
+##contig=<ID=post_ins_moves_j_no_flip__plus__u1,length=262>
+##contig=<ID=post_ins_moves_j_no_flip__minus__u0,length=232>
+##contig=<ID=post_ins_moves_j_no_flip__minus__u1,length=262>
 ##contig=<ID=post_snv_after_stop__plus__u0,length=192>
 ##contig=<ID=post_snv_after_stop__plus__u1,length=222>
 ##contig=<ID=post_snv_after_stop__minus__u0,length=192>
@@ -399,6 +403,14 @@ post_indel_last_exon_d51__minus__u0	23	.	TTGT	T	.	PASS	.	GT	1|0
 post_indel_last_exon_d51__minus__u0	168	.	G	A	.	PASS	.	GT	1|0
 post_indel_last_exon_d51__minus__u1	40	.	TTGT	T	.	PASS	.	GT	1|0
 post_indel_last_exon_d51__minus__u1	185	.	G	A	.	PASS	.	GT	1|0
+post_ins_moves_j_no_flip__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
+post_ins_moves_j_no_flip__plus__u0	136	.	A	AGGG	.	PASS	.	GT	1|0
+post_ins_moves_j_no_flip__plus__u1	78	.	C	T	.	PASS	.	GT	1|0
+post_ins_moves_j_no_flip__plus__u1	149	.	A	AGGG	.	PASS	.	GT	1|0
+post_ins_moves_j_no_flip__minus__u0	96	.	T	TCCC	.	PASS	.	GT	1|0
+post_ins_moves_j_no_flip__minus__u0	168	.	G	A	.	PASS	.	GT	1|0
+post_ins_moves_j_no_flip__minus__u1	113	.	T	TCCC	.	PASS	.	GT	1|0
+post_ins_moves_j_no_flip__minus__u1	185	.	G	A	.	PASS	.	GT	1|0
 post_snv_after_stop__plus__u0	65	.	C	T	.	PASS	.	GT	1|0
 post_snv_after_stop__plus__u0	86	.	C	G	.	PASS	.	GT	1|0
 post_snv_after_stop__plus__u1	78	.	C	T	.	PASS	.	GT	1|0

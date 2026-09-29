@@ -2,8 +2,8 @@ require duckvep
 
 # NMD attribution (slice 6 of #2, contract design/duckvep_haplotype_contract.md, rule ejc50-v1). The model, calls and
 # expectations are the committed fixtures of test/scripts/generate_nmd_goldens.R: base R with no DuckVEP code and no
-# csq (csq predicts no NMD). 60 scenarios laid out on both strands, with and without a UTR (u1: 13-nt 5' UTR and 17-nt
-# 3' UTR, so S and J are mRNA coordinates), 1 to 4 exons: 234 transcripts, 334 VCF records, 468 lane goldens.
+# csq (csq predicts no NMD). 61 scenarios laid out on both strands, with and without a UTR (u1: 13-nt 5' UTR and 17-nt
+# 3' UTR, so S and J are mRNA coordinates), 1 to 4 exons: 238 transcripts, 342 VCF records, 476 lane goldens.
 #
 # The rule: for a newly premature stop (stop_gained in the whole-haplotype result) return trigger when J - S > 50, else
 # escape; S is the final nucleotide of the first stop codon, J the final nucleotide of the penultimate exon, both
@@ -12,7 +12,7 @@ require duckvep
 # ineligible or failed path are unknown. An EJC-distance heuristic only: no reinitiation, no long-exon exception, no
 # NMD_transcript_variant biotype term, and never the single-allele NMD plugin or a per-allele union.
 # nmd_contributors are the event_index of the contributors with role 'applied' (the edits up to and including the
-# stop); post_stop sources are never attributed, although a post-stop indel before J moves J (see post_* below).
+# stop) plus the post_stop indels that moved J (their role stays post_stop; see the attribution table below).
 
 statement ok
 CREATE TABLE nm_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region,
@@ -29,7 +29,7 @@ CREATE TABLE nm_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start
  FROM read_csv('test/data/haplotype/nmd_exons.tsv',delim='\t',header=true);
 
 query I
-SELECT loaded FROM duckvep_model_load('nm','SELECT i::UINTEGER seq_region FROM range(234) t(i)',
+SELECT loaded FROM duckvep_model_load('nm','SELECT i::UINTEGER seq_region FROM range(238) t(i)',
  'SELECT * EXCLUDE(case_name) FROM nm_tx ORDER BY transcript_index',
  'SELECT * FROM nm_exons ORDER BY transcript_index,exon_cdna_start');
 ----
@@ -49,20 +49,20 @@ CREATE TABLE nm_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq
 query I
 SELECT count(*) FROM nm_calls;
 ----
-334
+342
 
 statement ok
 CREATE TABLE nm_gold AS SELECT g."case" AS case_name,t.transcript_index,g.scenario,g.strand,g.utr,g.exons,g.lane,
  g.has_carrier,g.nmd,g.premature,nullif(g.stop_end,'.')::BIGINT stop_end,nullif(g.junction,'.')::BIGINT junction,
- nullif(g.distance,'.')::BIGINT distance,g.applied_positions,g.post_stop_positions
+ nullif(g.distance,'.')::BIGINT distance,g.applied_positions,g.nmd_positions,g.post_stop_positions
  FROM read_csv('test/data/haplotype/nmd_goldens.tsv',delim='\t',header=true,nullstr='<none>',
-  types={'stop_end':'VARCHAR','junction':'VARCHAR','distance':'VARCHAR','applied_positions':'VARCHAR','post_stop_positions':'VARCHAR',
+  types={'stop_end':'VARCHAR','junction':'VARCHAR','distance':'VARCHAR','applied_positions':'VARCHAR','nmd_positions':'VARCHAR','post_stop_positions':'VARCHAR',
          'has_carrier':'BOOLEAN','premature':'BOOLEAN'}) g JOIN nm_tx t ON t.case_name=g."case";
 
 query III
 SELECT count(*),count(*) FILTER (WHERE has_carrier),count(*) FILTER (WHERE NOT has_carrier) FROM nm_gold;
 ----
-468	250	218
+476	254	222
 
 # One row per distinct edit path; one carrier per (sample, phase set, lane). The row summary is the path's NMD when
 # every carrier is decided; per carrier, carrier_predictions has nmd_prediction, nmd_stop_position and nmd_junction_position.
@@ -92,13 +92,13 @@ SELECT count(*),
  count(*) FILTER (WHERE list_contains(haplotype_consequences,'stop_gained')=premature)
 FROM nm_named;
 ----
-250	250	250	250	250	250	250	250	250
+254	254	254	254	254	254	254	254	254
 
 query II
 SELECT count(*) FILTER (WHERE NOT g.has_carrier),count(*) FILTER (WHERE NOT g.has_carrier AND o.lane IS NOT NULL)
 FROM nm_gold g LEFT JOIN nm_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane;
 ----
-218	0
+222	0
 
 # Outcome counts by golden result: unknown is lost initiation and frames that run off (no stop in the edited CDS), never a
 # premature stop; premature stops are exactly trigger or escape; known termination is not_applicable.
@@ -108,7 +108,7 @@ SELECT nmd,count(*),count(*) FILTER (WHERE premature),count(DISTINCT scenario) F
 ----
 escape	90	90	23
 not_applicable	44	0	9
-trigger	92	92	23
+trigger	96	96	24
 unknown	24	0	6
 
 query TTI
@@ -123,7 +123,7 @@ missense_variant	not_applicable	24
 protein_altering_variant	not_applicable	4
 start_lost	unknown	8
 stop_gained	escape	78
-stop_gained	trigger	72
+stop_gained	trigger	76
 stop_lost	unknown	4
 stop_retained_variant	not_applicable	4
 synonymous_variant	not_applicable	4
@@ -187,6 +187,7 @@ fs_three_exons	30	81	51	trigger
 post_del_pen_shifts_j	51	100	49	escape
 post_indel_last_exon_d49	51	100	49	escape
 post_indel_last_exon_d51	51	102	51	trigger
+post_ins_moves_j_no_flip	51	105	54	trigger
 post_ins_pen_shifts_j	51	103	52	trigger
 post_ins_pen_two_exon	51	103	52	trigger
 post_snv_after_stop	51	102	51	trigger
@@ -245,46 +246,54 @@ trans_pair_halves	1	NULL	missense_variant	not_applicable	1
 trans_stop_and_missense	0	51	stop_gained	trigger	1
 trans_stop_and_missense	1	NULL	missense_variant	not_applicable	1
 
-# Attribution. nmd_contributors lists the contributors with role 'applied' (edits up to and including the stop), by
-# event_index; the post_stop and omitted contributors are not attributed, whatever they did to J. It equals the golden edit set for every
-# premature stop and is NULL when nothing is premature.
+# Attribution. nmd_contributors lists, by event_index, the contributors with role 'applied' (edits up to and including the
+# stop) plus the 'post_stop' contributors whose indel changes length at or before the penultimate exon's last base, i.e. exactly
+# the edits that moved J. Roles are unchanged (those edits stay post_stop). Post-stop substitutions and post-stop indels in the
+# last exon are not attributed. It equals the golden nmd_positions for every premature stop; for not_applicable and unknown
+# (and every non-predicted row) it is NULL, as are the stop and junction positions.
 
-query IIII
+query IIIII
 SELECT count(*),
  count(*) FILTER (WHERE coalesce(nullif(array_to_string(list_sort(list_transform(list_filter(contributor_provenance,
-   lambda p: list_contains(nmd_contributors,p.event_index)),lambda p: p.position)),';'),''),'.')=applied_positions),
+   lambda p: list_contains(nmd_contributors,p.event_index)),lambda p: p.position)),';'),''),'.')=nmd_positions),
  count(*) FILTER (WHERE array_to_string(list_sort(list_transform(list_filter(contributor_provenance,
    lambda p: p.role='post_stop'),lambda p: p.position)),';')=coalesce(nullif(post_stop_positions,'.'),'')),
- count(*) FILTER (WHERE (nmd_contributors IS NULL)=(NOT premature))
+ count(*) FILTER (WHERE (nmd_contributors IS NULL)=(NOT premature)),
+ count(*) FILTER (WHERE nmd_positions<>applied_positions)
 FROM nm_named;
 ----
-250	250	250	250
+254	254	254	254	16
 
-# Attribution, plus strand without a UTR (VCF positions): the stop's own edit is applied; an upstream frame or in-frame indel and
-# each half of a cis pair are applied too; edits after the stop are post_stop and unattributed, including the one inside the
-# penultimate exon that moved J (post_ins_pen_shifts_j).
+# Attribution, plus strand without a UTR (VCF positions; columns: applied edits, attributed nmd_contributors, post_stop edits, prediction).
+# The stop's own edit is applied; an upstream frame or in-frame indel and each half of a cis pair are applied too. A post-stop indel
+# inside the penultimate exon moves J, so it is attributed although its role stays post_stop: post_ins_pen_shifts_j (escape at 49
+# without it, trigger at 52 with it, so it flips the outcome), post_del_pen_shifts_j (trigger to escape) and post_ins_moves_j_no_flip
+# (51 to 54, still trigger, still attributed). A post-stop substitution, and a post-stop indel in the last exon, are not.
 
-query TTTT
+query TTTTT
 SELECT scenario,coalesce(nullif(array_to_string(list_sort(list_transform(list_filter(contributor_provenance,
+   lambda p: p.role='applied'),lambda p: p.position)),';'),''),'-'),coalesce(nullif(array_to_string(list_sort(list_transform(list_filter(contributor_provenance,
    lambda p: list_contains(nmd_contributors,p.event_index)),lambda p: p.position)),';'),''),'-'),
  coalesce(nullif(array_to_string(list_sort(list_transform(list_filter(contributor_provenance,lambda p: p.role='post_stop'),
    lambda p: p.position)),';'),''),'-'),nmd_prediction
 FROM nm_named WHERE strand='+' AND utr='u0' AND lane=0 AND scenario IN ('d51','up_ins3_d51','up_del3_d50','cis_pair_stop',
- 'post_ins_pen_shifts_j','post_del_pen_shifts_j','post_snv_after_stop','fs_post_stop_edits','frame_pair_stop_second','trans_stop_and_missense',
+ 'post_ins_pen_shifts_j','post_del_pen_shifts_j','post_ins_moves_j_no_flip','post_indel_last_exon_d49','post_snv_after_stop','fs_post_stop_edits','frame_pair_stop_second','trans_stop_and_missense',
  'start_lost_with_stop','run_off_deletion') ORDER BY scenario;
 ----
-cis_pair_stop	20;22	-	trigger
-d51	65	-	trigger
-frame_pair_stop_second	28;36;65	-	escape
-fs_post_stop_edits	26	146;156	trigger
-post_del_pen_shifts_j	65	136	escape
-post_ins_pen_shifts_j	65	136	trigger
-post_snv_after_stop	65	86	trigger
-run_off_deletion	-	-	unknown
-start_lost_with_stop	-	-	unknown
-trans_stop_and_missense	65	-	trigger
-up_del3_d50	46;65	-	escape
-up_ins3_d51	46;65	-	trigger
+cis_pair_stop	20;22	20;22	-	trigger
+d51	65	65	-	trigger
+frame_pair_stop_second	28;36;65	28;36;65	-	escape
+fs_post_stop_edits	26	26	146;156	trigger
+post_del_pen_shifts_j	65	65;136	136	escape
+post_indel_last_exon_d49	65	65	206	escape
+post_ins_moves_j_no_flip	65	65;136	136	trigger
+post_ins_pen_shifts_j	65	65;136	136	trigger
+post_snv_after_stop	65	65	86	trigger
+run_off_deletion	66	-	-	unknown
+start_lost_with_stop	17;65	-	-	unknown
+trans_stop_and_missense	65	65	-	trigger
+up_del3_d50	46;65	46;65	-	escape
+up_ins3_d51	46;65	46;65	-	trigger
 
 # Failed and ineligible paths are unknown, with NULL S, J and attribution (and NULL SO/IMPACT as before): an unphased
 # heterozygous call (sample 1), a missing allele's other lane (sample 3), a triploid call (sample 2, non_diploid_call), and a contradictory pair of
@@ -333,7 +342,7 @@ SELECT c.prediction_status,c.prediction_reason,c.nmd_prediction,h.nmd_prediction
 ----
 unsupported_context	non_strict_phase_policy	unknown	unknown	ejc50-v1
 
-# Reference lanes: an ALT-free lane carries no carrier in strict decoded output, so it has no row to label (218 golden lanes
+# Reference lanes: an ALT-free lane carries no carrier in strict decoded output, so it has no row to label (222 golden lanes
 # above); the goldens record it as not_applicable, and a lane whose path has no edits gets not_applicable in the kernel
 # (property test haplotype_nmd_no_op_alt_is_rejected_so_no_reference_lane_leaf_exists). Independent-event output is unchanged: the NMD columns are
-# additions at the end of the row (and of each carrier) and duckvep_annotate is untouched.
+# additions before nominal_length_diff (and at the end of each carrier) and duckvep_annotate is untouched.

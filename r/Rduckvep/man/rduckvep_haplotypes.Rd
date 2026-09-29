@@ -207,8 +207,12 @@ absent), unresolved exon topology, and every path that is not `predicted`
 the non-strict phase policy), whose consequences and IMPACT are NULL as before.
 `nmd_stop_position` and `nmd_junction_position` are NULL unless a premature stop was
 decided (J also needs a junction). `nmd_contributors` lists the `event_index` of the
-contributors with role `applied`, the edits up to and including the stop, and never a
-`post_stop`, `shadowed` or `omitted` source; it is NULL when nothing is premature. The
+contributors that jointly determine a `trigger` or `escape`: those with role `applied`
+(the edits up to and including the stop) plus the `post_stop` indels that changed length at
+or before the penultimate exon's last base, i.e. exactly the edits that moved J. Their
+`role` stays `post_stop`. Post-stop substitutions, post-stop indels in the last exon, and
+`shadowed` or `omitted` sources are not listed. For `not_applicable`, `unknown` and every
+non-predicted row it is NULL, as are the stop and junction positions. The
 row fields are `unknown` and NULL unless every carrier is predicted; the keyed
 `carrier_predictions` also carry `nmd_prediction`, `nmd_stop_position` and
 `nmd_junction_position`, so one ineligible carrier does not hide the others. Only the

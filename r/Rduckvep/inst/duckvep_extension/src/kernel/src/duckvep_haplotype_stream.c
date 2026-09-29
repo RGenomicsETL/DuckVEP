@@ -766,7 +766,7 @@ static void nmd_ejc50(const duckvep_haplotype_stream_t *s, duckvep_haplotype_lea
     }
     /* Exons tile the spliced transcript from cDNA 1 without gaps or overlaps, and hold the CDS. */
     if (total != last_end || (n > 1u && (!pen_start || pen_end + 1u != last_start)) ||
-        origin + ref_length - 1u > last_end) return;
+        origin + ref_length - 1u > last_end) { leaf->nmd_stop_valid = 0u; return; }
     leaf->nmd_stop_position1 = stop;
     leaf->nmd_stop_valid = 1u;
     if (n == 1u) {                                                  /* intronless: no junction, always escapes */
@@ -781,15 +781,18 @@ static void nmd_ejc50(const duckvep_haplotype_stream_t *s, duckvep_haplotype_lea
         uint64_t q0 = origin + (uint64_t)e->cds_start - 1u;
         int64_t change = (int64_t)e->alt_len - (int64_t)e->ref_len;
         if (q0 <= pen_end) {
-            if (e->ref_len && q0 + e->ref_len - 1u > pen_end) return; /* an edit may not span the junction */
+            if (e->ref_len && q0 + e->ref_len - 1u > pen_end) { leaf->nmd_stop_valid = 0u; return; } /* an edit may not span the junction */
             junction += change;
+            if (change)
+                for (size_t j = 0u; j < leaf->contributor_count; j++)
+                    if (b->contributors[j].source.event_id == b->edit_event_ids[i]) b->contributors[j].nmd_moved_junction = 1u;
             if (q0 >= pen_start) pen_size += change;
         } else if (q0 >= last_start) {
-            if (e->ref_len && q0 + e->ref_len - 1u > last_end) return;
+            if (e->ref_len && q0 + e->ref_len - 1u > last_end) { leaf->nmd_stop_valid = 0u; return; }
             last_size += change;
         }
     }
-    if (pen_size <= 0 || last_size <= 0 || junction < 1) return;   /* an exon was deleted whole */
+    if (pen_size <= 0 || last_size <= 0 || junction < 1) { leaf->nmd_stop_valid = 0u; return; } /* an exon was deleted whole */
     leaf->nmd_junction_position1 = (uint64_t)junction;
     leaf->nmd_junction_valid = 1u;
     leaf->nmd = junction - (int64_t)stop > DUCKVEP_HAPLOTYPE_NMD_THRESHOLD ? DUCKVEP_HAPLOTYPE_NMD_TRIGGER

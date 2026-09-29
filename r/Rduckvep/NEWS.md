@@ -40,7 +40,9 @@
   coordinates (indels upstream or inside the penultimate exon move J; a single-exon transcript always escapes and has no
   J). Known termination without a new premature stop is `not_applicable`; `start_lost`, an edited CDS with no stop (a
   frame that runs off the CDS, `stop_lost`), unresolved exon topology and every failed or ineligible path are `unknown`.
-  `nmd_contributors` lists the applied contributors (the edits up to and including the stop), never `post_stop` ones. The
+  `nmd_contributors` lists the applied contributors (the edits up to and including the stop) plus the `post_stop`
+  indels that moved J (changed length at or before the penultimate exon's last base; their `role` stays `post_stop`), and is
+  NULL unless the prediction is `trigger` or `escape`. The
   prediction is decided on the whole haplotype, not per allele, and is an EJC-distance heuristic only: no reinitiation,
   no long-exon exception, no `NMD_transcript_variant` biotype term. Existing columns and their values are unchanged.
 - The extension's SQL preparation and annotation entry points are native builders:

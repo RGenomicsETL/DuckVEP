@@ -89,6 +89,7 @@ scenarios <- list(
   post_ins_pen_two_exon = sc('caa', c(100L, 120L), function(e) list(e$snv(49, 'T'), e$ins(80, 'GGG')), x('trigger', 52L)),
   post_indel_last_exon_d49 = sc('caa', c(60L, 100L, 120L), function(e) list(e$snv(49, 'T'), e$ins(110, 'GGG')), x('escape', 49L)),
   post_indel_last_exon_d51 = sc('caa', c(60L, 102L, 120L), function(e) list(e$snv(49, 'T'), e$del(110, 3)), x('trigger', 51L)),
+  post_ins_moves_j_no_flip = sc('caa', c(60L, 102L, 120L), function(e) list(e$snv(49, 'T'), e$ins(80, 'GGG')), x('trigger', 54L)),
   post_snv_after_stop = sc('caa', c(102L, 120L), function(e) list(e$snv(49, 'T'), e$snv(70, 'G')), x('trigger', 51L)),
   post_snv_last_exon = sc('caa', c(100L, 120L), function(e) list(e$snv(49, 'T'), e$snv(110, 'G')), x('escape', 49L)),
   # -- frameshifts with a premature stop (mix: the +1 frame reads a stop ending at edited cDNA 30; J follows the insertion)
@@ -163,18 +164,19 @@ edit_mrna <- function(mrna, label, edits, lane, u5) {
     }
     list(seq = paste(seq_out, collapse = ''), label = lab_out, island_start0 = starts_out, island_id = ids, n = length(isl),
          change = vapply(isl, function(z) nchar(z$alt) - z$ref_len, integer(1L)),
+         ref_start = vapply(isl, function(z) z$start, numeric(1L)),
          ref_end = vapply(isl, function(z) z$start + z$ref_len - 1L, numeric(1L)))
 }
-policy <- function(cds, u5, u3, mrna, label, edits, lane, n_exons) {
+policy <- function(cds, u5, u3, mrna, label, edits, lane, n_exons, ends) {
     if (!any(vapply(edits, function(e) lane %in% e$lane, logical(1L))))
         return(list(carrier = FALSE, nmd = 'not_applicable', premature = FALSE, S = NA_integer_, J = NA_integer_,
-                    D = NA_integer_, applied = integer(), post = integer()))
+                    D = NA_integer_, applied = integer(), post = integer(), attributed = integer()))
     w <- edit_mrna(mrna, label, edits, lane, u5)
     edited_cds <- substr(w$seq, u5 + 1L, nchar(w$seq) - u3)
     protein <- translate(edited_cds); first <- match('*', protein)
     ref_protein <- translate(cds); nref <- length(ref_protein)
     res <- list(carrier = TRUE, nmd = 'unknown', premature = FALSE, S = NA_integer_, J = NA_integer_, D = NA_integer_,
-                applied = integer(), post = integer())
+                applied = integer(), post = integer(), attributed = integer())
     if (substr(edited_cds, 1L, 3L) != 'ATG' || is.na(first)) return(res)
     # The reference terminator (last three CDS bases) sits after every edit that ends before it.
     before <- sum(w$change[w$ref_end <= u5 + nchar(cds) - 3L])
@@ -189,6 +191,10 @@ policy <- function(cds, u5, u3, mrna, label, edits, lane, n_exons) {
     # island start in edited CDS coordinates, 0-based: post_stop when it is at or after the end of the stop codon
     post <- w$island_start0 - u5 >= 3L * first
     res$applied <- w$island_id[!post]; res$post <- w$island_id[post]
+    # NMD attribution: the applied edits plus the post-stop edits that changed length at or before the penultimate
+    # exon's last base (reference mRNA coordinates), i.e. exactly the edits that moved J.
+    moved <- if (n_exons > 1L) w$change != 0L & w$ref_start <= ends[n_exons - 1L] else logical(length(post))
+    res$attributed <- w$island_id[!post | (post & moved)]
     res
 }
 
@@ -257,7 +263,7 @@ for (scenario_name in names(scenarios)) {
                 order = length(records))
         }
         for (lane in 0:1) {
-            res <- policy(cds, u5, u3, mrna, label, edits, lane, n_exons)
+            res <- policy(cds, u5, u3, mrna, label, edits, lane, n_exons, ends)
             if (lane == 0L && !is.null(scenario$expect)) {
                 if (!(identical(res$nmd, scenario$expect$nmd) &&
                       (is.na(scenario$expect$d) || identical(res$D, scenario$expect$d) || (n_exons == 1L && is.na(res$D)))))
@@ -269,6 +275,7 @@ for (scenario_name in names(scenarios)) {
                 has_carrier = res$carrier, nmd = res$nmd, premature = res$premature,
                 stop_end = res$S, junction = res$J, distance = res$D,
                 applied_positions = if (length(res$applied)) paste(sort(edit_pos[res$applied]), collapse = ';') else '.',
+                nmd_positions = if (length(res$attributed)) paste(sort(edit_pos[res$attributed]), collapse = ';') else '.',
                 post_stop_positions = if (length(res$post)) paste(sort(edit_pos[res$post]), collapse = ';') else '.')
         }
     }

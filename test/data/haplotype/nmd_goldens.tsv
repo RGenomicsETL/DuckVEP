@@ -1,469 +1,477 @@
-case	scenario	strand	utr	exons	lane	has_carrier	nmd	premature	stop_end	junction	distance	applied_positions	post_stop_positions
-d49__plus__u0	d49	+	u0	2	0	TRUE	escape	TRUE	51	100	49	65	.
-d49__plus__u0	d49	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d49__plus__u1	d49	+	u1	2	0	TRUE	escape	TRUE	64	113	49	78	.
-d49__plus__u1	d49	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d49__minus__u0	d49	-	u0	2	0	TRUE	escape	TRUE	51	100	49	128	.
-d49__minus__u0	d49	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d49__minus__u1	d49	-	u1	2	0	TRUE	escape	TRUE	64	113	49	145	.
-d49__minus__u1	d49	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d50__plus__u0	d50	+	u0	2	0	TRUE	escape	TRUE	51	101	50	65	.
-d50__plus__u0	d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d50__plus__u1	d50	+	u1	2	0	TRUE	escape	TRUE	64	114	50	78	.
-d50__plus__u1	d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d50__minus__u0	d50	-	u0	2	0	TRUE	escape	TRUE	51	101	50	128	.
-d50__minus__u0	d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d50__minus__u1	d50	-	u1	2	0	TRUE	escape	TRUE	64	114	50	145	.
-d50__minus__u1	d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d51__plus__u0	d51	+	u0	2	0	TRUE	trigger	TRUE	51	102	51	65	.
-d51__plus__u0	d51	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d51__plus__u1	d51	+	u1	2	0	TRUE	trigger	TRUE	64	115	51	78	.
-d51__plus__u1	d51	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d51__minus__u0	d51	-	u0	2	0	TRUE	trigger	TRUE	51	102	51	128	.
-d51__minus__u0	d51	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d51__minus__u1	d51	-	u1	2	0	TRUE	trigger	TRUE	64	115	51	145	.
-d51__minus__u1	d51	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d52__plus__u0	d52	+	u0	2	0	TRUE	trigger	TRUE	51	103	52	65	.
-d52__plus__u0	d52	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d52__plus__u1	d52	+	u1	2	0	TRUE	trigger	TRUE	64	116	52	78	.
-d52__plus__u1	d52	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d52__minus__u0	d52	-	u0	2	0	TRUE	trigger	TRUE	51	103	52	128	.
-d52__minus__u0	d52	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d52__minus__u1	d52	-	u1	2	0	TRUE	trigger	TRUE	64	116	52	145	.
-d52__minus__u1	d52	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d0_stop_ends_exon__plus__u0	d0_stop_ends_exon	+	u0	2	0	TRUE	escape	TRUE	51	51	0	65	.
-d0_stop_ends_exon__plus__u0	d0_stop_ends_exon	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d0_stop_ends_exon__plus__u1	d0_stop_ends_exon	+	u1	2	0	TRUE	escape	TRUE	64	64	0	78	.
-d0_stop_ends_exon__plus__u1	d0_stop_ends_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d0_stop_ends_exon__minus__u0	d0_stop_ends_exon	-	u0	2	0	TRUE	escape	TRUE	51	51	0	128	.
-d0_stop_ends_exon__minus__u0	d0_stop_ends_exon	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-d0_stop_ends_exon__minus__u1	d0_stop_ends_exon	-	u1	2	0	TRUE	escape	TRUE	64	64	0	145	.
-d0_stop_ends_exon__minus__u1	d0_stop_ends_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_d50__plus__u0	pen_d50	+	u0	3	0	TRUE	escape	TRUE	51	101	50	105	.
-pen_d50__plus__u0	pen_d50	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_d50__plus__u1	pen_d50	+	u1	3	0	TRUE	escape	TRUE	64	114	50	118	.
-pen_d50__plus__u1	pen_d50	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_d50__minus__u0	pen_d50	-	u0	3	0	TRUE	escape	TRUE	51	101	50	128	.
-pen_d50__minus__u0	pen_d50	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_d50__minus__u1	pen_d50	-	u1	3	0	TRUE	escape	TRUE	64	114	50	145	.
-pen_d50__minus__u1	pen_d50	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_d51__plus__u0	pen_d51	+	u0	3	0	TRUE	trigger	TRUE	51	102	51	105	.
-pen_d51__plus__u0	pen_d51	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_d51__plus__u1	pen_d51	+	u1	3	0	TRUE	trigger	TRUE	64	115	51	118	.
-pen_d51__plus__u1	pen_d51	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_d51__minus__u0	pen_d51	-	u0	3	0	TRUE	trigger	TRUE	51	102	51	128	.
-pen_d51__minus__u0	pen_d51	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_d51__minus__u1	pen_d51	-	u1	3	0	TRUE	trigger	TRUE	64	115	51	145	.
-pen_d51__minus__u1	pen_d51	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-first_of_three_trigger__plus__u0	first_of_three_trigger	+	u0	3	0	TRUE	trigger	TRUE	12	100	88	26	.
-first_of_three_trigger__plus__u0	first_of_three_trigger	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-first_of_three_trigger__plus__u1	first_of_three_trigger	+	u1	3	0	TRUE	trigger	TRUE	25	113	88	39	.
-first_of_three_trigger__plus__u1	first_of_three_trigger	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-first_of_three_trigger__minus__u0	first_of_three_trigger	-	u0	3	0	TRUE	trigger	TRUE	12	100	88	207	.
-first_of_three_trigger__minus__u0	first_of_three_trigger	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-first_of_three_trigger__minus__u1	first_of_three_trigger	-	u1	3	0	TRUE	trigger	TRUE	25	113	88	224	.
-first_of_three_trigger__minus__u1	first_of_three_trigger	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-first_of_three_escape__plus__u0	first_of_three_escape	+	u0	3	0	TRUE	escape	TRUE	51	90	39	65	.
-first_of_three_escape__plus__u0	first_of_three_escape	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-first_of_three_escape__plus__u1	first_of_three_escape	+	u1	3	0	TRUE	escape	TRUE	64	103	39	78	.
-first_of_three_escape__plus__u1	first_of_three_escape	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-first_of_three_escape__minus__u0	first_of_three_escape	-	u0	3	0	TRUE	escape	TRUE	51	90	39	168	.
-first_of_three_escape__minus__u0	first_of_three_escape	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-first_of_three_escape__minus__u1	first_of_three_escape	-	u1	3	0	TRUE	escape	TRUE	64	103	39	185	.
-first_of_three_escape__minus__u1	first_of_three_escape	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_exon_escape__plus__u0	pen_exon_escape	+	u0	3	0	TRUE	escape	TRUE	90	100	10	144	.
-pen_exon_escape__plus__u0	pen_exon_escape	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_exon_escape__plus__u1	pen_exon_escape	+	u1	3	0	TRUE	escape	TRUE	103	113	10	157	.
-pen_exon_escape__plus__u1	pen_exon_escape	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_exon_escape__minus__u0	pen_exon_escape	-	u0	3	0	TRUE	escape	TRUE	90	100	10	89	.
-pen_exon_escape__minus__u0	pen_exon_escape	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-pen_exon_escape__minus__u1	pen_exon_escape	-	u1	3	0	TRUE	escape	TRUE	103	113	10	106	.
-pen_exon_escape__minus__u1	pen_exon_escape	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-last_exon_stop__plus__u0	last_exon_stop	+	u0	2	0	TRUE	escape	TRUE	102	60	-42	156	.
-last_exon_stop__plus__u0	last_exon_stop	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-last_exon_stop__plus__u1	last_exon_stop	+	u1	2	0	TRUE	escape	TRUE	115	73	-42	169	.
-last_exon_stop__plus__u1	last_exon_stop	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-last_exon_stop__minus__u0	last_exon_stop	-	u0	2	0	TRUE	escape	TRUE	102	60	-42	37	.
-last_exon_stop__minus__u0	last_exon_stop	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-last_exon_stop__minus__u1	last_exon_stop	-	u1	2	0	TRUE	escape	TRUE	115	73	-42	54	.
-last_exon_stop__minus__u1	last_exon_stop	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-last_of_three__plus__u0	last_of_three	+	u0	3	0	TRUE	escape	TRUE	102	60	-42	196	.
-last_of_three__plus__u0	last_of_three	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-last_of_three__plus__u1	last_of_three	+	u1	3	0	TRUE	escape	TRUE	115	73	-42	209	.
-last_of_three__plus__u1	last_of_three	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-last_of_three__minus__u0	last_of_three	-	u0	3	0	TRUE	escape	TRUE	102	60	-42	37	.
-last_of_three__minus__u0	last_of_three	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-last_of_three__minus__u1	last_of_three	-	u1	3	0	TRUE	escape	TRUE	115	73	-42	54	.
-last_of_three__minus__u1	last_of_three	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-four_exons_escape__plus__u0	four_exons_escape	+	u0	4	0	TRUE	escape	TRUE	12	60	48	26	.
-four_exons_escape__plus__u0	four_exons_escape	+	u0	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-four_exons_escape__plus__u1	four_exons_escape	+	u1	4	0	TRUE	escape	TRUE	25	73	48	39	.
-four_exons_escape__plus__u1	four_exons_escape	+	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-four_exons_escape__minus__u0	four_exons_escape	-	u0	4	0	TRUE	escape	TRUE	12	60	48	247	.
-four_exons_escape__minus__u0	four_exons_escape	-	u0	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-four_exons_escape__minus__u1	four_exons_escape	-	u1	4	0	TRUE	escape	TRUE	25	73	48	264	.
-four_exons_escape__minus__u1	four_exons_escape	-	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-four_exons_first_far__plus__u0	four_exons_first_far	+	u0	4	0	TRUE	trigger	TRUE	12	105	93	26	.
-four_exons_first_far__plus__u0	four_exons_first_far	+	u0	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-four_exons_first_far__plus__u1	four_exons_first_far	+	u1	4	0	TRUE	trigger	TRUE	25	118	93	39	.
-four_exons_first_far__plus__u1	four_exons_first_far	+	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-four_exons_first_far__minus__u0	four_exons_first_far	-	u0	4	0	TRUE	trigger	TRUE	12	105	93	247	.
-four_exons_first_far__minus__u0	four_exons_first_far	-	u0	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-four_exons_first_far__minus__u1	four_exons_first_far	-	u1	4	0	TRUE	trigger	TRUE	25	118	93	264	.
-four_exons_first_far__minus__u1	four_exons_first_far	-	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless__plus__u0	intronless	+	u0	1	0	TRUE	escape	TRUE	51	.	.	65	.
-intronless__plus__u0	intronless	+	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless__plus__u1	intronless	+	u1	1	0	TRUE	escape	TRUE	64	.	.	78	.
-intronless__plus__u1	intronless	+	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless__minus__u0	intronless	-	u0	1	0	TRUE	escape	TRUE	51	.	.	88	.
-intronless__minus__u0	intronless	-	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless__minus__u1	intronless	-	u1	1	0	TRUE	escape	TRUE	64	.	.	105	.
-intronless__minus__u1	intronless	-	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless_frame__plus__u0	intronless_frame	+	u0	1	0	TRUE	escape	TRUE	30	.	.	26	.
-intronless_frame__plus__u0	intronless_frame	+	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless_frame__plus__u1	intronless_frame	+	u1	1	0	TRUE	escape	TRUE	43	.	.	39	.
-intronless_frame__plus__u1	intronless_frame	+	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless_frame__minus__u0	intronless_frame	-	u0	1	0	TRUE	escape	TRUE	30	.	.	114	.
-intronless_frame__minus__u0	intronless_frame	-	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless_frame__minus__u1	intronless_frame	-	u1	1	0	TRUE	escape	TRUE	43	.	.	131	.
-intronless_frame__minus__u1	intronless_frame	-	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless_early_stop__plus__u0	intronless_early_stop	+	u0	1	0	TRUE	escape	TRUE	12	.	.	26	.
-intronless_early_stop__plus__u0	intronless_early_stop	+	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless_early_stop__plus__u1	intronless_early_stop	+	u1	1	0	TRUE	escape	TRUE	25	.	.	39	.
-intronless_early_stop__plus__u1	intronless_early_stop	+	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless_early_stop__minus__u0	intronless_early_stop	-	u0	1	0	TRUE	escape	TRUE	12	.	.	127	.
-intronless_early_stop__minus__u0	intronless_early_stop	-	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-intronless_early_stop__minus__u1	intronless_early_stop	-	u1	1	0	TRUE	escape	TRUE	25	.	.	144	.
-intronless_early_stop__minus__u1	intronless_early_stop	-	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins3_d51__plus__u0	up_ins3_d51	+	u0	2	0	TRUE	trigger	TRUE	54	105	51	46;65	.
-up_ins3_d51__plus__u0	up_ins3_d51	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins3_d51__plus__u1	up_ins3_d51	+	u1	2	0	TRUE	trigger	TRUE	67	118	51	59;78	.
-up_ins3_d51__plus__u1	up_ins3_d51	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins3_d51__minus__u0	up_ins3_d51	-	u0	2	0	TRUE	trigger	TRUE	54	105	51	128;146	.
-up_ins3_d51__minus__u0	up_ins3_d51	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins3_d51__minus__u1	up_ins3_d51	-	u1	2	0	TRUE	trigger	TRUE	67	118	51	145;163	.
-up_ins3_d51__minus__u1	up_ins3_d51	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins3_d50__plus__u0	up_ins3_d50	+	u0	2	0	TRUE	escape	TRUE	54	104	50	46;65	.
-up_ins3_d50__plus__u0	up_ins3_d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins3_d50__plus__u1	up_ins3_d50	+	u1	2	0	TRUE	escape	TRUE	67	117	50	59;78	.
-up_ins3_d50__plus__u1	up_ins3_d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins3_d50__minus__u0	up_ins3_d50	-	u0	2	0	TRUE	escape	TRUE	54	104	50	128;146	.
-up_ins3_d50__minus__u0	up_ins3_d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins3_d50__minus__u1	up_ins3_d50	-	u1	2	0	TRUE	escape	TRUE	67	117	50	145;163	.
-up_ins3_d50__minus__u1	up_ins3_d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del3_d50__plus__u0	up_del3_d50	+	u0	2	0	TRUE	escape	TRUE	48	98	50	46;65	.
-up_del3_d50__plus__u0	up_del3_d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del3_d50__plus__u1	up_del3_d50	+	u1	2	0	TRUE	escape	TRUE	61	111	50	59;78	.
-up_del3_d50__plus__u1	up_del3_d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del3_d50__minus__u0	up_del3_d50	-	u0	2	0	TRUE	escape	TRUE	48	98	50	128;143	.
-up_del3_d50__minus__u0	up_del3_d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del3_d50__minus__u1	up_del3_d50	-	u1	2	0	TRUE	escape	TRUE	61	111	50	145;160	.
-up_del3_d50__minus__u1	up_del3_d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del3_d51__plus__u0	up_del3_d51	+	u0	2	0	TRUE	trigger	TRUE	48	99	51	46;65	.
-up_del3_d51__plus__u0	up_del3_d51	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del3_d51__plus__u1	up_del3_d51	+	u1	2	0	TRUE	trigger	TRUE	61	112	51	59;78	.
-up_del3_d51__plus__u1	up_del3_d51	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del3_d51__minus__u0	up_del3_d51	-	u0	2	0	TRUE	trigger	TRUE	48	99	51	128;143	.
-up_del3_d51__minus__u0	up_del3_d51	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del3_d51__minus__u1	up_del3_d51	-	u1	2	0	TRUE	trigger	TRUE	61	112	51	145;160	.
-up_del3_d51__minus__u1	up_del3_d51	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins6_three_exons__plus__u0	up_ins6_three_exons	+	u0	3	0	TRUE	trigger	TRUE	57	108	51	86;105	.
-up_ins6_three_exons__plus__u0	up_ins6_three_exons	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins6_three_exons__plus__u1	up_ins6_three_exons	+	u1	3	0	TRUE	trigger	TRUE	70	121	51	99;118	.
-up_ins6_three_exons__plus__u1	up_ins6_three_exons	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins6_three_exons__minus__u0	up_ins6_three_exons	-	u0	3	0	TRUE	trigger	TRUE	57	108	51	128;146	.
-up_ins6_three_exons__minus__u0	up_ins6_three_exons	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_ins6_three_exons__minus__u1	up_ins6_three_exons	-	u1	3	0	TRUE	trigger	TRUE	70	121	51	145;163	.
-up_ins6_three_exons__minus__u1	up_ins6_three_exons	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_indel_in_pen_exon__plus__u0	up_indel_in_pen_exon	+	u0	3	0	TRUE	trigger	TRUE	54	105	51	86;105	.
-up_indel_in_pen_exon__plus__u0	up_indel_in_pen_exon	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_indel_in_pen_exon__plus__u1	up_indel_in_pen_exon	+	u1	3	0	TRUE	trigger	TRUE	67	118	51	99;118	.
-up_indel_in_pen_exon__plus__u1	up_indel_in_pen_exon	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_indel_in_pen_exon__minus__u0	up_indel_in_pen_exon	-	u0	3	0	TRUE	trigger	TRUE	54	105	51	128;146	.
-up_indel_in_pen_exon__minus__u0	up_indel_in_pen_exon	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_indel_in_pen_exon__minus__u1	up_indel_in_pen_exon	-	u1	3	0	TRUE	trigger	TRUE	67	118	51	145;163	.
-up_indel_in_pen_exon__minus__u1	up_indel_in_pen_exon	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del_in_first_exon_of_three__plus__u0	up_del_in_first_exon_of_three	+	u0	3	0	TRUE	escape	TRUE	48	98	50	28;105	.
-up_del_in_first_exon_of_three__plus__u0	up_del_in_first_exon_of_three	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del_in_first_exon_of_three__plus__u1	up_del_in_first_exon_of_three	+	u1	3	0	TRUE	escape	TRUE	61	111	50	41;118	.
-up_del_in_first_exon_of_three__plus__u1	up_del_in_first_exon_of_three	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del_in_first_exon_of_three__minus__u0	up_del_in_first_exon_of_three	-	u0	3	0	TRUE	escape	TRUE	48	98	50	128;201	.
-up_del_in_first_exon_of_three__minus__u0	up_del_in_first_exon_of_three	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-up_del_in_first_exon_of_three__minus__u1	up_del_in_first_exon_of_three	-	u1	3	0	TRUE	escape	TRUE	61	111	50	145;218	.
-up_del_in_first_exon_of_three__minus__u1	up_del_in_first_exon_of_three	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_ins_pen_shifts_j__plus__u0	post_ins_pen_shifts_j	+	u0	3	0	TRUE	trigger	TRUE	51	103	52	65	136
-post_ins_pen_shifts_j__plus__u0	post_ins_pen_shifts_j	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_ins_pen_shifts_j__plus__u1	post_ins_pen_shifts_j	+	u1	3	0	TRUE	trigger	TRUE	64	116	52	78	149
-post_ins_pen_shifts_j__plus__u1	post_ins_pen_shifts_j	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_ins_pen_shifts_j__minus__u0	post_ins_pen_shifts_j	-	u0	3	0	TRUE	trigger	TRUE	51	103	52	168	96
-post_ins_pen_shifts_j__minus__u0	post_ins_pen_shifts_j	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_ins_pen_shifts_j__minus__u1	post_ins_pen_shifts_j	-	u1	3	0	TRUE	trigger	TRUE	64	116	52	185	113
-post_ins_pen_shifts_j__minus__u1	post_ins_pen_shifts_j	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_del_pen_shifts_j__plus__u0	post_del_pen_shifts_j	+	u0	3	0	TRUE	escape	TRUE	51	100	49	65	136
-post_del_pen_shifts_j__plus__u0	post_del_pen_shifts_j	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_del_pen_shifts_j__plus__u1	post_del_pen_shifts_j	+	u1	3	0	TRUE	escape	TRUE	64	113	49	78	149
-post_del_pen_shifts_j__plus__u1	post_del_pen_shifts_j	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_del_pen_shifts_j__minus__u0	post_del_pen_shifts_j	-	u0	3	0	TRUE	escape	TRUE	51	100	49	168	93
-post_del_pen_shifts_j__minus__u0	post_del_pen_shifts_j	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_del_pen_shifts_j__minus__u1	post_del_pen_shifts_j	-	u1	3	0	TRUE	escape	TRUE	64	113	49	185	110
-post_del_pen_shifts_j__minus__u1	post_del_pen_shifts_j	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_ins_pen_two_exon__plus__u0	post_ins_pen_two_exon	+	u0	2	0	TRUE	trigger	TRUE	51	103	52	65	96
-post_ins_pen_two_exon__plus__u0	post_ins_pen_two_exon	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_ins_pen_two_exon__plus__u1	post_ins_pen_two_exon	+	u1	2	0	TRUE	trigger	TRUE	64	116	52	78	109
-post_ins_pen_two_exon__plus__u1	post_ins_pen_two_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_ins_pen_two_exon__minus__u0	post_ins_pen_two_exon	-	u0	2	0	TRUE	trigger	TRUE	51	103	52	128	96
-post_ins_pen_two_exon__minus__u0	post_ins_pen_two_exon	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_ins_pen_two_exon__minus__u1	post_ins_pen_two_exon	-	u1	2	0	TRUE	trigger	TRUE	64	116	52	145	113
-post_ins_pen_two_exon__minus__u1	post_ins_pen_two_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_indel_last_exon_d49__plus__u0	post_indel_last_exon_d49	+	u0	3	0	TRUE	escape	TRUE	51	100	49	65	206
-post_indel_last_exon_d49__plus__u0	post_indel_last_exon_d49	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_indel_last_exon_d49__plus__u1	post_indel_last_exon_d49	+	u1	3	0	TRUE	escape	TRUE	64	113	49	78	219
-post_indel_last_exon_d49__plus__u1	post_indel_last_exon_d49	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_indel_last_exon_d49__minus__u0	post_indel_last_exon_d49	-	u0	3	0	TRUE	escape	TRUE	51	100	49	168	26
-post_indel_last_exon_d49__minus__u0	post_indel_last_exon_d49	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_indel_last_exon_d49__minus__u1	post_indel_last_exon_d49	-	u1	3	0	TRUE	escape	TRUE	64	113	49	185	43
-post_indel_last_exon_d49__minus__u1	post_indel_last_exon_d49	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_indel_last_exon_d51__plus__u0	post_indel_last_exon_d51	+	u0	3	0	TRUE	trigger	TRUE	51	102	51	65	206
-post_indel_last_exon_d51__plus__u0	post_indel_last_exon_d51	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_indel_last_exon_d51__plus__u1	post_indel_last_exon_d51	+	u1	3	0	TRUE	trigger	TRUE	64	115	51	78	219
-post_indel_last_exon_d51__plus__u1	post_indel_last_exon_d51	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_indel_last_exon_d51__minus__u0	post_indel_last_exon_d51	-	u0	3	0	TRUE	trigger	TRUE	51	102	51	168	23
-post_indel_last_exon_d51__minus__u0	post_indel_last_exon_d51	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_indel_last_exon_d51__minus__u1	post_indel_last_exon_d51	-	u1	3	0	TRUE	trigger	TRUE	64	115	51	185	40
-post_indel_last_exon_d51__minus__u1	post_indel_last_exon_d51	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_snv_after_stop__plus__u0	post_snv_after_stop	+	u0	2	0	TRUE	trigger	TRUE	51	102	51	65	86
-post_snv_after_stop__plus__u0	post_snv_after_stop	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_snv_after_stop__plus__u1	post_snv_after_stop	+	u1	2	0	TRUE	trigger	TRUE	64	115	51	78	99
-post_snv_after_stop__plus__u1	post_snv_after_stop	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_snv_after_stop__minus__u0	post_snv_after_stop	-	u0	2	0	TRUE	trigger	TRUE	51	102	51	128	107
-post_snv_after_stop__minus__u0	post_snv_after_stop	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_snv_after_stop__minus__u1	post_snv_after_stop	-	u1	2	0	TRUE	trigger	TRUE	64	115	51	145	124
-post_snv_after_stop__minus__u1	post_snv_after_stop	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_snv_last_exon__plus__u0	post_snv_last_exon	+	u0	2	0	TRUE	escape	TRUE	51	100	49	65	166
-post_snv_last_exon__plus__u0	post_snv_last_exon	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_snv_last_exon__plus__u1	post_snv_last_exon	+	u1	2	0	TRUE	escape	TRUE	64	113	49	78	179
-post_snv_last_exon__plus__u1	post_snv_last_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_snv_last_exon__minus__u0	post_snv_last_exon	-	u0	2	0	TRUE	escape	TRUE	51	100	49	128	27
-post_snv_last_exon__minus__u0	post_snv_last_exon	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-post_snv_last_exon__minus__u1	post_snv_last_exon	-	u1	2	0	TRUE	escape	TRUE	64	113	49	145	44
-post_snv_last_exon__minus__u1	post_snv_last_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d49__plus__u0	fs_d49	+	u0	2	0	TRUE	escape	TRUE	30	79	49	26	.
-fs_d49__plus__u0	fs_d49	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d49__plus__u1	fs_d49	+	u1	2	0	TRUE	escape	TRUE	43	92	49	39	.
-fs_d49__plus__u1	fs_d49	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d49__minus__u0	fs_d49	-	u0	2	0	TRUE	escape	TRUE	30	79	49	154	.
-fs_d49__minus__u0	fs_d49	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d49__minus__u1	fs_d49	-	u1	2	0	TRUE	escape	TRUE	43	92	49	171	.
-fs_d49__minus__u1	fs_d49	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d50__plus__u0	fs_d50	+	u0	2	0	TRUE	escape	TRUE	30	80	50	26	.
-fs_d50__plus__u0	fs_d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d50__plus__u1	fs_d50	+	u1	2	0	TRUE	escape	TRUE	43	93	50	39	.
-fs_d50__plus__u1	fs_d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d50__minus__u0	fs_d50	-	u0	2	0	TRUE	escape	TRUE	30	80	50	154	.
-fs_d50__minus__u0	fs_d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d50__minus__u1	fs_d50	-	u1	2	0	TRUE	escape	TRUE	43	93	50	171	.
-fs_d50__minus__u1	fs_d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d51__plus__u0	fs_d51	+	u0	2	0	TRUE	trigger	TRUE	30	81	51	26	.
-fs_d51__plus__u0	fs_d51	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d51__plus__u1	fs_d51	+	u1	2	0	TRUE	trigger	TRUE	43	94	51	39	.
-fs_d51__plus__u1	fs_d51	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d51__minus__u0	fs_d51	-	u0	2	0	TRUE	trigger	TRUE	30	81	51	154	.
-fs_d51__minus__u0	fs_d51	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_d51__minus__u1	fs_d51	-	u1	2	0	TRUE	trigger	TRUE	43	94	51	171	.
-fs_d51__minus__u1	fs_d51	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_three_exons__plus__u0	fs_three_exons	+	u0	3	0	TRUE	trigger	TRUE	30	81	51	26	.
-fs_three_exons__plus__u0	fs_three_exons	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_three_exons__plus__u1	fs_three_exons	+	u1	3	0	TRUE	trigger	TRUE	43	94	51	39	.
-fs_three_exons__plus__u1	fs_three_exons	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_three_exons__minus__u0	fs_three_exons	-	u0	3	0	TRUE	trigger	TRUE	30	81	51	194	.
-fs_three_exons__minus__u0	fs_three_exons	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_three_exons__minus__u1	fs_three_exons	-	u1	3	0	TRUE	trigger	TRUE	43	94	51	211	.
-fs_three_exons__minus__u1	fs_three_exons	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_deletion_minus2__plus__u0	fs_deletion_minus2	+	u0	2	0	TRUE	trigger	TRUE	27	78	51	26	.
-fs_deletion_minus2__plus__u0	fs_deletion_minus2	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_deletion_minus2__plus__u1	fs_deletion_minus2	+	u1	2	0	TRUE	trigger	TRUE	40	91	51	39	.
-fs_deletion_minus2__plus__u1	fs_deletion_minus2	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_deletion_minus2__minus__u0	fs_deletion_minus2	-	u0	2	0	TRUE	trigger	TRUE	27	78	51	152	.
-fs_deletion_minus2__minus__u0	fs_deletion_minus2	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_deletion_minus2__minus__u1	fs_deletion_minus2	-	u1	2	0	TRUE	trigger	TRUE	40	91	51	169	.
-fs_deletion_minus2__minus__u1	fs_deletion_minus2	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_stop_by_insertion__plus__u0	fs_stop_by_insertion	+	u0	2	0	TRUE	trigger	TRUE	33	105	72	46	.
-fs_stop_by_insertion__plus__u0	fs_stop_by_insertion	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_stop_by_insertion__plus__u1	fs_stop_by_insertion	+	u1	2	0	TRUE	trigger	TRUE	46	118	72	59	.
-fs_stop_by_insertion__plus__u1	fs_stop_by_insertion	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_stop_by_insertion__minus__u0	fs_stop_by_insertion	-	u0	2	0	TRUE	trigger	TRUE	33	105	72	146	.
-fs_stop_by_insertion__minus__u0	fs_stop_by_insertion	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_stop_by_insertion__minus__u1	fs_stop_by_insertion	-	u1	2	0	TRUE	trigger	TRUE	46	118	72	163	.
-fs_stop_by_insertion__minus__u1	fs_stop_by_insertion	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_post_stop_edits__plus__u0	fs_post_stop_edits	+	u0	2	0	TRUE	trigger	TRUE	30	81	51	26	146;156
-fs_post_stop_edits__plus__u0	fs_post_stop_edits	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_post_stop_edits__plus__u1	fs_post_stop_edits	+	u1	2	0	TRUE	trigger	TRUE	43	94	51	39	159;169
-fs_post_stop_edits__plus__u1	fs_post_stop_edits	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_post_stop_edits__minus__u0	fs_post_stop_edits	-	u0	2	0	TRUE	trigger	TRUE	30	81	51	154	25;34
-fs_post_stop_edits__minus__u0	fs_post_stop_edits	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-fs_post_stop_edits__minus__u1	fs_post_stop_edits	-	u1	2	0	TRUE	trigger	TRUE	43	94	51	171	42;51
-fs_post_stop_edits__minus__u1	fs_post_stop_edits	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_deletion__plus__u0	run_off_deletion	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_deletion__plus__u0	run_off_deletion	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_deletion__plus__u1	run_off_deletion	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_deletion__plus__u1	run_off_deletion	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_deletion__minus__u0	run_off_deletion	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_deletion__minus__u0	run_off_deletion	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_deletion__minus__u1	run_off_deletion	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_deletion__minus__u1	run_off_deletion	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_plus2__plus__u0	run_off_plus2	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_plus2__plus__u0	run_off_plus2	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_plus2__plus__u1	run_off_plus2	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_plus2__plus__u1	run_off_plus2	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_plus2__minus__u0	run_off_plus2	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_plus2__minus__u0	run_off_plus2	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_plus2__minus__u1	run_off_plus2	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_plus2__minus__u1	run_off_plus2	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_intronless__plus__u0	run_off_intronless	+	u0	1	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_intronless__plus__u0	run_off_intronless	+	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_intronless__plus__u1	run_off_intronless	+	u1	1	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_intronless__plus__u1	run_off_intronless	+	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_intronless__minus__u0	run_off_intronless	-	u0	1	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_intronless__minus__u0	run_off_intronless	-	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-run_off_intronless__minus__u1	run_off_intronless	-	u1	1	0	TRUE	unknown	FALSE	.	.	.	.	.
-run_off_intronless__minus__u1	run_off_intronless	-	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-start_lost__plus__u0	start_lost	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-start_lost__plus__u0	start_lost	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-start_lost__plus__u1	start_lost	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-start_lost__plus__u1	start_lost	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-start_lost__minus__u0	start_lost	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-start_lost__minus__u0	start_lost	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-start_lost__minus__u1	start_lost	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-start_lost__minus__u1	start_lost	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-start_lost_with_stop__plus__u0	start_lost_with_stop	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-start_lost_with_stop__plus__u0	start_lost_with_stop	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-start_lost_with_stop__plus__u1	start_lost_with_stop	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-start_lost_with_stop__plus__u1	start_lost_with_stop	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-start_lost_with_stop__minus__u0	start_lost_with_stop	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-start_lost_with_stop__minus__u0	start_lost_with_stop	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-start_lost_with_stop__minus__u1	start_lost_with_stop	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-start_lost_with_stop__minus__u1	start_lost_with_stop	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-stop_lost__plus__u0	stop_lost	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-stop_lost__plus__u0	stop_lost	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-stop_lost__plus__u1	stop_lost	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-stop_lost__plus__u1	stop_lost	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-stop_lost__minus__u0	stop_lost	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-stop_lost__minus__u0	stop_lost	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-stop_lost__minus__u1	stop_lost	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.
-stop_lost__minus__u1	stop_lost	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-missense__plus__u0	missense	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-missense__plus__u0	missense	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-missense__plus__u1	missense	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-missense__plus__u1	missense	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-missense__minus__u0	missense	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-missense__minus__u0	missense	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-missense__minus__u1	missense	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-missense__minus__u1	missense	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-synonymous__plus__u0	synonymous	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-synonymous__plus__u0	synonymous	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-synonymous__plus__u1	synonymous	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-synonymous__plus__u1	synonymous	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-synonymous__minus__u0	synonymous	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-synonymous__minus__u0	synonymous	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-synonymous__minus__u1	synonymous	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-synonymous__minus__u1	synonymous	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-stop_retained__plus__u0	stop_retained	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-stop_retained__plus__u0	stop_retained	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-stop_retained__plus__u1	stop_retained	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-stop_retained__plus__u1	stop_retained	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-stop_retained__minus__u0	stop_retained	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-stop_retained__minus__u0	stop_retained	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-stop_retained__minus__u1	stop_retained	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-stop_retained__minus__u1	stop_retained	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-inframe_deletion__plus__u0	inframe_deletion	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-inframe_deletion__plus__u0	inframe_deletion	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-inframe_deletion__plus__u1	inframe_deletion	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-inframe_deletion__plus__u1	inframe_deletion	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-inframe_deletion__minus__u0	inframe_deletion	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-inframe_deletion__minus__u0	inframe_deletion	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-inframe_deletion__minus__u1	inframe_deletion	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-inframe_deletion__minus__u1	inframe_deletion	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-inframe_insertion__plus__u0	inframe_insertion	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-inframe_insertion__plus__u0	inframe_insertion	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-inframe_insertion__plus__u1	inframe_insertion	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-inframe_insertion__plus__u1	inframe_insertion	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-inframe_insertion__minus__u0	inframe_insertion	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-inframe_insertion__minus__u0	inframe_insertion	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-inframe_insertion__minus__u1	inframe_insertion	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-inframe_insertion__minus__u1	inframe_insertion	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-frame_restored__plus__u0	frame_restored	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-frame_restored__plus__u0	frame_restored	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-frame_restored__plus__u1	frame_restored	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-frame_restored__plus__u1	frame_restored	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-frame_restored__minus__u0	frame_restored	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-frame_restored__minus__u0	frame_restored	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-frame_restored__minus__u1	frame_restored	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-frame_restored__minus__u1	frame_restored	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-cis_pair_stop__plus__u0	cis_pair_stop	+	u0	2	0	TRUE	trigger	TRUE	6	57	51	20;22	.
-cis_pair_stop__plus__u0	cis_pair_stop	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-cis_pair_stop__plus__u1	cis_pair_stop	+	u1	2	0	TRUE	trigger	TRUE	19	70	51	33;35	.
-cis_pair_stop__plus__u1	cis_pair_stop	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-cis_pair_stop__minus__u0	cis_pair_stop	-	u0	2	0	TRUE	trigger	TRUE	6	57	51	171;173	.
-cis_pair_stop__minus__u0	cis_pair_stop	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-cis_pair_stop__minus__u1	cis_pair_stop	-	u1	2	0	TRUE	trigger	TRUE	19	70	51	188;190	.
-cis_pair_stop__minus__u1	cis_pair_stop	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-cis_pair_stop_d50__plus__u0	cis_pair_stop_d50	+	u0	2	0	TRUE	escape	TRUE	6	56	50	20;22	.
-cis_pair_stop_d50__plus__u0	cis_pair_stop_d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-cis_pair_stop_d50__plus__u1	cis_pair_stop_d50	+	u1	2	0	TRUE	escape	TRUE	19	69	50	33;35	.
-cis_pair_stop_d50__plus__u1	cis_pair_stop_d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-cis_pair_stop_d50__minus__u0	cis_pair_stop_d50	-	u0	2	0	TRUE	escape	TRUE	6	56	50	171;173	.
-cis_pair_stop_d50__minus__u0	cis_pair_stop_d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-cis_pair_stop_d50__minus__u1	cis_pair_stop_d50	-	u1	2	0	TRUE	escape	TRUE	19	69	50	188;190	.
-cis_pair_stop_d50__minus__u1	cis_pair_stop_d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-trans_pair_halves__plus__u0	trans_pair_halves	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_pair_halves__plus__u0	trans_pair_halves	+	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_pair_halves__plus__u1	trans_pair_halves	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_pair_halves__plus__u1	trans_pair_halves	+	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_pair_halves__minus__u0	trans_pair_halves	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_pair_halves__minus__u0	trans_pair_halves	-	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_pair_halves__minus__u1	trans_pair_halves	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_pair_halves__minus__u1	trans_pair_halves	-	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_stop_and_missense__plus__u0	trans_stop_and_missense	+	u0	2	0	TRUE	trigger	TRUE	51	102	51	65	.
-trans_stop_and_missense__plus__u0	trans_stop_and_missense	+	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_stop_and_missense__plus__u1	trans_stop_and_missense	+	u1	2	0	TRUE	trigger	TRUE	64	115	51	78	.
-trans_stop_and_missense__plus__u1	trans_stop_and_missense	+	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_stop_and_missense__minus__u0	trans_stop_and_missense	-	u0	2	0	TRUE	trigger	TRUE	51	102	51	128	.
-trans_stop_and_missense__minus__u0	trans_stop_and_missense	-	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_stop_and_missense__minus__u1	trans_stop_and_missense	-	u1	2	0	TRUE	trigger	TRUE	64	115	51	145	.
-trans_stop_and_missense__minus__u1	trans_stop_and_missense	-	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_missense_only__plus__u0	trans_missense_only	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_missense_only__plus__u0	trans_missense_only	+	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_missense_only__plus__u1	trans_missense_only	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_missense_only__plus__u1	trans_missense_only	+	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_missense_only__minus__u0	trans_missense_only	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_missense_only__minus__u0	trans_missense_only	-	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_missense_only__minus__u1	trans_missense_only	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.
-trans_missense_only__minus__u1	trans_missense_only	-	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.
-hom_alt_stop__plus__u0	hom_alt_stop	+	u0	2	0	TRUE	trigger	TRUE	51	102	51	65	.
-hom_alt_stop__plus__u0	hom_alt_stop	+	u0	2	1	TRUE	trigger	TRUE	51	102	51	65	.
-hom_alt_stop__plus__u1	hom_alt_stop	+	u1	2	0	TRUE	trigger	TRUE	64	115	51	78	.
-hom_alt_stop__plus__u1	hom_alt_stop	+	u1	2	1	TRUE	trigger	TRUE	64	115	51	78	.
-hom_alt_stop__minus__u0	hom_alt_stop	-	u0	2	0	TRUE	trigger	TRUE	51	102	51	128	.
-hom_alt_stop__minus__u0	hom_alt_stop	-	u0	2	1	TRUE	trigger	TRUE	51	102	51	128	.
-hom_alt_stop__minus__u1	hom_alt_stop	-	u1	2	0	TRUE	trigger	TRUE	64	115	51	145	.
-hom_alt_stop__minus__u1	hom_alt_stop	-	u1	2	1	TRUE	trigger	TRUE	64	115	51	145	.
-frame_pair_stop_second__plus__u0	frame_pair_stop_second	+	u0	2	0	TRUE	escape	TRUE	51	101	50	28;36;65	.
-frame_pair_stop_second__plus__u0	frame_pair_stop_second	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-frame_pair_stop_second__plus__u1	frame_pair_stop_second	+	u1	2	0	TRUE	escape	TRUE	64	114	50	41;49;78	.
-frame_pair_stop_second__plus__u1	frame_pair_stop_second	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-frame_pair_stop_second__minus__u0	frame_pair_stop_second	-	u0	2	0	TRUE	escape	TRUE	51	101	50	128;155;164	.
-frame_pair_stop_second__minus__u0	frame_pair_stop_second	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-frame_pair_stop_second__minus__u1	frame_pair_stop_second	-	u1	2	0	TRUE	escape	TRUE	64	114	50	145;172;181	.
-frame_pair_stop_second__minus__u1	frame_pair_stop_second	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-utr_last_exon__plus__u1	utr_last_exon	+	u1	2	0	TRUE	trigger	TRUE	64	133	69	78	.
-utr_last_exon__plus__u1	utr_last_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-utr_last_exon__minus__u1	utr_last_exon	-	u1	2	0	TRUE	trigger	TRUE	64	133	69	145	.
-utr_last_exon__minus__u1	utr_last_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-utr_first_exon__plus__u1	utr_first_exon	+	u1	2	0	TRUE	escape	TRUE	64	13	-51	118	.
-utr_first_exon__plus__u1	utr_first_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-utr_first_exon__minus__u1	utr_first_exon	-	u1	2	0	TRUE	escape	TRUE	64	13	-51	105	.
-utr_first_exon__minus__u1	utr_first_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-utr_first_and_last__plus__u1	utr_first_and_last	+	u1	4	0	TRUE	trigger	TRUE	64	133	69	118	.
-utr_first_and_last__plus__u1	utr_first_and_last	+	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
-utr_first_and_last__minus__u1	utr_first_and_last	-	u1	4	0	TRUE	trigger	TRUE	64	133	69	185	.
-utr_first_and_last__minus__u1	utr_first_and_last	-	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.
+case	scenario	strand	utr	exons	lane	has_carrier	nmd	premature	stop_end	junction	distance	applied_positions	nmd_positions	post_stop_positions
+d49__plus__u0	d49	+	u0	2	0	TRUE	escape	TRUE	51	100	49	65	65	.
+d49__plus__u0	d49	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d49__plus__u1	d49	+	u1	2	0	TRUE	escape	TRUE	64	113	49	78	78	.
+d49__plus__u1	d49	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d49__minus__u0	d49	-	u0	2	0	TRUE	escape	TRUE	51	100	49	128	128	.
+d49__minus__u0	d49	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d49__minus__u1	d49	-	u1	2	0	TRUE	escape	TRUE	64	113	49	145	145	.
+d49__minus__u1	d49	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d50__plus__u0	d50	+	u0	2	0	TRUE	escape	TRUE	51	101	50	65	65	.
+d50__plus__u0	d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d50__plus__u1	d50	+	u1	2	0	TRUE	escape	TRUE	64	114	50	78	78	.
+d50__plus__u1	d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d50__minus__u0	d50	-	u0	2	0	TRUE	escape	TRUE	51	101	50	128	128	.
+d50__minus__u0	d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d50__minus__u1	d50	-	u1	2	0	TRUE	escape	TRUE	64	114	50	145	145	.
+d50__minus__u1	d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d51__plus__u0	d51	+	u0	2	0	TRUE	trigger	TRUE	51	102	51	65	65	.
+d51__plus__u0	d51	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d51__plus__u1	d51	+	u1	2	0	TRUE	trigger	TRUE	64	115	51	78	78	.
+d51__plus__u1	d51	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d51__minus__u0	d51	-	u0	2	0	TRUE	trigger	TRUE	51	102	51	128	128	.
+d51__minus__u0	d51	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d51__minus__u1	d51	-	u1	2	0	TRUE	trigger	TRUE	64	115	51	145	145	.
+d51__minus__u1	d51	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d52__plus__u0	d52	+	u0	2	0	TRUE	trigger	TRUE	51	103	52	65	65	.
+d52__plus__u0	d52	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d52__plus__u1	d52	+	u1	2	0	TRUE	trigger	TRUE	64	116	52	78	78	.
+d52__plus__u1	d52	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d52__minus__u0	d52	-	u0	2	0	TRUE	trigger	TRUE	51	103	52	128	128	.
+d52__minus__u0	d52	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d52__minus__u1	d52	-	u1	2	0	TRUE	trigger	TRUE	64	116	52	145	145	.
+d52__minus__u1	d52	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d0_stop_ends_exon__plus__u0	d0_stop_ends_exon	+	u0	2	0	TRUE	escape	TRUE	51	51	0	65	65	.
+d0_stop_ends_exon__plus__u0	d0_stop_ends_exon	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d0_stop_ends_exon__plus__u1	d0_stop_ends_exon	+	u1	2	0	TRUE	escape	TRUE	64	64	0	78	78	.
+d0_stop_ends_exon__plus__u1	d0_stop_ends_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d0_stop_ends_exon__minus__u0	d0_stop_ends_exon	-	u0	2	0	TRUE	escape	TRUE	51	51	0	128	128	.
+d0_stop_ends_exon__minus__u0	d0_stop_ends_exon	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+d0_stop_ends_exon__minus__u1	d0_stop_ends_exon	-	u1	2	0	TRUE	escape	TRUE	64	64	0	145	145	.
+d0_stop_ends_exon__minus__u1	d0_stop_ends_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_d50__plus__u0	pen_d50	+	u0	3	0	TRUE	escape	TRUE	51	101	50	105	105	.
+pen_d50__plus__u0	pen_d50	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_d50__plus__u1	pen_d50	+	u1	3	0	TRUE	escape	TRUE	64	114	50	118	118	.
+pen_d50__plus__u1	pen_d50	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_d50__minus__u0	pen_d50	-	u0	3	0	TRUE	escape	TRUE	51	101	50	128	128	.
+pen_d50__minus__u0	pen_d50	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_d50__minus__u1	pen_d50	-	u1	3	0	TRUE	escape	TRUE	64	114	50	145	145	.
+pen_d50__minus__u1	pen_d50	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_d51__plus__u0	pen_d51	+	u0	3	0	TRUE	trigger	TRUE	51	102	51	105	105	.
+pen_d51__plus__u0	pen_d51	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_d51__plus__u1	pen_d51	+	u1	3	0	TRUE	trigger	TRUE	64	115	51	118	118	.
+pen_d51__plus__u1	pen_d51	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_d51__minus__u0	pen_d51	-	u0	3	0	TRUE	trigger	TRUE	51	102	51	128	128	.
+pen_d51__minus__u0	pen_d51	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_d51__minus__u1	pen_d51	-	u1	3	0	TRUE	trigger	TRUE	64	115	51	145	145	.
+pen_d51__minus__u1	pen_d51	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+first_of_three_trigger__plus__u0	first_of_three_trigger	+	u0	3	0	TRUE	trigger	TRUE	12	100	88	26	26	.
+first_of_three_trigger__plus__u0	first_of_three_trigger	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+first_of_three_trigger__plus__u1	first_of_three_trigger	+	u1	3	0	TRUE	trigger	TRUE	25	113	88	39	39	.
+first_of_three_trigger__plus__u1	first_of_three_trigger	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+first_of_three_trigger__minus__u0	first_of_three_trigger	-	u0	3	0	TRUE	trigger	TRUE	12	100	88	207	207	.
+first_of_three_trigger__minus__u0	first_of_three_trigger	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+first_of_three_trigger__minus__u1	first_of_three_trigger	-	u1	3	0	TRUE	trigger	TRUE	25	113	88	224	224	.
+first_of_three_trigger__minus__u1	first_of_three_trigger	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+first_of_three_escape__plus__u0	first_of_three_escape	+	u0	3	0	TRUE	escape	TRUE	51	90	39	65	65	.
+first_of_three_escape__plus__u0	first_of_three_escape	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+first_of_three_escape__plus__u1	first_of_three_escape	+	u1	3	0	TRUE	escape	TRUE	64	103	39	78	78	.
+first_of_three_escape__plus__u1	first_of_three_escape	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+first_of_three_escape__minus__u0	first_of_three_escape	-	u0	3	0	TRUE	escape	TRUE	51	90	39	168	168	.
+first_of_three_escape__minus__u0	first_of_three_escape	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+first_of_three_escape__minus__u1	first_of_three_escape	-	u1	3	0	TRUE	escape	TRUE	64	103	39	185	185	.
+first_of_three_escape__minus__u1	first_of_three_escape	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_exon_escape__plus__u0	pen_exon_escape	+	u0	3	0	TRUE	escape	TRUE	90	100	10	144	144	.
+pen_exon_escape__plus__u0	pen_exon_escape	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_exon_escape__plus__u1	pen_exon_escape	+	u1	3	0	TRUE	escape	TRUE	103	113	10	157	157	.
+pen_exon_escape__plus__u1	pen_exon_escape	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_exon_escape__minus__u0	pen_exon_escape	-	u0	3	0	TRUE	escape	TRUE	90	100	10	89	89	.
+pen_exon_escape__minus__u0	pen_exon_escape	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+pen_exon_escape__minus__u1	pen_exon_escape	-	u1	3	0	TRUE	escape	TRUE	103	113	10	106	106	.
+pen_exon_escape__minus__u1	pen_exon_escape	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+last_exon_stop__plus__u0	last_exon_stop	+	u0	2	0	TRUE	escape	TRUE	102	60	-42	156	156	.
+last_exon_stop__plus__u0	last_exon_stop	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+last_exon_stop__plus__u1	last_exon_stop	+	u1	2	0	TRUE	escape	TRUE	115	73	-42	169	169	.
+last_exon_stop__plus__u1	last_exon_stop	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+last_exon_stop__minus__u0	last_exon_stop	-	u0	2	0	TRUE	escape	TRUE	102	60	-42	37	37	.
+last_exon_stop__minus__u0	last_exon_stop	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+last_exon_stop__minus__u1	last_exon_stop	-	u1	2	0	TRUE	escape	TRUE	115	73	-42	54	54	.
+last_exon_stop__minus__u1	last_exon_stop	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+last_of_three__plus__u0	last_of_three	+	u0	3	0	TRUE	escape	TRUE	102	60	-42	196	196	.
+last_of_three__plus__u0	last_of_three	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+last_of_three__plus__u1	last_of_three	+	u1	3	0	TRUE	escape	TRUE	115	73	-42	209	209	.
+last_of_three__plus__u1	last_of_three	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+last_of_three__minus__u0	last_of_three	-	u0	3	0	TRUE	escape	TRUE	102	60	-42	37	37	.
+last_of_three__minus__u0	last_of_three	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+last_of_three__minus__u1	last_of_three	-	u1	3	0	TRUE	escape	TRUE	115	73	-42	54	54	.
+last_of_three__minus__u1	last_of_three	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+four_exons_escape__plus__u0	four_exons_escape	+	u0	4	0	TRUE	escape	TRUE	12	60	48	26	26	.
+four_exons_escape__plus__u0	four_exons_escape	+	u0	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+four_exons_escape__plus__u1	four_exons_escape	+	u1	4	0	TRUE	escape	TRUE	25	73	48	39	39	.
+four_exons_escape__plus__u1	four_exons_escape	+	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+four_exons_escape__minus__u0	four_exons_escape	-	u0	4	0	TRUE	escape	TRUE	12	60	48	247	247	.
+four_exons_escape__minus__u0	four_exons_escape	-	u0	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+four_exons_escape__minus__u1	four_exons_escape	-	u1	4	0	TRUE	escape	TRUE	25	73	48	264	264	.
+four_exons_escape__minus__u1	four_exons_escape	-	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+four_exons_first_far__plus__u0	four_exons_first_far	+	u0	4	0	TRUE	trigger	TRUE	12	105	93	26	26	.
+four_exons_first_far__plus__u0	four_exons_first_far	+	u0	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+four_exons_first_far__plus__u1	four_exons_first_far	+	u1	4	0	TRUE	trigger	TRUE	25	118	93	39	39	.
+four_exons_first_far__plus__u1	four_exons_first_far	+	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+four_exons_first_far__minus__u0	four_exons_first_far	-	u0	4	0	TRUE	trigger	TRUE	12	105	93	247	247	.
+four_exons_first_far__minus__u0	four_exons_first_far	-	u0	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+four_exons_first_far__minus__u1	four_exons_first_far	-	u1	4	0	TRUE	trigger	TRUE	25	118	93	264	264	.
+four_exons_first_far__minus__u1	four_exons_first_far	-	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless__plus__u0	intronless	+	u0	1	0	TRUE	escape	TRUE	51	.	.	65	65	.
+intronless__plus__u0	intronless	+	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless__plus__u1	intronless	+	u1	1	0	TRUE	escape	TRUE	64	.	.	78	78	.
+intronless__plus__u1	intronless	+	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless__minus__u0	intronless	-	u0	1	0	TRUE	escape	TRUE	51	.	.	88	88	.
+intronless__minus__u0	intronless	-	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless__minus__u1	intronless	-	u1	1	0	TRUE	escape	TRUE	64	.	.	105	105	.
+intronless__minus__u1	intronless	-	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless_frame__plus__u0	intronless_frame	+	u0	1	0	TRUE	escape	TRUE	30	.	.	26	26	.
+intronless_frame__plus__u0	intronless_frame	+	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless_frame__plus__u1	intronless_frame	+	u1	1	0	TRUE	escape	TRUE	43	.	.	39	39	.
+intronless_frame__plus__u1	intronless_frame	+	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless_frame__minus__u0	intronless_frame	-	u0	1	0	TRUE	escape	TRUE	30	.	.	114	114	.
+intronless_frame__minus__u0	intronless_frame	-	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless_frame__minus__u1	intronless_frame	-	u1	1	0	TRUE	escape	TRUE	43	.	.	131	131	.
+intronless_frame__minus__u1	intronless_frame	-	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless_early_stop__plus__u0	intronless_early_stop	+	u0	1	0	TRUE	escape	TRUE	12	.	.	26	26	.
+intronless_early_stop__plus__u0	intronless_early_stop	+	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless_early_stop__plus__u1	intronless_early_stop	+	u1	1	0	TRUE	escape	TRUE	25	.	.	39	39	.
+intronless_early_stop__plus__u1	intronless_early_stop	+	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless_early_stop__minus__u0	intronless_early_stop	-	u0	1	0	TRUE	escape	TRUE	12	.	.	127	127	.
+intronless_early_stop__minus__u0	intronless_early_stop	-	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+intronless_early_stop__minus__u1	intronless_early_stop	-	u1	1	0	TRUE	escape	TRUE	25	.	.	144	144	.
+intronless_early_stop__minus__u1	intronless_early_stop	-	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins3_d51__plus__u0	up_ins3_d51	+	u0	2	0	TRUE	trigger	TRUE	54	105	51	46;65	46;65	.
+up_ins3_d51__plus__u0	up_ins3_d51	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins3_d51__plus__u1	up_ins3_d51	+	u1	2	0	TRUE	trigger	TRUE	67	118	51	59;78	59;78	.
+up_ins3_d51__plus__u1	up_ins3_d51	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins3_d51__minus__u0	up_ins3_d51	-	u0	2	0	TRUE	trigger	TRUE	54	105	51	128;146	128;146	.
+up_ins3_d51__minus__u0	up_ins3_d51	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins3_d51__minus__u1	up_ins3_d51	-	u1	2	0	TRUE	trigger	TRUE	67	118	51	145;163	145;163	.
+up_ins3_d51__minus__u1	up_ins3_d51	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins3_d50__plus__u0	up_ins3_d50	+	u0	2	0	TRUE	escape	TRUE	54	104	50	46;65	46;65	.
+up_ins3_d50__plus__u0	up_ins3_d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins3_d50__plus__u1	up_ins3_d50	+	u1	2	0	TRUE	escape	TRUE	67	117	50	59;78	59;78	.
+up_ins3_d50__plus__u1	up_ins3_d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins3_d50__minus__u0	up_ins3_d50	-	u0	2	0	TRUE	escape	TRUE	54	104	50	128;146	128;146	.
+up_ins3_d50__minus__u0	up_ins3_d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins3_d50__minus__u1	up_ins3_d50	-	u1	2	0	TRUE	escape	TRUE	67	117	50	145;163	145;163	.
+up_ins3_d50__minus__u1	up_ins3_d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del3_d50__plus__u0	up_del3_d50	+	u0	2	0	TRUE	escape	TRUE	48	98	50	46;65	46;65	.
+up_del3_d50__plus__u0	up_del3_d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del3_d50__plus__u1	up_del3_d50	+	u1	2	0	TRUE	escape	TRUE	61	111	50	59;78	59;78	.
+up_del3_d50__plus__u1	up_del3_d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del3_d50__minus__u0	up_del3_d50	-	u0	2	0	TRUE	escape	TRUE	48	98	50	128;143	128;143	.
+up_del3_d50__minus__u0	up_del3_d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del3_d50__minus__u1	up_del3_d50	-	u1	2	0	TRUE	escape	TRUE	61	111	50	145;160	145;160	.
+up_del3_d50__minus__u1	up_del3_d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del3_d51__plus__u0	up_del3_d51	+	u0	2	0	TRUE	trigger	TRUE	48	99	51	46;65	46;65	.
+up_del3_d51__plus__u0	up_del3_d51	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del3_d51__plus__u1	up_del3_d51	+	u1	2	0	TRUE	trigger	TRUE	61	112	51	59;78	59;78	.
+up_del3_d51__plus__u1	up_del3_d51	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del3_d51__minus__u0	up_del3_d51	-	u0	2	0	TRUE	trigger	TRUE	48	99	51	128;143	128;143	.
+up_del3_d51__minus__u0	up_del3_d51	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del3_d51__minus__u1	up_del3_d51	-	u1	2	0	TRUE	trigger	TRUE	61	112	51	145;160	145;160	.
+up_del3_d51__minus__u1	up_del3_d51	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins6_three_exons__plus__u0	up_ins6_three_exons	+	u0	3	0	TRUE	trigger	TRUE	57	108	51	86;105	86;105	.
+up_ins6_three_exons__plus__u0	up_ins6_three_exons	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins6_three_exons__plus__u1	up_ins6_three_exons	+	u1	3	0	TRUE	trigger	TRUE	70	121	51	99;118	99;118	.
+up_ins6_three_exons__plus__u1	up_ins6_three_exons	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins6_three_exons__minus__u0	up_ins6_three_exons	-	u0	3	0	TRUE	trigger	TRUE	57	108	51	128;146	128;146	.
+up_ins6_three_exons__minus__u0	up_ins6_three_exons	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_ins6_three_exons__minus__u1	up_ins6_three_exons	-	u1	3	0	TRUE	trigger	TRUE	70	121	51	145;163	145;163	.
+up_ins6_three_exons__minus__u1	up_ins6_three_exons	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_indel_in_pen_exon__plus__u0	up_indel_in_pen_exon	+	u0	3	0	TRUE	trigger	TRUE	54	105	51	86;105	86;105	.
+up_indel_in_pen_exon__plus__u0	up_indel_in_pen_exon	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_indel_in_pen_exon__plus__u1	up_indel_in_pen_exon	+	u1	3	0	TRUE	trigger	TRUE	67	118	51	99;118	99;118	.
+up_indel_in_pen_exon__plus__u1	up_indel_in_pen_exon	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_indel_in_pen_exon__minus__u0	up_indel_in_pen_exon	-	u0	3	0	TRUE	trigger	TRUE	54	105	51	128;146	128;146	.
+up_indel_in_pen_exon__minus__u0	up_indel_in_pen_exon	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_indel_in_pen_exon__minus__u1	up_indel_in_pen_exon	-	u1	3	0	TRUE	trigger	TRUE	67	118	51	145;163	145;163	.
+up_indel_in_pen_exon__minus__u1	up_indel_in_pen_exon	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del_in_first_exon_of_three__plus__u0	up_del_in_first_exon_of_three	+	u0	3	0	TRUE	escape	TRUE	48	98	50	28;105	28;105	.
+up_del_in_first_exon_of_three__plus__u0	up_del_in_first_exon_of_three	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del_in_first_exon_of_three__plus__u1	up_del_in_first_exon_of_three	+	u1	3	0	TRUE	escape	TRUE	61	111	50	41;118	41;118	.
+up_del_in_first_exon_of_three__plus__u1	up_del_in_first_exon_of_three	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del_in_first_exon_of_three__minus__u0	up_del_in_first_exon_of_three	-	u0	3	0	TRUE	escape	TRUE	48	98	50	128;201	128;201	.
+up_del_in_first_exon_of_three__minus__u0	up_del_in_first_exon_of_three	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+up_del_in_first_exon_of_three__minus__u1	up_del_in_first_exon_of_three	-	u1	3	0	TRUE	escape	TRUE	61	111	50	145;218	145;218	.
+up_del_in_first_exon_of_three__minus__u1	up_del_in_first_exon_of_three	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_pen_shifts_j__plus__u0	post_ins_pen_shifts_j	+	u0	3	0	TRUE	trigger	TRUE	51	103	52	65	65;136	136
+post_ins_pen_shifts_j__plus__u0	post_ins_pen_shifts_j	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_pen_shifts_j__plus__u1	post_ins_pen_shifts_j	+	u1	3	0	TRUE	trigger	TRUE	64	116	52	78	78;149	149
+post_ins_pen_shifts_j__plus__u1	post_ins_pen_shifts_j	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_pen_shifts_j__minus__u0	post_ins_pen_shifts_j	-	u0	3	0	TRUE	trigger	TRUE	51	103	52	168	96;168	96
+post_ins_pen_shifts_j__minus__u0	post_ins_pen_shifts_j	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_pen_shifts_j__minus__u1	post_ins_pen_shifts_j	-	u1	3	0	TRUE	trigger	TRUE	64	116	52	185	113;185	113
+post_ins_pen_shifts_j__minus__u1	post_ins_pen_shifts_j	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_del_pen_shifts_j__plus__u0	post_del_pen_shifts_j	+	u0	3	0	TRUE	escape	TRUE	51	100	49	65	65;136	136
+post_del_pen_shifts_j__plus__u0	post_del_pen_shifts_j	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_del_pen_shifts_j__plus__u1	post_del_pen_shifts_j	+	u1	3	0	TRUE	escape	TRUE	64	113	49	78	78;149	149
+post_del_pen_shifts_j__plus__u1	post_del_pen_shifts_j	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_del_pen_shifts_j__minus__u0	post_del_pen_shifts_j	-	u0	3	0	TRUE	escape	TRUE	51	100	49	168	93;168	93
+post_del_pen_shifts_j__minus__u0	post_del_pen_shifts_j	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_del_pen_shifts_j__minus__u1	post_del_pen_shifts_j	-	u1	3	0	TRUE	escape	TRUE	64	113	49	185	110;185	110
+post_del_pen_shifts_j__minus__u1	post_del_pen_shifts_j	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_pen_two_exon__plus__u0	post_ins_pen_two_exon	+	u0	2	0	TRUE	trigger	TRUE	51	103	52	65	65;96	96
+post_ins_pen_two_exon__plus__u0	post_ins_pen_two_exon	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_pen_two_exon__plus__u1	post_ins_pen_two_exon	+	u1	2	0	TRUE	trigger	TRUE	64	116	52	78	78;109	109
+post_ins_pen_two_exon__plus__u1	post_ins_pen_two_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_pen_two_exon__minus__u0	post_ins_pen_two_exon	-	u0	2	0	TRUE	trigger	TRUE	51	103	52	128	96;128	96
+post_ins_pen_two_exon__minus__u0	post_ins_pen_two_exon	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_pen_two_exon__minus__u1	post_ins_pen_two_exon	-	u1	2	0	TRUE	trigger	TRUE	64	116	52	145	113;145	113
+post_ins_pen_two_exon__minus__u1	post_ins_pen_two_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_indel_last_exon_d49__plus__u0	post_indel_last_exon_d49	+	u0	3	0	TRUE	escape	TRUE	51	100	49	65	65	206
+post_indel_last_exon_d49__plus__u0	post_indel_last_exon_d49	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_indel_last_exon_d49__plus__u1	post_indel_last_exon_d49	+	u1	3	0	TRUE	escape	TRUE	64	113	49	78	78	219
+post_indel_last_exon_d49__plus__u1	post_indel_last_exon_d49	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_indel_last_exon_d49__minus__u0	post_indel_last_exon_d49	-	u0	3	0	TRUE	escape	TRUE	51	100	49	168	168	26
+post_indel_last_exon_d49__minus__u0	post_indel_last_exon_d49	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_indel_last_exon_d49__minus__u1	post_indel_last_exon_d49	-	u1	3	0	TRUE	escape	TRUE	64	113	49	185	185	43
+post_indel_last_exon_d49__minus__u1	post_indel_last_exon_d49	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_indel_last_exon_d51__plus__u0	post_indel_last_exon_d51	+	u0	3	0	TRUE	trigger	TRUE	51	102	51	65	65	206
+post_indel_last_exon_d51__plus__u0	post_indel_last_exon_d51	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_indel_last_exon_d51__plus__u1	post_indel_last_exon_d51	+	u1	3	0	TRUE	trigger	TRUE	64	115	51	78	78	219
+post_indel_last_exon_d51__plus__u1	post_indel_last_exon_d51	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_indel_last_exon_d51__minus__u0	post_indel_last_exon_d51	-	u0	3	0	TRUE	trigger	TRUE	51	102	51	168	168	23
+post_indel_last_exon_d51__minus__u0	post_indel_last_exon_d51	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_indel_last_exon_d51__minus__u1	post_indel_last_exon_d51	-	u1	3	0	TRUE	trigger	TRUE	64	115	51	185	185	40
+post_indel_last_exon_d51__minus__u1	post_indel_last_exon_d51	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_moves_j_no_flip__plus__u0	post_ins_moves_j_no_flip	+	u0	3	0	TRUE	trigger	TRUE	51	105	54	65	65;136	136
+post_ins_moves_j_no_flip__plus__u0	post_ins_moves_j_no_flip	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_moves_j_no_flip__plus__u1	post_ins_moves_j_no_flip	+	u1	3	0	TRUE	trigger	TRUE	64	118	54	78	78;149	149
+post_ins_moves_j_no_flip__plus__u1	post_ins_moves_j_no_flip	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_moves_j_no_flip__minus__u0	post_ins_moves_j_no_flip	-	u0	3	0	TRUE	trigger	TRUE	51	105	54	168	96;168	96
+post_ins_moves_j_no_flip__minus__u0	post_ins_moves_j_no_flip	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_ins_moves_j_no_flip__minus__u1	post_ins_moves_j_no_flip	-	u1	3	0	TRUE	trigger	TRUE	64	118	54	185	113;185	113
+post_ins_moves_j_no_flip__minus__u1	post_ins_moves_j_no_flip	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_snv_after_stop__plus__u0	post_snv_after_stop	+	u0	2	0	TRUE	trigger	TRUE	51	102	51	65	65	86
+post_snv_after_stop__plus__u0	post_snv_after_stop	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_snv_after_stop__plus__u1	post_snv_after_stop	+	u1	2	0	TRUE	trigger	TRUE	64	115	51	78	78	99
+post_snv_after_stop__plus__u1	post_snv_after_stop	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_snv_after_stop__minus__u0	post_snv_after_stop	-	u0	2	0	TRUE	trigger	TRUE	51	102	51	128	128	107
+post_snv_after_stop__minus__u0	post_snv_after_stop	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_snv_after_stop__minus__u1	post_snv_after_stop	-	u1	2	0	TRUE	trigger	TRUE	64	115	51	145	145	124
+post_snv_after_stop__minus__u1	post_snv_after_stop	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_snv_last_exon__plus__u0	post_snv_last_exon	+	u0	2	0	TRUE	escape	TRUE	51	100	49	65	65	166
+post_snv_last_exon__plus__u0	post_snv_last_exon	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_snv_last_exon__plus__u1	post_snv_last_exon	+	u1	2	0	TRUE	escape	TRUE	64	113	49	78	78	179
+post_snv_last_exon__plus__u1	post_snv_last_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_snv_last_exon__minus__u0	post_snv_last_exon	-	u0	2	0	TRUE	escape	TRUE	51	100	49	128	128	27
+post_snv_last_exon__minus__u0	post_snv_last_exon	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+post_snv_last_exon__minus__u1	post_snv_last_exon	-	u1	2	0	TRUE	escape	TRUE	64	113	49	145	145	44
+post_snv_last_exon__minus__u1	post_snv_last_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d49__plus__u0	fs_d49	+	u0	2	0	TRUE	escape	TRUE	30	79	49	26	26	.
+fs_d49__plus__u0	fs_d49	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d49__plus__u1	fs_d49	+	u1	2	0	TRUE	escape	TRUE	43	92	49	39	39	.
+fs_d49__plus__u1	fs_d49	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d49__minus__u0	fs_d49	-	u0	2	0	TRUE	escape	TRUE	30	79	49	154	154	.
+fs_d49__minus__u0	fs_d49	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d49__minus__u1	fs_d49	-	u1	2	0	TRUE	escape	TRUE	43	92	49	171	171	.
+fs_d49__minus__u1	fs_d49	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d50__plus__u0	fs_d50	+	u0	2	0	TRUE	escape	TRUE	30	80	50	26	26	.
+fs_d50__plus__u0	fs_d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d50__plus__u1	fs_d50	+	u1	2	0	TRUE	escape	TRUE	43	93	50	39	39	.
+fs_d50__plus__u1	fs_d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d50__minus__u0	fs_d50	-	u0	2	0	TRUE	escape	TRUE	30	80	50	154	154	.
+fs_d50__minus__u0	fs_d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d50__minus__u1	fs_d50	-	u1	2	0	TRUE	escape	TRUE	43	93	50	171	171	.
+fs_d50__minus__u1	fs_d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d51__plus__u0	fs_d51	+	u0	2	0	TRUE	trigger	TRUE	30	81	51	26	26	.
+fs_d51__plus__u0	fs_d51	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d51__plus__u1	fs_d51	+	u1	2	0	TRUE	trigger	TRUE	43	94	51	39	39	.
+fs_d51__plus__u1	fs_d51	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d51__minus__u0	fs_d51	-	u0	2	0	TRUE	trigger	TRUE	30	81	51	154	154	.
+fs_d51__minus__u0	fs_d51	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_d51__minus__u1	fs_d51	-	u1	2	0	TRUE	trigger	TRUE	43	94	51	171	171	.
+fs_d51__minus__u1	fs_d51	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_three_exons__plus__u0	fs_three_exons	+	u0	3	0	TRUE	trigger	TRUE	30	81	51	26	26	.
+fs_three_exons__plus__u0	fs_three_exons	+	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_three_exons__plus__u1	fs_three_exons	+	u1	3	0	TRUE	trigger	TRUE	43	94	51	39	39	.
+fs_three_exons__plus__u1	fs_three_exons	+	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_three_exons__minus__u0	fs_three_exons	-	u0	3	0	TRUE	trigger	TRUE	30	81	51	194	194	.
+fs_three_exons__minus__u0	fs_three_exons	-	u0	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_three_exons__minus__u1	fs_three_exons	-	u1	3	0	TRUE	trigger	TRUE	43	94	51	211	211	.
+fs_three_exons__minus__u1	fs_three_exons	-	u1	3	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_deletion_minus2__plus__u0	fs_deletion_minus2	+	u0	2	0	TRUE	trigger	TRUE	27	78	51	26	26	.
+fs_deletion_minus2__plus__u0	fs_deletion_minus2	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_deletion_minus2__plus__u1	fs_deletion_minus2	+	u1	2	0	TRUE	trigger	TRUE	40	91	51	39	39	.
+fs_deletion_minus2__plus__u1	fs_deletion_minus2	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_deletion_minus2__minus__u0	fs_deletion_minus2	-	u0	2	0	TRUE	trigger	TRUE	27	78	51	152	152	.
+fs_deletion_minus2__minus__u0	fs_deletion_minus2	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_deletion_minus2__minus__u1	fs_deletion_minus2	-	u1	2	0	TRUE	trigger	TRUE	40	91	51	169	169	.
+fs_deletion_minus2__minus__u1	fs_deletion_minus2	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_stop_by_insertion__plus__u0	fs_stop_by_insertion	+	u0	2	0	TRUE	trigger	TRUE	33	105	72	46	46	.
+fs_stop_by_insertion__plus__u0	fs_stop_by_insertion	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_stop_by_insertion__plus__u1	fs_stop_by_insertion	+	u1	2	0	TRUE	trigger	TRUE	46	118	72	59	59	.
+fs_stop_by_insertion__plus__u1	fs_stop_by_insertion	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_stop_by_insertion__minus__u0	fs_stop_by_insertion	-	u0	2	0	TRUE	trigger	TRUE	33	105	72	146	146	.
+fs_stop_by_insertion__minus__u0	fs_stop_by_insertion	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_stop_by_insertion__minus__u1	fs_stop_by_insertion	-	u1	2	0	TRUE	trigger	TRUE	46	118	72	163	163	.
+fs_stop_by_insertion__minus__u1	fs_stop_by_insertion	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_post_stop_edits__plus__u0	fs_post_stop_edits	+	u0	2	0	TRUE	trigger	TRUE	30	81	51	26	26	146;156
+fs_post_stop_edits__plus__u0	fs_post_stop_edits	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_post_stop_edits__plus__u1	fs_post_stop_edits	+	u1	2	0	TRUE	trigger	TRUE	43	94	51	39	39	159;169
+fs_post_stop_edits__plus__u1	fs_post_stop_edits	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_post_stop_edits__minus__u0	fs_post_stop_edits	-	u0	2	0	TRUE	trigger	TRUE	30	81	51	154	154	25;34
+fs_post_stop_edits__minus__u0	fs_post_stop_edits	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+fs_post_stop_edits__minus__u1	fs_post_stop_edits	-	u1	2	0	TRUE	trigger	TRUE	43	94	51	171	171	42;51
+fs_post_stop_edits__minus__u1	fs_post_stop_edits	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_deletion__plus__u0	run_off_deletion	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_deletion__plus__u0	run_off_deletion	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_deletion__plus__u1	run_off_deletion	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_deletion__plus__u1	run_off_deletion	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_deletion__minus__u0	run_off_deletion	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_deletion__minus__u0	run_off_deletion	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_deletion__minus__u1	run_off_deletion	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_deletion__minus__u1	run_off_deletion	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_plus2__plus__u0	run_off_plus2	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_plus2__plus__u0	run_off_plus2	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_plus2__plus__u1	run_off_plus2	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_plus2__plus__u1	run_off_plus2	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_plus2__minus__u0	run_off_plus2	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_plus2__minus__u0	run_off_plus2	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_plus2__minus__u1	run_off_plus2	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_plus2__minus__u1	run_off_plus2	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_intronless__plus__u0	run_off_intronless	+	u0	1	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_intronless__plus__u0	run_off_intronless	+	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_intronless__plus__u1	run_off_intronless	+	u1	1	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_intronless__plus__u1	run_off_intronless	+	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_intronless__minus__u0	run_off_intronless	-	u0	1	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_intronless__minus__u0	run_off_intronless	-	u0	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+run_off_intronless__minus__u1	run_off_intronless	-	u1	1	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+run_off_intronless__minus__u1	run_off_intronless	-	u1	1	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+start_lost__plus__u0	start_lost	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+start_lost__plus__u0	start_lost	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+start_lost__plus__u1	start_lost	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+start_lost__plus__u1	start_lost	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+start_lost__minus__u0	start_lost	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+start_lost__minus__u0	start_lost	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+start_lost__minus__u1	start_lost	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+start_lost__minus__u1	start_lost	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+start_lost_with_stop__plus__u0	start_lost_with_stop	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+start_lost_with_stop__plus__u0	start_lost_with_stop	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+start_lost_with_stop__plus__u1	start_lost_with_stop	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+start_lost_with_stop__plus__u1	start_lost_with_stop	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+start_lost_with_stop__minus__u0	start_lost_with_stop	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+start_lost_with_stop__minus__u0	start_lost_with_stop	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+start_lost_with_stop__minus__u1	start_lost_with_stop	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+start_lost_with_stop__minus__u1	start_lost_with_stop	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+stop_lost__plus__u0	stop_lost	+	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+stop_lost__plus__u0	stop_lost	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+stop_lost__plus__u1	stop_lost	+	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+stop_lost__plus__u1	stop_lost	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+stop_lost__minus__u0	stop_lost	-	u0	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+stop_lost__minus__u0	stop_lost	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+stop_lost__minus__u1	stop_lost	-	u1	2	0	TRUE	unknown	FALSE	.	.	.	.	.	.
+stop_lost__minus__u1	stop_lost	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+missense__plus__u0	missense	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+missense__plus__u0	missense	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+missense__plus__u1	missense	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+missense__plus__u1	missense	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+missense__minus__u0	missense	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+missense__minus__u0	missense	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+missense__minus__u1	missense	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+missense__minus__u1	missense	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+synonymous__plus__u0	synonymous	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+synonymous__plus__u0	synonymous	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+synonymous__plus__u1	synonymous	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+synonymous__plus__u1	synonymous	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+synonymous__minus__u0	synonymous	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+synonymous__minus__u0	synonymous	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+synonymous__minus__u1	synonymous	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+synonymous__minus__u1	synonymous	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+stop_retained__plus__u0	stop_retained	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+stop_retained__plus__u0	stop_retained	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+stop_retained__plus__u1	stop_retained	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+stop_retained__plus__u1	stop_retained	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+stop_retained__minus__u0	stop_retained	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+stop_retained__minus__u0	stop_retained	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+stop_retained__minus__u1	stop_retained	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+stop_retained__minus__u1	stop_retained	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_deletion__plus__u0	inframe_deletion	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_deletion__plus__u0	inframe_deletion	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_deletion__plus__u1	inframe_deletion	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_deletion__plus__u1	inframe_deletion	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_deletion__minus__u0	inframe_deletion	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_deletion__minus__u0	inframe_deletion	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_deletion__minus__u1	inframe_deletion	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_deletion__minus__u1	inframe_deletion	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_insertion__plus__u0	inframe_insertion	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_insertion__plus__u0	inframe_insertion	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_insertion__plus__u1	inframe_insertion	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_insertion__plus__u1	inframe_insertion	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_insertion__minus__u0	inframe_insertion	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_insertion__minus__u0	inframe_insertion	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_insertion__minus__u1	inframe_insertion	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+inframe_insertion__minus__u1	inframe_insertion	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+frame_restored__plus__u0	frame_restored	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+frame_restored__plus__u0	frame_restored	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+frame_restored__plus__u1	frame_restored	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+frame_restored__plus__u1	frame_restored	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+frame_restored__minus__u0	frame_restored	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+frame_restored__minus__u0	frame_restored	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+frame_restored__minus__u1	frame_restored	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+frame_restored__minus__u1	frame_restored	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+cis_pair_stop__plus__u0	cis_pair_stop	+	u0	2	0	TRUE	trigger	TRUE	6	57	51	20;22	20;22	.
+cis_pair_stop__plus__u0	cis_pair_stop	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+cis_pair_stop__plus__u1	cis_pair_stop	+	u1	2	0	TRUE	trigger	TRUE	19	70	51	33;35	33;35	.
+cis_pair_stop__plus__u1	cis_pair_stop	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+cis_pair_stop__minus__u0	cis_pair_stop	-	u0	2	0	TRUE	trigger	TRUE	6	57	51	171;173	171;173	.
+cis_pair_stop__minus__u0	cis_pair_stop	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+cis_pair_stop__minus__u1	cis_pair_stop	-	u1	2	0	TRUE	trigger	TRUE	19	70	51	188;190	188;190	.
+cis_pair_stop__minus__u1	cis_pair_stop	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+cis_pair_stop_d50__plus__u0	cis_pair_stop_d50	+	u0	2	0	TRUE	escape	TRUE	6	56	50	20;22	20;22	.
+cis_pair_stop_d50__plus__u0	cis_pair_stop_d50	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+cis_pair_stop_d50__plus__u1	cis_pair_stop_d50	+	u1	2	0	TRUE	escape	TRUE	19	69	50	33;35	33;35	.
+cis_pair_stop_d50__plus__u1	cis_pair_stop_d50	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+cis_pair_stop_d50__minus__u0	cis_pair_stop_d50	-	u0	2	0	TRUE	escape	TRUE	6	56	50	171;173	171;173	.
+cis_pair_stop_d50__minus__u0	cis_pair_stop_d50	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+cis_pair_stop_d50__minus__u1	cis_pair_stop_d50	-	u1	2	0	TRUE	escape	TRUE	19	69	50	188;190	188;190	.
+cis_pair_stop_d50__minus__u1	cis_pair_stop_d50	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+trans_pair_halves__plus__u0	trans_pair_halves	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_pair_halves__plus__u0	trans_pair_halves	+	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_pair_halves__plus__u1	trans_pair_halves	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_pair_halves__plus__u1	trans_pair_halves	+	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_pair_halves__minus__u0	trans_pair_halves	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_pair_halves__minus__u0	trans_pair_halves	-	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_pair_halves__minus__u1	trans_pair_halves	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_pair_halves__minus__u1	trans_pair_halves	-	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_stop_and_missense__plus__u0	trans_stop_and_missense	+	u0	2	0	TRUE	trigger	TRUE	51	102	51	65	65	.
+trans_stop_and_missense__plus__u0	trans_stop_and_missense	+	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_stop_and_missense__plus__u1	trans_stop_and_missense	+	u1	2	0	TRUE	trigger	TRUE	64	115	51	78	78	.
+trans_stop_and_missense__plus__u1	trans_stop_and_missense	+	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_stop_and_missense__minus__u0	trans_stop_and_missense	-	u0	2	0	TRUE	trigger	TRUE	51	102	51	128	128	.
+trans_stop_and_missense__minus__u0	trans_stop_and_missense	-	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_stop_and_missense__minus__u1	trans_stop_and_missense	-	u1	2	0	TRUE	trigger	TRUE	64	115	51	145	145	.
+trans_stop_and_missense__minus__u1	trans_stop_and_missense	-	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_missense_only__plus__u0	trans_missense_only	+	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_missense_only__plus__u0	trans_missense_only	+	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_missense_only__plus__u1	trans_missense_only	+	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_missense_only__plus__u1	trans_missense_only	+	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_missense_only__minus__u0	trans_missense_only	-	u0	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_missense_only__minus__u0	trans_missense_only	-	u0	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_missense_only__minus__u1	trans_missense_only	-	u1	2	0	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+trans_missense_only__minus__u1	trans_missense_only	-	u1	2	1	TRUE	not_applicable	FALSE	.	.	.	.	.	.
+hom_alt_stop__plus__u0	hom_alt_stop	+	u0	2	0	TRUE	trigger	TRUE	51	102	51	65	65	.
+hom_alt_stop__plus__u0	hom_alt_stop	+	u0	2	1	TRUE	trigger	TRUE	51	102	51	65	65	.
+hom_alt_stop__plus__u1	hom_alt_stop	+	u1	2	0	TRUE	trigger	TRUE	64	115	51	78	78	.
+hom_alt_stop__plus__u1	hom_alt_stop	+	u1	2	1	TRUE	trigger	TRUE	64	115	51	78	78	.
+hom_alt_stop__minus__u0	hom_alt_stop	-	u0	2	0	TRUE	trigger	TRUE	51	102	51	128	128	.
+hom_alt_stop__minus__u0	hom_alt_stop	-	u0	2	1	TRUE	trigger	TRUE	51	102	51	128	128	.
+hom_alt_stop__minus__u1	hom_alt_stop	-	u1	2	0	TRUE	trigger	TRUE	64	115	51	145	145	.
+hom_alt_stop__minus__u1	hom_alt_stop	-	u1	2	1	TRUE	trigger	TRUE	64	115	51	145	145	.
+frame_pair_stop_second__plus__u0	frame_pair_stop_second	+	u0	2	0	TRUE	escape	TRUE	51	101	50	28;36;65	28;36;65	.
+frame_pair_stop_second__plus__u0	frame_pair_stop_second	+	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+frame_pair_stop_second__plus__u1	frame_pair_stop_second	+	u1	2	0	TRUE	escape	TRUE	64	114	50	41;49;78	41;49;78	.
+frame_pair_stop_second__plus__u1	frame_pair_stop_second	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+frame_pair_stop_second__minus__u0	frame_pair_stop_second	-	u0	2	0	TRUE	escape	TRUE	51	101	50	128;155;164	128;155;164	.
+frame_pair_stop_second__minus__u0	frame_pair_stop_second	-	u0	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+frame_pair_stop_second__minus__u1	frame_pair_stop_second	-	u1	2	0	TRUE	escape	TRUE	64	114	50	145;172;181	145;172;181	.
+frame_pair_stop_second__minus__u1	frame_pair_stop_second	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+utr_last_exon__plus__u1	utr_last_exon	+	u1	2	0	TRUE	trigger	TRUE	64	133	69	78	78	.
+utr_last_exon__plus__u1	utr_last_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+utr_last_exon__minus__u1	utr_last_exon	-	u1	2	0	TRUE	trigger	TRUE	64	133	69	145	145	.
+utr_last_exon__minus__u1	utr_last_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+utr_first_exon__plus__u1	utr_first_exon	+	u1	2	0	TRUE	escape	TRUE	64	13	-51	118	118	.
+utr_first_exon__plus__u1	utr_first_exon	+	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+utr_first_exon__minus__u1	utr_first_exon	-	u1	2	0	TRUE	escape	TRUE	64	13	-51	105	105	.
+utr_first_exon__minus__u1	utr_first_exon	-	u1	2	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+utr_first_and_last__plus__u1	utr_first_and_last	+	u1	4	0	TRUE	trigger	TRUE	64	133	69	118	118	.
+utr_first_and_last__plus__u1	utr_first_and_last	+	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
+utr_first_and_last__minus__u1	utr_first_and_last	-	u1	4	0	TRUE	trigger	TRUE	64	133	69	185	185	.
+utr_first_and_last__minus__u1	utr_first_and_last	-	u1	4	1	FALSE	not_applicable	FALSE	.	.	.	.	.	.
