@@ -13,16 +13,16 @@
 suppressPackageStartupMessages({ library(DBI); library(duckdb); library(jsonlite) })
 source("r/Rduckvep/R/builders.R")
 source("r/Rduckvep/R/structural_hgvs.R")
-fasta <- "/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
-cache <- "/root/.cache/duckhts/vep/cache-grch38-chr21"
-model <- "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb"
+fasta <- Sys.getenv("DUCKVEP_GRCH38_FASTA", "/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa")
+cache <- Sys.getenv("DUCKVEP_GRCH38_VEP_CACHE", "/root/.cache/duckhts/vep/cache-grch38-chr21")
+model <- Sys.getenv("DUCKVEP_GRCH38_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
 counterexamples <- "test/duckvep/conformance/data/structural_hgvs_vep116_counterexamples.tsv"
 refused_file <- "test/duckvep/conformance/data/structural_hgvs_vep116_refused.tsv"
 n_events <- 600L # random events; targeted duplications are appended
 directory <- tempfile("structural-hgvs-")
 dir.create(directory)
 binary <- file.path(directory, "duckvep.duckdb_extension")
-stopifnot(file.copy("build/release/duckvep.duckdb_extension", binary))
+stopifnot(file.copy(Sys.getenv("DUCKVEP_EXTENSION_FILE", "build/release/duckvep.duckdb_extension"), binary))
 con <- dbConnect(duckdb(shared_home = FALSE,
   config = list(allow_unsigned_extensions = "true")))
 on.exit({dbDisconnect(con, shutdown = TRUE); unlink(directory, recursive = TRUE)}, add = TRUE)
