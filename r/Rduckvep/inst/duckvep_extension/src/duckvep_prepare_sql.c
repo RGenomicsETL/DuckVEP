@@ -65,10 +65,11 @@ static void prepare_sv(duckdb_function_info info, duckdb_data_chunk input, duckd
 }
 
 static const char str_sql[] =
-"), joined AS (SELECT s.*, r.reference_sequence FROM source s LEFT JOIN " ;
+"), joined AS (SELECT s.*, r.reference_sequence, r.ref_rows FROM source s LEFT JOIN "
+"(SELECT event_index, count(*) AS ref_rows, CASE WHEN count(*) > 1 THEN NULL ELSE min(reference_sequence) END AS reference_sequence FROM " ;
 
 static const char str_tail[] =
-" r USING (event_index)), parsed AS (SELECT *, string_split(alt,',') alts, "
+" GROUP BY event_index) r USING (event_index)), parsed AS (SELECT *, string_split(alt,',') alts, "
 "string_split(info,';') tokens, string_split(format,':') fields, string_split(\"sample\",':') entries "
 "FROM joined), metadata AS (SELECT *, list_transform(tokens, lambda x: split_part(x,'=',1)) keys, "
 "nullif(regexp_extract(info,'(?:^|;)REF=([^;]*)',1),'') ref_text, "
@@ -91,6 +92,7 @@ static const char str_tail[] =
 
 static const char str_tail2[] =
 "decisions AS (SELECT *, CASE "
+"WHEN ref_rows > 1 THEN 'ambiguous_reference_sequence' "
 "WHEN info IS NULL OR format IS NULL OR \"sample\" IS NULL OR ref IS NULL OR alt IS NULL OR reference_sequence IS NULL THEN 'missing_field' "
 "WHEN alt_index IS NULL OR NOT isfinite(try_cast(alt_index AS DOUBLE)) OR "
 "try_cast(alt_index AS DOUBLE) != floor(try_cast(alt_index AS DOUBLE)) OR "
@@ -129,7 +131,7 @@ static const char str_tail2[] =
 "ELSE 'invalid' END status, reason, "
 "struct_pack(info := info, format := format, sample := \"sample\", ref := ref, alt := alt, "
 "reference_sequence := reference_sequence, alt_index := alt_index) AS \"source\", "
-"CASE WHEN reason NOT IN ('missing_field','alt_index','literal_reference','duplicate_info',"
+"CASE WHEN reason NOT IN ('ambiguous_reference_sequence','missing_field','alt_index','literal_reference','duplicate_info',"
 "'missing_info','metadata_syntax','reference_mismatch','allele_capacity') "
 "OR (reason='allele_capacity' AND ref_length<=5000) "
 "THEN struct_pack(unit := unit, count := ref_count) END reference_components, "
