@@ -679,19 +679,30 @@ static duckvep_prediction_reason_t edit_relation(const duckvep_haplotype_edit_t 
     return overlap;
 }
 
-/* Same-codon classifier (coding-v1 slice 3). Runs only on a path that is inside the supported
- * domain. It classifies the whole edited peptide against the uncurated reference peptide, never
- * an edit alone, and decides only haplotypes with no frame, start or stop effect:
- *   identical peptide                          -> synonymous_variant
- *   substitutions only, changed peptide        -> missense_variant
- *   every edit a pure insertion / pure deletion -> inframe_insertion / inframe_deletion
- *   any other frame-preserving replacement     -> protein_altering_variant
- * Purity is a property of the normalized edit path (differing islands), as the contract pins
- * for frame SO; the peptide is compared only for the identical-peptide (synonymous) case.
- * Any edit whose length change is not a multiple of three (even if a later edit restores the
- * frame), any edit touching the first or terminal reference codon, and any first stop other than
- * the terminal one, are left pending for the frame (slice 4) and start/stop (slice 5) classifiers. */
-static void classify_same_codon(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf) {
+/* Whole-haplotype classifier for the frame-, stop-gain- and same-codon effects (coding-v1 slices 3
+ * and 4). Runs only on a path that is inside the supported domain. It classifies the whole edited
+ * peptide against the uncurated reference peptide, never an edit alone. The decision follows the
+ * translated sequence of the edited CDS, not the nominal net frame offset of its edits:
+ *   no stop in the edited CDS, frame still displaced when the CDS runs out -> frameshift_variant
+ *   first stop upstream of the reference terminator (its last base at or before the start of the
+ *     terminator-length tail)                        -> stop_gained, plus frameshift_variant when the
+ *                                                       stop codon intersects a displaced-frame interval
+ *   first stop is the reference terminator, read in frame:
+ *     identical peptide                              -> synonymous_variant
+ *     substitutions only, changed peptide            -> missense_variant
+ *     every edit a pure insertion / pure deletion    -> inframe_insertion / inframe_deletion
+ *     any other change, including a frame that was displaced and restored before termination
+ *                                                    -> protein_altering_variant
+ * Displaced-frame intervals are geometric facts of the ascending edit islands (leaf.stop_in_displaced_frame,
+ * from duckvep_haplotype_block_frame_intersects): they start at the first frame-changing edit and end
+ * after the ALT bases of the restoring edit, so an early stop inside an open interval keeps the frame
+ * term even when a later edit would have restored the frame, while a restoration before termination
+ * removes it. Edits after the first stop stay contributors (role post_stop) and never an expressed effect.
+ * Purity is a property of the normalized edit path (differing islands), as the contract pins for frame SO.
+ * Left pending for the start/stop classifier (slice 5): any edit touching the first or terminal
+ * reference codon, a reference whose first stop is not its terminator, and a first stop overlapping the
+ * terminator-length tail of the edited CDS (which would need stop_retained/stop_lost semantics). */
+static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf) {
     if (leaf->path_status != DUCKVEP_PREDICTION_ELIGIBLE || !leaf->cds || leaf->ordered_replacements) return;
     const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
     uint32_t tx = leaf->carriers.transcript_index;
@@ -719,23 +730,41 @@ static void classify_same_codon(duckvep_haplotype_stream_t *s, duckvep_haplotype
         insertions &= e->ref_len == 0u && e->alt_len != 0u;
         deletions &= e->alt_len == 0u && e->ref_len != 0u;
     }
-    if (frame || alt_length % 3u) {
-        leaf->path_reason = DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING;
-        return;
-    }
-    if (alt_length < 6u || terminal || leaf->translation.first_stop_position1 != alt_length / 3u ||
+    const size_t first_stop = leaf->translation.first_stop_position1;
+    if (alt_length < 6u || terminal ||
         leaf->reference_coding_translation.first_stop_position1 != ref_length / 3u) {
         leaf->path_reason = DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING;
         return;
     }
-    const uint8_t *ref = leaf->reference_coding_protein, *alt = b->protein;
-    size_t ref_n = ref_length / 3u - 1u, alt_n = alt_length / 3u - 1u;
     uint64_t mask;
-    if (ref_n == alt_n && !memcmp(ref, alt, ref_n)) mask = DUCKVEP_SO(DUCKVEP_SO_SYNONYMOUS);
-    else if (substitutions) mask = DUCKVEP_SO(DUCKVEP_SO_MISSENSE);
-    else if (insertions) mask = DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION);
-    else if (deletions) mask = DUCKVEP_SO(DUCKVEP_SO_INFRAME_DELETION);
-    else mask = DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING);
+    if (!first_stop) {
+        /* No stop at all: only a frame that is still displaced at CDS exhaustion is decided here.
+         * The frame term is the only one emitted; termination extension is not invented. */
+        if (alt_length % 3u == 0u) {
+            leaf->path_reason = DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING;
+            return;
+        }
+        mask = DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT);
+    } else if (first_stop * 3u == alt_length) {
+        /* The terminator itself, read in frame (a length that is not a multiple of three cannot end
+         * on a codon boundary). Only a stop codon inside a displaced interval carries a frame term. */
+        const uint8_t *ref = leaf->reference_coding_protein, *alt = b->protein;
+        size_t ref_n = ref_length / 3u - 1u, alt_n = alt_length / 3u - 1u;
+        if (leaf->stop_in_displaced_frame) mask = DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT);
+        else if (ref_n == alt_n && !memcmp(ref, alt, ref_n)) mask = DUCKVEP_SO(DUCKVEP_SO_SYNONYMOUS);
+        else if (frame) mask = DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING);
+        else if (substitutions) mask = DUCKVEP_SO(DUCKVEP_SO_MISSENSE);
+        else if (insertions) mask = DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION);
+        else if (deletions) mask = DUCKVEP_SO(DUCKVEP_SO_INFRAME_DELETION);
+        else mask = DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING);
+    } else if (first_stop * 3u + 3u <= alt_length) {
+        /* A new first stop upstream of where the reference terminator now sits (the last three bases). */
+        mask = DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED);
+        if (leaf->stop_in_displaced_frame) mask |= DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT);
+    } else {
+        leaf->path_reason = DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING;
+        return;
+    }
     leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
     leaf->haplotype_so_mask = mask;
 }
@@ -835,7 +864,7 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
     }
     leaf->path_status = status;
     leaf->path_reason = reason;
-    classify_same_codon(s, leaf);
+    classify_haplotype(s, leaf);
     leaf->prediction_status = leaf->path_status;
     leaf->prediction_reason = leaf->path_reason;
     uint32_t id = leaf->carriers.first_call;

@@ -145,18 +145,30 @@ otherwise the first ineligible carrier's result.
 
 `haplotype_consequences` (a character list) and `haplotype_impact` give the
 reduced whole-protein SO set and IMPACT of the edited coding sequence, decided
-by the same-codon classifier for an eligible path with no start, stop or frame
-effect; both are NULL unless `prediction_status` is `predicted`. The combined
-haplotype is classified, never one edit alone: an unchanged peptide is
-`synonymous_variant` (LOW); substitutions that change the peptide are
-`missense_variant`; edits that are all pure insertions or all pure deletions
-are `inframe_insertion` or `inframe_deletion`; any other frame-preserving
-replacement is `protein_altering_variant` (all MODERATE). Cis and trans edits
-are separate carriers of separate paths. Paths with a length change that is not
-a multiple of three, an edit in the first or terminal codon, or a first stop
-other than the terminal one stay `eligible_classifier_pending` with reason
-`frame_classifier_pending` or `start_stop_classifier_pending`, their SO and
-IMPACT NULL until those classifiers land. Reference lanes have no carrier row.
+by the same-codon and frame/stop-gain classifiers for an eligible path; both are
+NULL unless `prediction_status` is `predicted`. The combined haplotype is
+classified from its translated sequence, never one edit alone and never from
+the nominal net length change. A new first stop upstream of the reference
+terminator is `stop_gained` (HIGH), and `frameshift_variant` (HIGH) is added when
+that stop codon intersects a displaced-frame interval; with no stop at all, a frame
+still displaced when the CDS runs out is `frameshift_variant` alone. A frame that is
+displaced and restored before termination has no frame term: an unchanged peptide
+is `synonymous_variant` (LOW), any other change `protein_altering_variant`. Two
+compensating indels can therefore be rescued or end in an earlier stop. Without
+frame edits, substitutions that change the peptide are `missense_variant`, and edits
+that are all pure insertions or all pure deletions are `inframe_insertion` or
+`inframe_deletion`; any other frame-preserving replacement is
+`protein_altering_variant` (MODERATE). Edits after the first stop stay
+contributors, never expressed effects. Cis and trans edits are separate carriers
+of separate paths. `carrier_predictions` also carries `haplotype_impact` and
+`haplotype_consequences` per carrier (the edited sequence is shared, so its set is
+defined for every predicted carrier), so a row with an ineligible carrier (for
+example a triploid call) has NULL row-level fields but keeps the set of its
+eligible carriers. Edits in the first or terminal codon, or a first stop that
+overlaps the terminator-length tail of the edited CDS, stay
+`eligible_classifier_pending` with reason `start_stop_classifier_pending`
+(start_lost, stop_lost and stop_retained_variant are not yet decided), their SO
+and IMPACT NULL. Reference lanes have no carrier row.
 `contributor_provenance` lists every source of the path, including omitted,
 shadowed, unapplied (conflicting or incomplete) and post-stop ones, with its
 original operands, `alt_index`, evidence, projection status, `role` and
@@ -173,7 +185,7 @@ It is FALSE for no stop or a stop after frame restoration, and NA when
 sequence is unavailable. It is a sequence fact, not a combined SO consequence
 or a claim that a restored DNA frame rescues the protein.
 
-Frame, start and stop whole-haplotype SO, NMD, DNA HGVS, complete protein HGVS and structural-event
+Start-codon and terminal-codon whole-haplotype SO, NMD, DNA HGVS, complete protein HGVS and structural-event
 composition remain unfinished. Input must contain one row per
 `event_index`, `transcript_index`, `sample_index`, with columns `seq_region`,
 `position`, `reference`, `alternate`, `alt_index`, `alleles`, `phase_before`

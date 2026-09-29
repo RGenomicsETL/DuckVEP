@@ -80,8 +80,8 @@ typedef struct {
 
 /* Versioned coding-v1 status of one completed leaf. ELIGIBLE means the leaf is inside
  * the supported domain but its whole-haplotype consequence needs a classifier that has
- * not landed (see the PENDING reasons); PREDICTED means the same-codon classifier
- * decided it and leaf.haplotype_so_mask is authoritative. No NMD is predicted yet.
+ * not landed (see the PENDING reason); PREDICTED means the same-codon or frame/stop-gain
+ * classifier decided it and leaf.haplotype_so_mask is authoritative. No NMD is predicted yet.
  * Failures keep every contributor. */
 typedef enum {
     DUCKVEP_PREDICTION_ELIGIBLE = 0,
@@ -116,8 +116,7 @@ typedef enum {
     DUCKVEP_REASON_INTERNAL_STOP,
     DUCKVEP_REASON_NON_LITERAL_ALLELE,
     DUCKVEP_REASON_ALLELE_OVER_50,
-    /* Eligible, not yet classified: slice 4 (frame/restoration) and slice 5 (start/stop). */
-    DUCKVEP_REASON_FRAME_CLASSIFIER_PENDING,
+    /* Eligible, not yet classified: slice 5 (start/terminal codon effects). */
     DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING
 } duckvep_prediction_reason_t;
 
@@ -241,7 +240,7 @@ typedef struct {
     duckvep_prediction_status_t prediction_status, path_status;
     duckvep_prediction_reason_t prediction_reason, path_reason;
     duckvep_cds_edit_status_t prediction_projection; /* Valid for DUCKVEP_REASON_PROJECTION. */
-    /* Same-codon classifier (coding-v1 slice 3). Set only when path_status is PREDICTED;
+    /* Same-codon and frame/stop-gain classifier (coding-v1 slices 3 and 4). Set only when path_status is PREDICTED;
      * the reduced whole-protein SO set as DUCKVEP_SO() bits, empty for a lane equal to the
      * reference (which has no IMPACT). */
     uint64_t haplotype_so_mask;

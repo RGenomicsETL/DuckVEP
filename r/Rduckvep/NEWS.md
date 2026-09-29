@@ -16,6 +16,14 @@
   eligible paths with no frame, start or stop effect: synonymous (LOW), missense, inframe insertion or
   deletion, or protein-altering (MODERATE). Other eligible paths stay `eligible_classifier_pending`,
   now with reason `frame_classifier_pending` or `start_stop_classifier_pending`.
+- The frame opening/restoration classifier (coding-v1 slice 4) decides frame-shifting and stop-gain paths from the
+  translated haplotype: `stop_gained` for a new first stop before the reference terminator, `frameshift_variant`
+  when that stop intersects a displaced-frame interval or the frame is still displaced when the CDS runs out,
+  and, for a frame restored before termination, `synonymous_variant` or `protein_altering_variant`. Edits after
+  the first stop stay contributors. `carrier_predictions` gains `haplotype_impact` and `haplotype_consequences`
+  per carrier, so an ineligible carrier no longer hides the set of eligible carriers of the same row. The
+  reason `frame_classifier_pending` no longer occurs; only start/terminal-codon paths stay
+  `start_stop_classifier_pending`.
 - The extension's SQL preparation and annotation entry points are native builders:
   `query(duckvep_annotate_sql('events', 'model', {hgvs: true}))` replaces
   direct annotation macro calls. `rduckvep_annotate_sql()` and the other

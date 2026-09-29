@@ -1,9 +1,9 @@
 library(tinytest)
 library(DBI)
 
-# Coding-v1 eligibility and provenance (slice 2 of #2) plus the same-codon classifier (slice 3).
-# prediction_status says whether a path is inside the supported domain and whether the classifier
-# decided it (`predicted`) or the frame/start-stop classifiers still must (`eligible_classifier_pending`).
+# Coding-v1 eligibility and provenance (slice 2 of #2), the same-codon classifier (slice 3) and the frame/stop-gain
+# classifier (slice 4). prediction_status says whether a path is inside the supported domain and whether a
+# classifier decided it (`predicted`) or the start/terminal classifier still must (`eligible_classifier_pending`).
 # Transcript 0 is + strand with exons 100-108 (ATGGCTGCT) and 120-128 (GAAGGTTAA).
 # Transcripts 1-6 are single-exon variants that each break one v1 CDS requirement.
 local({
@@ -72,11 +72,11 @@ local({
     haplotype_lane = c(1, 1, 2, 1, 2, 1, 2, 1, 1, rep(1, 14)),
     prediction_status = unname(status[c("predicted", "predicted", "predicted", "predicted", "incomplete",
       "incomplete", "incomplete", "incomplete", "incomplete", "overlap", "conflict", "context",
-      "eligible", "context", rep("context", 6), "predicted", "predicted", "predicted")]),
+      "predicted", "context", rep("context", 6), "predicted", "predicted", "predicted")]),
     prediction_reason = c("supported_domain", "supported_domain", "supported_domain",
       "supported_domain", "missing_call", "unphased_heterozygous", "unphased_heterozygous",
       "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "overlapping_edits",
-      "contradictory_edits", "outside_cds", "start_stop_classifier_pending", "non_diploid_call",
+      "contradictory_edits", "outside_cds", "supported_domain", "non_diploid_call",
       "noncanonical_start", "internal_stop", "noncanonical_stop", "curated_transcript",
       "incomplete_cds", "non_standard_codon_table", "supported_domain", "supported_domain",
       "supported_domain"),
@@ -94,9 +94,11 @@ local({
     expect_identical(result$prediction_status[i] %in% ok, all(per_carrier$prediction_status %in% ok))
   }
 
-  # Same-codon classifier: the combined haplotype is classified, and the SO set/IMPACT are NULL unless
-  # the row is predicted. A cis SNV pair and an MNV in one codon give the same missense; a trans pair
-  # is two paths; a wobble SNV is synonymous (LOW); a created stop stays pending with no SO or IMPACT.
+  # Same-codon and frame/stop-gain classifiers: the combined haplotype is classified, and the row-level SO
+  # set/IMPACT are NULL unless the row is predicted. A cis SNV pair and an MNV in one codon give the same
+  # missense; a trans pair is two paths; a wobble SNV is synonymous (LOW); a created stop before the
+  # terminator is stop_gained (HIGH) and the SNV after it stays a contributor (slice 4 transition: this path
+  # was eligible_classifier_pending at slice 3), so nothing in this fixture is pending any more.
   so <- vapply(result$haplotype_consequences, function(x) if (is.null(x)) NA_character_ else
     paste(x, collapse = ","), "")
   expect_identical(is.na(so), result$prediction_status != "predicted")
@@ -107,10 +109,30 @@ local({
   expect_equal(length(syn), 1L)
   expect_identical(result$cds[syn], "ATGGCTGCCGAAGGTTAA")
   expect_identical(result$haplotype_impact[syn], "LOW")
-  pending <- which(result$prediction_status == "eligible_classifier_pending")
-  expect_equal(length(pending), 1L)
-  expect_identical(result$prediction_reason[pending], "start_stop_classifier_pending")
-  expect_true(is.na(result$haplotype_impact[pending]) && is.null(result$haplotype_consequences[[pending]]))
+  stopped <- which(so %in% "stop_gained")
+  expect_equal(length(stopped), 1L)
+  expect_identical(result$haplotype_impact[stopped], "HIGH")
+  expect_equal(nrow(result$contributor_provenance[[stopped]]), 2L)
+  expect_equal(sum(result$prediction_status == "eligible_classifier_pending"), 0L)
+
+  # Per-carrier consequences (slice 4): every carrier whose own keyed status is predicted carries the shared
+  # edited sequence's set and IMPACT, so an ineligible carrier of a row does not hide it; other carriers are NULL.
+  for (i in seq_len(nrow(result))) {
+    per_carrier <- result$carrier_predictions[[i]]
+    expect_true(all(c("haplotype_impact", "haplotype_consequences") %in% names(per_carrier)))
+    ok <- per_carrier$prediction_status == "predicted"
+    expect_identical(is.na(per_carrier$haplotype_impact), !ok) # every predicted path here has a non-empty set
+    expect_identical(vapply(per_carrier$haplotype_consequences, is.null, NA), !ok)
+    if (all(ok)) {
+      expect_true(all(vapply(per_carrier$haplotype_consequences, identical, NA, result$haplotype_consequences[[i]])))
+      expect_true(all(is.na(per_carrier$haplotype_impact) | per_carrier$haplotype_impact == result$haplotype_impact[i]))
+    }
+  }
+  mixed <- which(vapply(result$carrier_predictions, function(x) any(x$prediction_status == "predicted") &&
+    any(x$prediction_status != "predicted"), NA))
+  expect_true(length(mixed) > 0L)
+  expect_true(all(is.na(result$haplotype_impact[mixed])))
+  expect_true(all(vapply(mixed, function(i) any(!is.na(result$carrier_predictions[[i]]$haplotype_impact)), NA)))
 
   # Every contributor keeps its operands, evidence, ALT ordinal, role and normalized edits.
   for (i in seq_len(nrow(result))) {
