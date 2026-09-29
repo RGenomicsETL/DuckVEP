@@ -1,6 +1,6 @@
 # Haplotype prediction contract: `duckvep-coding-v1`
 
-Status: **signed by the maintainer on 2026-09-28 and amended the same day.** (1) **`bcftools csq` replaces Haplosaurus** as the executable authority for whole-haplotype consequences. (2) The scale gate is **2× faster than `bcftools csq`** on identical input, model and cores (section 4). The NMD rule is `ejc50-v1`. Deferred work is tracked in #11 (compound HGVS), #12 (extended domains), #13 (extended consequences and NMD models) and #4 item 5 (phased structural composition).
+Status: **signed by the maintainer on 2026-09-28 and amended the same day.** (1) **`bcftools csq` replaces Haplosaurus** as the executable authority for whole-haplotype consequences. (2) The scale gate is **2× faster than `bcftools csq`** on identical input, model and cores (section 4). The NMD rule is `ejc50-v1`. Deferred work is tracked in #11 (compound HGVS), #12 (extended domains), #13 (extended consequences and NMD models) and #28 (phased structural composition).
 
 **Scope:** close #2 on a versioned, coding-only vertical, not “general haplotype prediction.” Maintainer approval is required before classifiers change; #8 and #3 land first. Keep independent-event and haplotype classifiers separate, sharing projection/edit/translation facts only where their semantics agree. A framework rewrite is unnecessary. `bcftools csq` is the pinned test oracle, not a runtime dependency; DuckVEP extends its existing native path.
 
@@ -41,7 +41,7 @@ Reference-only lanes have an empty SO set and NULL IMPACT. Other mixed frame-pre
 ## 3. Named follow-ups, not closure blockers
 
 - **#11, “Compound haplotype HGVS and overlap nomenclature”**: move checklist item 3 and its compound shifted-HGVS work from item 6 here. Sequence equality cannot validate nomenclature. Existing supported protein HGVS remains a regression gate.
-- **#4 item 5 — “Phased structural composition”**: move item 4 there; typed SV/BND/STR composition requires its own event/topology contract.
+- **#28 — “Phased structural composition”**: move item 4 there; typed SV/BND/STR composition requires its own event/topology contract.
 - **#12, “Extended haplotype domains”**: defer item 5’s arbitrary ploidy, uncertain-phase enumeration, general overlaps/raw-parser contexts, nonstandard/partial transcripts, larger alleles. Retain current replay tests and disagreement ledgers.
 - **#13, “Extended haplotype consequences and translation”**: defer splice-changing/regulatory/UTR composition, alternative initiation, downstream stop-loss extension, richer SO sets and additional NMD models.
 
