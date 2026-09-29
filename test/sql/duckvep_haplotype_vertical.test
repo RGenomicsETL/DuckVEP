@@ -1,10 +1,10 @@
 require duckvep
 
-# Same-codon classifier against the slice-1 vertical fixtures (test/data/haplotype/vertical.*): the base-R goldens in
-# vertical_goldens.tsv decide cis (synonymous) and trans (two missense lanes); every other case has a frame, start
-# or stop effect and stays eligible_classifier_pending with the reason naming the classifier that will decide it
-# (slice 4: frame/restoration; slice 5: start/stop). The model is derived from vertical.fa/vertical.gff3 by
-# test/scripts/generate_haplotype_models.R.
+# Same-codon and frame/stop-gain classifiers against the slice-1 vertical fixtures (test/data/haplotype/vertical.*):
+# the base-R goldens in vertical_goldens.tsv decide cis (synonymous), trans (two missense lanes), frame_open,
+# restored_before_stop, restored_after_stop and the stop-gain cases (nmd49/50/51, intronless, shifted_junction). Only
+# the start_lost, stop_lost and stop_retained cases stay eligible_classifier_pending for slice 5. The model is
+# derived from vertical.fa/vertical.gff3 by test/scripts/generate_haplotype_models.R.
 
 statement ok
 CREATE TABLE vt_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region,
@@ -48,7 +48,8 @@ CREATE TABLE vt_out AS SELECT h.transcript_index,c.haplotype_lane-1 AS lane,h.pr
  h.haplotype_consequences,h.haplotype_impact
  FROM (SELECT *,unnest(carriers) c FROM duckvep_haplotypes('SELECT * FROM vt_calls','vt')) h;
 
-# Decided lanes equal the goldens exactly (cis: one synonymous lane; trans: two missense lanes).
+# Decided lanes equal the goldens exactly. Slice 4 transitions from pending: frame_open, restored_before_stop,
+# restored_after_stop, nmd49, nmd50, nmd51, intronless and shifted_junction.
 
 query TITTT
 SELECT g.case_name,o.lane,o.prediction_status,array_to_string(o.haplotype_consequences,','),
@@ -57,10 +58,18 @@ FROM vt_gold g JOIN vt_out o ON o.transcript_index=g.transcript_index AND o.lane
 WHERE o.prediction_status='predicted' ORDER BY 1,2;
 ----
 cis	0	predicted	synonymous_variant	LOW/true
+frame_open	0	predicted	stop_gained,frameshift_variant	HIGH/true
+intronless	0	predicted	stop_gained	HIGH/true
+nmd49	0	predicted	stop_gained	HIGH/true
+nmd50	0	predicted	stop_gained	HIGH/true
+nmd51	0	predicted	stop_gained	HIGH/true
+restored_after_stop	0	predicted	stop_gained,frameshift_variant	HIGH/true
+restored_before_stop	0	predicted	protein_altering_variant	MODERATE/true
+shifted_junction	0	predicted	stop_gained	HIGH/true
 trans	0	predicted	missense_variant	MODERATE/true
 trans	1	predicted	missense_variant	MODERATE/true
 
-# Every other carrier lane is pending on the classifier that owns it, with no invented SO set or IMPACT.
+# Every other carrier lane (start/terminal codon effects) is pending on slice 5, with no invented SO set or IMPACT.
 # The reference lanes of the goldens (empty SO set) have no carrier.
 
 query TTTTT
@@ -68,14 +77,6 @@ SELECT g.case_name,o.lane,o.prediction_reason,o.haplotype_consequences IS NULL,o
 FROM vt_gold g JOIN vt_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
 WHERE o.prediction_status='eligible_classifier_pending' ORDER BY 1,2;
 ----
-frame_open	0	frame_classifier_pending	true	true
-intronless	0	start_stop_classifier_pending	true	true
-nmd49	0	start_stop_classifier_pending	true	true
-nmd50	0	start_stop_classifier_pending	true	true
-nmd51	0	start_stop_classifier_pending	true	true
-restored_after_stop	0	frame_classifier_pending	true	true
-restored_before_stop	0	frame_classifier_pending	true	true
-shifted_junction	0	start_stop_classifier_pending	true	true
 start_lost	0	start_stop_classifier_pending	true	true
 stop_lost	0	start_stop_classifier_pending	true	true
 stop_retained	0	start_stop_classifier_pending	true	true
