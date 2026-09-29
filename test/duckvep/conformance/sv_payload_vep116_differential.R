@@ -95,6 +95,32 @@ local({
     stopifnot(vep[[i]]$start == geometry$nominal_start[i],
       vep[[i]]$end == geometry$nominal_end[i])
   }
+  confidence_vcf <- "test/duckvep/conformance/data/structural_confidence_grch38.vcf"
+  confidence_json <- file.path(directory, "confidence.json")
+  stopifnot(identical(system2("scripts/run_species_vep116_docker.sh",
+    c("homo_sapiens", "GRCh38", "116", cache, fasta, confidence_vcf,
+      confidence_json)), 0L))
+  confidence_vep <- lapply(readLines(confidence_json), fromJSON,
+    simplifyVector = FALSE)
+  confidence_rows <- grep("^21\\t", readLines(confidence_vcf), value = TRUE)
+  stopifnot(length(confidence_vep) == 12L, length(confidence_rows) == 12L)
+  for (i in seq.int(1L, 12L, by = 2L)) {
+    nominal <- strsplit(confidence_rows[[i]], "\t", fixed = TRUE)[[1L]]
+    uncertain <- strsplit(confidence_rows[[i + 1L]], "\t", fixed = TRUE)[[1L]]
+    a <- rduckvep_prepare_sv_geometry(as.numeric(nominal[2L]), nominal[4L],
+      nominal[5L], nominal[8L])
+    b <- rduckvep_prepare_sv_geometry(as.numeric(uncertain[2L]), uncertain[4L],
+      uncertain[5L], uncertain[8L])
+    stopifnot(identical(a$status, "ok"), identical(b$status, "ok"),
+      is.na(a$outer_start), !is.na(b$outer_start), !is.na(b$outer_end),
+      a$nominal_start == b$nominal_start,
+      a$nominal_end == b$nominal_end,
+      a$nominal_start == confidence_vep[[i]]$start,
+      a$nominal_end == confidence_vep[[i]]$end,
+      b$nominal_start == confidence_vep[[i + 1L]]$start,
+      b$nominal_end == confidence_vep[[i + 1L]]$end,
+      identical(pairs(confidence_vep[[i]]), pairs(confidence_vep[[i + 1L]])))
+  }
   stopifnot(identical(pairs(vep[[1L]]), pairs(vep[[2L]])),
     identical(duck_pairs(0), duck_pairs(1)))
   target <- "ENST00000427446"
@@ -107,5 +133,5 @@ local({
     identical(sort(strsplit(duck_term(2), "&", fixed = TRUE)[[1L]]),
       sort(vep_term(3))),
     identical(vep[[3L]]$allele_string, "-/ATG"))
-  cat("VEP 116 and DuckVEP: 3 nominal coordinates, CI consequence invariance, symbolic vs literal insertion predicate\n")
+  cat("VEP 116: 6 typed nominal/CI SV pairs; DuckVEP: INS confidence and literal payload predicates\n")
 })

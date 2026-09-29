@@ -23,6 +23,7 @@ A one-row data frame with status, mode, nominal and confidence
 \description{
 For symbolic alleles the VCF padding base is outside the affected interval.
 Confidence bounds are VEP 116's inner/outer coordinates; annotation uses
-nominal start/end. A literal anchored insertion takes the small-variant path
+nominal start/end. The supported symbolic contract has a one-base A/C/G/T/N
+padding REF, an integral END, and coordinates within signed 32-bit range. A literal anchored insertion takes the small-variant path
 and carries its inserted bases; INFO/SEQ on a symbolic INS is provenance only.
 }
