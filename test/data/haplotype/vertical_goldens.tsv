@@ -1,0 +1,27 @@
+case	lane	so_terms	nmd	first_stop_end	junction
+cis	0	synonymous_variant	not_applicable	120	.
+cis	1		not_applicable	120	.
+trans	0	missense_variant	not_applicable	120	.
+trans	1	missense_variant	not_applicable	120	.
+frame_open	0	frameshift_variant,stop_gained	escape	27	.
+frame_open	1		not_applicable	120	.
+restored_before_stop	0	protein_altering_variant	not_applicable	120	.
+restored_before_stop	1		not_applicable	120	.
+restored_after_stop	0	frameshift_variant,stop_gained	escape	27	.
+restored_after_stop	1		not_applicable	120	.
+start_lost	0	start_lost	unknown	120	.
+start_lost	1		not_applicable	120	.
+stop_lost	0	stop_lost	unknown	.	.
+stop_lost	1		not_applicable	120	.
+stop_retained	0	stop_retained_variant	not_applicable	120	.
+stop_retained	1		not_applicable	120	.
+nmd49	0	stop_gained	escape	51	100
+nmd49	1		not_applicable	120	100
+nmd50	0	stop_gained	escape	51	101
+nmd50	1		not_applicable	120	101
+nmd51	0	stop_gained	trigger	51	102
+nmd51	1		not_applicable	120	102
+intronless	0	stop_gained	escape	51	.
+intronless	1		not_applicable	120	.
+shifted_junction	0	stop_gained	trigger	51	103
+shifted_junction	1		not_applicable	120	100

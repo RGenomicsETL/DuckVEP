@@ -1,0 +1,13 @@
+cis	120	5	120	121
+trans	120	133	120	121
+frame_open	120	266	120	121
+restored_before_stop	120	409	120	121
+restored_after_stop	120	551	120	121
+start_lost	120	684	120	121
+stop_lost	120	816	120	121
+stop_retained	120	952	120	121
+nmd49	219	1080	219	220
+nmd50	218	1307	218	219
+nmd51	217	1533	217	218
+intronless	120	1763	120	121
+shifted_junction	219	1902	219	220

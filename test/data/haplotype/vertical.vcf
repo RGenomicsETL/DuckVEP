@@ -1,0 +1,34 @@
+##fileformat=VCFv4.2
+##contig=<ID=cis,length=120>
+##contig=<ID=trans,length=120>
+##contig=<ID=frame_open,length=120>
+##contig=<ID=restored_before_stop,length=120>
+##contig=<ID=restored_after_stop,length=120>
+##contig=<ID=start_lost,length=120>
+##contig=<ID=stop_lost,length=120>
+##contig=<ID=stop_retained,length=120>
+##contig=<ID=nmd49,length=219>
+##contig=<ID=nmd50,length=218>
+##contig=<ID=nmd51,length=217>
+##contig=<ID=intronless,length=120>
+##contig=<ID=shifted_junction,length=219>
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S
+cis	4	.	A	T	.	PASS	.	GT	1|0
+cis	5	.	G	C	.	PASS	.	GT	1|0
+trans	4	.	A	T	.	PASS	.	GT	1|0
+trans	5	.	G	C	.	PASS	.	GT	0|1
+frame_open	12	.	A	AT	.	PASS	.	GT	1|0
+restored_before_stop	12	.	A	AT	.	PASS	.	GT	1|0
+restored_before_stop	19	.	CA	C	.	PASS	.	GT	1|0
+restored_after_stop	12	.	A	AT	.	PASS	.	GT	1|0
+restored_after_stop	34	.	CA	C	.	PASS	.	GT	1|0
+start_lost	1	.	A	C	.	PASS	.	GT	1|0
+stop_lost	118	.	T	C	.	PASS	.	GT	1|0
+stop_retained	120	.	A	G	.	PASS	.	GT	1|0
+nmd49	49	.	C	T	.	PASS	.	GT	1|0
+nmd50	49	.	C	T	.	PASS	.	GT	1|0
+nmd51	49	.	C	T	.	PASS	.	GT	1|0
+intronless	49	.	C	T	.	PASS	.	GT	1|0
+shifted_junction	49	.	C	T	.	PASS	.	GT	1|0
+shifted_junction	60	.	A	ACAA	.	PASS	.	GT	1|0
