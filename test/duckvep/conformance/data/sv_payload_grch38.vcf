@@ -1,0 +1,13 @@
+##fileformat=VCFv4.2
+##reference=GRCh38
+##contig=<ID=21,length=46709983>
+##INFO=<ID=END,Number=1,Type=Integer,Description="Nominal end">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Structural type">
+##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Uncertain breakpoints">
+##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Start offsets">
+##INFO=<ID=CIEND,Number=2,Type=Integer,Description="End offsets">
+##INFO=<ID=SEQ,Number=1,Type=String,Description="Producer sequence payload">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+21	13546123	symbolic-nominal	G	<INS>	.	PASS	SVTYPE=INS;END=13546123
+21	13546123	symbolic-confidence	G	<INS>	.	PASS	SVTYPE=INS;END=13546123;IMPRECISE;CIPOS=-2,0;CIEND=0,2;SEQ=ATG
+21	13546123	literal-insertion	G	GATG	.	PASS	.
