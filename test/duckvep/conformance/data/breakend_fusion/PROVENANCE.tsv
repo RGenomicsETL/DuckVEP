@@ -1,0 +1,20 @@
+fixture	field	value
+fusioncatcher_v1.20_test.vcf	source_url	https://raw.githubusercontent.com/ndaniel/fusioncatcher/58a198d1508093ad73612f87e6c1bfdd9083b8c5/test/final-list_candidate-fusion-genes.vcf
+fusioncatcher_v1.20_test.vcf	source_commit	ndaniel/fusioncatcher 58a198d1508093ad73612f87e6c1bfdd9083b8c5 test/final-list_candidate-fusion-genes.vcf
+fusioncatcher_v1.20_test.vcf	upstream_sha256	5c833c8d57ccf94a711ce0953d8abb781f9a41d80103d84839832bd91937a2fd
+fusioncatcher_v1.20_test.vcf	fixture_sha256	5c833c8d57ccf94a711ce0953d8abb781f9a41d80103d84839832bd91937a2fd
+fusioncatcher_v1.20_test.vcf	fixture_relation	complete upstream file, byte-identical (no excerpt)
+fusioncatcher_v1.20_test.vcf	producer	FusionCatcher v1.20 on its bundled test reads (test/reads_1.fq.gz, reads_2.fq.gz); reference GRCh38 Ensembl release 98
+fusioncatcher_v1.20_test.vcf	known_fusions	17 published fusions as 44 physical BND records: FGFR3--TACC3 (2 events), FIP1L1--PDGFRA, GOPC--ROS1 (2), IGH@--CRLF2 (4), HOOK3--RET, AKAP9--BRAF, EWSR1--ATF1, TMPRSS2--ETV1, EWSR1--FLI1, ETV6--NTRK3, BRD4--NUTM1, CD74--ROS1, CIC--DUX4, DUX4--IGH@ (2), EML4--ALK, MALT1--IGH@, NPM1--ALK
+fusioncatcher_v1.20_test.vcf	declared_truth	INFO FUSION, GENE5/GENE3, GENS5/GENS3 (Ensembl v98 gene ids), PUBLISHED flag; IGH@ ids ENSG09000000014/ENSG09000001017 are FusionCatcher locus labels, not Ensembl genes
+fusioncatcher_v1.20_test.vcf	license	GPL-3.0 (upstream repository); the file is small test data retained verbatim for conformance
+fusioncatcher_v1.20_test.vcf	retrieved	2026-09-29
+gridss_DO52605T_excerpt.vcf	source_url	https://raw.githubusercontent.com/PapenfussLab/gridss/f8f6d2eebc6c7823f5f9e347e3f3215f70e04655/example/DO52605T.purple.sv.vcf
+gridss_DO52605T_excerpt.vcf	source_commit	PapenfussLab/gridss f8f6d2eebc6c7823f5f9e347e3f3215f70e04655 example/DO52605T.purple.sv.vcf
+gridss_DO52605T_excerpt.vcf	upstream_sha256	81eb0b3a9982ccf67f584f0510c35bb36d77130ff936b8f2ab2c7a6db4c9ad41
+gridss_DO52605T_excerpt.vcf	fixture_sha256	ed490e904ebdd330dd06d5c768d00807c006e6f38da39cb182c688cdf043831b
+gridss_DO52605T_excerpt.vcf	fixture_relation	11 verbatim upstream records (##fileformat and ##excerpt lines and the #CHROM header rewritten; sample columns kept): events gridss14fb_8091, gridss15fb_1247, gridss28fb_8844, gridss1099ff_135 (both mates each), and the first three single breakends purple_0, unbalanced_9, gridss123b_16525b
+gridss_DO52605T_excerpt.vcf	producer	GRIDSS with PURPLE annotation, PCAWG donor DO52605, GRCh37; upstream repository example
+gridss_DO52605T_excerpt.vcf	declared_truth	none: caller output used for MATEID/EVENT/orientation identity, an inserted-sequence pair and a real one-base mate-coordinate disagreement (gridss1099ff_135o/h); no fusion claim
+gridss_DO52605T_excerpt.vcf	license	upstream repository has no SPDX license assertion; a nine-kilobyte excerpt of an example file
+gridss_DO52605T_excerpt.vcf	retrieved	2026-09-29
