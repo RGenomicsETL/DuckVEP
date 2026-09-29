@@ -79,22 +79,25 @@ for (i in chosen) {
 
 # Translation-table witnesses are mapped from single-exon CDS coordinates.
 # TGG-to-TGA witnesses distinguish table 1 from tables 2, 4, and 5;
-# table 11 also admits ATG-to-GTG initiation witnesses.
+# table 11 witnesses exercise GTG initiation and ATG-to-GTG changes.
 for (table in tables) {
   candidates <- transcripts[transcripts$codon_table == table &
                               transcripts$exon_count == 1L &
                               !is.na(transcripts$cds) &
                               nchar(transcripts$cds) >= 12L, ]
   if (table == 11L) {
-    candidates <- candidates[startsWith(candidates$cds, "ATG"), ]
+    candidates <- candidates[startsWith(candidates$cds, "ATG") |
+                               startsWith(candidates$cds, "GTG"), ]
   } else {
     candidates <- candidates[grepl("TGG", candidates$cds, fixed = TRUE), ]
   }
   stopifnot(nrow(candidates) > 0L)
-  candidates <- candidates[order(candidates$tx), ]
+  gtg_priority <- table == 11L & startsWith(candidates$cds, "GTG")
+  candidates <- candidates[order(!gtg_priority, candidates$tx), ]
   for (j in seq_len(min(nrow(candidates), if (table == 11L) 30L else 12L))) {
     t <- candidates[j, ]
-    offset <- if (table == 11L) 0L else {
+    gtg_start <- table == 11L && startsWith(t$cds, "GTG")
+    offset <- if (gtg_start) 1L else if (table == 11L) 0L else {
       codons <- substring(t$cds, seq.int(1L, nchar(t$cds) - 2L, by = 3L),
                           seq.int(3L, nchar(t$cds), by = 3L))
       hit <- which(codons == "TGG")
@@ -103,8 +106,8 @@ for (table in tables) {
     }
     pos <- if (t$strand == 1L) t$cds_start + offset else t$cds_end - offset
     ref <- base_at(t$chrom, pos)
-    expected <- if (table == 11L) "A" else "G"
-    alt <- if (table == 11L) "G" else "A"
+    expected <- if (gtg_start) "T" else if (table == 11L) "A" else "G"
+    alt <- if (gtg_start) "C" else if (table == 11L) "G" else "A"
     if (t$strand == -1L) {
       expected <- as.character(complement(DNAString(expected)))
       alt <- as.character(complement(DNAString(alt)))

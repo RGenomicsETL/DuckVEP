@@ -35,6 +35,9 @@ dbExecute(con, "CREATE TABLE duckvep_exons AS
   SELECT transcript_index, e.exon_start, e.exon_end, e.exon_cdna_start,
          e.exon_cdna_end, e.phase, e.end_phase
   FROM model.model_transcripts, unnest(exons) AS x(e)")
+dbExecute(con, "CREATE TABLE duckvep_mature_mirna AS
+  SELECT transcript_index, r.mature_mirna_start, r.mature_mirna_end
+  FROM model.model_transcripts, unnest(mature_mirna_regions) AS x(r)")
 dbExecute(con, "CREATE TABLE duckvep_transcript_names AS
   SELECT transcript_index, transcript_stable_id AS transcript_id,
          transcript_biotype AS biotype, codon_table, strand, seq_region_name
@@ -44,6 +47,7 @@ loaded <- dbGetQuery(con, paste0("SELECT loaded FROM duckvep_model_load(
   ", q("SELECT seq_region, sequence_length FROM duckvep_sequence_regions ORDER BY seq_region"), ",
   ", q("SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM duckvep_transcripts ORDER BY seq_region, transcript_start, transcript_index"), ",
   ", q("SELECT transcript_index, exon_start, exon_end, exon_cdna_start, exon_cdna_end, phase, end_phase FROM duckvep_exons ORDER BY transcript_index, exon_cdna_start"), ",
+  mature_mirna_query := ", q("SELECT transcript_index, mature_mirna_start, mature_mirna_end FROM duckvep_mature_mirna ORDER BY transcript_index, mature_mirna_start"), ",
   transcript_coverage_complete := true)"))$loaded
 stopifnot(identical(loaded, TRUE))
 
@@ -106,7 +110,8 @@ dbExecute(con, "CREATE TEMP VIEW annotated_diff AS
            CASE WHEN length(v.ref) = 1 THEN 'SNV' ELSE 'MNV' END
            WHEN length(v.ref) < length(v.alt) THEN 'insertion' ELSE 'deletion' END AS allele_shape,
          t.codon_table, t.biotype, t.strand,
-         CASE WHEN v.chrom IN ('MT', 'M', 'mitochondrion_genome') OR v.chrom LIKE '%MIT%' THEN 'mitochondrion'
+         CASE WHEN v.chrom IN ('MT', 'M', 'Mt', 'mitochondrion_genome') OR v.chrom LIKE '%MIT%' THEN 'mitochondrion'
+              WHEN v.chrom = 'Pt' THEN 'chloroplast'
               WHEN v.chrom LIKE '%API%' THEN 'apicoplast' ELSE 'nuclear' END AS contig_class
   FROM differential x JOIN variants v ON x.id = v.id
   LEFT JOIN duckvep_transcript_names t ON x.tx = t.transcript_id")

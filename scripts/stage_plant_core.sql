@@ -1,0 +1,18 @@
+INSTALL mysql;
+LOAD mysql;
+SET mysql_enable_transactions=false;
+SET threads=2;
+ATTACH 'host=mysql-eg-publicsql.ebi.ac.uk port=4157 user=anonymous database=arabidopsis_thaliana_core_63_116_11' AS public_core (TYPE mysql, READ_ONLY);
+CREATE SCHEMA source_core;
+CREATE TABLE source_core.attrib_type AS FROM public_core.attrib_type;
+CREATE TABLE source_core.coord_system AS FROM public_core.coord_system;
+CREATE TABLE source_core.seq_region AS FROM public_core.seq_region;
+CREATE TABLE source_core.seq_region_attrib AS FROM public_core.seq_region_attrib;
+CREATE TABLE source_core.gene AS FROM public_core.gene;
+CREATE TABLE source_core.transcript AS FROM public_core.transcript;
+CREATE TABLE source_core.transcript_attrib AS FROM public_core.transcript_attrib;
+CREATE TABLE source_core.translation AS FROM public_core.translation;
+CREATE TABLE source_core.translation_attrib AS FROM public_core.translation_attrib;
+CREATE TABLE source_core.exon AS FROM public_core.exon;
+CREATE TABLE source_core.exon_transcript AS FROM public_core.exon_transcript;
+CHECKPOINT;

@@ -1,0 +1,10 @@
+"biotype","verdict","n"
+"lncRNA","exact",1822
+"miRNA","exact",509
+"ncRNA","exact",660
+"nontranslating_CDS","exact",200
+"protein_coding","exact",15282
+"rRNA","exact",218
+"snRNA","exact",320
+"snoRNA","exact",1008
+"tRNA","exact",1753

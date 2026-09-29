@@ -22,7 +22,7 @@ dbExecute(con, paste0('LOAD ', q(normalizePath(args[[7L]]))))
 dbExecute(con, paste0('ATTACH ', q(normalizePath(args[[1L]])),
   ' AS core_snapshot (READ_ONLY)'))
 filter <- paste0("is_current=1; stable_id present; biotype!=artifact; !readthrough_tra; ",
-  if (args[[5L]] == "BDGP6.54") "toplevel FASTA regions" else "primary-assembly FASTA regions")
+  if (args[[5L]] %in% c("BDGP6.54", "TAIR10")) "toplevel FASTA regions" else "primary-assembly FASTA regions")
 if (length(args) == 8L) {
   dbExecute(con, paste(readLines(args[[8L]], warn = FALSE), collapse = '\n'))
   if (args[[5L]] == 'GRCm39') {
