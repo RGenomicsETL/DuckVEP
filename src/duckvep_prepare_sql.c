@@ -142,7 +142,7 @@ static const char str_tail2[] =
 "ELSE 'invalid' END status, reason, "
 "struct_pack(info := info, format := format, sample := \"sample\", ref := ref, alt := alt, "
 "reference_sequence := reference_sequence, alt_index := alt_index) AS \"source\", "
-"CASE WHEN reason NOT IN ('missing_field','alt_index','literal_reference','duplicate_info'," 
+"CASE WHEN reason NOT IN ('missing_field','alt_index','literal_reference','duplicate_info',"
 "'missing_info','metadata_syntax','reference_mismatch','allele_capacity') "
 "OR (reason='allele_capacity' AND ref_length<=5000) "
 "THEN struct_pack(unit := unit, count := ref_count) END reference_components, "
