@@ -36,7 +36,7 @@ A list with status, reason, source, reference_components,
 }
 \description{
 The supported contract is ExpansionHunter v5.0.0 INFO/REF, RL, RU, END,
-symbolic `<STRn>` ALT, and FORMAT/GT, REPCN, REPCI, SO. The caller supplies
+symbolic `<STRn>` ALT, and FORMAT/GT, SO with either CN/CI or REPCN/REPCI. The caller supplies
 the literal reference interval from POS+1 through END (excluding the VCF
 padding base). An ALT is accepted only if a called, spanning allele has a
 point confidence interval matching its symbolic copy number. Other records
