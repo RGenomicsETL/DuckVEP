@@ -192,24 +192,24 @@ duckvep_sequence_diff_status_t duckvep_sequence_differences(
         /* Every optimum costs at most this feasible path. Leaving |i-j| <= U/3
          * needs more than U in gap cost alone, so no optimal traceback is lost. */
         band = (size_t)minimum(maximum(n, m), (size_t)(cost_bound(ref, n, alt, m) / 3u));
-        stride = band >= m / 2u ? m + 1u : band * 2u + 1u;
-        if (n + 1u > SIZE_MAX / stride) return DUCKVEP_SEQUENCE_DIFF_INVALID_ARG;
-        result->trace_cells = (n + 1u) * stride;
-        if (!b || !b->trace || result->trace_cells > b->trace_capacity)
-            return DUCKVEP_SEQUENCE_DIFF_TRACE_FULL;
-        if (!b->scores || m + 1u > b->score_capacity / 2u)
-            return DUCKVEP_SEQUENCE_DIFF_SCORE_FULL;
-        /* The band above is a bound, not a need: an optimum that stays within |i-j| <= w is exact whenever every
-         * path leaving that band costs more. Reaching offset w+1 and returning to the final offset costs at least
+        /* That band is a bound, not a need: an optimum that stays within |i-j| <= w is exact whenever every path
+         * leaving that band costs more. Reaching offset w+1 and returning to the final offset costs at least
          * 3*(2(w+1)-|m-n|) in gaps, so a banded optimum below that value has every optimal path inside the band,
          * every traceback direction on those paths is unchanged, and the traceback is identical to the full band.
-         * Start narrow and widen (at most to the bound above). Only the band changes; the capacity check above
-         * still uses the bound, so capacity errors and their reported cell counts are unchanged. */
+         * Start at the length change and widen (never beyond the bound). Capacity is checked against the band of
+         * each attempt, (n+1) x stride cells, so a long sequence with a short indel no longer needs the trace of its
+         * feasible bound; when the band that is still to be tried does not fit, that band's cell count is reported. */
         size_t gap = n > m ? n - m : m - n, width = minimum(band, gap + 3u);
         size_t prefix = 0u, shared = minimum(n, m);
         while (prefix < shared && ref[prefix] == alt[prefix]) prefix++;
         for (;;) {
             size_t narrow = width >= m / 2u ? m + 1u : width * 2u + 1u;
+            if (n + 1u > SIZE_MAX / narrow) return DUCKVEP_SEQUENCE_DIFF_INVALID_ARG;
+            result->trace_cells = (n + 1u) * narrow;
+            if (!b || !b->trace || result->trace_cells > b->trace_capacity)
+                return DUCKVEP_SEQUENCE_DIFF_TRACE_FULL;
+            if (!b->scores || m + 1u > b->score_capacity / 2u)
+                return DUCKVEP_SEQUENCE_DIFF_SCORE_FULL;
             size_t rows = prefix > width ? prefix - width : 0u;
             uint64_t cost = build_trace(ref, n, alt, m, width, narrow, rows, b);
             if (width >= band || cost < (uint64_t)3u * (2u * (width + 1u) - gap)) {
