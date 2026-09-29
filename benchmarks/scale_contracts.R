@@ -124,7 +124,8 @@ if (count_text(built, "_duckvep_annotate_small_projected(") != 1L ||
     grepl("rich_result", built, fixed = TRUE)) stop("projected builder has a second projection pass")
 plan <- get(paste("EXPLAIN (FORMAT JSON)", complete))$explain_value
 if (count_text(plan, '"name": "UNNEST"') != 1L ||
-    count_text(plan, '"Join Type": "LEFT"') != 1L ||
+    count_text(plan, '"Join Type": "LEFT"') +
+      count_text(plan, '"Join Type": "RIGHT"') != 1L ||
     count_text(plan, '"CTE Name": "rich_result"') != 0L) stop("complete query plan must unnest once and join one dimension")
 receipts <- list(receipt("compact", compact, compact_fields),
   receipt("complete17", complete, complete_fields))
