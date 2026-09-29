@@ -1,0 +1,287 @@
+require duckvep
+
+# Start and stop classifier (slice 5 of #2, contract design/duckvep_haplotype_contract.md). The model, calls and
+# expectations are the committed fixtures of test/scripts/generate_startstop_goldens.R: 58 scenarios on six layouts
+# (plus/minus strand, one/two/three exons, introns inside codons 12 and 18), 348 transcripts, 522 VCF records.
+# Goldens are base R with no DuckVEP code; startstop_csq_expected.tsv is the pinned bcftools csq output mapped
+# through csq_so_map_v1.tsv, with each divergence declared (test/data/haplotype/README.md), checked offline by
+# check_startstop_goldens.R.
+
+statement ok
+CREATE TABLE ss_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region,
+ transcript_start::UBIGINT transcript_start,transcript_end::UBIGINT transcript_end,strand::TINYINT strand,
+ seq_region::UINTEGER gene_index,3::UBIGINT transcript_flags,transcript_start::UBIGINT cds_start,
+ transcript_end::UBIGINT cds_end,cds_sequence::BLOB cds_sequence,1::UTINYINT codon_table,
+ ''::BLOB pre_cds_sequence,''::BLOB post_cds_sequence,"case" AS case_name
+ FROM read_csv('test/data/haplotype/startstop_transcripts.tsv',delim='\t',header=true);
+
+statement ok
+CREATE TABLE ss_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start::UBIGINT exon_start,
+ exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,exon_cdna_end::UBIGINT exon_cdna_end,
+ phase::TINYINT phase,end_phase::TINYINT end_phase
+ FROM read_csv('test/data/haplotype/startstop_exons.tsv',delim='\t',header=true);
+
+query I
+SELECT loaded FROM duckvep_model_load('ss','SELECT i::UINTEGER seq_region FROM range(348) t(i)',
+ 'SELECT * EXCLUDE(case_name) FROM ss_tx ORDER BY transcript_index',
+ 'SELECT * FROM ss_exons ORDER BY transcript_index,exon_cdna_start');
+----
+1
+
+statement ok
+CREATE TABLE ss_vcf AS SELECT string_split(line,chr(9)) f FROM (SELECT unnest(string_split(content,chr(10))) line
+ FROM read_text('test/data/haplotype/startstop.vcf')) WHERE line<>'' AND NOT starts_with(line,'#');
+
+statement ok
+CREATE TABLE ss_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq_region::INT seq_region,
+ v.f[2]::BIGINT AS position,v.f[4] AS reference,v.f[5] AS alternate,1 AS alt_index,t.transcript_index::INT transcript_index,
+ 0 sample_index,(CASE v.f[10] WHEN '1|0' THEN [1,0] WHEN '0|1' THEN [0,1] ELSE [1,1] END)::INTEGER[] alleles,
+ [false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set
+ FROM ss_vcf v JOIN ss_tx t ON t.case_name=v.f[1];
+
+query I
+SELECT count(*) FROM ss_calls;
+----
+522
+
+statement ok
+CREATE TABLE ss_gold AS SELECT g."case" AS case_name,g.scenario,t.transcript_index,g.lane,g.so_terms,g.impact,
+ g.classifier_slice,g.protein,e.csq_so_terms,e.declared_divergence
+ FROM read_csv('test/data/haplotype/startstop_goldens.tsv',delim='\t',header=true,nullstr='<none>',
+  types={'so_terms':'VARCHAR','impact':'VARCHAR','protein':'VARCHAR'}) g
+ JOIN ss_tx t ON t.case_name=g."case"
+ JOIN read_csv('test/data/haplotype/startstop_csq_expected.tsv',delim='\t',header=true,nullstr='<none>',
+  types={'csq_so_terms':'VARCHAR'}) e ON e."case"=g."case" AND e.lane=g.lane;
+
+query I
+SELECT count(*) FROM ss_gold;
+----
+696
+
+
+# One row per distinct edit path; one carrier per (sample, phase set, lane).
+
+statement ok
+CREATE TABLE ss_out AS SELECT h.transcript_index,c.haplotype_lane-1 AS lane,c.prediction_status carrier_status,
+ c.haplotype_consequences carrier_consequences,c.haplotype_impact carrier_impact,h.prediction_status,
+ h.prediction_reason,h.haplotype_consequences,h.haplotype_impact,h.protein,h.sequence_status,
+ h.carrier_count,h.contributor_provenance,h.normalized_edits
+ FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes('SELECT * FROM ss_calls','ss')) h;
+
+query II
+SELECT count(*),count(DISTINCT transcript_index) FROM ss_out;
+----
+384	348
+
+# Gate (i): every lane with an ALT is decided by the start/stop classifier and equals the independent base-R golden
+# exactly: whole-haplotype SO set, IMPACT and edited protein, both at the row and per carrier.
+
+query IIIIIIII
+SELECT count(*),
+ count(*) FILTER (WHERE o.prediction_status='predicted' AND o.prediction_reason='supported_domain'),
+ count(*) FILTER (WHERE list_sort(o.haplotype_consequences)=list_sort(string_split(g.so_terms,','))),
+ count(*) FILTER (WHERE o.haplotype_impact=g.impact),
+ count(*) FILTER (WHERE list_sort(o.carrier_consequences)=list_sort(string_split(g.so_terms,','))),
+ count(*) FILTER (WHERE o.carrier_impact=g.impact),
+ count(*) FILTER (WHERE o.carrier_status='predicted'),
+ count(*) FILTER (WHERE o.protein=g.protein)
+FROM ss_gold g JOIN ss_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.so_terms<>'';
+----
+384	384	384	384	384	384	384	384
+
+# Nothing is left pending for a classifier reason: no eligible path, row or carrier remains
+# eligible_classifier_pending, and no start_stop_classifier_pending reason occurs.
+
+query III
+SELECT count(*) FILTER (WHERE prediction_status='eligible_classifier_pending' OR carrier_status='eligible_classifier_pending'),
+ count(*) FILTER (WHERE prediction_reason='start_stop_classifier_pending'),
+ count(*) FILTER (WHERE carrier_consequences IS NULL OR carrier_impact IS NULL)
+FROM ss_out;
+----
+0	0	0
+
+# Reference-only lanes (empty golden set) have no carrier row.
+
+query II
+SELECT count(*) FILTER (WHERE g.so_terms=''),
+ count(*) FILTER (WHERE g.so_terms='' AND o.lane IS NOT NULL)
+FROM ss_gold g LEFT JOIN ss_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane;
+----
+312	0
+
+# Gate (ii): the pinned csq output mapped through csq_so_map_v1 agrees on every lane outside the 38 declared
+# divergences (README.md), on both strands and every exon layout; each divergent lane equals the declared csq set on
+# the csq side and the golden on the DuckVEP side.
+
+query IIII
+SELECT count(*) FILTER (WHERE g.declared_divergence='.'),
+ count(*) FILTER (WHERE g.declared_divergence='.' AND
+  array_to_string(list_sort(o.haplotype_consequences),',')=g.csq_so_terms),
+ count(*) FILTER (WHERE g.declared_divergence<>'.'),
+ count(*) FILTER (WHERE g.declared_divergence<>'.' AND
+  array_to_string(list_sort(o.haplotype_consequences),',')<>g.csq_so_terms)
+FROM ss_gold g JOIN ss_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE g.so_terms<>'';
+----
+180	180	204	204
+
+# Start codon. The edited CDS must begin with ATG. Any loss is start_lost alone: initiation and NMD are unknown, so
+# other predictions are suppressed (a missense, a frame opening, an early stop and an abolished terminator elsewhere
+# add nothing). Insertions that leave the ATG intact (after codon 1, or rescuing it inside the codon) are not start_lost.
+
+query TTTI
+SELECT g.scenario,array_to_string(list_sort(o.haplotype_consequences),','),o.haplotype_impact,count(DISTINCT g.case_name)
+FROM ss_gold g JOIN ss_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE starts_with(g.scenario,'start_') AND g.lane=0 GROUP BY ALL ORDER BY ALL;
+----
+start_deletion_frame	start_lost	HIGH	6
+start_deletion_inframe	start_lost	HIGH	6
+start_deletion_within_exon	start_lost	HIGH	6
+start_insertion_after_start	inframe_insertion	MODERATE	6
+start_insertion_inside	start_lost	HIGH	6
+start_intact_frame_open_early_stop	frameshift_variant,stop_gained	HIGH	6
+start_lost_hom_alt	start_lost	HIGH	6
+start_lost_suppresses_frame	start_lost	HIGH	6
+start_lost_suppresses_missense	start_lost	HIGH	6
+start_lost_suppresses_stop_gain	start_lost	HIGH	6
+start_lost_suppresses_stop_lost	start_lost	HIGH	6
+start_lost_trans_control	start_lost	HIGH	6
+start_mnv	start_lost	HIGH	6
+start_rescued_by_insertion_a	inframe_insertion	MODERATE	6
+start_rescued_by_insertion_b	inframe_insertion	MODERATE	6
+start_snv_first	start_lost	HIGH	6
+start_snv_last	start_lost	HIGH	6
+
+# Stop lost: no stop at all in the edited CDS. A frame that is displaced when the CDS runs out adds frameshift_variant;
+# nothing is ever extended past the CDS end, so the edited protein has no stop residue.
+
+query TTTI
+SELECT g.scenario,array_to_string(list_sort(o.haplotype_consequences),','),o.haplotype_impact,count(DISTINCT g.case_name)
+FROM ss_gold g JOIN ss_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE (starts_with(g.scenario,'stop_lost') OR starts_with(g.scenario,'run_off') OR starts_with(g.scenario,'rescued')) GROUP BY ALL ORDER BY ALL;
+----
+rescued_termination_after_stop_lost	stop_lost	HIGH	6
+rescued_termination_by_deletion_in_terminator	frameshift_variant,stop_gained	HIGH	6
+rescued_termination_by_restoring_insertion	protein_altering_variant	MODERATE	6
+rescued_termination_by_terminator_deletion	frameshift_variant,stop_gained	HIGH	6
+rescued_termination_restore_inside_terminator	stop_lost	HIGH	6
+run_off_deletion	frameshift_variant,stop_lost	HIGH	6
+run_off_insertion_plus2	frameshift_variant,stop_lost	HIGH	6
+run_off_inside_codon_35	frameshift_variant,stop_lost	HIGH	6
+run_off_trans_control	frameshift_variant,stop_lost	HIGH	6
+run_off_trans_control	missense_variant	MODERATE	6
+stop_lost_and_missense	stop_lost	HIGH	6
+stop_lost_deletion_partial	frameshift_variant,stop_lost	HIGH	6
+stop_lost_hom_alt	stop_lost	HIGH	6
+stop_lost_insertion_before_plus1	frameshift_variant,stop_lost	HIGH	6
+stop_lost_insertion_before_plus2	frameshift_variant,stop_lost	HIGH	6
+stop_lost_insertion_inside	stop_lost	HIGH	6
+stop_lost_last_codon_and_terminator_deleted	stop_lost	HIGH	6
+stop_lost_mnv	stop_lost	HIGH	6
+stop_lost_snv_first	stop_lost	HIGH	6
+stop_lost_snv_second	stop_lost	HIGH	6
+stop_lost_snv_third	stop_lost	HIGH	6
+stop_lost_terminator_deleted	stop_lost	HIGH	6
+
+# Terminal codon still a stop.
+
+query TTTI
+SELECT g.scenario,array_to_string(list_sort(o.haplotype_consequences),','),o.haplotype_impact,count(DISTINCT g.case_name)
+FROM ss_gold g JOIN ss_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+WHERE (starts_with(g.scenario,'stop_retained') OR starts_with(g.scenario,'stop_inserted') OR starts_with(g.scenario,'inframe')
+  OR g.scenario='stop_gained_in_codon_35') GROUP BY ALL ORDER BY ALL;
+----
+inframe_deletion_before_terminator	inframe_deletion	MODERATE	6
+inframe_insertion_before_terminator	inframe_insertion	MODERATE	6
+stop_gained_in_codon_35	stop_gained	HIGH	6
+stop_inserted_before_terminator	stop_retained_variant	LOW	6
+stop_retained_after_frame_pair	protein_altering_variant	MODERATE	6
+stop_retained_displaced_insertion	frameshift_variant	HIGH	6
+stop_retained_hom_alt	stop_retained_variant	LOW	6
+stop_retained_plus_inframe_insertion	protein_altering_variant	MODERATE	6
+stop_retained_plus_missense	missense_variant	MODERATE	6
+stop_retained_plus_synonymous	stop_retained_variant	LOW	6
+stop_retained_tag	stop_retained_variant	LOW	6
+stop_retained_tga	stop_retained_variant	LOW	6
+stop_retained_trans_control	missense_variant	MODERATE	6
+stop_retained_trans_control	stop_retained_variant	LOW	6
+
+# Contributor roles are assigned per edit, by the edit's position relative to the first stop of the edited sequence
+# (cDNA coordinates of the normalized edit, identical on both strands and every layout): the edit that creates the
+# stop is applied; edits after it are post_stop even when they share the interaction block with an earlier
+# edit (a frame that stays displaced until the CDS end, or a restoring deletion after the stop).
+
+query TTI
+SELECT scenario,roles,count(*) FROM (
+ SELECT g.scenario,(SELECT string_agg(e.cds_start||':'||p.role,' ' ORDER BY e.cds_start)
+   FROM unnest(o.normalized_edits) a(e),unnest(o.contributor_provenance) b(p) WHERE e.event_index=p.event_index) roles
+ FROM ss_gold g JOIN ss_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
+ WHERE starts_with(g.scenario,'post_stop') OR g.scenario IN ('restoring_insertion_creates_stop','stop_lost_and_missense',
+  'stop_retained_after_frame_pair','rescued_termination_after_stop_lost'))
+GROUP BY ALL ORDER BY ALL;
+----
+post_stop_after_start_lost	1:applied 40:applied 106:post_stop	6
+post_stop_restoring_deletion	11:applied 61:post_stop	6
+post_stop_run_off	11:applied 106:post_stop	6
+post_stop_terminator_lost	40:applied 106:post_stop	6
+post_stop_terminator_retained	40:applied 107:post_stop	6
+post_stop_two_edits	40:applied 71:post_stop 108:post_stop	6
+rescued_termination_after_stop_lost	51:applied 71:applied 106:applied	6
+restoring_insertion_creates_stop	31:applied 61:applied	6
+stop_lost_and_missense	50:applied 106:applied	6
+stop_retained_after_frame_pair	31:applied 61:applied 108:applied	6
+
+# Distribution of the decided sets over all 384 ALT-carrying carriers.
+
+query TTI
+SELECT array_to_string(list_sort(carrier_consequences),','),carrier_impact,count(*)
+FROM ss_out WHERE carrier_status='predicted' GROUP BY ALL ORDER BY ALL;
+----
+frameshift_variant	HIGH	6
+frameshift_variant,stop_gained	HIGH	36
+frameshift_variant,stop_lost	HIGH	42
+inframe_deletion	MODERATE	6
+inframe_insertion	MODERATE	24
+missense_variant	MODERATE	24
+protein_altering_variant	MODERATE	18
+start_lost	HIGH	90
+stop_gained	HIGH	24
+stop_lost	HIGH	72
+stop_retained_variant	LOW	42
+
+# Smallest complete CDS (ATGTAA, one exon): deletions leave edited CDSs of 3, 2 and 1 bases. An edited CDS too short
+# to hold ATG is start_lost; the three bases ATG with the terminator deleted are stop_lost (no extension invented);
+# the 4-base remainder ATGA of a 2-base deletion is a displaced frame that runs off with no stop.
+
+query T
+SELECT loaded FROM duckvep_model_load('tiny',
+ 'SELECT 0::UINTEGER seq_region',
+ 'SELECT 0::UINTEGER transcript_index,0::UINTEGER seq_region,100::UBIGINT transcript_start,105::UBIGINT transcript_end,
+  1::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,100::UBIGINT cds_start,105::UBIGINT cds_end,
+  ''ATGTAA''::BLOB cds_sequence,1::UTINYINT codon_table,''''::BLOB pre_cds_sequence,''''::BLOB post_cds_sequence',
+ 'SELECT 0::UINTEGER transcript_index,100::UBIGINT exon_start,105::UBIGINT exon_end,1::UBIGINT exon_cdna_start,
+  6::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase')
+----
+true
+
+statement ok
+CREATE TABLE ss_tiny_calls AS SELECT * FROM (VALUES
+ (1::BIGINT,0,100::BIGINT,'ATGTAA','A',1,0,1,[1,0]::INTEGER[],[false,true]::BOOLEAN[],NULL::BIGINT),
+ (2::BIGINT,0,100::BIGINT,'ATGTA','A',1,0,2,[1,0]::INTEGER[],[false,true]::BOOLEAN[],NULL::BIGINT),
+ (3::BIGINT,0,101::BIGINT,'TGTAA','T',1,0,3,[1,0]::INTEGER[],[false,true]::BOOLEAN[],NULL::BIGINT),
+ (4::BIGINT,0,102::BIGINT,'GTAA','G',1,0,4,[1,0]::INTEGER[],[false,true]::BOOLEAN[],NULL::BIGINT),
+ (5::BIGINT,0,102::BIGINT,'GTA','G',1,0,5,[1,0]::INTEGER[],[false,true]::BOOLEAN[],NULL::BIGINT),
+ (6::BIGINT,0,104::BIGINT,'A','G',1,0,6,[1,0]::INTEGER[],[false,true]::BOOLEAN[],NULL::BIGINT))
+ t(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index,alleles,phase_before,phase_set);
+
+query ITTTI
+SELECT c.sample_index,h.prediction_status,array_to_string(h.haplotype_consequences,','),h.protein,length(h.protein)
+FROM (SELECT *,unnest(carriers) c FROM duckvep_haplotypes('SELECT * FROM ss_tiny_calls','tiny')) h ORDER BY 1;
+----
+1	predicted	start_lost	(empty)	0
+2	predicted	start_lost	(empty)	0
+3	predicted	start_lost	(empty)	0
+4	predicted	stop_lost	M	1
+5	predicted	frameshift_variant,stop_lost	M	1
+6	predicted	stop_retained_variant	M*	2

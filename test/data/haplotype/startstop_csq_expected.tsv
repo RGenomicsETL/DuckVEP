@@ -1,0 +1,697 @@
+case	lane	csq_so_terms	declared_divergence
+plus_1exon__start_snv_first	0	start_lost	.
+plus_1exon__start_snv_first	1		.
+plus_1exon__start_snv_last	0	start_lost	.
+plus_1exon__start_snv_last	1		.
+plus_1exon__start_mnv	0	start_lost	.
+plus_1exon__start_mnv	1		.
+plus_1exon__start_deletion_frame	0	start_lost	.
+plus_1exon__start_deletion_frame	1		.
+plus_1exon__start_deletion_inframe	0	start_retained_variant	csq calls a deletion that removes bases 2-4 of the start codon start_retained_variant although the edited CDS begins AGT; the policy classifies the edited sequence: start_lost
+plus_1exon__start_deletion_inframe	1		.
+plus_1exon__start_insertion_inside	0	start_lost	.
+plus_1exon__start_insertion_inside	1		.
+plus_1exon__start_insertion_after_start	0	inframe_insertion,start_lost	csq anchors an insertion after the last base of the start codon inside the codon: it reports start_lost on the plus strand; the policy uses the normalized edit (an insertion between codons 1 and 2 leaves the start codon intact)
+plus_1exon__start_insertion_after_start	1		.
+plus_1exon__start_rescued_by_insertion_a	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+plus_1exon__start_rescued_by_insertion_a	1		.
+plus_1exon__start_rescued_by_insertion_b	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+plus_1exon__start_rescued_by_insertion_b	1		.
+plus_1exon__start_deletion_within_exon	0	inframe_deletion,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_1exon__start_deletion_within_exon	1		.
+plus_1exon__start_lost_suppresses_missense	0	missense_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_1exon__start_lost_suppresses_missense	1		.
+plus_1exon__start_lost_suppresses_frame	0	frameshift_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_1exon__start_lost_suppresses_frame	1		.
+plus_1exon__start_lost_suppresses_stop_gain	0	start_lost,stop_gained	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_1exon__start_lost_suppresses_stop_gain	1		.
+plus_1exon__start_lost_suppresses_stop_lost	0	start_lost,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_1exon__start_lost_suppresses_stop_lost	1		.
+plus_1exon__start_lost_trans_control	0	start_lost	.
+plus_1exon__start_lost_trans_control	1	missense_variant	.
+plus_1exon__start_lost_hom_alt	0	start_lost	.
+plus_1exon__start_lost_hom_alt	1	start_lost	.
+plus_1exon__start_intact_frame_open_early_stop	0	start_lost	csq anchors an insertion after the last base of the start codon inside the codon: it reports start_lost on the plus strand; the policy uses the normalized edit (an insertion between codons 1 and 2 leaves the start codon intact)
+plus_1exon__start_intact_frame_open_early_stop	1		.
+plus_1exon__stop_lost_snv_first	0	stop_lost	.
+plus_1exon__stop_lost_snv_first	1		.
+plus_1exon__stop_lost_snv_second	0	stop_lost	.
+plus_1exon__stop_lost_snv_second	1		.
+plus_1exon__stop_lost_snv_third	0	stop_lost	.
+plus_1exon__stop_lost_snv_third	1		.
+plus_1exon__stop_lost_mnv	0	stop_lost	.
+plus_1exon__stop_lost_mnv	1		.
+plus_1exon__stop_lost_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_1exon__stop_lost_terminator_deleted	1		.
+plus_1exon__stop_lost_last_codon_and_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_1exon__stop_lost_last_codon_and_terminator_deleted	1		.
+plus_1exon__stop_lost_deletion_partial	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_1exon__stop_lost_deletion_partial	1		.
+plus_1exon__stop_lost_insertion_inside	0	inframe_insertion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_1exon__stop_lost_insertion_inside	1		.
+plus_1exon__stop_lost_insertion_before_plus1	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_1exon__stop_lost_insertion_before_plus1	1		.
+plus_1exon__stop_lost_insertion_before_plus2	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_1exon__stop_lost_insertion_before_plus2	1		.
+plus_1exon__run_off_deletion	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_1exon__run_off_deletion	1		.
+plus_1exon__run_off_insertion_plus2	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_1exon__run_off_insertion_plus2	1		.
+plus_1exon__run_off_inside_codon_35	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_1exon__run_off_inside_codon_35	1		.
+plus_1exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_1exon__run_off_trans_control	1	missense_variant	.
+plus_1exon__stop_lost_hom_alt	0	stop_lost	.
+plus_1exon__stop_lost_hom_alt	1	stop_lost	.
+plus_1exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_1exon__stop_lost_and_missense	1		.
+plus_1exon__stop_retained_tag	0	stop_retained_variant	.
+plus_1exon__stop_retained_tag	1		.
+plus_1exon__stop_retained_tga	0	stop_retained_variant	.
+plus_1exon__stop_retained_tga	1		.
+plus_1exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_1exon__stop_retained_plus_synonymous	1		.
+plus_1exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_1exon__stop_retained_plus_missense	1		.
+plus_1exon__stop_retained_plus_inframe_insertion	0	inframe_insertion,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_1exon__stop_retained_plus_inframe_insertion	1		.
+plus_1exon__stop_retained_trans_control	0	stop_retained_variant	.
+plus_1exon__stop_retained_trans_control	1	missense_variant	.
+plus_1exon__stop_retained_hom_alt	0	stop_retained_variant	.
+plus_1exon__stop_retained_hom_alt	1	stop_retained_variant	.
+plus_1exon__stop_retained_after_frame_pair	0	missense_variant,protein_altering_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_1exon__stop_retained_after_frame_pair	1		.
+plus_1exon__stop_retained_displaced_insertion	0	frameshift_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_1exon__stop_retained_displaced_insertion	1		.
+plus_1exon__inframe_insertion_before_terminator	0	inframe_insertion	.
+plus_1exon__inframe_insertion_before_terminator	1		.
+plus_1exon__stop_inserted_before_terminator	0	inframe_insertion,stop_gained	a stop codon inserted next to the terminator leaves the peptide unchanged and is sequence-equivalent to a stop inserted after it: the policy reports stop_retained_variant; csq reports stop_gained on the plus strand and stop_retained on the minus strand
+plus_1exon__stop_inserted_before_terminator	1		.
+plus_1exon__stop_gained_in_codon_35	0	stop_gained	.
+plus_1exon__stop_gained_in_codon_35	1		.
+plus_1exon__inframe_deletion_before_terminator	0	inframe_deletion	.
+plus_1exon__inframe_deletion_before_terminator	1		.
+plus_1exon__rescued_termination_by_restoring_insertion	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
+plus_1exon__rescued_termination_by_restoring_insertion	1		.
+plus_1exon__rescued_termination_restore_inside_terminator	0	protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_1exon__rescued_termination_restore_inside_terminator	1		.
+plus_1exon__rescued_termination_by_deletion_in_terminator	0	frameshift_variant,stop_gained,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_1exon__rescued_termination_by_deletion_in_terminator	1		.
+plus_1exon__rescued_termination_by_terminator_deletion	0	missense_variant,protein_altering_variant	the normalized deletion of one base of TT (cDNA 105-106) has several placements; csq reports a restored frame on the plus strand and misses the stop the +1 frame reads at cDNA 102, and adds stop_retained on the minus strand; the policy reports the stop gained in the displaced frame
+plus_1exon__rescued_termination_by_terminator_deletion	1		.
+plus_1exon__rescued_termination_after_stop_lost	0	missense_variant,protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_1exon__rescued_termination_after_stop_lost	1		.
+plus_1exon__post_stop_terminator_lost	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+plus_1exon__post_stop_terminator_lost	1		.
+plus_1exon__post_stop_terminator_retained	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+plus_1exon__post_stop_terminator_retained	1		.
+plus_1exon__post_stop_run_off	0	frameshift_variant,stop_gained	.
+plus_1exon__post_stop_run_off	1		.
+plus_1exon__post_stop_two_edits	0	stop_gained	.
+plus_1exon__post_stop_two_edits	1		.
+plus_1exon__post_stop_restoring_deletion	0	frameshift_variant,stop_gained	.
+plus_1exon__post_stop_restoring_deletion	1		.
+plus_1exon__restoring_insertion_creates_stop	0	frameshift_variant,stop_gained	.
+plus_1exon__restoring_insertion_creates_stop	1		.
+plus_1exon__post_stop_after_start_lost	0	start_lost,stop_gained,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_1exon__post_stop_after_start_lost	1		.
+plus_2exon__start_snv_first	0	start_lost	.
+plus_2exon__start_snv_first	1		.
+plus_2exon__start_snv_last	0	start_lost	.
+plus_2exon__start_snv_last	1		.
+plus_2exon__start_mnv	0	start_lost	.
+plus_2exon__start_mnv	1		.
+plus_2exon__start_deletion_frame	0	start_lost	.
+plus_2exon__start_deletion_frame	1		.
+plus_2exon__start_deletion_inframe	0	start_retained_variant	csq calls a deletion that removes bases 2-4 of the start codon start_retained_variant although the edited CDS begins AGT; the policy classifies the edited sequence: start_lost
+plus_2exon__start_deletion_inframe	1		.
+plus_2exon__start_insertion_inside	0	start_lost	.
+plus_2exon__start_insertion_inside	1		.
+plus_2exon__start_insertion_after_start	0	inframe_insertion,start_lost	csq anchors an insertion after the last base of the start codon inside the codon: it reports start_lost on the plus strand; the policy uses the normalized edit (an insertion between codons 1 and 2 leaves the start codon intact)
+plus_2exon__start_insertion_after_start	1		.
+plus_2exon__start_rescued_by_insertion_a	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+plus_2exon__start_rescued_by_insertion_a	1		.
+plus_2exon__start_rescued_by_insertion_b	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+plus_2exon__start_rescued_by_insertion_b	1		.
+plus_2exon__start_deletion_within_exon	0	inframe_deletion,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_2exon__start_deletion_within_exon	1		.
+plus_2exon__start_lost_suppresses_missense	0	missense_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_2exon__start_lost_suppresses_missense	1		.
+plus_2exon__start_lost_suppresses_frame	0	frameshift_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_2exon__start_lost_suppresses_frame	1		.
+plus_2exon__start_lost_suppresses_stop_gain	0	start_lost,stop_gained	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_2exon__start_lost_suppresses_stop_gain	1		.
+plus_2exon__start_lost_suppresses_stop_lost	0	start_lost,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_2exon__start_lost_suppresses_stop_lost	1		.
+plus_2exon__start_lost_trans_control	0	start_lost	.
+plus_2exon__start_lost_trans_control	1	missense_variant	.
+plus_2exon__start_lost_hom_alt	0	start_lost	.
+plus_2exon__start_lost_hom_alt	1	start_lost	.
+plus_2exon__start_intact_frame_open_early_stop	0	start_lost	csq anchors an insertion after the last base of the start codon inside the codon: it reports start_lost on the plus strand; the policy uses the normalized edit (an insertion between codons 1 and 2 leaves the start codon intact)
+plus_2exon__start_intact_frame_open_early_stop	1		.
+plus_2exon__stop_lost_snv_first	0	stop_lost	.
+plus_2exon__stop_lost_snv_first	1		.
+plus_2exon__stop_lost_snv_second	0	stop_lost	.
+plus_2exon__stop_lost_snv_second	1		.
+plus_2exon__stop_lost_snv_third	0	stop_lost	.
+plus_2exon__stop_lost_snv_third	1		.
+plus_2exon__stop_lost_mnv	0	stop_lost	.
+plus_2exon__stop_lost_mnv	1		.
+plus_2exon__stop_lost_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_2exon__stop_lost_terminator_deleted	1		.
+plus_2exon__stop_lost_last_codon_and_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_2exon__stop_lost_last_codon_and_terminator_deleted	1		.
+plus_2exon__stop_lost_deletion_partial	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_2exon__stop_lost_deletion_partial	1		.
+plus_2exon__stop_lost_insertion_inside	0	inframe_insertion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_2exon__stop_lost_insertion_inside	1		.
+plus_2exon__stop_lost_insertion_before_plus1	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_2exon__stop_lost_insertion_before_plus1	1		.
+plus_2exon__stop_lost_insertion_before_plus2	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_2exon__stop_lost_insertion_before_plus2	1		.
+plus_2exon__run_off_deletion	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_2exon__run_off_deletion	1		.
+plus_2exon__run_off_insertion_plus2	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_2exon__run_off_insertion_plus2	1		.
+plus_2exon__run_off_inside_codon_35	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_2exon__run_off_inside_codon_35	1		.
+plus_2exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_2exon__run_off_trans_control	1	missense_variant	.
+plus_2exon__stop_lost_hom_alt	0	stop_lost	.
+plus_2exon__stop_lost_hom_alt	1	stop_lost	.
+plus_2exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_2exon__stop_lost_and_missense	1		.
+plus_2exon__stop_retained_tag	0	stop_retained_variant	.
+plus_2exon__stop_retained_tag	1		.
+plus_2exon__stop_retained_tga	0	stop_retained_variant	.
+plus_2exon__stop_retained_tga	1		.
+plus_2exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_2exon__stop_retained_plus_synonymous	1		.
+plus_2exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_2exon__stop_retained_plus_missense	1		.
+plus_2exon__stop_retained_plus_inframe_insertion	0	inframe_insertion,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_2exon__stop_retained_plus_inframe_insertion	1		.
+plus_2exon__stop_retained_trans_control	0	stop_retained_variant	.
+plus_2exon__stop_retained_trans_control	1	missense_variant	.
+plus_2exon__stop_retained_hom_alt	0	stop_retained_variant	.
+plus_2exon__stop_retained_hom_alt	1	stop_retained_variant	.
+plus_2exon__stop_retained_after_frame_pair	0	missense_variant,protein_altering_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_2exon__stop_retained_after_frame_pair	1		.
+plus_2exon__stop_retained_displaced_insertion	0	frameshift_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_2exon__stop_retained_displaced_insertion	1		.
+plus_2exon__inframe_insertion_before_terminator	0	inframe_insertion	.
+plus_2exon__inframe_insertion_before_terminator	1		.
+plus_2exon__stop_inserted_before_terminator	0	inframe_insertion,stop_gained	a stop codon inserted next to the terminator leaves the peptide unchanged and is sequence-equivalent to a stop inserted after it: the policy reports stop_retained_variant; csq reports stop_gained on the plus strand and stop_retained on the minus strand
+plus_2exon__stop_inserted_before_terminator	1		.
+plus_2exon__stop_gained_in_codon_35	0	stop_gained	.
+plus_2exon__stop_gained_in_codon_35	1		.
+plus_2exon__inframe_deletion_before_terminator	0	inframe_deletion	.
+plus_2exon__inframe_deletion_before_terminator	1		.
+plus_2exon__rescued_termination_by_restoring_insertion	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
+plus_2exon__rescued_termination_by_restoring_insertion	1		.
+plus_2exon__rescued_termination_restore_inside_terminator	0	protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_2exon__rescued_termination_restore_inside_terminator	1		.
+plus_2exon__rescued_termination_by_deletion_in_terminator	0	frameshift_variant,stop_gained,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_2exon__rescued_termination_by_deletion_in_terminator	1		.
+plus_2exon__rescued_termination_by_terminator_deletion	0	missense_variant,protein_altering_variant	the normalized deletion of one base of TT (cDNA 105-106) has several placements; csq reports a restored frame on the plus strand and misses the stop the +1 frame reads at cDNA 102, and adds stop_retained on the minus strand; the policy reports the stop gained in the displaced frame
+plus_2exon__rescued_termination_by_terminator_deletion	1		.
+plus_2exon__rescued_termination_after_stop_lost	0	missense_variant,protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_2exon__rescued_termination_after_stop_lost	1		.
+plus_2exon__post_stop_terminator_lost	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+plus_2exon__post_stop_terminator_lost	1		.
+plus_2exon__post_stop_terminator_retained	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+plus_2exon__post_stop_terminator_retained	1		.
+plus_2exon__post_stop_run_off	0	frameshift_variant,stop_gained	.
+plus_2exon__post_stop_run_off	1		.
+plus_2exon__post_stop_two_edits	0	stop_gained	.
+plus_2exon__post_stop_two_edits	1		.
+plus_2exon__post_stop_restoring_deletion	0	frameshift_variant,stop_gained	.
+plus_2exon__post_stop_restoring_deletion	1		.
+plus_2exon__restoring_insertion_creates_stop	0	frameshift_variant,stop_gained	.
+plus_2exon__restoring_insertion_creates_stop	1		.
+plus_2exon__post_stop_after_start_lost	0	start_lost,stop_gained,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_2exon__post_stop_after_start_lost	1		.
+plus_3exon__start_snv_first	0	start_lost	.
+plus_3exon__start_snv_first	1		.
+plus_3exon__start_snv_last	0	start_lost	.
+plus_3exon__start_snv_last	1		.
+plus_3exon__start_mnv	0	start_lost	.
+plus_3exon__start_mnv	1		.
+plus_3exon__start_deletion_frame	0	start_lost	.
+plus_3exon__start_deletion_frame	1		.
+plus_3exon__start_deletion_inframe	0	start_retained_variant	csq calls a deletion that removes bases 2-4 of the start codon start_retained_variant although the edited CDS begins AGT; the policy classifies the edited sequence: start_lost
+plus_3exon__start_deletion_inframe	1		.
+plus_3exon__start_insertion_inside	0	start_lost	.
+plus_3exon__start_insertion_inside	1		.
+plus_3exon__start_insertion_after_start	0	inframe_insertion,start_lost	csq anchors an insertion after the last base of the start codon inside the codon: it reports start_lost on the plus strand; the policy uses the normalized edit (an insertion between codons 1 and 2 leaves the start codon intact)
+plus_3exon__start_insertion_after_start	1		.
+plus_3exon__start_rescued_by_insertion_a	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+plus_3exon__start_rescued_by_insertion_a	1		.
+plus_3exon__start_rescued_by_insertion_b	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+plus_3exon__start_rescued_by_insertion_b	1		.
+plus_3exon__start_deletion_within_exon	0	inframe_deletion,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_3exon__start_deletion_within_exon	1		.
+plus_3exon__start_lost_suppresses_missense	0	missense_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_3exon__start_lost_suppresses_missense	1		.
+plus_3exon__start_lost_suppresses_frame	0	frameshift_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_3exon__start_lost_suppresses_frame	1		.
+plus_3exon__start_lost_suppresses_stop_gain	0	start_lost,stop_gained	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_3exon__start_lost_suppresses_stop_gain	1		.
+plus_3exon__start_lost_suppresses_stop_lost	0	start_lost,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_3exon__start_lost_suppresses_stop_lost	1		.
+plus_3exon__start_lost_trans_control	0	start_lost	.
+plus_3exon__start_lost_trans_control	1	missense_variant	.
+plus_3exon__start_lost_hom_alt	0	start_lost	.
+plus_3exon__start_lost_hom_alt	1	start_lost	.
+plus_3exon__start_intact_frame_open_early_stop	0	start_lost	csq anchors an insertion after the last base of the start codon inside the codon: it reports start_lost on the plus strand; the policy uses the normalized edit (an insertion between codons 1 and 2 leaves the start codon intact)
+plus_3exon__start_intact_frame_open_early_stop	1		.
+plus_3exon__stop_lost_snv_first	0	stop_lost	.
+plus_3exon__stop_lost_snv_first	1		.
+plus_3exon__stop_lost_snv_second	0	stop_lost	.
+plus_3exon__stop_lost_snv_second	1		.
+plus_3exon__stop_lost_snv_third	0	stop_lost	.
+plus_3exon__stop_lost_snv_third	1		.
+plus_3exon__stop_lost_mnv	0	stop_lost	.
+plus_3exon__stop_lost_mnv	1		.
+plus_3exon__stop_lost_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_3exon__stop_lost_terminator_deleted	1		.
+plus_3exon__stop_lost_last_codon_and_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_3exon__stop_lost_last_codon_and_terminator_deleted	1		.
+plus_3exon__stop_lost_deletion_partial	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_3exon__stop_lost_deletion_partial	1		.
+plus_3exon__stop_lost_insertion_inside	0	inframe_insertion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+plus_3exon__stop_lost_insertion_inside	1		.
+plus_3exon__stop_lost_insertion_before_plus1	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_3exon__stop_lost_insertion_before_plus1	1		.
+plus_3exon__stop_lost_insertion_before_plus2	0	frameshift_variant	csq reports the run-off frame as frameshift only on the plus strand and as stop_lost&frameshift on the minus strand: its indel anchor differs by strand (the contract frame SO is normalized-edit-path-sensitive); the policy reports both on every layout
+plus_3exon__stop_lost_insertion_before_plus2	1		.
+plus_3exon__run_off_deletion	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_3exon__run_off_deletion	1		.
+plus_3exon__run_off_insertion_plus2	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_3exon__run_off_insertion_plus2	1		.
+plus_3exon__run_off_inside_codon_35	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_3exon__run_off_inside_codon_35	1		.
+plus_3exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+plus_3exon__run_off_trans_control	1	missense_variant	.
+plus_3exon__stop_lost_hom_alt	0	stop_lost	.
+plus_3exon__stop_lost_hom_alt	1	stop_lost	.
+plus_3exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_3exon__stop_lost_and_missense	1		.
+plus_3exon__stop_retained_tag	0	stop_retained_variant	.
+plus_3exon__stop_retained_tag	1		.
+plus_3exon__stop_retained_tga	0	stop_retained_variant	.
+plus_3exon__stop_retained_tga	1		.
+plus_3exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_3exon__stop_retained_plus_synonymous	1		.
+plus_3exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_3exon__stop_retained_plus_missense	1		.
+plus_3exon__stop_retained_plus_inframe_insertion	0	inframe_insertion,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_3exon__stop_retained_plus_inframe_insertion	1		.
+plus_3exon__stop_retained_trans_control	0	stop_retained_variant	.
+plus_3exon__stop_retained_trans_control	1	missense_variant	.
+plus_3exon__stop_retained_hom_alt	0	stop_retained_variant	.
+plus_3exon__stop_retained_hom_alt	1	stop_retained_variant	.
+plus_3exon__stop_retained_after_frame_pair	0	missense_variant,protein_altering_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_3exon__stop_retained_after_frame_pair	1		.
+plus_3exon__stop_retained_displaced_insertion	0	frameshift_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_3exon__stop_retained_displaced_insertion	1		.
+plus_3exon__inframe_insertion_before_terminator	0	inframe_insertion	.
+plus_3exon__inframe_insertion_before_terminator	1		.
+plus_3exon__stop_inserted_before_terminator	0	inframe_insertion,stop_gained	a stop codon inserted next to the terminator leaves the peptide unchanged and is sequence-equivalent to a stop inserted after it: the policy reports stop_retained_variant; csq reports stop_gained on the plus strand and stop_retained on the minus strand
+plus_3exon__stop_inserted_before_terminator	1		.
+plus_3exon__stop_gained_in_codon_35	0	stop_gained	.
+plus_3exon__stop_gained_in_codon_35	1		.
+plus_3exon__inframe_deletion_before_terminator	0	inframe_deletion	.
+plus_3exon__inframe_deletion_before_terminator	1		.
+plus_3exon__rescued_termination_by_restoring_insertion	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
+plus_3exon__rescued_termination_by_restoring_insertion	1		.
+plus_3exon__rescued_termination_restore_inside_terminator	0	protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_3exon__rescued_termination_restore_inside_terminator	1		.
+plus_3exon__rescued_termination_by_deletion_in_terminator	0	frameshift_variant,stop_gained,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+plus_3exon__rescued_termination_by_deletion_in_terminator	1		.
+plus_3exon__rescued_termination_by_terminator_deletion	0	missense_variant,protein_altering_variant	the normalized deletion of one base of TT (cDNA 105-106) has several placements; csq reports a restored frame on the plus strand and misses the stop the +1 frame reads at cDNA 102, and adds stop_retained on the minus strand; the policy reports the stop gained in the displaced frame
+plus_3exon__rescued_termination_by_terminator_deletion	1		.
+plus_3exon__rescued_termination_after_stop_lost	0	missense_variant,protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_3exon__rescued_termination_after_stop_lost	1		.
+plus_3exon__post_stop_terminator_lost	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+plus_3exon__post_stop_terminator_lost	1		.
+plus_3exon__post_stop_terminator_retained	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+plus_3exon__post_stop_terminator_retained	1		.
+plus_3exon__post_stop_run_off	0	frameshift_variant,stop_gained	.
+plus_3exon__post_stop_run_off	1		.
+plus_3exon__post_stop_two_edits	0	stop_gained	.
+plus_3exon__post_stop_two_edits	1		.
+plus_3exon__post_stop_restoring_deletion	0	frameshift_variant,stop_gained	.
+plus_3exon__post_stop_restoring_deletion	1		.
+plus_3exon__restoring_insertion_creates_stop	0	frameshift_variant,stop_gained	.
+plus_3exon__restoring_insertion_creates_stop	1		.
+plus_3exon__post_stop_after_start_lost	0	start_lost,stop_gained,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+plus_3exon__post_stop_after_start_lost	1		.
+minus_1exon__start_snv_first	0	start_lost	.
+minus_1exon__start_snv_first	1		.
+minus_1exon__start_snv_last	0	start_lost	.
+minus_1exon__start_snv_last	1		.
+minus_1exon__start_mnv	0	start_lost	.
+minus_1exon__start_mnv	1		.
+minus_1exon__start_deletion_frame	0	start_lost	.
+minus_1exon__start_deletion_frame	1		.
+minus_1exon__start_deletion_inframe	0	start_retained_variant	csq calls a deletion that removes bases 2-4 of the start codon start_retained_variant although the edited CDS begins AGT; the policy classifies the edited sequence: start_lost
+minus_1exon__start_deletion_inframe	1		.
+minus_1exon__start_insertion_inside	0	start_lost	.
+minus_1exon__start_insertion_inside	1		.
+minus_1exon__start_insertion_after_start	0	inframe_insertion	.
+minus_1exon__start_insertion_after_start	1		.
+minus_1exon__start_rescued_by_insertion_a	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+minus_1exon__start_rescued_by_insertion_a	1		.
+minus_1exon__start_rescued_by_insertion_b	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+minus_1exon__start_rescued_by_insertion_b	1		.
+minus_1exon__start_deletion_within_exon	0	inframe_deletion,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_1exon__start_deletion_within_exon	1		.
+minus_1exon__start_lost_suppresses_missense	0	missense_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_1exon__start_lost_suppresses_missense	1		.
+minus_1exon__start_lost_suppresses_frame	0	frameshift_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_1exon__start_lost_suppresses_frame	1		.
+minus_1exon__start_lost_suppresses_stop_gain	0	start_lost,stop_gained	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_1exon__start_lost_suppresses_stop_gain	1		.
+minus_1exon__start_lost_suppresses_stop_lost	0	start_lost,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_1exon__start_lost_suppresses_stop_lost	1		.
+minus_1exon__start_lost_trans_control	0	start_lost	.
+minus_1exon__start_lost_trans_control	1	missense_variant	.
+minus_1exon__start_lost_hom_alt	0	start_lost	.
+minus_1exon__start_lost_hom_alt	1	start_lost	.
+minus_1exon__start_intact_frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
+minus_1exon__start_intact_frame_open_early_stop	1		.
+minus_1exon__stop_lost_snv_first	0	stop_lost	.
+minus_1exon__stop_lost_snv_first	1		.
+minus_1exon__stop_lost_snv_second	0	stop_lost	.
+minus_1exon__stop_lost_snv_second	1		.
+minus_1exon__stop_lost_snv_third	0	stop_lost	.
+minus_1exon__stop_lost_snv_third	1		.
+minus_1exon__stop_lost_mnv	0	stop_lost	.
+minus_1exon__stop_lost_mnv	1		.
+minus_1exon__stop_lost_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_1exon__stop_lost_terminator_deleted	1		.
+minus_1exon__stop_lost_last_codon_and_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_1exon__stop_lost_last_codon_and_terminator_deleted	1		.
+minus_1exon__stop_lost_deletion_partial	0	frameshift_variant,stop_lost	.
+minus_1exon__stop_lost_deletion_partial	1		.
+minus_1exon__stop_lost_insertion_inside	0	inframe_insertion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_1exon__stop_lost_insertion_inside	1		.
+minus_1exon__stop_lost_insertion_before_plus1	0	frameshift_variant,stop_lost	.
+minus_1exon__stop_lost_insertion_before_plus1	1		.
+minus_1exon__stop_lost_insertion_before_plus2	0	frameshift_variant,stop_lost	.
+minus_1exon__stop_lost_insertion_before_plus2	1		.
+minus_1exon__run_off_deletion	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_1exon__run_off_deletion	1		.
+minus_1exon__run_off_insertion_plus2	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_1exon__run_off_insertion_plus2	1		.
+minus_1exon__run_off_inside_codon_35	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_1exon__run_off_inside_codon_35	1		.
+minus_1exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_1exon__run_off_trans_control	1	missense_variant	.
+minus_1exon__stop_lost_hom_alt	0	stop_lost	.
+minus_1exon__stop_lost_hom_alt	1	stop_lost	.
+minus_1exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_1exon__stop_lost_and_missense	1		.
+minus_1exon__stop_retained_tag	0	stop_retained_variant	.
+minus_1exon__stop_retained_tag	1		.
+minus_1exon__stop_retained_tga	0	stop_retained_variant	.
+minus_1exon__stop_retained_tga	1		.
+minus_1exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_1exon__stop_retained_plus_synonymous	1		.
+minus_1exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_1exon__stop_retained_plus_missense	1		.
+minus_1exon__stop_retained_plus_inframe_insertion	0	inframe_insertion,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_1exon__stop_retained_plus_inframe_insertion	1		.
+minus_1exon__stop_retained_trans_control	0	stop_retained_variant	.
+minus_1exon__stop_retained_trans_control	1	missense_variant	.
+minus_1exon__stop_retained_hom_alt	0	stop_retained_variant	.
+minus_1exon__stop_retained_hom_alt	1	stop_retained_variant	.
+minus_1exon__stop_retained_after_frame_pair	0	missense_variant,protein_altering_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_1exon__stop_retained_after_frame_pair	1		.
+minus_1exon__stop_retained_displaced_insertion	0	frameshift_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_1exon__stop_retained_displaced_insertion	1		.
+minus_1exon__inframe_insertion_before_terminator	0	inframe_insertion,stop_retained_variant	csq anchors an insertion before the terminator inside the terminator codon on the minus strand and adds stop_retained_variant; the policy uses the normalized edit
+minus_1exon__inframe_insertion_before_terminator	1		.
+minus_1exon__stop_inserted_before_terminator	0	inframe_insertion,stop_retained_variant	a stop codon inserted next to the terminator leaves the peptide unchanged and is sequence-equivalent to a stop inserted after it: the policy reports stop_retained_variant; csq reports stop_gained on the plus strand and stop_retained on the minus strand
+minus_1exon__stop_inserted_before_terminator	1		.
+minus_1exon__stop_gained_in_codon_35	0	stop_gained	.
+minus_1exon__stop_gained_in_codon_35	1		.
+minus_1exon__inframe_deletion_before_terminator	0	inframe_deletion	.
+minus_1exon__inframe_deletion_before_terminator	1		.
+minus_1exon__rescued_termination_by_restoring_insertion	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
+minus_1exon__rescued_termination_by_restoring_insertion	1		.
+minus_1exon__rescued_termination_restore_inside_terminator	0	protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_1exon__rescued_termination_restore_inside_terminator	1		.
+minus_1exon__rescued_termination_by_deletion_in_terminator	0	frameshift_variant,stop_gained,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_1exon__rescued_termination_by_deletion_in_terminator	1		.
+minus_1exon__rescued_termination_by_terminator_deletion	0	frameshift_variant,stop_gained,stop_retained_variant	the normalized deletion of one base of TT (cDNA 105-106) has several placements; csq reports a restored frame on the plus strand and misses the stop the +1 frame reads at cDNA 102, and adds stop_retained on the minus strand; the policy reports the stop gained in the displaced frame
+minus_1exon__rescued_termination_by_terminator_deletion	1		.
+minus_1exon__rescued_termination_after_stop_lost	0	missense_variant,protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_1exon__rescued_termination_after_stop_lost	1		.
+minus_1exon__post_stop_terminator_lost	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_1exon__post_stop_terminator_lost	1		.
+minus_1exon__post_stop_terminator_retained	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_1exon__post_stop_terminator_retained	1		.
+minus_1exon__post_stop_run_off	0	frameshift_variant,stop_gained,stop_retained_variant	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_1exon__post_stop_run_off	1		.
+minus_1exon__post_stop_two_edits	0	stop_gained	.
+minus_1exon__post_stop_two_edits	1		.
+minus_1exon__post_stop_restoring_deletion	0	frameshift_variant,stop_gained	.
+minus_1exon__post_stop_restoring_deletion	1		.
+minus_1exon__restoring_insertion_creates_stop	0	frameshift_variant,stop_gained	.
+minus_1exon__restoring_insertion_creates_stop	1		.
+minus_1exon__post_stop_after_start_lost	0	start_lost,stop_gained,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_1exon__post_stop_after_start_lost	1		.
+minus_2exon__start_snv_first	0	start_lost	.
+minus_2exon__start_snv_first	1		.
+minus_2exon__start_snv_last	0	start_lost	.
+minus_2exon__start_snv_last	1		.
+minus_2exon__start_mnv	0	start_lost	.
+minus_2exon__start_mnv	1		.
+minus_2exon__start_deletion_frame	0	start_lost	.
+minus_2exon__start_deletion_frame	1		.
+minus_2exon__start_deletion_inframe	0	start_retained_variant	csq calls a deletion that removes bases 2-4 of the start codon start_retained_variant although the edited CDS begins AGT; the policy classifies the edited sequence: start_lost
+minus_2exon__start_deletion_inframe	1		.
+minus_2exon__start_insertion_inside	0	start_lost	.
+minus_2exon__start_insertion_inside	1		.
+minus_2exon__start_insertion_after_start	0	inframe_insertion	.
+minus_2exon__start_insertion_after_start	1		.
+minus_2exon__start_rescued_by_insertion_a	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+minus_2exon__start_rescued_by_insertion_a	1		.
+minus_2exon__start_rescued_by_insertion_b	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+minus_2exon__start_rescued_by_insertion_b	1		.
+minus_2exon__start_deletion_within_exon	0	inframe_deletion,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_2exon__start_deletion_within_exon	1		.
+minus_2exon__start_lost_suppresses_missense	0	missense_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_2exon__start_lost_suppresses_missense	1		.
+minus_2exon__start_lost_suppresses_frame	0	frameshift_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_2exon__start_lost_suppresses_frame	1		.
+minus_2exon__start_lost_suppresses_stop_gain	0	start_lost,stop_gained	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_2exon__start_lost_suppresses_stop_gain	1		.
+minus_2exon__start_lost_suppresses_stop_lost	0	start_lost,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_2exon__start_lost_suppresses_stop_lost	1		.
+minus_2exon__start_lost_trans_control	0	start_lost	.
+minus_2exon__start_lost_trans_control	1	missense_variant	.
+minus_2exon__start_lost_hom_alt	0	start_lost	.
+minus_2exon__start_lost_hom_alt	1	start_lost	.
+minus_2exon__start_intact_frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
+minus_2exon__start_intact_frame_open_early_stop	1		.
+minus_2exon__stop_lost_snv_first	0	stop_lost	.
+minus_2exon__stop_lost_snv_first	1		.
+minus_2exon__stop_lost_snv_second	0	stop_lost	.
+minus_2exon__stop_lost_snv_second	1		.
+minus_2exon__stop_lost_snv_third	0	stop_lost	.
+minus_2exon__stop_lost_snv_third	1		.
+minus_2exon__stop_lost_mnv	0	stop_lost	.
+minus_2exon__stop_lost_mnv	1		.
+minus_2exon__stop_lost_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_2exon__stop_lost_terminator_deleted	1		.
+minus_2exon__stop_lost_last_codon_and_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_2exon__stop_lost_last_codon_and_terminator_deleted	1		.
+minus_2exon__stop_lost_deletion_partial	0	frameshift_variant,stop_lost	.
+minus_2exon__stop_lost_deletion_partial	1		.
+minus_2exon__stop_lost_insertion_inside	0	inframe_insertion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_2exon__stop_lost_insertion_inside	1		.
+minus_2exon__stop_lost_insertion_before_plus1	0	frameshift_variant,stop_lost	.
+minus_2exon__stop_lost_insertion_before_plus1	1		.
+minus_2exon__stop_lost_insertion_before_plus2	0	frameshift_variant,stop_lost	.
+minus_2exon__stop_lost_insertion_before_plus2	1		.
+minus_2exon__run_off_deletion	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_2exon__run_off_deletion	1		.
+minus_2exon__run_off_insertion_plus2	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_2exon__run_off_insertion_plus2	1		.
+minus_2exon__run_off_inside_codon_35	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_2exon__run_off_inside_codon_35	1		.
+minus_2exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_2exon__run_off_trans_control	1	missense_variant	.
+minus_2exon__stop_lost_hom_alt	0	stop_lost	.
+minus_2exon__stop_lost_hom_alt	1	stop_lost	.
+minus_2exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_2exon__stop_lost_and_missense	1		.
+minus_2exon__stop_retained_tag	0	stop_retained_variant	.
+minus_2exon__stop_retained_tag	1		.
+minus_2exon__stop_retained_tga	0	stop_retained_variant	.
+minus_2exon__stop_retained_tga	1		.
+minus_2exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_2exon__stop_retained_plus_synonymous	1		.
+minus_2exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_2exon__stop_retained_plus_missense	1		.
+minus_2exon__stop_retained_plus_inframe_insertion	0	inframe_insertion,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_2exon__stop_retained_plus_inframe_insertion	1		.
+minus_2exon__stop_retained_trans_control	0	stop_retained_variant	.
+minus_2exon__stop_retained_trans_control	1	missense_variant	.
+minus_2exon__stop_retained_hom_alt	0	stop_retained_variant	.
+minus_2exon__stop_retained_hom_alt	1	stop_retained_variant	.
+minus_2exon__stop_retained_after_frame_pair	0	missense_variant,protein_altering_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_2exon__stop_retained_after_frame_pair	1		.
+minus_2exon__stop_retained_displaced_insertion	0	frameshift_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_2exon__stop_retained_displaced_insertion	1		.
+minus_2exon__inframe_insertion_before_terminator	0	inframe_insertion,stop_retained_variant	csq anchors an insertion before the terminator inside the terminator codon on the minus strand and adds stop_retained_variant; the policy uses the normalized edit
+minus_2exon__inframe_insertion_before_terminator	1		.
+minus_2exon__stop_inserted_before_terminator	0	inframe_insertion,stop_retained_variant	a stop codon inserted next to the terminator leaves the peptide unchanged and is sequence-equivalent to a stop inserted after it: the policy reports stop_retained_variant; csq reports stop_gained on the plus strand and stop_retained on the minus strand
+minus_2exon__stop_inserted_before_terminator	1		.
+minus_2exon__stop_gained_in_codon_35	0	stop_gained	.
+minus_2exon__stop_gained_in_codon_35	1		.
+minus_2exon__inframe_deletion_before_terminator	0	inframe_deletion	.
+minus_2exon__inframe_deletion_before_terminator	1		.
+minus_2exon__rescued_termination_by_restoring_insertion	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
+minus_2exon__rescued_termination_by_restoring_insertion	1		.
+minus_2exon__rescued_termination_restore_inside_terminator	0	protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_2exon__rescued_termination_restore_inside_terminator	1		.
+minus_2exon__rescued_termination_by_deletion_in_terminator	0	frameshift_variant,stop_gained,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_2exon__rescued_termination_by_deletion_in_terminator	1		.
+minus_2exon__rescued_termination_by_terminator_deletion	0	frameshift_variant,stop_gained,stop_retained_variant	the normalized deletion of one base of TT (cDNA 105-106) has several placements; csq reports a restored frame on the plus strand and misses the stop the +1 frame reads at cDNA 102, and adds stop_retained on the minus strand; the policy reports the stop gained in the displaced frame
+minus_2exon__rescued_termination_by_terminator_deletion	1		.
+minus_2exon__rescued_termination_after_stop_lost	0	missense_variant,protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_2exon__rescued_termination_after_stop_lost	1		.
+minus_2exon__post_stop_terminator_lost	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_2exon__post_stop_terminator_lost	1		.
+minus_2exon__post_stop_terminator_retained	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_2exon__post_stop_terminator_retained	1		.
+minus_2exon__post_stop_run_off	0	frameshift_variant,stop_gained,stop_retained_variant	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_2exon__post_stop_run_off	1		.
+minus_2exon__post_stop_two_edits	0	stop_gained	.
+minus_2exon__post_stop_two_edits	1		.
+minus_2exon__post_stop_restoring_deletion	0	frameshift_variant,stop_gained	.
+minus_2exon__post_stop_restoring_deletion	1		.
+minus_2exon__restoring_insertion_creates_stop	0	frameshift_variant,stop_gained	.
+minus_2exon__restoring_insertion_creates_stop	1		.
+minus_2exon__post_stop_after_start_lost	0	start_lost,stop_gained,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_2exon__post_stop_after_start_lost	1		.
+minus_3exon__start_snv_first	0	start_lost	.
+minus_3exon__start_snv_first	1		.
+minus_3exon__start_snv_last	0	start_lost	.
+minus_3exon__start_snv_last	1		.
+minus_3exon__start_mnv	0	start_lost	.
+minus_3exon__start_mnv	1		.
+minus_3exon__start_deletion_frame	0	start_lost	.
+minus_3exon__start_deletion_frame	1		.
+minus_3exon__start_deletion_inframe	0	start_retained_variant	csq calls a deletion that removes bases 2-4 of the start codon start_retained_variant although the edited CDS begins AGT; the policy classifies the edited sequence: start_lost
+minus_3exon__start_deletion_inframe	1		.
+minus_3exon__start_insertion_inside	0	start_lost	.
+minus_3exon__start_insertion_inside	1		.
+minus_3exon__start_insertion_after_start	0	inframe_insertion	.
+minus_3exon__start_insertion_after_start	1		.
+minus_3exon__start_rescued_by_insertion_a	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+minus_3exon__start_rescued_by_insertion_a	1		.
+minus_3exon__start_rescued_by_insertion_b	0	inframe_insertion,start_retained_variant	csq adds start_retained_variant (LOW, outside the reduced set) when the start codon is kept; the policy reports the whole-protein category only
+minus_3exon__start_rescued_by_insertion_b	1		.
+minus_3exon__start_deletion_within_exon	0	inframe_deletion,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_3exon__start_deletion_within_exon	1		.
+minus_3exon__start_lost_suppresses_missense	0	missense_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_3exon__start_lost_suppresses_missense	1		.
+minus_3exon__start_lost_suppresses_frame	0	frameshift_variant,start_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_3exon__start_lost_suppresses_frame	1		.
+minus_3exon__start_lost_suppresses_stop_gain	0	start_lost,stop_gained	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_3exon__start_lost_suppresses_stop_gain	1		.
+minus_3exon__start_lost_suppresses_stop_lost	0	start_lost,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_3exon__start_lost_suppresses_stop_lost	1		.
+minus_3exon__start_lost_trans_control	0	start_lost	.
+minus_3exon__start_lost_trans_control	1	missense_variant	.
+minus_3exon__start_lost_hom_alt	0	start_lost	.
+minus_3exon__start_lost_hom_alt	1	start_lost	.
+minus_3exon__start_intact_frame_open_early_stop	0	frameshift_variant	csq reports a single frameshift record as frameshift only and does not add the stop_gained of the early stop it creates; the policy reports both HIGH terms
+minus_3exon__start_intact_frame_open_early_stop	1		.
+minus_3exon__stop_lost_snv_first	0	stop_lost	.
+minus_3exon__stop_lost_snv_first	1		.
+minus_3exon__stop_lost_snv_second	0	stop_lost	.
+minus_3exon__stop_lost_snv_second	1		.
+minus_3exon__stop_lost_snv_third	0	stop_lost	.
+minus_3exon__stop_lost_snv_third	1		.
+minus_3exon__stop_lost_mnv	0	stop_lost	.
+minus_3exon__stop_lost_mnv	1		.
+minus_3exon__stop_lost_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_3exon__stop_lost_terminator_deleted	1		.
+minus_3exon__stop_lost_last_codon_and_terminator_deleted	0	inframe_deletion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_3exon__stop_lost_last_codon_and_terminator_deleted	1		.
+minus_3exon__stop_lost_deletion_partial	0	frameshift_variant,stop_lost	.
+minus_3exon__stop_lost_deletion_partial	1		.
+minus_3exon__stop_lost_insertion_inside	0	inframe_insertion,stop_lost	csq also reports the in-frame insertion or deletion that carries the abolished termination; the reduced set reports the HIGH stop_lost only
+minus_3exon__stop_lost_insertion_inside	1		.
+minus_3exon__stop_lost_insertion_before_plus1	0	frameshift_variant,stop_lost	.
+minus_3exon__stop_lost_insertion_before_plus1	1		.
+minus_3exon__stop_lost_insertion_before_plus2	0	frameshift_variant,stop_lost	.
+minus_3exon__stop_lost_insertion_before_plus2	1		.
+minus_3exon__run_off_deletion	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_3exon__run_off_deletion	1		.
+minus_3exon__run_off_insertion_plus2	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_3exon__run_off_insertion_plus2	1		.
+minus_3exon__run_off_inside_codon_35	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_3exon__run_off_inside_codon_35	1		.
+minus_3exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that runs off the CDS with no stop as frameshift only; the contract has the reference termination abolished as well, so the policy reports frameshift_variant and stop_lost
+minus_3exon__run_off_trans_control	1	missense_variant	.
+minus_3exon__stop_lost_hom_alt	0	stop_lost	.
+minus_3exon__stop_lost_hom_alt	1	stop_lost	.
+minus_3exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_3exon__stop_lost_and_missense	1		.
+minus_3exon__stop_retained_tag	0	stop_retained_variant	.
+minus_3exon__stop_retained_tag	1		.
+minus_3exon__stop_retained_tga	0	stop_retained_variant	.
+minus_3exon__stop_retained_tga	1		.
+minus_3exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_3exon__stop_retained_plus_synonymous	1		.
+minus_3exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_3exon__stop_retained_plus_missense	1		.
+minus_3exon__stop_retained_plus_inframe_insertion	0	inframe_insertion,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_3exon__stop_retained_plus_inframe_insertion	1		.
+minus_3exon__stop_retained_trans_control	0	stop_retained_variant	.
+minus_3exon__stop_retained_trans_control	1	missense_variant	.
+minus_3exon__stop_retained_hom_alt	0	stop_retained_variant	.
+minus_3exon__stop_retained_hom_alt	1	stop_retained_variant	.
+minus_3exon__stop_retained_after_frame_pair	0	missense_variant,protein_altering_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_3exon__stop_retained_after_frame_pair	1		.
+minus_3exon__stop_retained_displaced_insertion	0	frameshift_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_3exon__stop_retained_displaced_insertion	1		.
+minus_3exon__inframe_insertion_before_terminator	0	inframe_insertion,stop_retained_variant	csq anchors an insertion before the terminator inside the terminator codon on the minus strand and adds stop_retained_variant; the policy uses the normalized edit
+minus_3exon__inframe_insertion_before_terminator	1		.
+minus_3exon__stop_inserted_before_terminator	0	inframe_insertion,stop_retained_variant	a stop codon inserted next to the terminator leaves the peptide unchanged and is sequence-equivalent to a stop inserted after it: the policy reports stop_retained_variant; csq reports stop_gained on the plus strand and stop_retained on the minus strand
+minus_3exon__stop_inserted_before_terminator	1		.
+minus_3exon__stop_gained_in_codon_35	0	stop_gained	.
+minus_3exon__stop_gained_in_codon_35	1		.
+minus_3exon__inframe_deletion_before_terminator	0	inframe_deletion	.
+minus_3exon__inframe_deletion_before_terminator	1		.
+minus_3exon__rescued_termination_by_restoring_insertion	0	missense_variant,protein_altering_variant	csq adds the per-record lower-severity missense to inframe_altering when the frame is restored; the policy reports the one whole-protein category protein_altering_variant
+minus_3exon__rescued_termination_by_restoring_insertion	1		.
+minus_3exon__rescued_termination_restore_inside_terminator	0	protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_3exon__rescued_termination_restore_inside_terminator	1		.
+minus_3exon__rescued_termination_by_deletion_in_terminator	0	frameshift_variant,stop_gained,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
+minus_3exon__rescued_termination_by_deletion_in_terminator	1		.
+minus_3exon__rescued_termination_by_terminator_deletion	0	frameshift_variant,stop_gained,stop_retained_variant	the normalized deletion of one base of TT (cDNA 105-106) has several placements; csq reports a restored frame on the plus strand and misses the stop the +1 frame reads at cDNA 102, and adds stop_retained on the minus strand; the policy reports the stop gained in the displaced frame
+minus_3exon__rescued_termination_by_terminator_deletion	1		.
+minus_3exon__rescued_termination_after_stop_lost	0	missense_variant,protein_altering_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_3exon__rescued_termination_after_stop_lost	1		.
+minus_3exon__post_stop_terminator_lost	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_3exon__post_stop_terminator_lost	1		.
+minus_3exon__post_stop_terminator_retained	0	stop_gained,stop_lost	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_3exon__post_stop_terminator_retained	1		.
+minus_3exon__post_stop_run_off	0	frameshift_variant,stop_gained,stop_retained_variant	csq reports an edit after the first stop as its own effect; the policy keeps it as a post_stop contributor, not an expressed effect (contract section 2)
+minus_3exon__post_stop_run_off	1		.
+minus_3exon__post_stop_two_edits	0	stop_gained	.
+minus_3exon__post_stop_two_edits	1		.
+minus_3exon__post_stop_restoring_deletion	0	frameshift_variant,stop_gained	.
+minus_3exon__post_stop_restoring_deletion	1		.
+minus_3exon__restoring_insertion_creates_stop	0	frameshift_variant,stop_gained	.
+minus_3exon__restoring_insertion_creates_stop	1		.
+minus_3exon__post_stop_after_start_lost	0	start_lost,stop_gained,stop_lost	start loss suppresses other biological predictions (contract section 2), so the policy reports start_lost alone; csq also reports the other effect
+minus_3exon__post_stop_after_start_lost	1		.
