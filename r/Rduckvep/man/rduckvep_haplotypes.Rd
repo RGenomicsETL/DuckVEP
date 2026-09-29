@@ -121,6 +121,34 @@ truncating text. Disabled HGVS allocates no HGVS buffers or reference handle
 and returns `not_requested`. Identifiers are joined
 through the model transcript ordinal; the suffix contains no accession.
 
+`prediction_policy` names the versioned contract (`duckvep-coding-v1`).
+`prediction_status` and `prediction_reason` state eligibility for its supported
+domain; they predict no SO, IMPACT or NMD yet, and the eligible status is
+`eligible_classifier_pending`. The domain is strict complete diploid calls, one
+unambiguous heterozygous phase domain per transcript and sample, literal ACGT
+SNVs, MNVs and indels of at most 50 normalized bases, non-overlapping and
+inside coding exons of complete table-1 CDSs with a canonical start and stop
+and no curated RNA or peptide edits. Statuses: `incomplete_input` (reasons
+`missing_call`, `unphased_heterozygous`, `unresolved_cross_ps_phase`),
+`edit_conflict` (`contradictory_edits`), `unsupported_overlap`
+(`overlapping_edits`, `duplicate_edits`, `ambiguous_same_gap_insertions`) and
+`unsupported_context` (`non_strict_phase_policy`, `non_diploid_call`,
+`non_literal_allele`, `allele_over_50_bases`, the transcript reasons
+`transcript_not_coding`, `non_standard_codon_table`, `curated_transcript`,
+`incomplete_cds`, `noncanonical_start`, `noncanonical_stop`, `internal_stop`,
+and preserved projection or sequence reasons such as `reference_mismatch`,
+`outside_cds`, `non_contiguous`, `invalid_allele`). Phase-domain completeness and
+ploidy belong to each sample/phase/lane, so `carrier_predictions` gives the keyed
+result in `carriers` order; the row status is `eligible_classifier_pending` only
+when every carrier is, and otherwise the first ineligible carrier's result.
+`contributor_provenance` lists every source of the path, including omitted,
+shadowed, unapplied (conflicting or incomplete) and post-stop ones, with its
+original operands, `alt_index`, evidence, projection status, `role` and
+differing edit count. `normalized_edits` lists the differing CDS edit islands in
+ascending order with their source `event_index` and `coding_blocks` index
+(NULL when no sequence was rebuilt). Sequence deduplication never merges or
+drops contributors. Malformed identities and exhausted budgets error.
+
 `stop_in_displaced_frame` reports whether any of the first translated stop
 codon's three bases overlaps a frame-displaced span of the rebuilt CDS.
 Displacement starts at a frame-changing edit and ends after the alternate
