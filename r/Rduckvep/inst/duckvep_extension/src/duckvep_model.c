@@ -126,8 +126,8 @@ duckvep_model_reserve_transcripts(duckvep_owned_model_t *model,
 
 	if (needed <= model->transcript_capacity)
 		return 1;
-	capacity = duckvep_sql_next_capacity(model->transcript_capacity,
-	    needed);
+	capacity = model->transcript_capacity == 0 ? needed :
+	    duckvep_sql_next_capacity(model->transcript_capacity, needed);
 #define DUCKVEP_RESIZE_TRANSCRIPT(member) \
 	if (!duckvep_sql_resize((void **)&model->member, \
 	    sizeof(*model->member), capacity)) \
@@ -495,6 +495,54 @@ duckvep_query_result_open(duckdb_connection connection, const char *query,
 	return 1;
 }
 
+static int
+duckvep_query_count(duckdb_connection connection, const char *query,
+    size_t *count, char *error, size_t error_size)
+{
+	duckdb_result result;
+	duckdb_data_chunk chunk;
+	char *sql;
+	size_t length;
+	duckdb_state state;
+
+	length = strlen(query);
+	if (length > SIZE_MAX - sizeof("SELECT CAST(count(*) AS UBIGINT) FROM () q")) {
+		duckvep_sql_set_error(error, error_size, "model query is too long");
+		return 0;
+	}
+	sql = malloc(length + sizeof("SELECT CAST(count(*) AS UBIGINT) FROM () q"));
+	if (sql == NULL) {
+		duckvep_sql_set_error(error, error_size, "out of memory counting model rows");
+		return 0;
+	}
+	(void)sprintf(sql, "SELECT CAST(count(*) AS UBIGINT) FROM (%s) q", query);
+	memset(&result, 0, sizeof(result));
+	state = duckdb_query(connection, sql, &result);
+	free(sql);
+	if (state != DuckDBSuccess) {
+		duckvep_sql_set_error(error, error_size, duckdb_result_error(&result));
+		duckdb_destroy_result(&result);
+		return 0;
+	}
+	chunk = duckdb_fetch_chunk(result);
+	if (chunk == NULL || duckdb_data_chunk_get_size(chunk) != 1 ||
+	    duckdb_column_type(&result, 0) != DUCKDB_TYPE_UBIGINT ||
+	    duckvep_row_is_null(duckdb_data_chunk_get_vector(chunk, 0), 0) ||
+	    *(uint64_t *)duckdb_vector_get_data(
+	    duckdb_data_chunk_get_vector(chunk, 0)) > SIZE_MAX) {
+		if (chunk != NULL)
+			duckdb_destroy_data_chunk(&chunk);
+		duckvep_sql_set_error(error, error_size, "invalid model row count");
+		duckdb_destroy_result(&result);
+		return 0;
+	}
+	*count = (size_t)*(uint64_t *)duckdb_vector_get_data(
+	    duckdb_data_chunk_get_vector(chunk, 0));
+	duckdb_destroy_data_chunk(&chunk);
+	duckdb_destroy_result(&result);
+	return 1;
+}
+
 int
 duckvep_row_is_null(duckdb_vector vector, idx_t row)
 {
@@ -541,6 +589,20 @@ duckvep_result_schema(duckdb_result *result, const char *const *names,
 	return 1;
 }
 
+typedef struct {
+	uint16_t region;
+	uint32_t length;
+	char *name;
+	bool circular;
+} duckvep_region_row_t;
+
+static int
+duckvep_region_row_compare(const void *left, const void *right)
+{
+	const duckvep_region_row_t *a = left, *b = right;
+	return (a->region > b->region) - (a->region < b->region);
+}
+
 static int
 duckvep_load_regions(duckdb_connection connection, const char *query,
 	int require_sequence_names, duckvep_owned_model_t *model,
@@ -568,11 +630,19 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 	duckvep_query_result_t query_result;
 	duckdb_data_chunk chunk;
 	idx_t column_count;
+	uint8_t *seen;
 	int ok;
 
-	if (!duckvep_query_result_open(connection, query, &query_result, error,
-	    error_size))
+	seen = calloc((size_t)UINT16_MAX + 1u, 1u);
+	if (seen == NULL) {
+		duckvep_sql_set_error(error, error_size, "out of memory loading sequence regions");
 		return 0;
+	}
+	if (!duckvep_query_result_open(connection, query, &query_result, error,
+	    error_size)) {
+		free(seen);
+		return 0;
+	}
 	ok = 0;
 	column_count = duckdb_column_count(&query_result.result);
 	if (column_count != 1 && column_count != 2 && column_count != 3 &&
@@ -646,10 +716,9 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			if (index != 0 && model->known_seq_regions[index - 1] >=
-			    values[row]) {
+			if (seen[values[row]]) {
 				duckvep_sql_set_error(error, error_size,
-				    "seq_region query must be sorted and unique");
+				    "seq_region query contains a duplicate region");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
@@ -678,6 +747,7 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 			    ? (uint32_t)lengths[row] : 0;
 			model->region_circular[index] = circular_vector != NULL
 			    ? ((bool *)duckdb_vector_get_data(circular_vector))[row] : 0;
+			seen[values[row]] = 1u;
 			model->known_seq_region_count++;
 		}
 		duckdb_destroy_data_chunk(&chunk);
@@ -687,8 +757,34 @@ duckvep_load_regions(duckdb_connection connection, const char *query,
 		    "seq_region query returned no rows");
 		goto done;
 	}
+	{
+		duckvep_region_row_t *sorted;
+		size_t i, n = model->known_seq_region_count;
+
+		sorted = malloc(n * sizeof(*sorted));
+		if (sorted == NULL) {
+			duckvep_sql_set_error(error, error_size,
+			    "out of memory sorting sequence regions");
+			goto done;
+		}
+		for (i = 0; i < n; i++) {
+			sorted[i].region = model->known_seq_regions[i];
+			sorted[i].length = model->sequence_lengths[i];
+			sorted[i].name = model->sequence_names[i];
+			sorted[i].circular = model->region_circular[i];
+		}
+		qsort(sorted, n, sizeof(*sorted), duckvep_region_row_compare);
+		for (i = 0; i < n; i++) {
+			model->known_seq_regions[i] = sorted[i].region;
+			model->sequence_lengths[i] = sorted[i].length;
+			model->sequence_names[i] = sorted[i].name;
+			model->region_circular[i] = sorted[i].circular;
+		}
+		free(sorted);
+	}
 	ok = 1;
 done:
+	free(seen);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -1123,11 +1219,29 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 	duckvep_query_result_t query_result;
 	duckdb_data_chunk chunk;
 	idx_t column_count;
+	size_t expected, received;
+	uint8_t *seen;
 	int ok;
 
-	if (!duckvep_query_result_open(connection, query, &query_result, error,
-	    error_size))
+	if (!duckvep_query_count(connection, query, &expected, error, error_size))
 		return 0;
+	if (expected == 0 || expected > UINT32_MAX ||
+	    !duckvep_model_reserve_transcripts(model, expected)) {
+		duckvep_sql_set_error(error, error_size,
+		    "transcript count is empty, exceeds uint32, or cannot be allocated");
+		return 0;
+	}
+	seen = calloc(expected, 1u);
+	if (seen == NULL) {
+		duckvep_sql_set_error(error, error_size, "out of memory tracking transcript indexes");
+		return 0;
+	}
+	if (!duckvep_query_result_open(connection, query, &query_result, error,
+	    error_size)) {
+		free(seen);
+		return 0;
+	}
+	received = 0;
 	ok = 0;
 	column_count = duckdb_column_count(&query_result.result);
 	if (column_count != 11 && column_count != 13) {
@@ -1185,22 +1299,17 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 					goto done;
 				}
 			}
-			index = model->transcripts.transcript_count;
-			if (transcript_indices[row] != (uint32_t)index ||
-			    index > UINT32_MAX) {
+			index = transcript_indices[row];
+			if (index >= expected || seen[index] || received >= expected) {
 				duckvep_sql_set_error(error, error_size,
-				    "transcript_index must be dense, zero-based, and ordered");
-				duckdb_destroy_data_chunk(&chunk);
-				goto done;
-			}
-			if (!duckvep_model_reserve_transcripts(model, index + 1)) {
-				duckvep_sql_set_error(error, error_size,
-				    "out of memory loading transcripts");
+				    "transcript_index is duplicated or outside the dense zero-based range");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
 			circular = 0;
 			region_length = 0;
+			seen[index] = 1u;
+			received++;
 			if (seq_regions[row] > UINT16_MAX || starts[row] == 0 ||
 			    ends[row] == 0 || starts[row] > UINT32_MAX ||
 			    ends[row] > UINT32_MAX ||
@@ -1353,15 +1462,119 @@ duckvep_load_transcripts(duckdb_connection connection, const char *query,
 		}
 		duckdb_destroy_data_chunk(&chunk);
 	}
-	if (model->transcripts.transcript_count == 0) {
+	if (received != expected) {
 		duckvep_sql_set_error(error, error_size,
-		    "transcript query returned no rows");
+		    "transcript_index has a gap in the dense zero-based range");
 		goto done;
+	}
+	{
+		uint8_t *cds, *flanks;
+		size_t i, cds_offset = 0u, flank_offset = 0u;
+
+		cds = malloc(model->cds_sequence_length == 0 ? 1u :
+		    model->cds_sequence_length);
+		flanks = malloc(model->flank_sequence_length == 0 ? 1u :
+		    model->flank_sequence_length);
+		if (cds == NULL || flanks == NULL) {
+			free(cds);
+			free(flanks);
+			duckvep_sql_set_error(error, error_size,
+			    "out of memory ordering transcript sequences");
+			goto done;
+		}
+		for (i = 0; i < expected; i++) {
+			size_t length = model->cds_sequence_lengths[i];
+			size_t pre = model->pre_cds_sequence_lengths[i];
+			size_t post = model->post_cds_sequence_lengths[i];
+
+			if (length != 0)
+				memcpy(cds + cds_offset, model->cds_sequence_bytes +
+				    model->cds_sequence_offsets[i], length);
+			if (pre + post != 0)
+				memcpy(flanks + flank_offset,
+				    model->flank_sequence_bytes +
+				    model->pre_cds_sequence_offsets[i], pre + post);
+			model->cds_sequence_offsets[i] = cds_offset;
+			model->pre_cds_sequence_offsets[i] = flank_offset;
+			model->post_cds_sequence_offsets[i] = flank_offset + pre;
+			cds_offset += length;
+			flank_offset += pre + post;
+		}
+		free(model->cds_sequence_bytes);
+		free(model->flank_sequence_bytes);
+		model->cds_sequence_bytes = cds;
+		model->flank_sequence_bytes = flanks;
+		model->cds_sequence_capacity = model->cds_sequence_length;
+		model->flank_sequence_capacity = model->flank_sequence_length;
 	}
 	ok = 1;
 done:
+	free(seen);
 	duckvep_query_result_close(&query_result);
 	return ok;
+}
+
+/* Unordered side-relation rows are streamed into one compact native array,
+ * counting-sorted by transcript_index, then sorted per transcript on the
+ * secondary key. The scratch is native, bounded by the row count, and freed
+ * before the load returns. */
+static int
+duckvep_rows_append(void **rows, size_t *count, size_t *capacity,
+	size_t width, const void *record)
+{
+	if (*count == *capacity) {
+		size_t next = duckvep_sql_next_capacity(*capacity, *count + 1u);
+
+		if (!duckvep_sql_resize(rows, width, next))
+			return 0;
+		*capacity = next;
+	}
+	memcpy((char *)*rows + *count * width, record, width);
+	(*count)++;
+	return 1;
+}
+
+/* Counting sort of fixed-width rows by uint32 transcript (first member).
+ * offsets has transcript_count + 1 entries holding per-transcript counts in
+ * slots 1..n on entry (counted while streaming) and group boundaries on exit. */
+static void *
+duckvep_rows_group(const void *rows, size_t count, size_t width,
+	size_t transcript_count, size_t *offsets)
+{
+	char *sorted;
+	size_t *cursor, i;
+
+	sorted = malloc(count == 0 ? 1u : count * width);
+	cursor = malloc((transcript_count + 1u) * sizeof(*cursor));
+	if (sorted == NULL || cursor == NULL) {
+		free(sorted);
+		free(cursor);
+		return NULL;
+	}
+	for (i = 1u; i <= transcript_count; i++)
+		offsets[i] += offsets[i - 1u];
+	memcpy(cursor, offsets, (transcript_count + 1u) * sizeof(*cursor));
+	for (i = 0; i < count; i++) {
+		const char *row = (const char *)rows + i * width;
+
+		memcpy(sorted + cursor[*(const uint32_t *)row]++ * width, row,
+		    width);
+	}
+	free(cursor);
+	return sorted;
+}
+
+typedef struct {
+	uint32_t transcript, start, end, cdna_start, cdna_end;
+	int8_t phase, end_phase;
+} duckvep_exon_row_t;
+
+static int
+duckvep_exon_row_compare(const void *left, const void *right)
+{
+	const duckvep_exon_row_t *a = left, *b = right;
+
+	return (a->cdna_start > b->cdna_start) - (a->cdna_start < b->cdna_start);
 }
 
 static int
@@ -1380,14 +1593,24 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 	};
 	duckvep_query_result_t query_result;
 	duckdb_data_chunk chunk;
-	uint32_t previous_transcript;
-	int have_previous, ok;
+	duckvep_exon_row_t *rows, *sorted;
+	size_t row_count, row_capacity, *offsets, transcript_count, i;
+	int ok;
 
-	if (!duckvep_query_result_open(connection, query, &query_result, error,
-	    error_size))
+	transcript_count = model->transcripts.transcript_count;
+	rows = sorted = NULL;
+	row_count = row_capacity = 0;
+	offsets = calloc(transcript_count + 1u, sizeof(*offsets));
+	if (offsets == NULL) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory loading exons");
 		return 0;
-	have_previous = 0;
-	previous_transcript = 0;
+	}
+	if (!duckvep_query_result_open(connection, query, &query_result, error,
+	    error_size)) {
+		free(offsets);
+		return 0;
+	}
 	ok = 0;
 	if (!duckvep_result_schema(&query_result.result, names, types, 7, SIZE_MAX,
 	    error, error_size))
@@ -1397,10 +1620,10 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 		uint32_t *transcript_indices;
 		uint64_t *starts, *ends, *cdna_starts, *cdna_ends;
 		int8_t *phases, *end_phases;
-		idx_t row, rows;
+		idx_t row, count;
 		size_t column;
 
-		rows = duckdb_data_chunk_get_size(chunk);
+		count = duckdb_data_chunk_get_size(chunk);
 		for (column = 0; column < 7; column++)
 			vectors[column] = duckdb_data_chunk_get_vector(chunk,
 			    (idx_t)column);
@@ -1411,10 +1634,10 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 		cdna_ends = duckdb_vector_get_data(vectors[4]);
 		phases = duckdb_vector_get_data(vectors[5]);
 		end_phases = duckdb_vector_get_data(vectors[6]);
-		for (row = 0; row < rows; row++) {
+		for (row = 0; row < count; row++) {
+			duckvep_exon_row_t record;
 			uint32_t transcript_index, region_length;
 			int circular;
-			size_t exon_index;
 
 			for (column = 0; column < 7; column++) {
 				if (duckvep_row_is_null(vectors[column], row)) {
@@ -1426,26 +1649,24 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 				}
 			}
 			transcript_index = transcript_indices[row];
-			if (transcript_index >= model->transcripts.transcript_count ||
-			    (have_previous && transcript_index < previous_transcript)) {
+			if (transcript_index >= transcript_count) {
 				duckvep_sql_set_error(error, error_size,
-				    "exon query must be grouped by transcript_index");
+				    "exon transcript_index is outside the loaded transcript range");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			if (model->exon_counts[transcript_index] == UINT16_MAX) {
+			if (offsets[transcript_index + 1u] == UINT16_MAX) {
 				duckvep_sql_set_error(error, error_size,
 				    "transcript has too many exons");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			exon_index = model->exons.exon_count;
 			region_length = 0;
 			circular = 0;
 			(void)duckvep_model_region_topology(model,
 			    model->seq_regions[transcript_index], &region_length,
 			    &circular);
-			if (exon_index > UINT32_MAX || starts[row] == 0 ||
+			if (row_count >= UINT32_MAX || starts[row] == 0 ||
 			    ends[row] == 0 || starts[row] > UINT32_MAX ||
 			    ends[row] > UINT32_MAX ||
 			    (region_length != 0 && (starts[row] > region_length ||
@@ -1472,109 +1693,121 @@ duckvep_load_exons(duckdb_connection connection, const char *query,
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			if (model->exon_counts[transcript_index] != 0) {
-				size_t previous_exon;
-				int ordered;
-
-				previous_exon = exon_index - 1;
-				ordered = cdna_starts[row] >
-				    model->exon_cdna_ends[previous_exon];
-				if (model->transcript_starts[transcript_index] <=
-				    model->transcript_ends[transcript_index]) {
-					if (model->strands[transcript_index] > 0)
-						ordered = ordered && starts[row] >
-						    model->exon_ends[previous_exon];
-					else
-						ordered = ordered && ends[row] <
-						    model->exon_starts[previous_exon];
-				}
-				if (!ordered) {
-					duckvep_sql_set_error(error, error_size,
-					    "exons must be non-overlapping and ordered on the transcript");
-					duckdb_destroy_data_chunk(&chunk);
-					goto done;
-				}
-			}
-			if (!duckvep_model_reserve_exons(model, exon_index + 1)) {
+			record.transcript = transcript_index;
+			record.start = (uint32_t)starts[row];
+			record.end = (uint32_t)ends[row];
+			record.cdna_start = (uint32_t)cdna_starts[row];
+			record.cdna_end = (uint32_t)cdna_ends[row];
+			record.phase = phases[row];
+			record.end_phase = end_phases[row];
+			if (!duckvep_rows_append((void **)&rows, &row_count,
+			    &row_capacity, sizeof(record), &record)) {
 				duckvep_sql_set_error(error, error_size,
 				    "out of memory loading exons");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			if (model->exon_counts[transcript_index] == 0)
-				model->exon_offsets[transcript_index] =
-				    (uint32_t)exon_index;
-			if (starts[row] > ends[row])
-				model->has_wrapped_coordinates = 1;
-			model->exon_starts[exon_index] = (uint32_t)starts[row];
-			model->exon_ends[exon_index] = (uint32_t)ends[row];
-			model->exon_cdna_starts[exon_index] =
-			    (uint32_t)cdna_starts[row];
-			model->exon_cdna_ends[exon_index] =
-			    (uint32_t)cdna_ends[row];
-			model->exon_phases[exon_index] = phases[row];
-			model->exon_end_phases[exon_index] = end_phases[row];
-			model->exon_counts[transcript_index]++;
-			model->exons.exon_count++;
-			previous_transcript = transcript_index;
-			have_previous = 1;
+			offsets[transcript_index + 1u]++;
 		}
 		duckdb_destroy_data_chunk(&chunk);
 	}
-	{
-		size_t transcript;
+	sorted = duckvep_rows_group(rows, row_count, sizeof(*rows),
+	    transcript_count, offsets);
+	free(rows);
+	rows = NULL;
+	if (sorted == NULL || !duckvep_model_reserve_exons(model, row_count)) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory ordering exons");
+		goto done;
+	}
+	for (i = 0; i < transcript_count; i++) {
+		size_t first = offsets[i], count = offsets[i + 1u] - offsets[i], k;
 
-		for (transcript = 0; transcript < model->transcripts.transcript_count;
-		    transcript++) {
-			size_t first, count, e;
-			uint32_t length;
-			int circular, crossings;
-			if (model->exon_counts[transcript] == 0) {
+		int wrapped_transcript, transcript_circular;
+		uint32_t region_length = 0;
+		int crossings = 0;
+
+		if (count == 0) {
+			duckvep_sql_set_error(error, error_size,
+			    "every transcript must have at least one exon");
+			goto done;
+		}
+		qsort(sorted + first, count, sizeof(*sorted),
+		    duckvep_exon_row_compare);
+		wrapped_transcript = model->transcript_starts[i] >
+		    model->transcript_ends[i];
+		transcript_circular = 0;
+		(void)duckvep_model_region_topology(model, model->seq_regions[i],
+		    &region_length, &transcript_circular);
+		/* Ordering, overlap and circular traversal checks need the
+		 * per-transcript exon rank order, so they run after the sort. */
+		for (k = first; k < first + count; k++) {
+			int ordered = 1;
+
+			if (k != first) {
+				ordered = sorted[k].cdna_start > sorted[k - 1u].cdna_end;
+				if (!wrapped_transcript) {
+					if (model->strands[i] > 0)
+						ordered = ordered && sorted[k].start >
+						    sorted[k - 1u].end;
+					else
+						ordered = ordered && sorted[k].end <
+						    sorted[k - 1u].start;
+				}
+			}
+			if (!ordered) {
 				duckvep_sql_set_error(error, error_size,
-				    "every transcript must have at least one exon");
+				    "exons must be non-overlapping and ordered on the transcript");
 				goto done;
 			}
-			first = model->exon_offsets[transcript];
-			count = model->exon_counts[transcript];
-			length = 0;
-			circular = 0;
-			(void)duckvep_model_region_topology(model,
-			    model->seq_regions[transcript], &length, &circular);
-			if (!circular || !length) continue;
-			crossings = 0;
-			for (e = first; e < first + count; e++) {
-				uint64_t span = model->exon_starts[e] > model->exon_ends[e]
-				    ? (uint64_t)length - model->exon_starts[e] + 1u + model->exon_ends[e]
-				    : (uint64_t)model->exon_ends[e] - model->exon_starts[e] + 1u;
-				if ((uint64_t)model->exon_cdna_ends[e] -
-				    model->exon_cdna_starts[e] + 1u != span) {
+			if (transcript_circular && region_length) {
+				uint64_t span = sorted[k].start > sorted[k].end
+				    ? (uint64_t)region_length - sorted[k].start + 1u +
+				    sorted[k].end
+				    : (uint64_t)sorted[k].end - sorted[k].start + 1u;
+
+				if ((uint64_t)sorted[k].cdna_end -
+				    sorted[k].cdna_start + 1u != span) {
 					duckvep_sql_set_error(error, error_size,
 					    "circular exon cDNA length does not match its genomic span");
 					goto done;
 				}
-				crossings += model->exon_starts[e] > model->exon_ends[e];
-				if (e == first) continue;
-				crossings += model->strands[transcript] == 1
-				    ? model->exon_ends[e - 1] > model->exon_starts[e]
-				    : model->exon_starts[e - 1] < model->exon_ends[e];
+				crossings += sorted[k].start > sorted[k].end;
+				if (k != first)
+					crossings += model->strands[i] == 1
+					    ? sorted[k - 1u].end > sorted[k].start
+					    : sorted[k - 1u].start < sorted[k].end;
 			}
-			if (crossings != (model->transcript_starts[transcript] >
-			    model->transcript_ends[transcript] ? 1 : 0) ||
-			    (model->transcript_starts[transcript] >
-			    model->transcript_ends[transcript] &&
-			    (model->strands[transcript] == 1
-			    ? (model->exon_starts[first] != model->transcript_starts[transcript] ||
-			    model->exon_ends[first + count - 1] != model->transcript_ends[transcript])
-			    : (model->exon_ends[first] != model->transcript_ends[transcript] ||
-			    model->exon_starts[first + count - 1] != model->transcript_starts[transcript])))) {
-				duckvep_sql_set_error(error, error_size,
-				    "circular exon ranks must traverse the origin exactly once");
-				goto done;
-			}
+			if (sorted[k].start > sorted[k].end)
+				model->has_wrapped_coordinates = 1;
+			model->exon_starts[k] = sorted[k].start;
+			model->exon_ends[k] = sorted[k].end;
+			model->exon_cdna_starts[k] = sorted[k].cdna_start;
+			model->exon_cdna_ends[k] = sorted[k].cdna_end;
+			model->exon_phases[k] = sorted[k].phase;
+			model->exon_end_phases[k] = sorted[k].end_phase;
 		}
+		if (transcript_circular && region_length &&
+		    (crossings != (wrapped_transcript ? 1 : 0) ||
+		    (wrapped_transcript &&
+		    (model->strands[i] == 1
+		    ? (sorted[first].start != model->transcript_starts[i] ||
+		    sorted[first + count - 1u].end != model->transcript_ends[i])
+		    : (sorted[first].end != model->transcript_ends[i] ||
+		    sorted[first + count - 1u].start != model->transcript_starts[i]))))) {
+			duckvep_sql_set_error(error, error_size,
+			    "circular exon ranks must traverse the origin exactly once");
+			goto done;
+		}
+		model->exon_offsets[i] = (uint32_t)first;
+		model->exon_counts[i] = (uint16_t)count;
 	}
+	model->exons.exon_count = row_count;
 	ok = 1;
 done:
+	free(rows);
+	free(sorted);
+	free(offsets);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -1606,6 +1839,20 @@ duckvep_mature_mirna_segment_is_exonic(
 	return 0;
 }
 
+typedef struct {
+	uint32_t transcript, start, end;
+} duckvep_mirna_row_t;
+
+static int
+duckvep_mirna_row_compare(const void *left, const void *right)
+{
+	const duckvep_mirna_row_t *a = left, *b = right;
+
+	if (a->start != b->start)
+		return a->start < b->start ? -1 : 1;
+	return (a->end > b->end) - (a->end < b->end);
+}
+
 static int
 duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 	duckvep_owned_model_t *model, char *error, size_t error_size)
@@ -1618,30 +1865,33 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 	};
 	duckvep_query_result_t query_result;
 	duckdb_data_chunk chunk;
-	uint32_t previous_transcript, previous_start;
-	int have_previous, ok;
-	size_t transcript;
+	duckvep_mirna_row_t *rows, *sorted;
+	size_t row_count, row_capacity, *offsets, transcript_count, i;
+	int ok;
 
-	if (model->transcripts.transcript_count >
+	transcript_count = model->transcripts.transcript_count;
+	if (transcript_count >
 	    SIZE_MAX / sizeof(*model->mature_mirna_offsets) - 1u) {
 		duckvep_sql_set_error(error, error_size,
 		    "mature-miRNA row-offset array exceeds addressable memory");
 		return 0;
 	}
-	model->mature_mirna_offsets = calloc(
-	    model->transcripts.transcript_count + 1u,
+	rows = sorted = NULL;
+	row_count = row_capacity = 0;
+	model->mature_mirna_offsets = calloc(transcript_count + 1u,
 	    sizeof(*model->mature_mirna_offsets));
-	if (model->mature_mirna_offsets == NULL) {
+	offsets = calloc(transcript_count + 1u, sizeof(*offsets));
+	if (model->mature_mirna_offsets == NULL || offsets == NULL) {
+		free(offsets);
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory loading mature-miRNA row offsets");
 		return 0;
 	}
 	if (!duckvep_query_result_open(connection, query, &query_result, error,
-	    error_size))
+	    error_size)) {
+		free(offsets);
 		return 0;
-	have_previous = 0;
-	previous_transcript = 0;
-	previous_start = 0;
+	}
 	ok = 0;
 	if (!duckvep_result_schema(&query_result.result, names, types, 3,
 	    SIZE_MAX, error, error_size))
@@ -1650,20 +1900,20 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 		duckdb_vector vectors[3];
 		uint32_t *transcript_indices;
 		uint64_t *starts, *ends;
-		idx_t row, rows;
+		idx_t row, count;
 		size_t column;
 
-		rows = duckdb_data_chunk_get_size(chunk);
+		count = duckdb_data_chunk_get_size(chunk);
 		for (column = 0; column < 3; column++)
 			vectors[column] = duckdb_data_chunk_get_vector(chunk,
 			    (idx_t)column);
 		transcript_indices = duckdb_vector_get_data(vectors[0]);
 		starts = duckdb_vector_get_data(vectors[1]);
 		ends = duckdb_vector_get_data(vectors[2]);
-		for (row = 0; row < rows; row++) {
+		for (row = 0; row < count; row++) {
+			duckvep_mirna_row_t record;
 			uint32_t transcript_index, region_length;
 			int circular;
-			size_t feature_index;
 
 			for (column = 0; column < 3; column++) {
 				if (duckvep_row_is_null(vectors[column], row)) {
@@ -1675,13 +1925,9 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 				}
 			}
 			transcript_index = transcript_indices[row];
-			if (transcript_index >= model->transcripts.transcript_count ||
-			    (have_previous &&
-			    (transcript_index < previous_transcript ||
-			    (transcript_index == previous_transcript &&
-			    starts[row] < previous_start)))) {
+			if (transcript_index >= transcript_count) {
 				duckvep_sql_set_error(error, error_size,
-				    "mature-miRNA query must be ordered by transcript_index and mature_mirna_start");
+				    "mature-miRNA transcript_index is outside the loaded transcript range");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
@@ -1715,34 +1961,49 @@ duckvep_load_mature_mirna(duckdb_connection connection, const char *query,
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			feature_index = model->mature_mirna_count;
-			if (feature_index == (size_t)UINT32_MAX ||
-			    !duckvep_model_reserve_mature_mirna(model,
-			    feature_index + 1u)) {
+			record.transcript = transcript_index;
+			record.start = (uint32_t)starts[row];
+			record.end = (uint32_t)ends[row];
+			if (row_count == (size_t)UINT32_MAX ||
+			    !duckvep_rows_append((void **)&rows, &row_count,
+			    &row_capacity, sizeof(record), &record)) {
 				duckvep_sql_set_error(error, error_size,
 				    "mature-miRNA side relation exceeds the uint32 model limit");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			model->mature_mirna_starts[feature_index] =
-			    (uint32_t)starts[row];
-			model->mature_mirna_ends[feature_index] =
-			    (uint32_t)ends[row];
-			model->mature_mirna_offsets[transcript_index + 1u]++;
-			model->mature_mirna_count++;
-			previous_transcript = transcript_index;
-			previous_start = (uint32_t)starts[row];
-			have_previous = 1;
+			offsets[transcript_index + 1u]++;
 		}
 		duckdb_destroy_data_chunk(&chunk);
 	}
-	for (transcript = 1u;
-	    transcript <= model->transcripts.transcript_count; transcript++) {
-		model->mature_mirna_offsets[transcript] +=
-		    model->mature_mirna_offsets[transcript - 1u];
+	sorted = duckvep_rows_group(rows, row_count, sizeof(*rows),
+	    transcript_count, offsets);
+	free(rows);
+	rows = NULL;
+	if (sorted == NULL ||
+	    !duckvep_model_reserve_mature_mirna(model, row_count)) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory ordering mature miRNAs");
+		goto done;
 	}
+	for (i = 0; i < transcript_count; i++) {
+		size_t k;
+
+		qsort(sorted + offsets[i], offsets[i + 1u] - offsets[i],
+		    sizeof(*sorted), duckvep_mirna_row_compare);
+		for (k = offsets[i]; k < offsets[i + 1u]; k++) {
+			model->mature_mirna_starts[k] = sorted[k].start;
+			model->mature_mirna_ends[k] = sorted[k].end;
+		}
+	}
+	for (i = 0; i <= transcript_count; i++)
+		model->mature_mirna_offsets[i] = (uint32_t)offsets[i];
+	model->mature_mirna_count = row_count;
 	ok = 1;
 done:
+	free(rows);
+	free(sorted);
+	free(offsets);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -1752,6 +2013,19 @@ duckvep_peptide_edit_alt_valid(uint8_t amino_acid)
 {
 	return amino_acid == (uint8_t)'*' ||
 	    (amino_acid >= (uint8_t)'A' && amino_acid <= (uint8_t)'Z');
+}
+
+typedef struct {
+	uint32_t transcript, position;
+	uint8_t amino_acid;
+} duckvep_peptide_row_t;
+
+static int
+duckvep_peptide_row_compare(const void *left, const void *right)
+{
+	const duckvep_peptide_row_t *a = left, *b = right;
+
+	return (a->position > b->position) - (a->position < b->position);
 }
 
 static int
@@ -1766,30 +2040,33 @@ duckvep_load_peptide_edits(duckdb_connection connection, const char *query,
 	};
 	duckvep_query_result_t query_result;
 	duckdb_data_chunk chunk;
-	uint32_t previous_transcript, previous_position;
-	int have_previous, ok;
-	size_t transcript;
+	duckvep_peptide_row_t *rows, *sorted;
+	size_t row_count, row_capacity, *offsets, transcript_count, i;
+	int ok;
 
-	if (model->transcripts.transcript_count >
+	transcript_count = model->transcripts.transcript_count;
+	if (transcript_count >
 	    SIZE_MAX / sizeof(*model->peptide_edit_offsets) - 1u) {
 		duckvep_sql_set_error(error, error_size,
 		    "peptide-edit row-offset array exceeds addressable memory");
 		return 0;
 	}
-	model->peptide_edit_offsets = calloc(
-	    model->transcripts.transcript_count + 1u,
+	rows = sorted = NULL;
+	row_count = row_capacity = 0;
+	model->peptide_edit_offsets = calloc(transcript_count + 1u,
 	    sizeof(*model->peptide_edit_offsets));
-	if (model->peptide_edit_offsets == NULL) {
+	offsets = calloc(transcript_count + 1u, sizeof(*offsets));
+	if (model->peptide_edit_offsets == NULL || offsets == NULL) {
+		free(offsets);
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory loading peptide-edit row offsets");
 		return 0;
 	}
 	if (!duckvep_query_result_open(connection, query, &query_result, error,
-	    error_size))
+	    error_size)) {
+		free(offsets);
 		return 0;
-	have_previous = 0;
-	previous_transcript = 0;
-	previous_position = 0;
+	}
 	ok = 0;
 	if (!duckvep_result_schema(&query_result.result, names, types, 3,
 	    SIZE_MAX, error, error_size))
@@ -1798,21 +2075,21 @@ duckvep_load_peptide_edits(duckdb_connection connection, const char *query,
 		duckdb_vector vectors[3];
 		uint32_t *transcript_indices, *positions;
 		duckdb_string_t *alternates;
-		idx_t row, rows;
+		idx_t row, count;
 		size_t column;
 
-		rows = duckdb_data_chunk_get_size(chunk);
+		count = duckdb_data_chunk_get_size(chunk);
 		for (column = 0; column < 3; column++)
 			vectors[column] = duckdb_data_chunk_get_vector(chunk,
 			    (idx_t)column);
 		transcript_indices = duckdb_vector_get_data(vectors[0]);
 		positions = duckdb_vector_get_data(vectors[1]);
 		alternates = duckdb_vector_get_data(vectors[2]);
-		for (row = 0; row < rows; row++) {
+		for (row = 0; row < count; row++) {
+			duckvep_peptide_row_t record;
 			const char *alternate;
 			uint32_t transcript_index, position;
 			uint32_t alternate_length;
-			size_t edit_index;
 			uint8_t amino_acid;
 
 			for (column = 0; column < 3; column++) {
@@ -1826,13 +2103,9 @@ duckvep_load_peptide_edits(duckdb_connection connection, const char *query,
 			}
 			transcript_index = transcript_indices[row];
 			position = positions[row];
-			if (transcript_index >= model->transcripts.transcript_count ||
-			    (have_previous &&
-			    (transcript_index < previous_transcript ||
-			    (transcript_index == previous_transcript &&
-			    position <= previous_position)))) {
+			if (transcript_index >= transcript_count) {
 				duckvep_sql_set_error(error, error_size,
-				    "peptide-edit query must be ordered and unique by transcript_index and protein_position");
+				    "peptide-edit transcript_index is outside the loaded transcript range");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
@@ -1849,32 +2122,55 @@ duckvep_load_peptide_edits(duckdb_connection connection, const char *query,
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			edit_index = model->peptide_edit_count;
-			if (edit_index == (size_t)UINT32_MAX ||
-			    !duckvep_model_reserve_peptide_edits(model,
-			    edit_index + 1u)) {
+			record.transcript = transcript_index;
+			record.position = position;
+			record.amino_acid = amino_acid;
+			if (row_count == (size_t)UINT32_MAX ||
+			    !duckvep_rows_append((void **)&rows, &row_count,
+			    &row_capacity, sizeof(record), &record)) {
 				duckvep_sql_set_error(error, error_size,
 				    "peptide-edit side relation exceeds the uint32 model limit");
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			model->peptide_edit_positions[edit_index] = position;
-			model->peptide_edit_alts[edit_index] = amino_acid;
-			model->peptide_edit_offsets[transcript_index + 1u]++;
-			model->peptide_edit_count++;
-			previous_transcript = transcript_index;
-			previous_position = position;
-			have_previous = 1;
+			offsets[transcript_index + 1u]++;
 		}
 		duckdb_destroy_data_chunk(&chunk);
 	}
-	for (transcript = 1u;
-	    transcript <= model->transcripts.transcript_count; transcript++) {
-		model->peptide_edit_offsets[transcript] +=
-		    model->peptide_edit_offsets[transcript - 1u];
+	sorted = duckvep_rows_group(rows, row_count, sizeof(*rows),
+	    transcript_count, offsets);
+	free(rows);
+	rows = NULL;
+	if (sorted == NULL ||
+	    !duckvep_model_reserve_peptide_edits(model, row_count)) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory ordering peptide edits");
+		goto done;
 	}
+	for (i = 0; i < transcript_count; i++) {
+		size_t k;
+
+		qsort(sorted + offsets[i], offsets[i + 1u] - offsets[i],
+		    sizeof(*sorted), duckvep_peptide_row_compare);
+		for (k = offsets[i]; k < offsets[i + 1u]; k++) {
+			if (k != offsets[i] &&
+			    sorted[k].position == sorted[k - 1u].position) {
+				duckvep_sql_set_error(error, error_size,
+				    "peptide-edit query must be unique by transcript_index and protein_position");
+				goto done;
+			}
+			model->peptide_edit_positions[k] = sorted[k].position;
+			model->peptide_edit_alts[k] = sorted[k].amino_acid;
+		}
+	}
+	for (i = 0; i <= transcript_count; i++)
+		model->peptide_edit_offsets[i] = (uint32_t)offsets[i];
+	model->peptide_edit_count = row_count;
 	ok = 1;
 done:
+	free(rows);
+	free(sorted);
+	free(offsets);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
@@ -1895,16 +2191,32 @@ duckvep_load_interval_features(duckdb_connection connection,
 	};
 	duckvep_query_result_t query_result;
 	duckdb_data_chunk chunk;
-	uint32_t previous_seq_region, previous_start;
-	int have_previous, ok;
+	size_t expected, received, i;
+	uint8_t *seen;
+	int ok;
 
-	if (!duckvep_query_result_open(connection, query, &query_result, error,
-	    error_size))
+	if (!duckvep_query_count(connection, query, &expected, error, error_size))
 		return 0;
+	if (expected > UINT32_MAX ||
+	    (expected != 0 && !duckvep_model_reserve_interval_features(model,
+	    expected))) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory loading interval features");
+		return 0;
+	}
+	seen = calloc(expected == 0 ? 1u : expected, 1u);
+	if (seen == NULL) {
+		duckvep_sql_set_error(error, error_size,
+		    "out of memory loading interval features");
+		return 0;
+	}
+	if (!duckvep_query_result_open(connection, query, &query_result, error,
+	    error_size)) {
+		free(seen);
+		return 0;
+	}
 	ok = 0;
-	have_previous = 0;
-	previous_seq_region = 0u;
-	previous_start = 0u;
+	received = 0;
 	if (!duckvep_result_schema(&query_result.result, names, types, 5,
 	    SIZE_MAX, error, error_size))
 		goto done;
@@ -1938,11 +2250,10 @@ duckvep_load_interval_features(duckdb_connection connection,
 					goto done;
 				}
 			}
-			index = model->interval_feature_count;
+			index = indices[row];
 			sequence_length = 0u;
 			circular = 0;
-			if ((uint64_t)index > UINT32_MAX ||
-			    indices[row] != (uint32_t)index ||
+			if (index >= expected || seen[index] ||
 			    seq_regions[row] > UINT16_MAX || starts[row] == 0u ||
 			    ends[row] == 0u ||
 			    (kinds[row] !=
@@ -1959,22 +2270,6 @@ duckvep_load_interval_features(duckdb_connection connection,
 				duckdb_destroy_data_chunk(&chunk);
 				goto done;
 			}
-			if (have_previous &&
-			    (seq_regions[row] < previous_seq_region ||
-			    (seq_regions[row] == previous_seq_region &&
-			    starts[row] < previous_start))) {
-				duckvep_sql_set_error(error, error_size,
-				    "interval-feature query must be ordered by seq_region, feature_start, and regulation_feature_index");
-				duckdb_destroy_data_chunk(&chunk);
-				goto done;
-			}
-			if (!duckvep_model_reserve_interval_features(model,
-			    index + 1u)) {
-				duckvep_sql_set_error(error, error_size,
-				    "out of memory loading interval features");
-				duckdb_destroy_data_chunk(&chunk);
-				goto done;
-			}
 			if (starts[row] > ends[row])
 				model->has_wrapped_coordinates = 1;
 			model->interval_feature_seq_regions[index] =
@@ -1982,15 +2277,32 @@ duckvep_load_interval_features(duckdb_connection connection,
 			model->interval_feature_starts[index] = starts[row];
 			model->interval_feature_ends[index] = ends[row];
 			model->interval_feature_kinds[index] = kinds[row];
-			model->interval_feature_count++;
-			previous_seq_region = seq_regions[row];
-			previous_start = starts[row];
-			have_previous = 1;
+			seen[index] = 1u;
+			received++;
 		}
 		duckdb_destroy_data_chunk(&chunk);
 	}
+	if (received != expected) {
+		duckvep_sql_set_error(error, error_size,
+		    "interval-feature row has an invalid dense index, region, coordinate, or kind");
+		goto done;
+	}
+	for (i = 1u; i < expected; i++) {
+		if (model->interval_feature_seq_regions[i] <
+		    model->interval_feature_seq_regions[i - 1u] ||
+		    (model->interval_feature_seq_regions[i] ==
+		    model->interval_feature_seq_regions[i - 1u] &&
+		    model->interval_feature_starts[i] <
+		    model->interval_feature_starts[i - 1u])) {
+			duckvep_sql_set_error(error, error_size,
+			    "interval-feature query must be ordered by seq_region, feature_start, and regulation_feature_index");
+			goto done;
+		}
+	}
+	model->interval_feature_count = expected;
 	ok = 1;
 done:
+	free(seen);
 	duckvep_query_result_close(&query_result);
 	return ok;
 }
