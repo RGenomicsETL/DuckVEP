@@ -81,7 +81,7 @@ typedef struct {
 /* Versioned coding-v1 status of one completed leaf. ELIGIBLE means the leaf is inside
  * the supported domain but its whole-haplotype consequence needs a classifier that has
  * not landed (no path is left in this state since the start/stop classifier); PREDICTED means the
- * same-codon, frame/stop-gain or start/stop classifier decided it and leaf.haplotype_so_mask is authoritative. No NMD is predicted yet.
+ * same-codon, frame/stop-gain or start/stop classifier decided it and leaf.haplotype_so_mask is authoritative.
  * Failures keep every contributor. */
 typedef enum {
     DUCKVEP_PREDICTION_ELIGIBLE = 0,
@@ -119,6 +119,20 @@ typedef enum {
     /* No longer emitted since slice 5 (every eligible path is decided); kept so the numbering is stable. */
     DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING
 } duckvep_prediction_reason_t;
+
+/* Whole-haplotype NMD prediction under rule ejc50-v1 (coding-v1 slice 6). An EJC-distance heuristic on the
+ * edited spliced transcript only: no reinitiation, no long-exon exception, no NMD_transcript_variant biotype
+ * term, and not the single-allele VEP NMD plugin. UNKNOWN (zero) is every path that is not PREDICTED, a
+ * lost start, an edited CDS with no stop (termination unavailable) and incomplete exon topology;
+ * NOT_APPLICABLE is a reference lane and known termination without a newly premature stop. */
+#define DUCKVEP_HAPLOTYPE_NMD_RULE "ejc50-v1"
+#define DUCKVEP_HAPLOTYPE_NMD_THRESHOLD 50
+typedef enum {
+    DUCKVEP_HAPLOTYPE_NMD_UNKNOWN = 0,
+    DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE,
+    DUCKVEP_HAPLOTYPE_NMD_ESCAPE,
+    DUCKVEP_HAPLOTYPE_NMD_TRIGGER
+} duckvep_haplotype_nmd_t;
 
 /* Contributor role in the completed leaf. Every contributor is retained. */
 typedef enum {
@@ -244,6 +258,13 @@ typedef struct {
      * the reduced whole-protein SO set as DUCKVEP_SO() bits, empty for a lane equal to the
      * reference (which has no IMPACT). */
     uint64_t haplotype_so_mask;
+    /* Slice 6: ejc50-v1. S is the final nucleotide of the first stop codon and J the final nucleotide of the
+     * penultimate exon, both 1-based in edited spliced-transcript (cDNA, 5' UTR included) coordinates. Each is
+     * valid only when its flag is set: S for a newly premature stop, J additionally for a multi-exon
+     * transcript. The contributors that put the stop there are those with role APPLIED. */
+    duckvep_haplotype_nmd_t nmd;
+    uint8_t nmd_stop_valid, nmd_junction_valid;
+    uint64_t nmd_stop_position1, nmd_junction_position1;
     /* Ascending-CDS edit islands with source IDs, in stream buffers edits/edit_event_ids.
      * Listed for known sequences and for failed decoded-call leaves, so conflicts and
      * omitted or post-stop sources stay attributable. */

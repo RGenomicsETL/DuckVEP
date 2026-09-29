@@ -720,6 +720,82 @@ static int same_peptide(const duckvep_haplotype_stream_t *s, const duckvep_haplo
     return ref_n == first_stop - 1u && !memcmp(leaf->reference_coding_protein, s->buffers.protein, ref_n);
 }
 
+/* ejc50-v1 (coding-v1 slice 6), decided on the edited spliced transcript of the shared path and never per
+ * allele. The 5' UTR is not edited (only CDS edits are applied), so the edited stop sits at the CDS cDNA origin
+ * plus its edited CDS offset, and the penultimate exon's last base moves by the length change of every edit
+ * that starts at or before it: indels upstream and inside that exon shift J, indels after it (the last exon)
+ * do not, and an insertion between the two exons belongs to the last exon. Edits after the stop are part of
+ * the edited transcript, so a post-stop indel before J shifts J (S never moves); one at or after J leaves the
+ * prediction unchanged. Unresolvable exon topology is unknown, never a guess. */
+static void nmd_ejc50(const duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf, uint64_t mask,
+                      size_t first_stop) {
+    const duckvep_transcript_model_t *m = s->carriers.model;
+    const duckvep_exon_model_t *x = s->exons;
+    leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_UNKNOWN;
+    leaf->nmd_stop_valid = leaf->nmd_junction_valid = 0u;
+    if (mask & DUCKVEP_SO(DUCKVEP_SO_START_LOST)) return;          /* lost initiation */
+    if (!first_stop) return;                                        /* no termination: run-off, stop_lost */
+    if (!(mask & DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED))) {             /* known termination, nothing premature */
+        leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE;
+        return;
+    }
+    uint32_t tx = leaf->carriers.transcript_index;
+    if (!m || !x || !m->exon_offset || !m->exon_count || !x->cdna_start1 || !x->cdna_end1 || !x->start1 ||
+        !x->end1 || !m->strand || !m->cds_start1 || !m->cds_end1) return;
+    size_t ref_length = s->sequences->cds_length[tx];
+    size_t n = m->exon_count[tx], first = m->exon_offset[tx];
+    if (!n || first > x->exon_count || n > x->exon_count - first) return;
+    /* cDNA position of the first CDS base: the model's cache when present, else from the exon holding it. */
+    uint64_t origin = m->cds_cdna_start1 ? m->cds_cdna_start1[tx] : 0u;
+    if (!origin) {
+        uint32_t coding_first = m->strand[tx] < 0 ? m->cds_end1[tx] : m->cds_start1[tx];
+        for (size_t i = first; i < first + n && !origin; i++)
+            if (coding_first >= x->start1[i] && coding_first <= x->end1[i])
+                origin = (uint64_t)x->cdna_start1[i] + (m->strand[tx] < 0 ? x->end1[i] - coding_first
+                                                                            : coding_first - x->start1[i]);
+    }
+    if (!origin) return;
+    uint64_t stop = origin + (uint64_t)first_stop * 3u - 1u;
+    uint64_t total = 0u, last_start = 0u, pen_start = 0u, last_end = 0u, pen_end = 0u;
+    for (size_t i = first; i < first + n; i++) {
+        uint64_t a = x->cdna_start1[i], z = x->cdna_end1[i];
+        if (!a || z < a) return;
+        total += z - a + 1u;
+        if (a > last_start) { pen_start = last_start; pen_end = last_end; last_start = a; last_end = z; }
+        else if (a > pen_start) { pen_start = a; pen_end = z; }
+    }
+    /* Exons tile the spliced transcript from cDNA 1 without gaps or overlaps, and hold the CDS. */
+    if (total != last_end || (n > 1u && (!pen_start || pen_end + 1u != last_start)) ||
+        origin + ref_length - 1u > last_end) return;
+    leaf->nmd_stop_position1 = stop;
+    leaf->nmd_stop_valid = 1u;
+    if (n == 1u) {                                                  /* intronless: no junction, always escapes */
+        leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_ESCAPE;
+        return;
+    }
+    const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
+    int64_t junction = (int64_t)pen_end, last_size = (int64_t)(last_end - last_start + 1u),
+            pen_size = (int64_t)(pen_end - pen_start + 1u);
+    for (size_t i = 0u; i < leaf->edit_count; i++) {
+        const duckvep_haplotype_edit_t *e = &b->edits[i];
+        uint64_t q0 = origin + (uint64_t)e->cds_start - 1u;
+        int64_t change = (int64_t)e->alt_len - (int64_t)e->ref_len;
+        if (q0 <= pen_end) {
+            if (e->ref_len && q0 + e->ref_len - 1u > pen_end) return; /* an edit may not span the junction */
+            junction += change;
+            if (q0 >= pen_start) pen_size += change;
+        } else if (q0 >= last_start) {
+            if (e->ref_len && q0 + e->ref_len - 1u > last_end) return;
+            last_size += change;
+        }
+    }
+    if (pen_size <= 0 || last_size <= 0 || junction < 1) return;   /* an exon was deleted whole */
+    leaf->nmd_junction_position1 = (uint64_t)junction;
+    leaf->nmd_junction_valid = 1u;
+    leaf->nmd = junction - (int64_t)stop > DUCKVEP_HAPLOTYPE_NMD_THRESHOLD ? DUCKVEP_HAPLOTYPE_NMD_TRIGGER
+                                                                            : DUCKVEP_HAPLOTYPE_NMD_ESCAPE;
+}
+
 static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf) {
     if (leaf->path_status != DUCKVEP_PREDICTION_ELIGIBLE || !leaf->cds || leaf->ordered_replacements) return;
     const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
@@ -729,6 +805,7 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
         if (alt_length != ref_length || memcmp(leaf->cds, leaf->reference_cds, ref_length)) return;
         leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
         leaf->haplotype_so_mask = 0u;
+        leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE; /* a reference lane has no termination change */
         return;
     }
     if (!leaf->reference_coding_protein || !leaf->reference_cds || ref_length % 3u || ref_length < 6u ||
@@ -799,6 +876,7 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
     }
     leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
     leaf->haplotype_so_mask = mask;
+    nmd_ejc50(s, leaf, mask, first_stop);
 }
 
 /* Runs on every leaf after sequence construction. It changes no existing field except
