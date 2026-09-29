@@ -1,6 +1,6 @@
 key	value
-run_id	scale-20260929T204055Z-242740
-started_utc	2026-09-29T20:40:55Z
+run_id	scale-20260929T205000Z-275080
+started_utc	2026-09-29T20:50:00Z
 host	Ubuntu-2404-noble-amd64-base
 kernel	6.8.0-78-generic
 cores	12
@@ -13,12 +13,13 @@ panel_sha256	51af4833b5cee778e2f8bcf68ea8fc714d2f813b541829a436bf9fb4c2bd82f4
 model	/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb
 model_sha256	0301905915b038b6b1f5db04d7dda1041ac5e30a7732ec700dd82b1616402c1b
 extension	/root/duckvep/wt-scale6/build/release/extension/duckvep/duckvep.duckdb_extension
-extension_sha256	ab23ed5c0f6066991db7f97c6e8fbf18fd454c6d4d5d9dc3e11ebfd843d2b5ff
-git_revision	290d13a28781e065a2fe24c1e1a2a27672e5a020
-git_dirty	5
+extension_sha256	fb567cbca680237ad5402a31357b9e3ee2566e80adc5d917413783c8c2704480
+git_revision	0691d2d0b5b02cc86d6ae4f19b71adbbf74a936a
+git_dirty	0
 cgroup_mode	systemd
 enforced	yes
 oversubscribed	0
+regulation	1
 min_free_gib	50
 threads_per_job	6
 modes	compact,complete17
@@ -30,7 +31,7 @@ max_temp_bytes	4294967296
 native_budget_mib	4096
 workers	6
 scratch_mib	128
-emit_mib	128
-loadavg_at_start	6.97 7.43 6.92
-wall_s	14.591
-finished_utc	2026-09-29T20:41:11Z
+emit_mib	256
+loadavg_at_start	6.19 5.91 6.15
+wall_s	17.359
+finished_utc	2026-09-29T20:50:18Z
