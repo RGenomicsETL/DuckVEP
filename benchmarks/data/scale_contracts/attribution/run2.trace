@@ -1,5 +1,5 @@
 Warning message:
-package ‘duckdb’ was built under R version 4.6.1 
+package ‘duckdb’ was built under R version 4.6.1
 load_trace	start	1790674524.023531999	112144	112144	0	0	0
 load_trace	query-open	1790674524.023807719	112144	112144	0	0	0
 load_trace	query-open	1790674524.024431238	114064	114064	0	0	0
