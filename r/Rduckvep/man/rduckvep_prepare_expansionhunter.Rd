@@ -2,44 +2,25 @@
 % Please edit documentation in R/expansionhunter.R
 \name{rduckvep_prepare_expansionhunter}
 \alias{rduckvep_prepare_expansionhunter}
-\title{Prepare a single-repeat ExpansionHunter v5 VCF allele}
+\title{Prepare ExpansionHunter v5 repeat alleles}
 \usage{
-rduckvep_prepare_expansionhunter(
-  info,
-  format,
-  sample,
-  ref,
-  alt,
-  reference_sequence,
-  alt_index = 1L
-)
+rduckvep_prepare_expansionhunter(con, input_table, reference_table, ...)
 }
 \arguments{
-\item{info}{VCF INFO text.}
+\item{con}{A connection with DuckVEP loaded.}
 
-\item{format}{VCF FORMAT keys.}
+\item{input_table}{Name of the caller's input relation.}
 
-\item{sample}{VCF sample values.}
+\item{reference_table}{Name of the literal reference relation.}
 
-\item{ref}{VCF REF padding base.}
-
-\item{alt}{Comma-separated VCF ALT field.}
-
-\item{reference_sequence}{Literal reference bases in the repeat interval.}
-
-\item{alt_index}{One-based selected ALT index.}
+\item{...}{Named options for the native builder.}
 }
 \value{
-A list with status, reason, source, reference_components,
-  alternate_components, and sequence_exact. Components have columns
-  `unit` and `count`, in reference order, for `duckvep_repeat_alleles`.
+A data frame with typed preparation rows.
 }
 \description{
-The supported contract is ExpansionHunter v5.0.0 INFO/REF, RL, RU, END,
-symbolic `<STRn>` ALT, and FORMAT/GT, SO with either CN/CI or REPCN/REPCI. The caller supplies
-the literal reference interval from POS+1 through END (excluding the VCF
-padding base). An ALT is accepted only if a called, spanning allele has a
-point confidence interval matching its symbolic copy number. Other records
-retain their source and a stable preparation reason; no symbolic sequence is
-treated as an observed literal allele.
+The input relation has `event_index`, `info`, `format`, `sample`, `ref`,
+`alt`, and one-based `alt_index`. The reference relation has `event_index`
+and the literal `reference_sequence` from POS+1 through END. Each input
+event retains its source, preparation reason and exactness decision.
 }

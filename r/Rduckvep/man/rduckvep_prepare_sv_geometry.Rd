@@ -2,28 +2,23 @@
 % Please edit documentation in R/structural_geometry.R
 \name{rduckvep_prepare_sv_geometry}
 \alias{rduckvep_prepare_sv_geometry}
-\title{Prepare VEP 116 VCF structural geometry and insertion provenance}
+\title{Prepare VCF structural geometry and insertion provenance}
 \usage{
-rduckvep_prepare_sv_geometry(pos, ref, alt, info)
+rduckvep_prepare_sv_geometry(con, input_table, ...)
 }
 \arguments{
-\item{pos}{One-based VCF POS.}
+\item{con}{A connection with DuckVEP loaded.}
 
-\item{ref}{VCF REF.}
+\item{input_table}{Name of the caller's input relation.}
 
-\item{alt}{One VCF ALT.}
-
-\item{info}{VCF INFO text.}
+\item{...}{Named options for the native builder.}
 }
 \value{
-A one-row data frame with status, mode, nominal and confidence
-  coordinates, inserted_sequence, and source_sequence. Join by the caller's
-  event identifier to annotations produced by `duckvep_annotate_sql`.
+A data frame with one typed preparation row per input event.
 }
 \description{
-For symbolic alleles the VCF padding base is outside the affected interval.
-Confidence bounds are VEP 116's inner/outer coordinates; annotation uses
-nominal start/end. The supported symbolic contract has a one-base A/C/G/T/N
-padding REF, an integral END, and coordinates within signed 32-bit range. A literal anchored insertion takes the small-variant path
-and carries its inserted bases; INFO/SEQ on a symbolic INS is provenance only.
+The input relation has `event_index`, `pos`, `ref`, `alt`, and `info`.
+Symbolic alleles retain breakpoint confidence bounds separately from the
+nominal coordinates. Literal anchored insertions carry inserted bases;
+symbolic INFO/SEQ is source provenance, not a literal insertion.
 }

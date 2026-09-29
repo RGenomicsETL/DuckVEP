@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages({ library(DBI); library(duckdb); library(jsonlite) })
+source("r/Rduckvep/R/builders.R")
 source("r/Rduckvep/R/structural_geometry.R")
 vcf <- "test/duckvep/conformance/data/sv_payload_grch38.vcf"
 fasta <- "/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
@@ -9,8 +10,24 @@ stopifnot(identical(tail(system2("samtools", c("faidx", fasta,
   "21:13546123-13546123"), stdout = TRUE), 1L), "G"))
 lines <- grep("^21\\t", readLines(vcf), value = TRUE)
 records <- lapply(lines, function(line) strsplit(line, "\t", fixed = TRUE)[[1L]])
-geometry <- do.call(rbind, lapply(records, function(row)
-  rduckvep_prepare_sv_geometry(as.numeric(row[2L]), row[4L], row[5L], row[8L])))
+directory <- tempfile("sv-vep116-")
+dir.create(directory)
+binary <- file.path(directory, "duckvep.duckdb_extension")
+stopifnot(file.copy("build/release/duckvep.duckdb_extension", binary))
+con <- dbConnect(duckdb(shared_home = FALSE,
+  config = list(allow_unsigned_extensions = "true")))
+q <- function(value) as.character(dbQuoteString(con, value))
+dbExecute(con, paste("LOAD", q(binary)))
+prepare <- function(rows) {
+  dbWriteTable(con, "sv_prepare_input", data.frame(
+    event_index = seq_along(rows) - 1L,
+    pos = vapply(rows, function(x) as.numeric(x[2L]), 0),
+    ref = vapply(rows, function(x) x[4L], ""),
+    alt = vapply(rows, function(x) x[5L], ""),
+    info = vapply(rows, function(x) x[8L], "")), temporary = TRUE, overwrite = TRUE)
+  rduckvep_prepare_sv_geometry(con, "sv_prepare_input")
+}
+geometry <- prepare(records)
 stopifnot(all(geometry$status == "ok"),
   identical(geometry$nominal_start, rep(13546124, 3)),
   identical(geometry$nominal_end, rep(13546123, 3)),
@@ -22,22 +39,13 @@ stopifnot(all(geometry$status == "ok"),
   identical(geometry$source_sequence[2L], "ATG"),
   is.na(geometry$inserted_sequence[2L]))
 local({
-  directory <- tempfile("sv-vep116-")
-  dir.create(directory)
-  on.exit(unlink(directory, recursive = TRUE), add = TRUE)
+  on.exit({dbDisconnect(con, shutdown = TRUE); unlink(directory, recursive = TRUE)}, add = TRUE)
   oracle <- file.path(directory, "oracle.json")
   rc <- system2("scripts/run_species_vep116_docker.sh", c("homo_sapiens", "GRCh38",
     "116", cache, fasta, vcf, oracle))
   stopifnot(identical(rc, 0L))
   vep <- lapply(readLines(oracle), fromJSON, simplifyVector = FALSE)
   stopifnot(length(vep) == 3L)
-  directory_binary <- file.path(directory, "duckvep.duckdb_extension")
-  stopifnot(file.copy("build/release/duckvep.duckdb_extension", directory_binary))
-  con <- dbConnect(duckdb(shared_home = FALSE,
-    config = list(allow_unsigned_extensions = "true")))
-  on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
-  q <- function(value) as.character(dbQuoteString(con, value))
-  dbExecute(con, paste("LOAD", q(directory_binary)))
   dbExecute(con, paste("ATTACH", q(model), "AS m (READ_ONLY)"))
   region <- dbGetQuery(con, "SELECT seq_region FROM m.bench_regions WHERE chrom='21'")$seq_region
   stopifnot(length(region) == 1L)
@@ -107,10 +115,9 @@ local({
   for (i in seq.int(1L, 12L, by = 2L)) {
     nominal <- strsplit(confidence_rows[[i]], "\t", fixed = TRUE)[[1L]]
     uncertain <- strsplit(confidence_rows[[i + 1L]], "\t", fixed = TRUE)[[1L]]
-    a <- rduckvep_prepare_sv_geometry(as.numeric(nominal[2L]), nominal[4L],
-      nominal[5L], nominal[8L])
-    b <- rduckvep_prepare_sv_geometry(as.numeric(uncertain[2L]), uncertain[4L],
-      uncertain[5L], uncertain[8L])
+    pair <- prepare(list(nominal, uncertain))
+    a <- pair[1L, ]
+    b <- pair[2L, ]
     stopifnot(identical(a$status, "ok"), identical(b$status, "ok"),
       is.na(a$outer_start), !is.na(b$outer_start), !is.na(b$outer_end),
       a$nominal_start == b$nominal_start,

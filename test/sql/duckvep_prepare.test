@@ -1,0 +1,86 @@
+require duckvep
+
+statement ok
+CREATE TEMP TABLE "sv"";λ" (event_index INTEGER, pos BIGINT, ref VARCHAR, alt VARCHAR, info VARCHAR);
+
+statement ok
+INSERT INTO "sv"";λ" VALUES
+(0, 13546123, 'G', '<INS>', 'SVTYPE=INS;END=13546123'),
+(1, 13546123, 'G', '<INS>', 'SVTYPE=INS;END=13546123;CIPOS=-2,0;CIEND=0,2;SEQ=ATG'),
+(2, 13546123, 'G', 'GATG', '.'),
+(3, 20, 'A', '<DEL>', 'END=22;CIPOS=3,-3'),
+(4, 20, 'AC', '<DEL>', 'END=22'),
+(5, 20, 'A', '<DEL>', 'END=20.5'),
+(6, 20, 'A', '<DEL>', 'END=19'),
+(7, 2147483647, 'A', 'AT', '.');
+
+query IIIIIII
+SELECT count(*), count(*) FILTER (WHERE status='ok'),
+  count(*) FILTER (WHERE status='unsupported_geometry'),
+  count(*) FILTER (WHERE mode='literal_insertion' AND inserted_sequence='ATG'),
+  count(*) FILTER (WHERE outer_start=13546122 AND outer_end=13546125 AND source_sequence='ATG'),
+  count(*) FILTER (WHERE nominal_start=13546124 AND nominal_end=13546123),
+  count(*) FILTER (WHERE status='ok' AND inserted_sequence IS NULL)
+FROM query(duckvep_prepare_sv_geometry_sql('sv";λ'));
+----
+8	3	5	1	1	3	2
+
+query II
+SELECT contains(duckvep_prepare_sv_geometry_sql('sv";λ'), '"sv"";λ"'),
+ duckvep_prepare_sv_geometry_sql('sv";λ') = duckvep_prepare_sv_geometry_sql('sv";λ');
+----
+1	1
+
+statement error
+SELECT duckvep_prepare_sv_geometry_sql('sv', {bogus: 1});
+----
+unknown option 'bogus'
+
+statement ok
+CREATE TEMP TABLE "eh"";λ" (event_index INTEGER, info VARCHAR, format VARCHAR,
+  "sample" VARCHAR, ref VARCHAR, alt VARCHAR, alt_index DOUBLE);
+
+statement ok
+CREATE TEMP TABLE "lit"";λ" (event_index INTEGER, reference_sequence VARCHAR);
+
+statement ok
+INSERT INTO "eh"";λ" VALUES
+(0, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 1),
+(1, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 2),
+(2, 'END=2008;REF=1;RL=1;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 1),
+(3, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:1-3/10-10', 'C', '<STR2>,<STR10>', 1),
+(4, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '0/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 1),
+(5, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 3),
+(6, 'END=27573544;REF=3;RL=18;RU=GGCCCC', 'GT:SO:CN:CI', '1/2:SPANNING/INREPEAT:2/349:2-2/323-376', 'C', '<STR2>,<STR349>', 1),
+(7, 'END=27573544;REF=3;RL=18;RU=GGCCCC', 'GT:SO:CN:CI', '1/2:SPANNING/INREPEAT:2/349:2-2/323-376', 'C', '<STR2>,<STR349>', 2);
+
+statement ok
+INSERT INTO "lit"";λ" SELECT event_index, CASE WHEN event_index >= 6 THEN repeat('GGCCCC',3) ELSE 'CAG' END FROM "eh"";λ";
+
+query IIII
+SELECT count(*) FILTER (WHERE status='ok'),
+ count(*) FILTER (WHERE reason='reference_mismatch'),
+ count(*) FILTER (WHERE status='summary_only'),
+ count(*) FILTER (WHERE reason='alt_index')
+FROM query(duckvep_prepare_expansionhunter_sql('eh";λ','lit";λ'));
+----
+3	1	3	1
+
+query III
+SELECT reference_components.count, alternate_components.count, sequence_exact
+FROM query(duckvep_prepare_expansionhunter_sql('eh";λ','lit";λ'))
+WHERE event_index=6;
+----
+3	2	1
+
+query II
+SELECT contains(duckvep_prepare_expansionhunter_sql('eh";λ','lit";λ'), '"eh"";λ"'),
+ duckvep_prepare_expansionhunter_sql('eh";λ','lit";λ') =
+ duckvep_prepare_expansionhunter_sql('eh";λ','lit";λ');
+----
+1	1
+
+statement error
+SELECT duckvep_prepare_expansionhunter_sql('eh";λ','lit";λ', {bogus: 1});
+----
+unknown option 'bogus'
