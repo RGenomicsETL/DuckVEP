@@ -36,3 +36,11 @@ _site/
 # Scratch databases the SQL tests create under __TEST_DIR__
 test/sql/*.duckdb
 test/sql/*.duckdb.wal
+test/sql/*.duckdb
+test/sql/*.duckdb.wal
+test/sql/circular_*.fa
+test/sql/circular_*.fa.fai
+test/sql/linear_*.fa
+test/sql/linear_*.fa.fai
+test/sql/mt.fa
+test/sql/mt.fa.fai
