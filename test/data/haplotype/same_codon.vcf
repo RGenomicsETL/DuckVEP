@@ -1,0 +1,369 @@
+##fileformat=VCFv4.2
+##contig=<ID=plus_1exon__cis_syn_pair_only_together,length=104>
+##contig=<ID=plus_1exon__trans_control_of_syn_pair,length=104>
+##contig=<ID=plus_1exon__cis_mis_pair,length=104>
+##contig=<ID=plus_1exon__cis_syn_pair_r,length=104>
+##contig=<ID=plus_1exon__cis_mnv_record,length=104>
+##contig=<ID=plus_1exon__cis_three_snv_codon,length=104>
+##contig=<ID=plus_1exon__hom_alt_snv,length=104>
+##contig=<ID=plus_1exon__ins_at_codon_boundary,length=104>
+##contig=<ID=plus_1exon__ins_inside_codon_pure,length=104>
+##contig=<ID=plus_1exon__ins_inside_codon_altering,length=104>
+##contig=<ID=plus_1exon__del_whole_codon,length=104>
+##contig=<ID=plus_1exon__del_inside_codons_pure,length=104>
+##contig=<ID=plus_1exon__delins_inframe,length=104>
+##contig=<ID=plus_1exon__far_syn_and_missense,length=104>
+##contig=<ID=plus_1exon__far_syn_and_syn,length=104>
+##contig=<ID=plus_1exon__far_missense_and_missense,length=104>
+##contig=<ID=plus_1exon__two_far_insertions,length=104>
+##contig=<ID=plus_1exon__insertion_and_deletion_far,length=104>
+##contig=<ID=plus_1exon__two_far_deletions,length=104>
+##contig=<ID=plus_1exon__stop_created_by_pair,length=104>
+##contig=<ID=plus_1exon__start_lost_by_pair,length=104>
+##contig=<ID=plus_1exon__stop_lost_by_pair,length=104>
+##contig=<ID=plus_1exon__stop_retained_single,length=104>
+##contig=<ID=plus_2exon__cis_syn_pair_only_together,length=144>
+##contig=<ID=plus_2exon__trans_control_of_syn_pair,length=144>
+##contig=<ID=plus_2exon__cis_mis_pair,length=144>
+##contig=<ID=plus_2exon__cis_syn_pair_r,length=144>
+##contig=<ID=plus_2exon__cis_mnv_record,length=144>
+##contig=<ID=plus_2exon__cis_three_snv_codon,length=144>
+##contig=<ID=plus_2exon__hom_alt_snv,length=144>
+##contig=<ID=plus_2exon__ins_at_codon_boundary,length=144>
+##contig=<ID=plus_2exon__ins_inside_codon_pure,length=144>
+##contig=<ID=plus_2exon__ins_inside_codon_altering,length=144>
+##contig=<ID=plus_2exon__del_whole_codon,length=144>
+##contig=<ID=plus_2exon__del_inside_codons_pure,length=144>
+##contig=<ID=plus_2exon__delins_inframe,length=144>
+##contig=<ID=plus_2exon__far_syn_and_missense,length=144>
+##contig=<ID=plus_2exon__far_syn_and_syn,length=144>
+##contig=<ID=plus_2exon__far_missense_and_missense,length=144>
+##contig=<ID=plus_2exon__two_far_insertions,length=144>
+##contig=<ID=plus_2exon__insertion_and_deletion_far,length=144>
+##contig=<ID=plus_2exon__two_far_deletions,length=144>
+##contig=<ID=plus_2exon__stop_created_by_pair,length=144>
+##contig=<ID=plus_2exon__start_lost_by_pair,length=144>
+##contig=<ID=plus_2exon__stop_lost_by_pair,length=144>
+##contig=<ID=plus_2exon__stop_retained_single,length=144>
+##contig=<ID=plus_3exon__cis_syn_pair_only_together,length=184>
+##contig=<ID=plus_3exon__trans_control_of_syn_pair,length=184>
+##contig=<ID=plus_3exon__cis_mis_pair,length=184>
+##contig=<ID=plus_3exon__cis_syn_pair_r,length=184>
+##contig=<ID=plus_3exon__cis_mnv_record,length=184>
+##contig=<ID=plus_3exon__cis_three_snv_codon,length=184>
+##contig=<ID=plus_3exon__hom_alt_snv,length=184>
+##contig=<ID=plus_3exon__ins_at_codon_boundary,length=184>
+##contig=<ID=plus_3exon__ins_inside_codon_pure,length=184>
+##contig=<ID=plus_3exon__ins_inside_codon_altering,length=184>
+##contig=<ID=plus_3exon__del_whole_codon,length=184>
+##contig=<ID=plus_3exon__del_inside_codons_pure,length=184>
+##contig=<ID=plus_3exon__delins_inframe,length=184>
+##contig=<ID=plus_3exon__far_syn_and_missense,length=184>
+##contig=<ID=plus_3exon__far_syn_and_syn,length=184>
+##contig=<ID=plus_3exon__far_missense_and_missense,length=184>
+##contig=<ID=plus_3exon__two_far_insertions,length=184>
+##contig=<ID=plus_3exon__insertion_and_deletion_far,length=184>
+##contig=<ID=plus_3exon__two_far_deletions,length=184>
+##contig=<ID=plus_3exon__stop_created_by_pair,length=184>
+##contig=<ID=plus_3exon__start_lost_by_pair,length=184>
+##contig=<ID=plus_3exon__stop_lost_by_pair,length=184>
+##contig=<ID=plus_3exon__stop_retained_single,length=184>
+##contig=<ID=minus_1exon__cis_syn_pair_only_together,length=104>
+##contig=<ID=minus_1exon__trans_control_of_syn_pair,length=104>
+##contig=<ID=minus_1exon__cis_mis_pair,length=104>
+##contig=<ID=minus_1exon__cis_syn_pair_r,length=104>
+##contig=<ID=minus_1exon__cis_mnv_record,length=104>
+##contig=<ID=minus_1exon__cis_three_snv_codon,length=104>
+##contig=<ID=minus_1exon__hom_alt_snv,length=104>
+##contig=<ID=minus_1exon__ins_at_codon_boundary,length=104>
+##contig=<ID=minus_1exon__ins_inside_codon_pure,length=104>
+##contig=<ID=minus_1exon__ins_inside_codon_altering,length=104>
+##contig=<ID=minus_1exon__del_whole_codon,length=104>
+##contig=<ID=minus_1exon__del_inside_codons_pure,length=104>
+##contig=<ID=minus_1exon__delins_inframe,length=104>
+##contig=<ID=minus_1exon__far_syn_and_missense,length=104>
+##contig=<ID=minus_1exon__far_syn_and_syn,length=104>
+##contig=<ID=minus_1exon__far_missense_and_missense,length=104>
+##contig=<ID=minus_1exon__two_far_insertions,length=104>
+##contig=<ID=minus_1exon__insertion_and_deletion_far,length=104>
+##contig=<ID=minus_1exon__two_far_deletions,length=104>
+##contig=<ID=minus_1exon__stop_created_by_pair,length=104>
+##contig=<ID=minus_1exon__start_lost_by_pair,length=104>
+##contig=<ID=minus_1exon__stop_lost_by_pair,length=104>
+##contig=<ID=minus_1exon__stop_retained_single,length=104>
+##contig=<ID=minus_2exon__cis_syn_pair_only_together,length=144>
+##contig=<ID=minus_2exon__trans_control_of_syn_pair,length=144>
+##contig=<ID=minus_2exon__cis_mis_pair,length=144>
+##contig=<ID=minus_2exon__cis_syn_pair_r,length=144>
+##contig=<ID=minus_2exon__cis_mnv_record,length=144>
+##contig=<ID=minus_2exon__cis_three_snv_codon,length=144>
+##contig=<ID=minus_2exon__hom_alt_snv,length=144>
+##contig=<ID=minus_2exon__ins_at_codon_boundary,length=144>
+##contig=<ID=minus_2exon__ins_inside_codon_pure,length=144>
+##contig=<ID=minus_2exon__ins_inside_codon_altering,length=144>
+##contig=<ID=minus_2exon__del_whole_codon,length=144>
+##contig=<ID=minus_2exon__del_inside_codons_pure,length=144>
+##contig=<ID=minus_2exon__delins_inframe,length=144>
+##contig=<ID=minus_2exon__far_syn_and_missense,length=144>
+##contig=<ID=minus_2exon__far_syn_and_syn,length=144>
+##contig=<ID=minus_2exon__far_missense_and_missense,length=144>
+##contig=<ID=minus_2exon__two_far_insertions,length=144>
+##contig=<ID=minus_2exon__insertion_and_deletion_far,length=144>
+##contig=<ID=minus_2exon__two_far_deletions,length=144>
+##contig=<ID=minus_2exon__stop_created_by_pair,length=144>
+##contig=<ID=minus_2exon__start_lost_by_pair,length=144>
+##contig=<ID=minus_2exon__stop_lost_by_pair,length=144>
+##contig=<ID=minus_2exon__stop_retained_single,length=144>
+##contig=<ID=minus_3exon__cis_syn_pair_only_together,length=184>
+##contig=<ID=minus_3exon__trans_control_of_syn_pair,length=184>
+##contig=<ID=minus_3exon__cis_mis_pair,length=184>
+##contig=<ID=minus_3exon__cis_syn_pair_r,length=184>
+##contig=<ID=minus_3exon__cis_mnv_record,length=184>
+##contig=<ID=minus_3exon__cis_three_snv_codon,length=184>
+##contig=<ID=minus_3exon__hom_alt_snv,length=184>
+##contig=<ID=minus_3exon__ins_at_codon_boundary,length=184>
+##contig=<ID=minus_3exon__ins_inside_codon_pure,length=184>
+##contig=<ID=minus_3exon__ins_inside_codon_altering,length=184>
+##contig=<ID=minus_3exon__del_whole_codon,length=184>
+##contig=<ID=minus_3exon__del_inside_codons_pure,length=184>
+##contig=<ID=minus_3exon__delins_inframe,length=184>
+##contig=<ID=minus_3exon__far_syn_and_missense,length=184>
+##contig=<ID=minus_3exon__far_syn_and_syn,length=184>
+##contig=<ID=minus_3exon__far_missense_and_missense,length=184>
+##contig=<ID=minus_3exon__two_far_insertions,length=184>
+##contig=<ID=minus_3exon__insertion_and_deletion_far,length=184>
+##contig=<ID=minus_3exon__two_far_deletions,length=184>
+##contig=<ID=minus_3exon__stop_created_by_pair,length=184>
+##contig=<ID=minus_3exon__start_lost_by_pair,length=184>
+##contig=<ID=minus_3exon__stop_lost_by_pair,length=184>
+##contig=<ID=minus_3exon__stop_retained_single,length=184>
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	S
+plus_1exon__cis_syn_pair_only_together	62	.	A	T	.	PASS	.	GT	1|0
+plus_1exon__cis_syn_pair_only_together	63	.	G	C	.	PASS	.	GT	1|0
+plus_1exon__trans_control_of_syn_pair	62	.	A	T	.	PASS	.	GT	1|0
+plus_1exon__trans_control_of_syn_pair	63	.	G	C	.	PASS	.	GT	0|1
+plus_1exon__cis_mis_pair	20	.	G	A	.	PASS	.	GT	1|0
+plus_1exon__cis_mis_pair	21	.	C	A	.	PASS	.	GT	1|0
+plus_1exon__cis_syn_pair_r	32	.	C	A	.	PASS	.	GT	1|0
+plus_1exon__cis_syn_pair_r	34	.	C	A	.	PASS	.	GT	1|0
+plus_1exon__cis_mnv_record	50	.	CA	GT	.	PASS	.	GT	1|0
+plus_1exon__cis_three_snv_codon	53	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__cis_three_snv_codon	54	.	G	C	.	PASS	.	GT	1|0
+plus_1exon__cis_three_snv_codon	55	.	G	C	.	PASS	.	GT	1|0
+plus_1exon__hom_alt_snv	21	.	C	A	.	PASS	.	GT	1|1
+plus_1exon__ins_at_codon_boundary	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_1exon__ins_inside_codon_pure	20	.	G	GCTG	.	PASS	.	GT	1|0
+plus_1exon__ins_inside_codon_altering	20	.	G	GAAA	.	PASS	.	GT	1|0
+plus_1exon__del_whole_codon	28	.	GAAA	G	.	PASS	.	GT	1|0
+plus_1exon__del_inside_codons_pure	68	.	CAGG	C	.	PASS	.	GT	1|0
+plus_1exon__delins_inframe	23	.	GAACTG	GGG	.	PASS	.	GT	1|0
+plus_1exon__far_syn_and_missense	21	.	C	G	.	PASS	.	GT	1|0
+plus_1exon__far_syn_and_missense	25	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__far_syn_and_syn	25	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__far_syn_and_syn	43	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__far_missense_and_missense	21	.	C	G	.	PASS	.	GT	1|0
+plus_1exon__far_missense_and_missense	54	.	G	C	.	PASS	.	GT	1|0
+plus_1exon__two_far_insertions	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_1exon__two_far_insertions	55	.	G	GACT	.	PASS	.	GT	1|0
+plus_1exon__insertion_and_deletion_far	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_1exon__insertion_and_deletion_far	70	.	GGAG	G	.	PASS	.	GT	1|0
+plus_1exon__two_far_deletions	28	.	GAAA	G	.	PASS	.	GT	1|0
+plus_1exon__two_far_deletions	70	.	GGAG	G	.	PASS	.	GT	1|0
+plus_1exon__stop_created_by_pair	45	.	T	A	.	PASS	.	GT	1|0
+plus_1exon__stop_created_by_pair	46	.	C	A	.	PASS	.	GT	1|0
+plus_1exon__start_lost_by_pair	17	.	A	C	.	PASS	.	GT	1|0
+plus_1exon__start_lost_by_pair	18	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_by_pair	86	.	T	C	.	PASS	.	GT	1|0
+plus_1exon__stop_lost_by_pair	87	.	A	G	.	PASS	.	GT	1|0
+plus_1exon__stop_retained_single	88	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__cis_syn_pair_only_together	62	.	A	T	.	PASS	.	GT	1|0
+plus_2exon__cis_syn_pair_only_together	103	.	G	C	.	PASS	.	GT	1|0
+plus_2exon__trans_control_of_syn_pair	62	.	A	T	.	PASS	.	GT	1|0
+plus_2exon__trans_control_of_syn_pair	103	.	G	C	.	PASS	.	GT	0|1
+plus_2exon__cis_mis_pair	20	.	G	A	.	PASS	.	GT	1|0
+plus_2exon__cis_mis_pair	21	.	C	A	.	PASS	.	GT	1|0
+plus_2exon__cis_syn_pair_r	32	.	C	A	.	PASS	.	GT	1|0
+plus_2exon__cis_syn_pair_r	34	.	C	A	.	PASS	.	GT	1|0
+plus_2exon__cis_mnv_record	50	.	CA	GT	.	PASS	.	GT	1|0
+plus_2exon__cis_three_snv_codon	53	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__cis_three_snv_codon	54	.	G	C	.	PASS	.	GT	1|0
+plus_2exon__cis_three_snv_codon	55	.	G	C	.	PASS	.	GT	1|0
+plus_2exon__hom_alt_snv	21	.	C	A	.	PASS	.	GT	1|1
+plus_2exon__ins_at_codon_boundary	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_2exon__ins_inside_codon_pure	20	.	G	GCTG	.	PASS	.	GT	1|0
+plus_2exon__ins_inside_codon_altering	20	.	G	GAAA	.	PASS	.	GT	1|0
+plus_2exon__del_whole_codon	28	.	GAAA	G	.	PASS	.	GT	1|0
+plus_2exon__del_inside_codons_pure	108	.	CAGG	C	.	PASS	.	GT	1|0
+plus_2exon__delins_inframe	23	.	GAACTG	GGG	.	PASS	.	GT	1|0
+plus_2exon__far_syn_and_missense	21	.	C	G	.	PASS	.	GT	1|0
+plus_2exon__far_syn_and_missense	25	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__far_syn_and_syn	25	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__far_syn_and_syn	43	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__far_missense_and_missense	21	.	C	G	.	PASS	.	GT	1|0
+plus_2exon__far_missense_and_missense	54	.	G	C	.	PASS	.	GT	1|0
+plus_2exon__two_far_insertions	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_2exon__two_far_insertions	55	.	G	GACT	.	PASS	.	GT	1|0
+plus_2exon__insertion_and_deletion_far	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_2exon__insertion_and_deletion_far	110	.	GGAG	G	.	PASS	.	GT	1|0
+plus_2exon__two_far_deletions	28	.	GAAA	G	.	PASS	.	GT	1|0
+plus_2exon__two_far_deletions	110	.	GGAG	G	.	PASS	.	GT	1|0
+plus_2exon__stop_created_by_pair	45	.	T	A	.	PASS	.	GT	1|0
+plus_2exon__stop_created_by_pair	46	.	C	A	.	PASS	.	GT	1|0
+plus_2exon__start_lost_by_pair	17	.	A	C	.	PASS	.	GT	1|0
+plus_2exon__start_lost_by_pair	18	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_by_pair	126	.	T	C	.	PASS	.	GT	1|0
+plus_2exon__stop_lost_by_pair	127	.	A	G	.	PASS	.	GT	1|0
+plus_2exon__stop_retained_single	128	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__cis_syn_pair_only_together	102	.	A	T	.	PASS	.	GT	1|0
+plus_3exon__cis_syn_pair_only_together	103	.	G	C	.	PASS	.	GT	1|0
+plus_3exon__trans_control_of_syn_pair	102	.	A	T	.	PASS	.	GT	1|0
+plus_3exon__trans_control_of_syn_pair	103	.	G	C	.	PASS	.	GT	0|1
+plus_3exon__cis_mis_pair	20	.	G	A	.	PASS	.	GT	1|0
+plus_3exon__cis_mis_pair	21	.	C	A	.	PASS	.	GT	1|0
+plus_3exon__cis_syn_pair_r	32	.	C	A	.	PASS	.	GT	1|0
+plus_3exon__cis_syn_pair_r	34	.	C	A	.	PASS	.	GT	1|0
+plus_3exon__cis_mnv_record	90	.	CA	GT	.	PASS	.	GT	1|0
+plus_3exon__cis_three_snv_codon	93	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__cis_three_snv_codon	94	.	G	C	.	PASS	.	GT	1|0
+plus_3exon__cis_three_snv_codon	95	.	G	C	.	PASS	.	GT	1|0
+plus_3exon__hom_alt_snv	21	.	C	A	.	PASS	.	GT	1|1
+plus_3exon__ins_at_codon_boundary	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_3exon__ins_inside_codon_pure	20	.	G	GCTG	.	PASS	.	GT	1|0
+plus_3exon__ins_inside_codon_altering	20	.	G	GAAA	.	PASS	.	GT	1|0
+plus_3exon__del_whole_codon	28	.	GAAA	G	.	PASS	.	GT	1|0
+plus_3exon__del_inside_codons_pure	108	.	CAGG	C	.	PASS	.	GT	1|0
+plus_3exon__delins_inframe	23	.	GAACTG	GGG	.	PASS	.	GT	1|0
+plus_3exon__far_syn_and_missense	21	.	C	G	.	PASS	.	GT	1|0
+plus_3exon__far_syn_and_missense	25	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__far_syn_and_syn	25	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__far_syn_and_syn	43	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__far_missense_and_missense	21	.	C	G	.	PASS	.	GT	1|0
+plus_3exon__far_missense_and_missense	94	.	G	C	.	PASS	.	GT	1|0
+plus_3exon__two_far_insertions	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_3exon__two_far_insertions	95	.	G	GACT	.	PASS	.	GT	1|0
+plus_3exon__insertion_and_deletion_far	28	.	G	GTCT	.	PASS	.	GT	1|0
+plus_3exon__insertion_and_deletion_far	110	.	GGAG	G	.	PASS	.	GT	1|0
+plus_3exon__two_far_deletions	28	.	GAAA	G	.	PASS	.	GT	1|0
+plus_3exon__two_far_deletions	110	.	GGAG	G	.	PASS	.	GT	1|0
+plus_3exon__stop_created_by_pair	45	.	T	A	.	PASS	.	GT	1|0
+plus_3exon__stop_created_by_pair	46	.	C	A	.	PASS	.	GT	1|0
+plus_3exon__start_lost_by_pair	17	.	A	C	.	PASS	.	GT	1|0
+plus_3exon__start_lost_by_pair	18	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_by_pair	166	.	T	C	.	PASS	.	GT	1|0
+plus_3exon__stop_lost_by_pair	167	.	A	G	.	PASS	.	GT	1|0
+plus_3exon__stop_retained_single	168	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__cis_syn_pair_only_together	42	.	C	G	.	PASS	.	GT	1|0
+minus_1exon__cis_syn_pair_only_together	43	.	T	A	.	PASS	.	GT	1|0
+minus_1exon__trans_control_of_syn_pair	42	.	C	G	.	PASS	.	GT	0|1
+minus_1exon__trans_control_of_syn_pair	43	.	T	A	.	PASS	.	GT	1|0
+minus_1exon__cis_mis_pair	84	.	G	T	.	PASS	.	GT	1|0
+minus_1exon__cis_mis_pair	85	.	C	T	.	PASS	.	GT	1|0
+minus_1exon__cis_syn_pair_r	71	.	G	T	.	PASS	.	GT	1|0
+minus_1exon__cis_syn_pair_r	73	.	G	T	.	PASS	.	GT	1|0
+minus_1exon__cis_mnv_record	54	.	TG	AC	.	PASS	.	GT	1|0
+minus_1exon__cis_three_snv_codon	50	.	C	G	.	PASS	.	GT	1|0
+minus_1exon__cis_three_snv_codon	51	.	C	G	.	PASS	.	GT	1|0
+minus_1exon__cis_three_snv_codon	52	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__hom_alt_snv	84	.	G	T	.	PASS	.	GT	1|1
+minus_1exon__ins_at_codon_boundary	76	.	T	TAGA	.	PASS	.	GT	1|0
+minus_1exon__ins_inside_codon_pure	84	.	G	GCAG	.	PASS	.	GT	1|0
+minus_1exon__ins_inside_codon_altering	84	.	G	GTTT	.	PASS	.	GT	1|0
+minus_1exon__del_whole_codon	73	.	GTTT	G	.	PASS	.	GT	1|0
+minus_1exon__del_inside_codons_pure	33	.	TCCT	T	.	PASS	.	GT	1|0
+minus_1exon__delins_inframe	77	.	CAGTTC	CCC	.	PASS	.	GT	1|0
+minus_1exon__far_syn_and_missense	80	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__far_syn_and_missense	84	.	G	C	.	PASS	.	GT	1|0
+minus_1exon__far_syn_and_syn	62	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__far_syn_and_syn	80	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__far_missense_and_missense	51	.	C	G	.	PASS	.	GT	1|0
+minus_1exon__far_missense_and_missense	84	.	G	C	.	PASS	.	GT	1|0
+minus_1exon__two_far_insertions	49	.	T	TAGT	.	PASS	.	GT	1|0
+minus_1exon__two_far_insertions	76	.	T	TAGA	.	PASS	.	GT	1|0
+minus_1exon__insertion_and_deletion_far	31	.	ACTC	A	.	PASS	.	GT	1|0
+minus_1exon__insertion_and_deletion_far	76	.	T	TAGA	.	PASS	.	GT	1|0
+minus_1exon__two_far_deletions	31	.	ACTC	A	.	PASS	.	GT	1|0
+minus_1exon__two_far_deletions	73	.	GTTT	G	.	PASS	.	GT	1|0
+minus_1exon__stop_created_by_pair	59	.	G	T	.	PASS	.	GT	1|0
+minus_1exon__stop_created_by_pair	60	.	A	T	.	PASS	.	GT	1|0
+minus_1exon__start_lost_by_pair	87	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__start_lost_by_pair	88	.	T	G	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_by_pair	18	.	T	C	.	PASS	.	GT	1|0
+minus_1exon__stop_lost_by_pair	19	.	A	G	.	PASS	.	GT	1|0
+minus_1exon__stop_retained_single	17	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__cis_syn_pair_only_together	42	.	C	G	.	PASS	.	GT	1|0
+minus_2exon__cis_syn_pair_only_together	83	.	T	A	.	PASS	.	GT	1|0
+minus_2exon__trans_control_of_syn_pair	42	.	C	G	.	PASS	.	GT	0|1
+minus_2exon__trans_control_of_syn_pair	83	.	T	A	.	PASS	.	GT	1|0
+minus_2exon__cis_mis_pair	124	.	G	T	.	PASS	.	GT	1|0
+minus_2exon__cis_mis_pair	125	.	C	T	.	PASS	.	GT	1|0
+minus_2exon__cis_syn_pair_r	111	.	G	T	.	PASS	.	GT	1|0
+minus_2exon__cis_syn_pair_r	113	.	G	T	.	PASS	.	GT	1|0
+minus_2exon__cis_mnv_record	94	.	TG	AC	.	PASS	.	GT	1|0
+minus_2exon__cis_three_snv_codon	90	.	C	G	.	PASS	.	GT	1|0
+minus_2exon__cis_three_snv_codon	91	.	C	G	.	PASS	.	GT	1|0
+minus_2exon__cis_three_snv_codon	92	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__hom_alt_snv	124	.	G	T	.	PASS	.	GT	1|1
+minus_2exon__ins_at_codon_boundary	116	.	T	TAGA	.	PASS	.	GT	1|0
+minus_2exon__ins_inside_codon_pure	124	.	G	GCAG	.	PASS	.	GT	1|0
+minus_2exon__ins_inside_codon_altering	124	.	G	GTTT	.	PASS	.	GT	1|0
+minus_2exon__del_whole_codon	113	.	GTTT	G	.	PASS	.	GT	1|0
+minus_2exon__del_inside_codons_pure	33	.	TCCT	T	.	PASS	.	GT	1|0
+minus_2exon__delins_inframe	117	.	CAGTTC	CCC	.	PASS	.	GT	1|0
+minus_2exon__far_syn_and_missense	120	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__far_syn_and_missense	124	.	G	C	.	PASS	.	GT	1|0
+minus_2exon__far_syn_and_syn	102	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__far_syn_and_syn	120	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__far_missense_and_missense	91	.	C	G	.	PASS	.	GT	1|0
+minus_2exon__far_missense_and_missense	124	.	G	C	.	PASS	.	GT	1|0
+minus_2exon__two_far_insertions	89	.	T	TAGT	.	PASS	.	GT	1|0
+minus_2exon__two_far_insertions	116	.	T	TAGA	.	PASS	.	GT	1|0
+minus_2exon__insertion_and_deletion_far	31	.	ACTC	A	.	PASS	.	GT	1|0
+minus_2exon__insertion_and_deletion_far	116	.	T	TAGA	.	PASS	.	GT	1|0
+minus_2exon__two_far_deletions	31	.	ACTC	A	.	PASS	.	GT	1|0
+minus_2exon__two_far_deletions	113	.	GTTT	G	.	PASS	.	GT	1|0
+minus_2exon__stop_created_by_pair	99	.	G	T	.	PASS	.	GT	1|0
+minus_2exon__stop_created_by_pair	100	.	A	T	.	PASS	.	GT	1|0
+minus_2exon__start_lost_by_pair	127	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__start_lost_by_pair	128	.	T	G	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_by_pair	18	.	T	C	.	PASS	.	GT	1|0
+minus_2exon__stop_lost_by_pair	19	.	A	G	.	PASS	.	GT	1|0
+minus_2exon__stop_retained_single	17	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__cis_syn_pair_only_together	82	.	C	G	.	PASS	.	GT	1|0
+minus_3exon__cis_syn_pair_only_together	83	.	T	A	.	PASS	.	GT	1|0
+minus_3exon__trans_control_of_syn_pair	82	.	C	G	.	PASS	.	GT	0|1
+minus_3exon__trans_control_of_syn_pair	83	.	T	A	.	PASS	.	GT	1|0
+minus_3exon__cis_mis_pair	164	.	G	T	.	PASS	.	GT	1|0
+minus_3exon__cis_mis_pair	165	.	C	T	.	PASS	.	GT	1|0
+minus_3exon__cis_syn_pair_r	151	.	G	T	.	PASS	.	GT	1|0
+minus_3exon__cis_syn_pair_r	153	.	G	T	.	PASS	.	GT	1|0
+minus_3exon__cis_mnv_record	94	.	TG	AC	.	PASS	.	GT	1|0
+minus_3exon__cis_three_snv_codon	90	.	C	G	.	PASS	.	GT	1|0
+minus_3exon__cis_three_snv_codon	91	.	C	G	.	PASS	.	GT	1|0
+minus_3exon__cis_three_snv_codon	92	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__hom_alt_snv	164	.	G	T	.	PASS	.	GT	1|1
+minus_3exon__ins_at_codon_boundary	156	.	T	TAGA	.	PASS	.	GT	1|0
+minus_3exon__ins_inside_codon_pure	164	.	G	GCAG	.	PASS	.	GT	1|0
+minus_3exon__ins_inside_codon_altering	164	.	G	GTTT	.	PASS	.	GT	1|0
+minus_3exon__del_whole_codon	153	.	GTTT	G	.	PASS	.	GT	1|0
+minus_3exon__del_inside_codons_pure	73	.	TCCT	T	.	PASS	.	GT	1|0
+minus_3exon__delins_inframe	157	.	CAGTTC	CCC	.	PASS	.	GT	1|0
+minus_3exon__far_syn_and_missense	160	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__far_syn_and_missense	164	.	G	C	.	PASS	.	GT	1|0
+minus_3exon__far_syn_and_syn	142	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__far_syn_and_syn	160	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__far_missense_and_missense	91	.	C	G	.	PASS	.	GT	1|0
+minus_3exon__far_missense_and_missense	164	.	G	C	.	PASS	.	GT	1|0
+minus_3exon__two_far_insertions	89	.	T	TAGT	.	PASS	.	GT	1|0
+minus_3exon__two_far_insertions	156	.	T	TAGA	.	PASS	.	GT	1|0
+minus_3exon__insertion_and_deletion_far	71	.	ACTC	A	.	PASS	.	GT	1|0
+minus_3exon__insertion_and_deletion_far	156	.	T	TAGA	.	PASS	.	GT	1|0
+minus_3exon__two_far_deletions	71	.	ACTC	A	.	PASS	.	GT	1|0
+minus_3exon__two_far_deletions	153	.	GTTT	G	.	PASS	.	GT	1|0
+minus_3exon__stop_created_by_pair	139	.	G	T	.	PASS	.	GT	1|0
+minus_3exon__stop_created_by_pair	140	.	A	T	.	PASS	.	GT	1|0
+minus_3exon__start_lost_by_pair	167	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__start_lost_by_pair	168	.	T	G	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_by_pair	18	.	T	C	.	PASS	.	GT	1|0
+minus_3exon__stop_lost_by_pair	19	.	A	G	.	PASS	.	GT	1|0
+minus_3exon__stop_retained_single	17	.	T	C	.	PASS	.	GT	1|0

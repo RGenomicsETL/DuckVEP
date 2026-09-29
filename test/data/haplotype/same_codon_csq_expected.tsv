@@ -1,0 +1,277 @@
+case	lane	csq_so_terms	declared_divergence
+plus_1exon__cis_syn_pair_only_together	0	synonymous_variant	.
+plus_1exon__cis_syn_pair_only_together	1		.
+plus_1exon__trans_control_of_syn_pair	0	missense_variant	.
+plus_1exon__trans_control_of_syn_pair	1	missense_variant	.
+plus_1exon__cis_mis_pair	0	missense_variant	.
+plus_1exon__cis_mis_pair	1		.
+plus_1exon__cis_syn_pair_r	0	synonymous_variant	.
+plus_1exon__cis_syn_pair_r	1		.
+plus_1exon__cis_mnv_record	0	missense_variant	.
+plus_1exon__cis_mnv_record	1		.
+plus_1exon__cis_three_snv_codon	0	missense_variant	.
+plus_1exon__cis_three_snv_codon	1		.
+plus_1exon__hom_alt_snv	0	missense_variant	.
+plus_1exon__hom_alt_snv	1	missense_variant	.
+plus_1exon__ins_at_codon_boundary	0	inframe_insertion	.
+plus_1exon__ins_at_codon_boundary	1		.
+plus_1exon__ins_inside_codon_pure	0	inframe_insertion	.
+plus_1exon__ins_inside_codon_pure	1		.
+plus_1exon__ins_inside_codon_altering	0	inframe_insertion	.
+plus_1exon__ins_inside_codon_altering	1		.
+plus_1exon__del_whole_codon	0	inframe_deletion	.
+plus_1exon__del_whole_codon	1		.
+plus_1exon__del_inside_codons_pure	0	inframe_deletion	.
+plus_1exon__del_inside_codons_pure	1		.
+plus_1exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
+plus_1exon__delins_inframe	1		.
+plus_1exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+plus_1exon__far_syn_and_missense	1		.
+plus_1exon__far_syn_and_syn	0	synonymous_variant	.
+plus_1exon__far_syn_and_syn	1		.
+plus_1exon__far_missense_and_missense	0	missense_variant	.
+plus_1exon__far_missense_and_missense	1		.
+plus_1exon__two_far_insertions	0	inframe_insertion	.
+plus_1exon__two_far_insertions	1		.
+plus_1exon__insertion_and_deletion_far	0	inframe_deletion,inframe_insertion	csq reports both inframe terms; the policy has mixed frame-preserving edits
+plus_1exon__insertion_and_deletion_far	1		.
+plus_1exon__two_far_deletions	0	inframe_deletion	.
+plus_1exon__two_far_deletions	1		.
+plus_1exon__stop_created_by_pair	0	stop_gained	.
+plus_1exon__stop_created_by_pair	1		.
+plus_1exon__start_lost_by_pair	0	start_lost	.
+plus_1exon__start_lost_by_pair	1		.
+plus_1exon__stop_lost_by_pair	0	stop_lost	.
+plus_1exon__stop_lost_by_pair	1		.
+plus_1exon__stop_retained_single	0	stop_retained_variant	.
+plus_1exon__stop_retained_single	1		.
+plus_2exon__cis_syn_pair_only_together	0	synonymous_variant	.
+plus_2exon__cis_syn_pair_only_together	1		.
+plus_2exon__trans_control_of_syn_pair	0	missense_variant	.
+plus_2exon__trans_control_of_syn_pair	1	missense_variant	.
+plus_2exon__cis_mis_pair	0	missense_variant	.
+plus_2exon__cis_mis_pair	1		.
+plus_2exon__cis_syn_pair_r	0	synonymous_variant	.
+plus_2exon__cis_syn_pair_r	1		.
+plus_2exon__cis_mnv_record	0	missense_variant	.
+plus_2exon__cis_mnv_record	1		.
+plus_2exon__cis_three_snv_codon	0	missense_variant	.
+plus_2exon__cis_three_snv_codon	1		.
+plus_2exon__hom_alt_snv	0	missense_variant	.
+plus_2exon__hom_alt_snv	1	missense_variant	.
+plus_2exon__ins_at_codon_boundary	0	inframe_insertion	.
+plus_2exon__ins_at_codon_boundary	1		.
+plus_2exon__ins_inside_codon_pure	0	inframe_insertion	.
+plus_2exon__ins_inside_codon_pure	1		.
+plus_2exon__ins_inside_codon_altering	0	inframe_insertion	.
+plus_2exon__ins_inside_codon_altering	1		.
+plus_2exon__del_whole_codon	0	inframe_deletion	.
+plus_2exon__del_whole_codon	1		.
+plus_2exon__del_inside_codons_pure	0	inframe_deletion	.
+plus_2exon__del_inside_codons_pure	1		.
+plus_2exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
+plus_2exon__delins_inframe	1		.
+plus_2exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+plus_2exon__far_syn_and_missense	1		.
+plus_2exon__far_syn_and_syn	0	synonymous_variant	.
+plus_2exon__far_syn_and_syn	1		.
+plus_2exon__far_missense_and_missense	0	missense_variant	.
+plus_2exon__far_missense_and_missense	1		.
+plus_2exon__two_far_insertions	0	inframe_insertion	.
+plus_2exon__two_far_insertions	1		.
+plus_2exon__insertion_and_deletion_far	0	inframe_deletion,inframe_insertion	csq reports both inframe terms; the policy has mixed frame-preserving edits
+plus_2exon__insertion_and_deletion_far	1		.
+plus_2exon__two_far_deletions	0	inframe_deletion	.
+plus_2exon__two_far_deletions	1		.
+plus_2exon__stop_created_by_pair	0	stop_gained	.
+plus_2exon__stop_created_by_pair	1		.
+plus_2exon__start_lost_by_pair	0	start_lost	.
+plus_2exon__start_lost_by_pair	1		.
+plus_2exon__stop_lost_by_pair	0	stop_lost	.
+plus_2exon__stop_lost_by_pair	1		.
+plus_2exon__stop_retained_single	0	stop_retained_variant	.
+plus_2exon__stop_retained_single	1		.
+plus_3exon__cis_syn_pair_only_together	0	synonymous_variant	.
+plus_3exon__cis_syn_pair_only_together	1		.
+plus_3exon__trans_control_of_syn_pair	0	missense_variant	.
+plus_3exon__trans_control_of_syn_pair	1	missense_variant	.
+plus_3exon__cis_mis_pair	0	missense_variant	.
+plus_3exon__cis_mis_pair	1		.
+plus_3exon__cis_syn_pair_r	0	synonymous_variant	.
+plus_3exon__cis_syn_pair_r	1		.
+plus_3exon__cis_mnv_record	0	missense_variant	.
+plus_3exon__cis_mnv_record	1		.
+plus_3exon__cis_three_snv_codon	0	missense_variant	.
+plus_3exon__cis_three_snv_codon	1		.
+plus_3exon__hom_alt_snv	0	missense_variant	.
+plus_3exon__hom_alt_snv	1	missense_variant	.
+plus_3exon__ins_at_codon_boundary	0	inframe_insertion	.
+plus_3exon__ins_at_codon_boundary	1		.
+plus_3exon__ins_inside_codon_pure	0	inframe_insertion	.
+plus_3exon__ins_inside_codon_pure	1		.
+plus_3exon__ins_inside_codon_altering	0	inframe_insertion	.
+plus_3exon__ins_inside_codon_altering	1		.
+plus_3exon__del_whole_codon	0	inframe_deletion	.
+plus_3exon__del_whole_codon	1		.
+plus_3exon__del_inside_codons_pure	0	inframe_deletion	.
+plus_3exon__del_inside_codons_pure	1		.
+plus_3exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
+plus_3exon__delins_inframe	1		.
+plus_3exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+plus_3exon__far_syn_and_missense	1		.
+plus_3exon__far_syn_and_syn	0	synonymous_variant	.
+plus_3exon__far_syn_and_syn	1		.
+plus_3exon__far_missense_and_missense	0	missense_variant	.
+plus_3exon__far_missense_and_missense	1		.
+plus_3exon__two_far_insertions	0	inframe_insertion	.
+plus_3exon__two_far_insertions	1		.
+plus_3exon__insertion_and_deletion_far	0	inframe_deletion,inframe_insertion	csq reports both inframe terms; the policy has mixed frame-preserving edits
+plus_3exon__insertion_and_deletion_far	1		.
+plus_3exon__two_far_deletions	0	inframe_deletion	.
+plus_3exon__two_far_deletions	1		.
+plus_3exon__stop_created_by_pair	0	stop_gained	.
+plus_3exon__stop_created_by_pair	1		.
+plus_3exon__start_lost_by_pair	0	start_lost	.
+plus_3exon__start_lost_by_pair	1		.
+plus_3exon__stop_lost_by_pair	0	stop_lost	.
+plus_3exon__stop_lost_by_pair	1		.
+plus_3exon__stop_retained_single	0	stop_retained_variant	.
+plus_3exon__stop_retained_single	1		.
+minus_1exon__cis_syn_pair_only_together	0	synonymous_variant	.
+minus_1exon__cis_syn_pair_only_together	1		.
+minus_1exon__trans_control_of_syn_pair	0	missense_variant	.
+minus_1exon__trans_control_of_syn_pair	1	missense_variant	.
+minus_1exon__cis_mis_pair	0	missense_variant	.
+minus_1exon__cis_mis_pair	1		.
+minus_1exon__cis_syn_pair_r	0	synonymous_variant	.
+minus_1exon__cis_syn_pair_r	1		.
+minus_1exon__cis_mnv_record	0	missense_variant	.
+minus_1exon__cis_mnv_record	1		.
+minus_1exon__cis_three_snv_codon	0	missense_variant	.
+minus_1exon__cis_three_snv_codon	1		.
+minus_1exon__hom_alt_snv	0	missense_variant	.
+minus_1exon__hom_alt_snv	1	missense_variant	.
+minus_1exon__ins_at_codon_boundary	0	inframe_insertion	.
+minus_1exon__ins_at_codon_boundary	1		.
+minus_1exon__ins_inside_codon_pure	0	inframe_insertion	.
+minus_1exon__ins_inside_codon_pure	1		.
+minus_1exon__ins_inside_codon_altering	0	inframe_insertion	.
+minus_1exon__ins_inside_codon_altering	1		.
+minus_1exon__del_whole_codon	0	inframe_deletion	.
+minus_1exon__del_whole_codon	1		.
+minus_1exon__del_inside_codons_pure	0	inframe_deletion	.
+minus_1exon__del_inside_codons_pure	1		.
+minus_1exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
+minus_1exon__delins_inframe	1		.
+minus_1exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+minus_1exon__far_syn_and_missense	1		.
+minus_1exon__far_syn_and_syn	0	synonymous_variant	.
+minus_1exon__far_syn_and_syn	1		.
+minus_1exon__far_missense_and_missense	0	missense_variant	.
+minus_1exon__far_missense_and_missense	1		.
+minus_1exon__two_far_insertions	0	inframe_insertion	.
+minus_1exon__two_far_insertions	1		.
+minus_1exon__insertion_and_deletion_far	0	inframe_deletion,inframe_insertion	csq reports both inframe terms; the policy has mixed frame-preserving edits
+minus_1exon__insertion_and_deletion_far	1		.
+minus_1exon__two_far_deletions	0	inframe_deletion	.
+minus_1exon__two_far_deletions	1		.
+minus_1exon__stop_created_by_pair	0	stop_gained	.
+minus_1exon__stop_created_by_pair	1		.
+minus_1exon__start_lost_by_pair	0	start_lost	.
+minus_1exon__start_lost_by_pair	1		.
+minus_1exon__stop_lost_by_pair	0	stop_lost	.
+minus_1exon__stop_lost_by_pair	1		.
+minus_1exon__stop_retained_single	0	stop_retained_variant	.
+minus_1exon__stop_retained_single	1		.
+minus_2exon__cis_syn_pair_only_together	0	synonymous_variant	.
+minus_2exon__cis_syn_pair_only_together	1		.
+minus_2exon__trans_control_of_syn_pair	0	missense_variant	.
+minus_2exon__trans_control_of_syn_pair	1	missense_variant	.
+minus_2exon__cis_mis_pair	0	missense_variant	.
+minus_2exon__cis_mis_pair	1		.
+minus_2exon__cis_syn_pair_r	0	synonymous_variant	.
+minus_2exon__cis_syn_pair_r	1		.
+minus_2exon__cis_mnv_record	0	missense_variant	.
+minus_2exon__cis_mnv_record	1		.
+minus_2exon__cis_three_snv_codon	0	missense_variant	.
+minus_2exon__cis_three_snv_codon	1		.
+minus_2exon__hom_alt_snv	0	missense_variant	.
+minus_2exon__hom_alt_snv	1	missense_variant	.
+minus_2exon__ins_at_codon_boundary	0	inframe_insertion	.
+minus_2exon__ins_at_codon_boundary	1		.
+minus_2exon__ins_inside_codon_pure	0	inframe_insertion	.
+minus_2exon__ins_inside_codon_pure	1		.
+minus_2exon__ins_inside_codon_altering	0	inframe_insertion	.
+minus_2exon__ins_inside_codon_altering	1		.
+minus_2exon__del_whole_codon	0	inframe_deletion	.
+minus_2exon__del_whole_codon	1		.
+minus_2exon__del_inside_codons_pure	0	inframe_deletion	.
+minus_2exon__del_inside_codons_pure	1		.
+minus_2exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
+minus_2exon__delins_inframe	1		.
+minus_2exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+minus_2exon__far_syn_and_missense	1		.
+minus_2exon__far_syn_and_syn	0	synonymous_variant	.
+minus_2exon__far_syn_and_syn	1		.
+minus_2exon__far_missense_and_missense	0	missense_variant	.
+minus_2exon__far_missense_and_missense	1		.
+minus_2exon__two_far_insertions	0	inframe_insertion	.
+minus_2exon__two_far_insertions	1		.
+minus_2exon__insertion_and_deletion_far	0	inframe_deletion,inframe_insertion	csq reports both inframe terms; the policy has mixed frame-preserving edits
+minus_2exon__insertion_and_deletion_far	1		.
+minus_2exon__two_far_deletions	0	inframe_deletion	.
+minus_2exon__two_far_deletions	1		.
+minus_2exon__stop_created_by_pair	0	stop_gained	.
+minus_2exon__stop_created_by_pair	1		.
+minus_2exon__start_lost_by_pair	0	start_lost	.
+minus_2exon__start_lost_by_pair	1		.
+minus_2exon__stop_lost_by_pair	0	stop_lost	.
+minus_2exon__stop_lost_by_pair	1		.
+minus_2exon__stop_retained_single	0	stop_retained_variant	.
+minus_2exon__stop_retained_single	1		.
+minus_3exon__cis_syn_pair_only_together	0	synonymous_variant	.
+minus_3exon__cis_syn_pair_only_together	1		.
+minus_3exon__trans_control_of_syn_pair	0	missense_variant	.
+minus_3exon__trans_control_of_syn_pair	1	missense_variant	.
+minus_3exon__cis_mis_pair	0	missense_variant	.
+minus_3exon__cis_mis_pair	1		.
+minus_3exon__cis_syn_pair_r	0	synonymous_variant	.
+minus_3exon__cis_syn_pair_r	1		.
+minus_3exon__cis_mnv_record	0	missense_variant	.
+minus_3exon__cis_mnv_record	1		.
+minus_3exon__cis_three_snv_codon	0	missense_variant	.
+minus_3exon__cis_three_snv_codon	1		.
+minus_3exon__hom_alt_snv	0	missense_variant	.
+minus_3exon__hom_alt_snv	1	missense_variant	.
+minus_3exon__ins_at_codon_boundary	0	inframe_insertion	.
+minus_3exon__ins_at_codon_boundary	1		.
+minus_3exon__ins_inside_codon_pure	0	inframe_insertion	.
+minus_3exon__ins_inside_codon_pure	1		.
+minus_3exon__ins_inside_codon_altering	0	inframe_insertion	.
+minus_3exon__ins_inside_codon_altering	1		.
+minus_3exon__del_whole_codon	0	inframe_deletion	.
+minus_3exon__del_whole_codon	1		.
+minus_3exon__del_inside_codons_pure	0	inframe_deletion	.
+minus_3exon__del_inside_codons_pure	1		.
+minus_3exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
+minus_3exon__delins_inframe	1		.
+minus_3exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+minus_3exon__far_syn_and_missense	1		.
+minus_3exon__far_syn_and_syn	0	synonymous_variant	.
+minus_3exon__far_syn_and_syn	1		.
+minus_3exon__far_missense_and_missense	0	missense_variant	.
+minus_3exon__far_missense_and_missense	1		.
+minus_3exon__two_far_insertions	0	inframe_insertion	.
+minus_3exon__two_far_insertions	1		.
+minus_3exon__insertion_and_deletion_far	0	inframe_deletion,inframe_insertion	csq reports both inframe terms; the policy has mixed frame-preserving edits
+minus_3exon__insertion_and_deletion_far	1		.
+minus_3exon__two_far_deletions	0	inframe_deletion	.
+minus_3exon__two_far_deletions	1		.
+minus_3exon__stop_created_by_pair	0	stop_gained	.
+minus_3exon__stop_created_by_pair	1		.
+minus_3exon__start_lost_by_pair	0	start_lost	.
+minus_3exon__start_lost_by_pair	1		.
+minus_3exon__stop_lost_by_pair	0	stop_lost	.
+minus_3exon__stop_lost_by_pair	1		.
+minus_3exon__stop_retained_single	0	stop_retained_variant	.
+minus_3exon__stop_retained_single	1		.
