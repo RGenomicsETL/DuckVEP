@@ -1,0 +1,4 @@
+"status","reason","Freq"
+"unsupported","duplication_adjacent_repeat",1
+"unsupported","inversion_not_reducible",3
+"supported",NA,396

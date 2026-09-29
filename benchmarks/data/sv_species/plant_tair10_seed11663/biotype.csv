@@ -1,0 +1,9 @@
+"biotype","exact","oracle_only","duckvep_only","terms_differ","pairs","events"
+"lncRNA",1069,0,2,0,1071,641
+"miRNA",84,0,0,0,84,64
+"ncRNA",110,0,0,0,110,79
+"nontranslating_CDS",23,0,0,0,23,14
+"protein_coding",18089,0,7,0,18096,1733
+"snRNA",32,0,0,0,32,30
+"snoRNA",75,0,0,0,75,42
+"tRNA",197,0,0,0,197,120
