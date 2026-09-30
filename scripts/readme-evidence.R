@@ -91,6 +91,23 @@ readme_evidence <- function(root = ".") {
   throughput <- throughput[order(throughput$run_date), ]
   throughput <- throughput[nrow(throughput), ]
 
+  # The public SQL builder on full GIAB, one core, compact: the newest measured
+  # revision that is part of this checkout's history.
+  public <- read.csv(path("benchmarks", "data", "duckvep_throughput.csv"),
+    colClasses = c(source_revision = "character"))
+  public <- public[public$workload == "ensembl116_grch38_giab_hg002_v4_2_1_full_literal_public_relation" &
+    public$output_mode == "compact" & public$threads == 1L, ]
+  in_history <- vapply(public$source_revision, function(rev) {
+    system2("git", c("merge-base", "--is-ancestor", rev, "HEAD"), stdout = FALSE, stderr = FALSE) == 0L
+  }, logical(1))
+  public <- public[in_history, ]
+  stopifnot(nrow(public) > 0L)
+  when <- vapply(public$source_revision, function(rev) {
+    as.numeric(system2("git", c("show", "-s", "--format=%ct", rev), stdout = TRUE))
+  }, numeric(1))
+  public <- public[when == max(when), ]
+  public <- public[nrow(public), ]
+
   list(conformance = conformance, hgvs = hgvs_summary, fastvep = fastvep,
-    throughput = throughput, giab_alt_alleles = 4096123L)
+    throughput = throughput, public = public, giab_alt_alleles = 4096123L)
 }
