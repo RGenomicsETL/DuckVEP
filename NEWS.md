@@ -1,5 +1,9 @@
 # DuckVEP
 
+## DuckDB C API v2 host, slice 4b: the annotation natives (issue #8)
+
+- The ten `_duckvep_annotate_*` natives (batch preparation, per-worker state, kernel run, HGVS and projection, result writers) moved from `src/duckvep_annotate.c` to `src/core/duckvep_core_annotate_run.c`, which reaches DuckDB only through a small host layer (`duckvep_host.h`); the v1 layer is macros over the same v1 C API calls, so v1 results are byte-identical. The v2 preview host registers the natives and `__duckvep_projection_code`, so `duckvep_annotate_sql`, `duckvep_annotate_projected_sql` and `duckvep_transcript_projection_sql` execute there, and their output equals v1's row for row (compact, rich, HGVS with a reference FASTA, projected, and mixed structural/breakend events, on three models, plus 11,100-row multi-vector runs). v1 throughput is unchanged: on 100,000 GIAB sites (compact, one pinned core, five alternating runs each) the median is 1,040 ns per variant against 1,080 for main, with identical rows.
+
 ## DuckDB C API v2 host, slice 4a: the model sink (issue #8)
 
 - The resident model (arrays, the six relation loaders and their validation, FASTA check, lifting, kernel, registry) moved to `src/core` and reads *row sources*; v1 backs them with its private-connection queries and loads exactly as before. The v2 preview host loads through `COPY ... (FORMAT duckvep_stage)` into spillable staging in the caller's own transaction (TEMP tables and uncommitted rows are visible), then `duckvep_model_publish()` builds and installs the model; `duckvep_model_load_sql()` returns the statements, and `rduckvep_load_model()` runs either form. A failed or cancelled COPY stages nothing and a failed publish installs nothing. Both hosts load byte-equal models: the new internal `_duckvep_model_fingerprint()` is equal for three fixture models. `docs/v2-host.md` lists the user-facing differences.
