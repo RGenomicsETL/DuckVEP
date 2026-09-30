@@ -1139,3 +1139,237 @@ SELECT duckvep_model_drop('no-such-model') AS dropped
 
 -- case: model drop empty name error
 SELECT duckvep_model_drop('') AS dropped
+
+-- fixture: hgvs model relations
+CREATE TABLE hg_regions AS SELECT * FROM (VALUES (0::UINTEGER, 1::UBIGINT, 'chrEmpty'), (1::UINTEGER, 260::UBIGINT, 'chrDuck')) t(seq_region, sequence_length, seq_region_name)
+
+-- fixture: hgvs model transcripts
+CREATE TABLE hg_transcripts AS SELECT 0::UINTEGER transcript_index, 1::UINTEGER seq_region, 21::UBIGINT transcript_start, 100::UBIGINT transcript_end, 1::TINYINT strand, 0::UINTEGER gene_index, 3::UBIGINT transcript_flags, 21::UBIGINT cds_start, 98::UBIGINT cds_end, (repeat('ACGT', 19) || 'AC')::BLOB cds_sequence, 1::UTINYINT codon_table, ''::BLOB pre_cds_sequence, 'GT'::BLOB post_cds_sequence
+
+-- fixture: hgvs model exons
+CREATE TABLE hg_exons AS SELECT 0::UINTEGER transcript_index, 21::UBIGINT exon_start, 100::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 80::UBIGINT exon_cdna_end, 0::TINYINT phase, 0::TINYINT end_phase
+
+-- fixture: annotation events on the README model
+CREATE TABLE ann_readme AS SELECT row_number() OVER (ORDER BY seq_region, position, alternate)::UBIGINT AS event_index, seq_region::UINTEGER AS seq_region, position::UBIGINT AS position, reference, alternate, NULL::UBIGINT AS end_position, NULL::VARCHAR AS structural_type, NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region, NULL::UBIGINT AS mate_position FROM (VALUES (0, 50, 'A', 'C'), (1, 90, 'A', 'C'), (1, 99, 'C', 'G'), (1, 100, 'A', 'T'), (1, 110, 'G', 'A'), (1, 121, 'T', 'C'), (1, 122, 'G', 'A'), (1, 123, 'A', 'GG'), (1, 124, 'T', 'G'), (1, 125, 'AC', 'A'), (1, 126, 'A', 'ACG'), (1, 130, 'AAC', 'A'), (1, 135, 'C', 'CAT'), (1, 149, 'G', 'T'), (1, 150, 'A', 'C'), (1, 151, 'A', 'G'), (1, 175, 'T', 'C'), (1, 199, 'A', 'G'), (1, 200, 'C', 'T'), (1, 239, 'A', 'T'), (1, 240, 'G', 'A'), (1, 241, 'C', 'G'), (1, 250, 'A', 'T'), (1, 255, 'A', 'C'), (1, 121, 'T', '<*>'), (1, 300, 'A', 'G')) v(seq_region, position, reference, alternate)
+
+-- fixture: annotation events on the rich model
+CREATE TABLE ann_rich AS SELECT row_number() OVER (ORDER BY seq_region, position, alternate)::UBIGINT AS event_index, seq_region::UINTEGER AS seq_region, position::UBIGINT AS position, reference, alternate, NULL::UBIGINT AS end_position, NULL::VARCHAR AS structural_type, NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region, NULL::UBIGINT AS mate_position FROM (VALUES (0, 49, 'A', 'T'), (0, 55, 'C', 'G'), (0, 61, 'A', 'C'), (0, 62, 'T', 'TA'), (0, 75, 'G', 'C'), (0, 99, 'A', 'G'), (0, 100, 'G', 'A'), (0, 101, 'A', 'C'), (0, 120, 'A', 'T'), (0, 149, 'C', 'T'), (0, 150, 'A', 'G'), (0, 151, 'T', 'C'), (0, 190, 'A', 'T'), (0, 191, 'A', 'G'), (0, 199, 'C', 'T'), (0, 205, 'A', 'C'), (1, 95, 'A', 'C'), (1, 110, 'G', 'A'), (1, 125, 'C', 'CA'), (1, 149, 'G', 'T'), (1, 160, 'A', 'T'), (1, 205, 'A', 'G'), (1, 239, 'A', 'T'), (1, 245, 'T', 'C'), (1, 290, 'A', 'G'), (1, 305, 'C', 'T'), (1, 330, 'CAA', 'C'), (1, 350, 'A', 'T'), (1, 391, 'A', 'G'), (1, 395, 'G', 'T'), (1, 405, 'A', 'C'), (1, 512, 'A', 'T'), (1, 520, 'G', 'C'), (1, 555, 'A', 'T'), (1, 580, 'C', 'G'), (1, 1005, 'A', 'T'), (1, 1010, 'C', 'CA'), (1, 5050, 'G', 'A'), (1, 9999, 'A', 'C')) v(seq_region, position, reference, alternate)
+
+-- fixture: annotation events with a reference FASTA
+CREATE TABLE ann_hgvs AS SELECT row_number() OVER (ORDER BY seq_region, position, alternate)::UBIGINT AS event_index, seq_region::UINTEGER AS seq_region, position::UBIGINT AS position, reference, alternate, NULL::UBIGINT AS end_position, NULL::VARCHAR AS structural_type, NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region, NULL::UBIGINT AS mate_position FROM (VALUES (1, 15, 'A', 'C'), (1, 21, 'A', 'G'), (1, 22, 'C', 'T'), (1, 23, 'G', 'A'), (1, 24, 'T', 'C'), (1, 25, 'A', 'T'), (1, 26, 'C', 'G'), (1, 27, 'G', 'T'), (1, 30, 'C', 'CA'), (1, 31, 'G', 'GTT'), (1, 34, 'ACG', 'A'), (1, 40, 'GTA', 'G'), (1, 50, 'A', 'ACGT'), (1, 60, 'T', 'TACG'), (1, 61, 'A', 'T'), (1, 80, 'C', 'A'), (1, 96, 'C', 'T'), (1, 97, 'G', 'C'), (1, 98, 'T', 'A'), (1, 99, 'A', 'T'), (1, 100, 'C', 'G'), (1, 101, 'G', 'C'), (1, 150, 'C', 'T')) v(seq_region, position, reference, alternate)
+
+-- fixture: annotation events: mixed families
+CREATE TABLE ann_mixed AS SELECT * FROM (VALUES (1::UBIGINT, 1::UINTEGER, 90::UBIGINT, NULL::VARCHAR, '<DUP>'::VARCHAR, 260::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT), (2::UBIGINT, 1::UINTEGER, 100::UBIGINT, NULL::VARCHAR, '<DEL>'::VARCHAR, 180::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT), (3::UBIGINT, 1::UINTEGER, 124::UBIGINT, 'T'::VARCHAR, 'C'::VARCHAR, NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT), (4::UBIGINT, 1::UINTEGER, 130::UBIGINT, NULL::VARCHAR, '<INV>'::VARCHAR, 210::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT), (5::UBIGINT, 1::UINTEGER, 159::UBIGINT, NULL::VARCHAR, 'N]1:170]'::VARCHAR, NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, 1::UINTEGER, 170::UBIGINT), (6::UBIGINT, 1::UINTEGER, 210::UBIGINT, NULL::VARCHAR, 'N[1:230['::VARCHAR, NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, 1::UINTEGER, 230::UBIGINT), (7::UBIGINT, 1::UINTEGER, 300::UBIGINT, 'A'::VARCHAR, 'G'::VARCHAR, NULL::UBIGINT, NULL::VARCHAR, NULL::VARCHAR, NULL::UINTEGER, NULL::UBIGINT)) t(event_index, seq_region, position, reference, alternate, end_position, structural_type, copy_change, mate_seq_region, mate_position)
+
+-- fixture: annotation events: literal only
+CREATE TABLE ann_lit AS SELECT * FROM ann_readme WHERE alternate <> '<*>' ORDER BY event_index
+
+-- fixture: annotation events: generated
+CREATE TABLE ann_big AS SELECT (row_number() OVER (ORDER BY seq_region, position, alternate) - 1)::UBIGINT AS event_index, seq_region::UINTEGER AS seq_region, position::UBIGINT AS position, reference, alternate, NULL::UBIGINT AS end_position, NULL::VARCHAR AS structural_type, NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region, NULL::UBIGINT AS mate_position FROM (SELECT (i % 2)::INTEGER AS seq_region, (40 + (i * 7919) % 650 + (i % 2) * 100)::BIGINT AS position, substr('ACGT', 1 + i % 4, 1) AS reference, CASE i % 5 WHEN 0 THEN substr('ACGT', 1 + (i + 1) % 4, 1) WHEN 1 THEN substr('ACGT', 1 + (i + 2) % 4, 1) WHEN 2 THEN substr('ACGT', 1 + i % 4, 1) || 'GA' WHEN 3 THEN substr('ACGT', 1 + (i + 3) % 4, 1) ELSE 'T' END AS alternate FROM range(6000) t(i)) v WHERE alternate <> reference
+
+-- fixture-v1: load hgvs model on the v1 host
+SELECT loaded FROM duckvep_model_load('hgvsref', 'SELECT * FROM hg_regions ORDER BY seq_region', 'SELECT * FROM hg_transcripts ORDER BY seq_region, transcript_start', 'SELECT * FROM hg_exons ORDER BY transcript_index, exon_start', reference_fasta := 'test/data/duckvep/minimal.fa')
+
+-- fixture-v2: stage hgvsref regions
+COPY (
+SELECT * FROM hg_regions ORDER BY seq_region
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'hgvsref', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage hgvsref transcripts
+COPY (
+SELECT * FROM hg_transcripts ORDER BY seq_region, transcript_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'hgvsref', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage hgvsref exons
+COPY (
+SELECT * FROM hg_exons ORDER BY transcript_index, exon_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'hgvsref', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: publish hgvsref
+SELECT duckvep_model_publish('hgvsref', {'reference_fasta': 'test/data/duckvep/minimal.fa'})
+
+-- fixture: projection transcripts of the README model
+CREATE TABLE readme_projection_transcripts AS SELECT t.*, (SELECT list(struct_pack(exon_start := e.exon_start, exon_end := e.exon_end, exon_cdna_start := e.exon_cdna_start, exon_cdna_end := e.exon_cdna_end, phase := e.phase, end_phase := e.end_phase) ORDER BY e.exon_start) FROM readme_exons e WHERE e.transcript_index = t.transcript_index) AS exons, []::STRUCT(protein_position UINTEGER, alternate_amino_acid VARCHAR, edit_code VARCHAR)[] AS peptide_edits FROM readme_transcripts t
+
+-- fixture: projection annotations of the README model
+CREATE TABLE readme_annotations AS SELECT * FROM query(duckvep_annotate_sql('ann_lit', 'readme'))
+
+-- case: annotate readme compact
+SELECT * FROM query(duckvep_annotate_sql('ann_readme', 'readme')) ORDER BY ALL
+
+-- case: annotate readme compact hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_readme', 'readme')) t)
+
+-- case: annotate readme rich
+SELECT * FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'rich': true})) ORDER BY ALL
+
+-- case: annotate readme rich hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'rich': true})) t)
+
+-- case: annotate readme hgvs without reference
+SELECT * FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'hgvs': true})) ORDER BY ALL
+
+-- case: annotate readme hgvs without reference hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'hgvs': true})) t)
+
+-- case: annotate readme rich hgvs
+SELECT * FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'hgvs': true, 'rich': true})) ORDER BY ALL
+
+-- case: annotate readme rich hgvs hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'hgvs': true, 'rich': true})) t)
+
+-- case: annotate readme distances zero
+SELECT * FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'upstream_distance': 0, 'downstream_distance': 0, 'rich': true})) ORDER BY ALL
+
+-- case: annotate readme distances zero hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'upstream_distance': 0, 'downstream_distance': 0, 'rich': true})) t)
+
+-- case: annotate readme distances small
+SELECT * FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'upstream_distance': 10, 'downstream_distance': 20})) ORDER BY ALL
+
+-- case: annotate readme distances small hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_readme', 'readme', {'upstream_distance': 10, 'downstream_distance': 20})) t)
+
+-- case: annotate readme mixed families compact
+SELECT * FROM query(duckvep_annotate_sql('ann_mixed', 'readme')) ORDER BY ALL
+
+-- case: annotate readme mixed families compact hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_mixed', 'readme')) t)
+
+-- case: annotate readme mixed families rich
+SELECT * FROM query(duckvep_annotate_sql('ann_mixed', 'readme', {'rich': true})) ORDER BY ALL
+
+-- case: annotate readme mixed families rich hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_mixed', 'readme', {'rich': true})) t)
+
+-- case: annotate rich model compact
+SELECT * FROM query(duckvep_annotate_sql('ann_rich', 'rich')) ORDER BY ALL
+
+-- case: annotate rich model compact hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_rich', 'rich')) t)
+
+-- case: annotate rich model rich
+SELECT * FROM query(duckvep_annotate_sql('ann_rich', 'rich', {'rich': true, 'upstream_distance': 100})) ORDER BY ALL
+
+-- case: annotate rich model rich hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_rich', 'rich', {'rich': true, 'upstream_distance': 100})) t)
+
+-- case: annotate rich model hgvs
+SELECT * FROM query(duckvep_annotate_sql('ann_rich', 'rich', {'hgvs': true, 'rich': true})) ORDER BY ALL
+
+-- case: annotate rich model hgvs hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_rich', 'rich', {'hgvs': true, 'rich': true})) t)
+
+-- case: annotate rich model distances
+SELECT * FROM query(duckvep_annotate_sql('ann_rich', 'rich', {'upstream_distance': 0, 'downstream_distance': 5000})) ORDER BY ALL
+
+-- case: annotate rich model distances hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_rich', 'rich', {'upstream_distance': 0, 'downstream_distance': 5000})) t)
+
+-- case: annotate reference model compact
+SELECT * FROM query(duckvep_annotate_sql('ann_hgvs', 'hgvsref')) ORDER BY ALL
+
+-- case: annotate reference model compact hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_hgvs', 'hgvsref')) t)
+
+-- case: annotate reference model hgvs
+SELECT * FROM query(duckvep_annotate_sql('ann_hgvs', 'hgvsref', {'hgvs': true})) ORDER BY ALL
+
+-- case: annotate reference model hgvs hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_hgvs', 'hgvsref', {'hgvs': true})) t)
+
+-- case: annotate reference model rich hgvs
+SELECT * FROM query(duckvep_annotate_sql('ann_hgvs', 'hgvsref', {'hgvs': true, 'rich': true})) ORDER BY ALL
+
+-- case: annotate reference model rich hgvs hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_hgvs', 'hgvsref', {'hgvs': true, 'rich': true})) t)
+
+-- case: annotate readme projected
+SELECT * FROM query(duckvep_annotate_projected_sql('ann_lit', 'readme')) ORDER BY ALL
+
+-- case: annotate readme projected hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_projected_sql('ann_lit', 'readme')) t)
+
+-- case: annotate readme projected distances
+SELECT * FROM query(duckvep_annotate_projected_sql('ann_lit', 'readme', {'upstream_distance': 0, 'downstream_distance': 0})) ORDER BY ALL
+
+-- case: annotate readme projected distances hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_projected_sql('ann_lit', 'readme', {'upstream_distance': 0, 'downstream_distance': 0})) t)
+
+-- case: annotate rich model projected
+SELECT * FROM query(duckvep_annotate_projected_sql('ann_rich', 'rich')) ORDER BY ALL
+
+-- case: annotate rich model projected hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_projected_sql('ann_rich', 'rich')) t)
+
+-- case: annotate reference model projected
+SELECT * FROM query(duckvep_annotate_projected_sql('ann_hgvs', 'hgvsref')) ORDER BY ALL
+
+-- case: annotate reference model projected hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_projected_sql('ann_hgvs', 'hgvsref')) t)
+
+-- case: annotate transcript projection
+SELECT * FROM query(duckvep_transcript_projection_sql('ann_lit', 'readme_annotations', 'readme_projection_transcripts')) ORDER BY ALL
+
+-- case: annotate transcript projection hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_transcript_projection_sql('ann_lit', 'readme_annotations', 'readme_projection_transcripts')) t)
+
+-- case: annotate generated events compact
+SELECT * FROM query(duckvep_annotate_sql('ann_big', 'rich')) ORDER BY ALL
+
+-- case: annotate generated events compact hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_big', 'rich')) t)
+
+-- case: annotate generated events rich
+SELECT * FROM query(duckvep_annotate_sql('ann_big', 'rich', {'rich': true})) ORDER BY ALL
+
+-- case: annotate generated events rich hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_big', 'rich', {'rich': true})) t)
+
+-- case: annotate generated events hgvs
+SELECT * FROM query(duckvep_annotate_sql('ann_big', 'rich', {'hgvs': true, 'rich': true, 'upstream_distance': 200})) ORDER BY ALL
+
+-- case: annotate generated events hgvs hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_sql('ann_big', 'rich', {'hgvs': true, 'rich': true, 'upstream_distance': 200})) t)
+
+-- case: annotate generated events projected
+SELECT * FROM query(duckvep_annotate_projected_sql('ann_big', 'rich')) ORDER BY ALL
+
+-- case: annotate generated events projected hashes
+SELECT count(*) AS n, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h FROM query(duckvep_annotate_projected_sql('ann_big', 'rich')) t)
+
+-- case: annotate unknown model error
+SELECT count(*) FROM query(duckvep_annotate_sql('ann_readme', 'no-such-model'))
+
+-- case: annotate natives types
+SELECT typeof(_duckvep_annotate_small_rich('readme', 1::UINTEGER, 124::UBIGINT, 'T', 'C')) AS a, typeof(_duckvep_annotate_small_compact('readme', 1::UINTEGER, 124::UBIGINT, 'T', 'C')) AS b, typeof(_duckvep_annotate_small_hgvs('readme', 1::UINTEGER, 124::UBIGINT, 'T', 'C')) AS c, typeof(_duckvep_annotate_small_rich_hgvs('readme', 1::UINTEGER, 124::UBIGINT, 'T', 'C')) AS d, typeof(_duckvep_annotate_small_projected('readme', 1::UINTEGER, 124::UBIGINT, 'T', 'C')) AS e, typeof(_duckvep_annotate_small_projected_hgvs('readme', 1::UINTEGER, 124::UBIGINT, 'T', 'C')) AS f, typeof(_duckvep_annotate_structural_rich('readme', 1::UINTEGER, 90::UBIGINT, 200::UBIGINT, 'DEL', 'LOSS')) AS g, typeof(_duckvep_annotate_structural_compact('readme', 1::UINTEGER, 90::UBIGINT, 200::UBIGINT, 'DEL', 'LOSS')) AS h, typeof(_duckvep_annotate_breakend_rich('readme', 1::UINTEGER, 159::UBIGINT, 1::UINTEGER, 170::UBIGINT)) AS i, typeof(_duckvep_annotate_breakend_compact('readme', 1::UINTEGER, 159::UBIGINT, 1::UINTEGER, 170::UBIGINT)) AS j
+
+-- case: annotate natives direct
+SELECT u.* FROM (SELECT unnest(_duckvep_annotate_small_rich('readme', 1::UINTEGER, 124::UBIGINT, 'T', 'C', 0::UBIGINT, 0::UBIGINT)) AS u) ORDER BY ALL
+
+-- case: annotate natives distance overloads
+SELECT len(_duckvep_annotate_small_compact('readme', 1::UINTEGER, 90::UBIGINT, 'A', 'C')) AS a, len(_duckvep_annotate_small_compact('readme', 1::UINTEGER, 90::UBIGINT, 'A', 'C', 10::UBIGINT)) AS b, len(_duckvep_annotate_small_compact('readme', 1::UINTEGER, 90::UBIGINT, 'A', 'C', 10::UBIGINT, 10::UBIGINT)) AS c
+
+-- case: annotate natives null allele gives null
+SELECT _duckvep_annotate_small_compact('readme', 1::UINTEGER, 124::UBIGINT, NULL::VARCHAR, 'C') AS r
+
+-- case: annotate natives bad allele error
+SELECT _duckvep_annotate_small_compact('readme', 1::UINTEGER, 124::UBIGINT, 'T', 'X') AS r
+
+-- case: annotate natives empty model error
+SELECT _duckvep_annotate_small_compact('', 1::UINTEGER, 124::UBIGINT, 'T', 'C') AS r
+
+-- case: annotate natives long alleles
+SELECT len(_duckvep_annotate_small_rich('readme', 1::UINTEGER, 90::UBIGINT, repeat('A', 300), repeat('A', 100) || 'C' || repeat('A', 199))) AS n, md5(to_json(_duckvep_annotate_small_rich('readme', 1::UINTEGER, 90::UBIGINT, repeat('A', 300), repeat('A', 100) || 'C' || repeat('A', 199)))::VARCHAR) AS h
+
+-- case: annotate natives many rows
+SELECT count(*) AS n, sum(hash(u)::HUGEINT) AS s, bit_xor(hash(u)) AS x FROM (SELECT unnest(_duckvep_annotate_small_rich('readme', 1::UINTEGER, (90 + i % 200)::UBIGINT, substr('ACGT', 1 + i % 4, 1), substr('ACGT', 1 + (i + 1) % 4, 1))) AS u FROM range(9000) t(i))
+
+-- case: projection code
+SELECT string_agg(__duckvep_projection_code(c::UTINYINT), '|' ORDER BY c) AS codes FROM (VALUES (1), (2), (3)) v(c)
+
+-- case: projection code null
+SELECT __duckvep_projection_code(NULL::UTINYINT) IS NULL AS n
+
+-- case: projection code unsupported error
+SELECT __duckvep_projection_code(200::UTINYINT) AS c

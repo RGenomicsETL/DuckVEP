@@ -10,6 +10,7 @@
  * that fails or is cancelled destroys its rows; publish consumes the staging,
  * whether it succeeds or not. */
 #include "host_v2_columns.h"
+#include "host_v2_model.h"
 
 #include "core/duckvep_core_model.h"
 #include "core/duckvep_core_model_script.h"
@@ -34,12 +35,12 @@ typedef struct stage {
     struct stage *next;
 } stage;
 
-typedef struct {
+struct model_state {
     pthread_mutex_t lock;
     stage *stages;
     duckvep_registry_t *registry;
     size_t references;
-} model_state;
+};
 
 static void stage_destroy(stage *s) {
     if (!s) {
@@ -57,13 +58,13 @@ static void stage_destroy(stage *s) {
     free(s);
 }
 
-static void state_retain(model_state *state) {
+void host_v2_state_retain(model_state *state) {
     pthread_mutex_lock(&state->lock);
     state->references++;
     pthread_mutex_unlock(&state->lock);
 }
 
-static void state_release(void *pointer) {
+void host_v2_state_release(void *pointer) {
     model_state *state = pointer;
     bool last;
     if (!state) {
@@ -958,8 +959,8 @@ static bool register_model_scalar(duckdb_v2_extension_handle extension, duckdb_v
         function, DUCKDB_V2_FUNCTION_PROPERTY_NULL_HANDLING, DUCKDB_V2_FUNCTION_PROPERTY_NULL_HANDLING_SPECIAL,
         &detail));
     if (state) {
-        duckdb_v2_opaque data = {state, state_release, NULL};
-        state_retain(state);
+        duckdb_v2_opaque data = {state, host_v2_state_release, NULL};
+        host_v2_state_retain(state);
         retained = true;
         DUCKDB_CALL(duckdb_v2_scalar_function_set_user_data(function, &data, &detail));
         retained = false;
@@ -969,7 +970,7 @@ static bool register_model_scalar(duckdb_v2_extension_handle extension, duckdb_v
     success = true;
 cleanup:
     if (retained) {
-        state_release(state);
+        host_v2_state_release(state);
     }
     (void)duckdb_v2_logical_type_destroy(&type);
     (void)duckdb_v2_scalar_function_destroy(&function);
@@ -987,8 +988,8 @@ static bool register_stage_format(duckdb_v2_extension_handle extension, model_st
     DUCKDB_CALL(duckdb_v2_copy_function_create_with_extension(extension, &function, &detail));
     DUCKDB_CALL(duckdb_v2_copy_function_set_name(function, &name, &detail));
     {
-        duckdb_v2_opaque data = {state, state_release, NULL};
-        state_retain(state);
+        duckdb_v2_opaque data = {state, host_v2_state_release, NULL};
+        host_v2_state_retain(state);
         retained = true;
         DUCKDB_CALL(duckdb_v2_copy_function_set_user_data(function, &data, &detail));
         retained = false;
@@ -1002,7 +1003,7 @@ static bool register_stage_format(duckdb_v2_extension_handle extension, model_st
     success = true;
 cleanup:
     if (retained) {
-        state_release(state);
+        host_v2_state_release(state);
     }
     (void)duckdb_v2_copy_function_destroy(&function);
     (void)duckdb_v2_error_info_destroy(&detail);
@@ -1046,6 +1047,11 @@ bool host_v2_register_model(duckdb_v2_extension_handle extension, duckdb_v2_cont
                                "VARCHAR[]", load_sql_exec, error) &&
          register_model_scalar(extension, context, NULL, "duckvep_model_load_sql", load_types, load_names, 5,
                                "VARCHAR[]", load_sql_exec, error);
-    state_release(state); /* the registrations hold their own references */
+    ok = ok && host_v2_register_annotate(extension, context, state, error);
+    host_v2_state_release(state); /* the registrations hold their own references */
     return ok;
+}
+
+duckvep_registry_t *host_v2_registry_of(void *user_data) {
+    return ((model_state *)user_data)->registry;
 }

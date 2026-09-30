@@ -13,7 +13,7 @@ public functions.
 | Build | `make release` (the root `CMakeLists.txt`) | `make release_v2` (`host_v2/CMakeLists.txt`) |
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
 | Ships | yes: CRAN and the community repository | no: preview, waits for DuckDB 2.0.0 |
-| Functions | all 26 public functions | slices 1 to 4a: `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the twelve `duckvep_*_sql` builders, `duckvep_model_load` / `duckvep_model_drop` (as the COPY sink below), and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order` |
+| Functions | all 26 public functions | slices 1 to 4: `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the twelve `duckvep_*_sql` builders, `duckvep_model_load` / `duckvep_model_drop` (as the COPY sink below), and the internal `_duckvep_annotate_*` natives with `__duckvep_projection_code`, and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order` |
 
 The v2 host is a separate CMake project, so a v1 build does not compile or link
 any v2 file, and `duckdb_capi/` and MainDistributionPipeline are untouched. Since
@@ -48,6 +48,8 @@ cannot drift:
 | `duckvep_core_annotate.{c,h}` | `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql`: templates and option rendering |
 | `duckvep_core_ensembl.{c,h}` | the three Ensembl builders and `duckvep_model_receipt_sql`: templates, species option, receipt body |
 | `duckvep_core_prepare.{c,h}` | `duckvep_prepare_sv_geometry_sql`, `duckvep_prepare_expansionhunter_sql` and the BND identity, breakend gene and structural HGVS builders, with the `max_span` option |
+| `duckvep_core_annotate_run.{c,h}` | the ten `_duckvep_annotate_*` natives end to end: batch preparation from the argument columns, the per-worker state and its pool, the kernel run, HGVS and projection, and the LIST-of-STRUCT result writers. It touches DuckDB only through the `duckvep_h_*` layer below |
+| `duckvep_core_annotate_types.{c,h}` | the result columns of the natives, from which both hosts build their result types |
 | `duckvep_core_model.{c,h}` | the resident model: arrays, the six relation loaders and their validation, FASTA check, publication, lifting of circular regions, kernel open, the model registry, and the fingerprint. Loaders read *row sources* (`duckvep_source_t`: typed, flat column batches) and never a DuckDB result |
 | `duckvep_core_model_script.{c,h}` | the statements of the v2 load (below) |
 | `duckvep_core_phase.{c,h}` | `duckvep_phase_call`: list checks, policy and phase-set options, the two-pass slot reducer with a reader interface (`allele`, `phase`, `emit` callbacks), and the `_duckvep_revcomp`, `_duckvep_raw_gt` and `_duckvep_record_order` kernels |
@@ -97,7 +99,7 @@ DUCKVEP_V2_DUCKDB=... make test_v2_asan           # the same tests under ASan an
 `make test_v2` runs `test/scripts/check_v2_host.py static` (only stable
 `duckdb_v2_*` calls, opt-ins off, `host_v2/core` and `src/kernel` free of DuckDB),
 then `test/scripts/run_v2_tests.py`: LOAD on a writable and a read-only primary
-(twice, no DDL, database bytes unchanged), `test/sql_v2/v2_native.sql`, and the 326
+(twice, no DDL, database bytes unchanged), `test/sql_v2/v2_native.sql`, and the 393
 cases of `test/sql_v2/equality_cases.sql` compared with the recorded v1 host
 (`equality_golden.json`, from `run_v2_tests.py --record`, also re-checked live
 against the v1 build when `build/release` exists). CI is `.github/workflows/v2-host.yml`.
@@ -121,7 +123,7 @@ slices are Astra's (memo section 4); slice 1 is this one.
 | 2 | Vectors and types | nested LIST/STRUCT input and output, list-child capacity, >2,048-element nested output, DECIMAL/HUGEINT, ANY parameters and overloads, option STRUCTs (done) | `duckvep_repeat_alleles`, `duckvep_phase_call` (and internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order`) |
 | 3 | SQL-builder surface | builders only: VARCHAR and STRUCT option inputs, SQL text out, no macros, no DDL at LOAD (done) | `duckvep_ensembl_regions_sql`, `duckvep_ensembl_transcripts_sql`, `duckvep_ensembl_regulation_features_sql`, `duckvep_model_receipt_sql`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql`, `duckvep_prepare_sv_geometry_sql`, `duckvep_prepare_breakend_pairs_sql`, `duckvep_prepare_breakend_fusion_sql`, `duckvep_prepare_structural_hgvs_sql`, `duckvep_prepare_expansionhunter_sql` |
 | 4a | Model sink (COPY staging) | stable-v2 COPY callbacks take the caller's relations; exact-size native arrays; explicit publish and drop (done) | `duckvep_model_load`, `duckvep_model_drop` |
-| 4b | Annotation natives | the internal natives that read a pinned model; then `duckvep_annotate_sql` and the projection builders execute on v2 | internal `_duckvep_annotate_*`, `__duckvep_projection_code` |
+| 4b | Annotation natives | the internal natives that read a pinned model; `duckvep_annotate_sql`, `duckvep_annotate_projected_sql` and `duckvep_transcript_projection_sql` execute on v2 with results equal to v1 (done) | internal `_duckvep_annotate_*`, `__duckvep_projection_code` |
 | 5 | Haplotype capture | caller-side normalization into spillable column collections, serial scanner, no appender | `duckvep_haplotypes`, `duckvep_coding_transcripts`, `duckvep_coding_calls` (all three share `src/duckvep_discovery.c`, which reads the model) |
 | 6 | Bounded parallelism | partitioned workers, spill, cancellation and cleanup, quota accounting; 5M variants and a ten-job stress | `duckvep_native_budget`, `duckvep_native_budget_set`, `duckvep_native_budget_reset_high_water`, `duckvep_worker_limits_set` |
 
@@ -151,7 +153,7 @@ Files not listed (`src/kernel/**`, `duckvep_reference.c`, `third_party/`,
 | `duckvep_sql.c` | `duckvep_so_terms`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql` | table-function bind/global state/exec (`duckvep_so_terms` done); the three builders (done) |
 | `duckvep_prepare_sql.c`, `duckvep_structural_sql.c` | five preparation builders (done) | builder adapter: `host_v2_builders.c` |
 | `duckvep_ensembl.c` | four Ensembl/receipt builders (done) | builder adapter: `host_v2_builders.c` |
-| `duckvep_annotate.c` | `duckvep_allele_geometry`, `duckvep_breakend_geometry` (ported), ten internal annotation natives (registry pin, `volatile`, extra info, STRUCT/LIST output) | scalar user data for the registry, STRUCT output, LIST output with child capacity, per-worker scratch |
+| `duckvep_annotate.c` | `duckvep_allele_geometry`, `duckvep_breakend_geometry` (ported), registration of the ten internal annotation natives (implementation in `src/core/duckvep_core_annotate_run.c`; all done) | the host layer of `duckvep_host.h` (`host_v2/duckvep_host.h`), scalar user data for the registry, LIST-of-STRUCT output with reserved child capacity. Done in `host_v2_annotate.c` |
 | `duckvep_repeat.c` | `duckvep_repeat_alleles` (done) | LIST and STRUCT input, DECIMAL/HUGEINT cells, NULL-in-child propagation, option STRUCT. Done in `host_v2_nested.c` |
 | `duckvep_phase_sql.c` | `duckvep_phase_call`, `_duckvep_raw_gt`, `_duckvep_record_order` (all done) | the same as repeat, plus LIST<STRUCT> output sized once per chunk. Done in `host_v2_nested.c` |
 | `duckvep_model.c` | `duckvep_model_load`/`_drop` and the registry with its private connection (v1 only; the model itself is `src/core`) | done for v2 in `host_v2_model.c`: COPY-to bind/init/batch/flush/finalize, ordered merge into a column-data collection, scan sources, publish/drop/fingerprint, the statement builder |
@@ -215,6 +217,25 @@ invalid staged rows, a wrong column type, discard by drop, and option errors.
 v2 does not yet have `duckvep_native_budget_set` (slice 6), so the budget refusal of a model load is tested on v1
 (`make test_fault_injection` fails every allocation of a load in turn) and shared by v2 through the same loaders.
 
+## The annotation natives on both hosts (slice 4b)
+
+`src/duckvep_annotate.c` held about 3,800 lines of annotation natives whose only DuckDB dependence is a few
+dozen vector calls. They moved to `src/core/duckvep_core_annotate_run.c`, which calls a small *host layer*
+instead: `duckvep_h_data`, `_validity`, `_chunk_vector`, `_chunk_rows`, `_struct_child`, `_list_child`,
+`_list_reserve`, `_list_set_size`, `_assign_string`, `_set_error`, `_extra_info`. Each host supplies its own
+`duckvep_host.h`; the core file includes it by name and resolves to `src/duckvep_host.h` in a v1 build and
+`host_v2/duckvep_host.h` in a v2 build.
+
+- **v1:** the layer is macros over the v1 C API calls the code used before, so the v1 build compiles to the
+  same calls and its results (and throughput, see the NEWS entry) are unchanged. `src/duckvep_annotate.c` keeps the
+  geometry scalars and the registration.
+- **v2:** the layer wraps the flat argument vectors and opens the result list for its reserved capacity
+  (writers size validity masks by an upper bound) and shrinks it to its final element count when the call ends.
+  Output masks start all valid; invalid UTF-8 becomes NULL, as in v1. `host_v2_annotate.c` registers the ten natives
+  (three overloads each for the optional distances) and `__duckvep_projection_code`.
+
+The v1 and v2 natives are volatile and use default NULL handling (a NULL argument yields NULL), exactly as on v1.
+
 ## Builders: text equality, and what runs on v2
 
 The builders' product is SQL text, so the gate is byte equality: the equality suite compares
@@ -231,8 +252,8 @@ Which built queries execute on v2 today (slice 3), by the natives their text cal
 | `duckvep_prepare_sv_geometry_sql`, `_prepare_expansionhunter_sql`, `_prepare_breakend_fusion_sql`, `_prepare_structural_hgvs_sql`, `_prepare_breakend_pairs_sql` | SQL only; `duckvep_breakend_geometry` (pairs, hgvs) | yes: run against fixtures in the suite and equal to v1 (the expansionhunter rows also feed `duckvep_repeat_alleles`) |
 | `duckvep_ensembl_regions_sql`, `_ensembl_regulation_features_sql`, `duckvep_model_receipt_sql` | SQL only | yes in principle (plain SQL over caller tables); only the text is tested |
 | `duckvep_ensembl_transcripts_sql` | `_duckvep_revcomp` | yes in principle; only the text is tested |
-| `duckvep_annotate_sql`, `duckvep_annotate_projected_sql` | `_duckvep_annotate_*` natives | no: slice 4 (they read a pinned model) |
-| `duckvep_transcript_projection_sql` | `__duckvep_projection_code` (and `duckvep_so_terms`, `_duckvep_revcomp`, `duckvep_allele_geometry`) | no: `__duckvep_projection_code` is slice 4 |
+| `duckvep_annotate_sql`, `duckvep_annotate_projected_sql` | `_duckvep_annotate_*` natives | yes (slice 4b): executed on the README, rich and reference-FASTA models in compact, rich, HGVS and projected modes, equal to v1 row for row |
+| `duckvep_transcript_projection_sql` | `__duckvep_projection_code` (and `duckvep_so_terms`, `_duckvep_revcomp`, `duckvep_allele_geometry`) | yes (slice 4b), equal to v1 |
 
 `duckvep_coding_transcripts` has no SQL-text part: it is a model lookup and moves with slice 4.
 
