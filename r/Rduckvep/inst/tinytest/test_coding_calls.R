@@ -34,5 +34,6 @@ local({
   expect_error(rduckvep_coding_calls(con, "tinytest_calls", tempfile(fileext = ".vcf")), "cannot open")
   expect_error(rduckvep_coding_calls(con, "no_such_model", vcf), "require a loaded model")
   expect_error(rduckvep_coding_calls(con, "tinytest_calls", ""), "path")
+  invisible(gc())   # release the failed statements, which pin the model until collected
   expect_true(DBI::dbGetQuery(con, "SELECT duckvep_model_drop('tinytest_calls') AS dropped")$dropped)
 })
