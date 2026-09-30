@@ -1,5 +1,9 @@
 # DuckVEP
 
+## DuckDB C API v2 host, slice 1 (issue #8)
+
+- A second, preview build of the extension targets DuckDB's stable C API v2 (`make release_v2`, footer `C_STRUCT`, extension API `v2.0.0`), next to the unchanged v1 build that ships. It uses only stable v2 functions against a pinned preview SDK (`duckdb_capi_v2/`, pins in `duckvep-package.json`) and runs no SQL at LOAD. This slice ports `duckvep_so_terms`, `duckvep_allele_geometry` and `duckvep_breakend_geometry`, whose results are identical to the v1 host's on 52 test cases. `docs/v2-host.md` maps all 25 public functions to the remaining slices.
+
 ## Haplotype scale qualification (issue #2, slice 7)
 
 - `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)` returns the ascending model ordinals of the transcripts the VCF event touches in coding sequence, from the resident interval index. It finds exactly the (event, transcript) pairs of the annotation builder's CDS overlap: the event is normalized inside the scalar as the builder does (a shared anchor base creates no overlap, an insertion is an interbase point, introns of at most 13 bases inside the CDS count as coding), so a whole-genome VCF reduces to its coding records before any per-record work. Records in an intron, UTR, flank or intergenic sequence, alleles that are not literal bases and events without a difference return an empty list. Integer arguments of any width and signedness bind. Lifted circular models are refused, like `duckvep_haplotypes`. It stays a separate scalar next to `duckvep_haplotypes` (whose input is a caller-staged relation of calls); `rduckvep_coding_transcripts()` is its R wrapper. On whole HG002 it matches the builder on 247,374 pairs with none missing or extra.
