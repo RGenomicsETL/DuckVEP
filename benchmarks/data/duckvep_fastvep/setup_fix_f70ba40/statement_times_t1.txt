@@ -1,0 +1,45 @@
+  exec    0.00 s  LOAD '/root/duckvep/data/closure/ext-660a4ed/duckvep.duckdb_extension'
+  exec    0.09 s  LOAD '/root/duckvep/data/closure/ext-duckhts/duckhts.duckdb_extension'
+  exec    0.00 s  PRAGMA threads=1
+  exec    0.00 s  SET memory_limit = '16GB'
+  exec    0.00 s  SET preserve_insertion_order = true
+  exec    5.00 s  COPY (SELECT CHROM, POS, ID, REF, ALT FROM read_bcf('/root/.cache/duckhts/benchmarks/variantkey-prov
+  exec    4.31 s  COPY (SELECT feature, map_from_entries(list_transform( list_filter(string_split(attributes, ';'), x
+  exec    0.00 s  CREATE TEMP MACRO read_bcf(path, scan_mode := 'sequential', decompression_threads := 0) AS TABLE SEL
+  exec    0.00 s  CREATE TEMP MACRO read_gff(path, attributes_map := TRUE, scan_mode := 'sequential') AS TABLE SELECT
+  exec    0.00 s  PRAGMA threads=1
+  exec    0.00 s  SET memory_limit = '16GB'
+  exec    0.00 s  SET max_temp_directory_size = '8GB'
+  exec    0.00 s  SET temp_directory = '/tmp/RtmpAVciPB/duckdb'
+  exec    0.00 s  SET preserve_insertion_order = false
+  exec    0.01 s  ATTACH '/root/.cache/duckhts/models/duckvep/ensembl-116-grch38-38da573cf9968c58e5ff42b8edddd0de952cc
+  get     0.00 s  SELECT table_name FROM information_schema.tables WHERE table_catalog = 'duckvep_bench_model' AND tab
+  exec    0.00 s  CREATE TEMP TABLE duckvep_bench_regions AS SELECT seq_region, name FROM (SELECT seq_region, sequence
+  exec    0.07 s  CREATE TEMP TABLE duckvep_bench_transcript_labels AS SELECT transcript_index, gene_stable_id, transc
+  get     3.02 s  SELECT loaded FROM duckvep_model_load( 'fastvep_comparison', 'SELECT seq_region, sequence_length FRO
+  get     0.00 s  SELECT current_setting('preserve_insertion_order') AS preserve_order
+  exec    0.00 s  SET preserve_insertion_order = true
+  exec    0.45 s  CREATE TEMP TABLE fastvep_source AS SELECT row_number() OVER ()::UBIGINT AS record_index, CHROM AS c
+  exec    0.00 s  SET preserve_insertion_order = false
+  exec    1.85 s  CREATE TEMP TABLE fastvep_source_spelling AS WITH anchored AS ( SELECT *, len(list_filter(alternates
+  exec    0.00 s  SET preserve_insertion_order = false
+  exec    0.00 s  SET preserve_insertion_order = false
+  exec    0.06 s  CREATE TEMP TABLE fastvep_chrom_region AS SELECT c.chrom, r.seq_region FROM (SELECT DISTINCT chrom F
+  exec   12.69 s  CREATE TEMP TABLE fastvep_events AS SELECT row_number() OVER (ORDER BY s.record_index, a.alt_index):
+  get     0.24 s  SELECT count(*) n FROM ( SELECT record_index, alt_index FROM fastvep_events GROUP BY record_index, a
+  exec    0.00 s  CREATE TEMP VIEW fastvep_ordered_events AS SELECT * FROM fastvep_events ORDER BY seq_region, positio
+  get     0.00 s  SELECT table_name FROM information_schema.tables WHERE table_catalog = 'duckvep_bench_model' AND tab
+  get     0.07 s  SELECT count(*) n FROM ( SELECT t.transcript_id, a.code FROM duckvep_bench_model.ensembl_core.transc
+  exec    0.22 s  CREATE TEMP TABLE fastvep_attributes AS SELECT t.transcript_id, max(t.value) FILTER (WHERE a.code =
+  exec    0.12 s  CREATE TEMP TABLE fastvep_core_metadata AS SELECT t.transcript_index, t.source_transcript_id = g.can
+  exec    0.17 s  CREATE TEMP TABLE fastvep_gff AS SELECT feature, attributes_map AS attributes FROM read_gff('/root/d
+  exec    0.06 s  CREATE TEMP TABLE fastvep_gff_genes AS SELECT regexp_replace(attributes['ID'], '^gene:', '') AS gene
+  exec    0.27 s  CREATE TEMP TABLE fastvep_gff_transcripts AS SELECT regexp_replace(attributes['ID'], '^transcript:',
+  exec    0.24 s  CREATE TEMP TABLE fastvep_metadata AS SELECT t.transcript_index, gg.symbol, CASE WHEN gt.transcript_
+  get     0.00 s  SELECT count(*) n FROM fastvep_metadata WHERE canonical IS NULL
+  exec    0.10 s  CREATE OR REPLACE TEMP TABLE fastvep_transcript_dimension AS SELECT t.transcript_index, t.gene_stabl
+  get     0.00 s  SELECT count(*) AS n FROM fastvep_transcript_dimension WHERE canonical IS NULL
+  exec   47.67 s  COPY (SELECT coalesce((coalesce(p.variant_id, p.native_location || '_' || p.native_reference || '/'
+real	1m17.295s
+user	1m13.074s
+sys	0m4.040s
