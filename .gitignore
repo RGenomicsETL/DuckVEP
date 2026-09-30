@@ -45,3 +45,4 @@ test/sql/linear_*.fa.fai
 test/sql/mt.fa
 test/sql/mt.fa.fai
 __pycache__/
+.deps-v2/
