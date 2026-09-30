@@ -692,6 +692,25 @@ Positive elapsed change means slower execution; negative throughput change
 means fewer input alleles per second. Identical output checksums are required
 before a pair is admitted to this table.
 
+The 2026-09-30 pair of rows (the branch commit `cfba55c` and its base on
+`origin/main`, `fad40e9`) was taken back to back on one host under DuckDB
+v1.5.5. Earlier rows in this ledger used DuckDB v1.5.3 and are not comparable
+in absolute seconds; only the paired rows are. Each run loaded an immutable
+copy of the `make release` binary of its revision (`extension_build_binding`
+`prebuilt_immutable_copy`, bound by SHA-256), started with a one-minute load
+average of at most 4 and, for one-core runs, an idle SMT sibling, and staged the
+same 4,095,611 alleles from the fastvep source map of GIAB HG002 v4.2.1 (source
+VCF SHA-256 `adb4d4a5...`); the aggregate checksums equal the 2026-07 rows
+above, and the untimed full-row fingerprints are equal between the two
+revisions in every mode. The two revisions alternated. One-core compact rows are
+the median of five runs (4.001 to 4.046 s and 3.923 s for the branch, 4.615 to
+4.791 s for `fad40e9`); the other one-core rows are the median of three runs
+(rich) or the faster of two (hgvs, rich_hgvs). Four-thread rows are the fastest
+run of five (compact), three (rich) or two (hgvs, rich_hgvs) because the pinned
+CPU set 2, 4, 6, 8 shares core 6 with an unrelated benchmark job, which made
+individual four-thread runs bimodal (compact: 1.04 to 1.07 s or 1.53 s for the
+branch, 1.43 to 1.96 s for `fad40e9`).
+
 This exact-revision comparison uses the complete Ensembl 116 GRCh38 model:
 644,427 transcripts, 5,068,416 exon memberships, and all 1,383,580 resident
 RegulatoryFeature and MotifFeature intervals. It annotates every one of the
