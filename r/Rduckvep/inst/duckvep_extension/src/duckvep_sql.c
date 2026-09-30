@@ -2,6 +2,7 @@
 #include "duckdb_extension.h"
 #include "kernel/src/duckvep_budget.h"
 DUCKDB_EXTENSION_EXTERN
+#include "duckvep_v1_cells.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,6 +16,7 @@ DUCKDB_EXTENSION_EXTERN
 #include "duckvep_sql.h"
 #include "duckvep_builder.h"
 #include "core/duckvep_core_geometry.h"
+#include "core/duckvep_core_annotate.h"
 
 typedef struct {
 	idx_t offset;
@@ -125,52 +127,14 @@ duckvep_register_so_terms(duckdb_connection connection)
 	return state == DuckDBSuccess;
 }
 
-static bool duckvep_projection_table(duckvep_sql_text *sql, const char *name);
 
-/* Annotation SQL keeps the event relation in the caller's transaction. */
-#include "duckvep_annotate_template.h"
-#include "duckvep_projected_template.h"
-
-static bool
-duckvep_annotate_number(duckdb_vector vector, idx_t row, duckvep_sql_text *sql)
+/* Reads option `field` of this row into a cell (the row's storage type). */
+static void
+duckvep_annotate_option_cell(duckdb_vector field, idx_t row, duckvep_cell_t *cell)
 {
-    uint64_t *validity = duckdb_vector_get_validity(vector);
-    duckdb_logical_type type = duckdb_vector_get_column_type(vector);
-    duckdb_type id = duckdb_get_type_id(type);
+    duckdb_logical_type type = duckdb_vector_get_column_type(field);
+    duckvep_v1_fill_cell(field, duckdb_get_type_id(type), 0, row, cell);
     duckdb_destroy_logical_type(&type);
-    if (id == DUCKDB_TYPE_SQLNULL || (validity && !duckdb_validity_row_is_valid(validity, row)))
-        return duckvep_sql_append(sql, "NULL");
-    const void *data = duckdb_vector_get_data(vector);
-    int64_t signed_value = 0;
-    uint64_t unsigned_value = 0;
-    bool is_unsigned = false;
-    switch (id) {
-    case DUCKDB_TYPE_TINYINT: signed_value = ((const int8_t *)data)[row]; break;
-    case DUCKDB_TYPE_SMALLINT: signed_value = ((const int16_t *)data)[row]; break;
-    case DUCKDB_TYPE_INTEGER: signed_value = ((const int32_t *)data)[row]; break;
-    case DUCKDB_TYPE_BIGINT: signed_value = ((const int64_t *)data)[row]; break;
-    case DUCKDB_TYPE_UTINYINT: unsigned_value = ((const uint8_t *)data)[row]; is_unsigned = true; break;
-    case DUCKDB_TYPE_USMALLINT: unsigned_value = ((const uint16_t *)data)[row]; is_unsigned = true; break;
-    case DUCKDB_TYPE_UINTEGER: unsigned_value = ((const uint32_t *)data)[row]; is_unsigned = true; break;
-    case DUCKDB_TYPE_UBIGINT: unsigned_value = ((const uint64_t *)data)[row]; is_unsigned = true; break;
-    default: return false;
-    }
-    char buffer[32];
-    if (is_unsigned) snprintf(buffer, sizeof(buffer), "%" PRIu64, unsigned_value);
-    else snprintf(buffer, sizeof(buffer), "%" PRId64, signed_value);
-    return duckvep_sql_append(sql, buffer);
-}
-
-static bool
-duckvep_annotate_boolean(duckdb_vector vector, idx_t row, duckvep_sql_text *sql)
-{
-    uint64_t *validity = duckdb_vector_get_validity(vector);
-    duckdb_logical_type type = duckdb_vector_get_column_type(vector);
-    duckdb_type id = duckdb_get_type_id(type);
-    duckdb_destroy_logical_type(&type);
-    if (id == DUCKDB_TYPE_SQLNULL || (validity && !duckdb_validity_row_is_valid(validity, row)))
-        return duckvep_sql_append(sql, "NULL");
-    return duckvep_sql_append(sql, ((const uint8_t *)duckdb_vector_get_data(vector))[row] ? "true" : "false");
 }
 
 static void
@@ -182,8 +146,6 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
         DUCKVEP_OPTION_INTEGER, DUCKVEP_OPTION_BOOLEAN};
     const char *const projected_keys[] = {"upstream_distance", "downstream_distance"};
     const duckvep_option_kind projected_kinds[] = {DUCKVEP_OPTION_INTEGER, DUCKVEP_OPTION_INTEGER};
-    const char *const tokens[] = {"__DUCKVEP_EVENTS__", "__DUCKVEP_MODEL__", "__DUCKVEP_HGVS__",
-        "__DUCKVEP_UPSTREAM__", "__DUCKVEP_DOWNSTREAM__", "__DUCKVEP_RICH__"};
     idx_t argc = duckdb_data_chunk_get_column_count(input);
     duckdb_vector args[3];
     for (idx_t i = 0; i < argc; i++) args[i] = duckdb_data_chunk_get_vector(input, i);
@@ -197,7 +159,7 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
             if (!names[i]) { ok = false; break; }
         }
         if (ok && projected && names[1][0] == '\0') {
-            duckdb_scalar_function_set_error(info, "duckvep_annotate_projected: model_name must be non-empty");
+            duckdb_scalar_function_set_error(info, duckvep_core_projected_model_empty);
             for (idx_t i = 0; i < 2; i++) duckvep_budget_free(names[i]);
             return;
         }
@@ -208,45 +170,18 @@ duckvep_annotate_builder_impl(duckdb_function_info info, duckdb_data_chunk input
                 duckvep_builder_option_vectors(info, args[2], row, keys, kinds, 4, fields);
             if (!ok) { for (idx_t i = 0; i < 2; i++) duckvep_budget_free(names[i]); return; }
         }
-        duckvep_sql_text values[6] = {{0}};
-        if (ok) ok = duckvep_projection_table(&values[0], names[0]) &&
-            duckvep_sql_literal(&values[1], names[1]) &&
-            duckvep_sql_append(&values[2], "false") &&
-            duckvep_sql_append(&values[3], "5000") &&
-            duckvep_sql_append(&values[4], "5000") &&
-            duckvep_sql_append(&values[5], "false");
+        duckvep_cell_t cells[4];
+        const duckvep_cell_t *options[4] = {0};
         for (size_t i = 0; ok && i < (projected ? 2 : 4); i++) {
             if (!fields[i]) continue;
-            size_t dest = projected ? i + 3 : (i == 3 ? 5 : i + 2);
-            duckvep_sql_free(&values[dest]);
-            ok = !projected && (i == 0 || i == 3) ?
-                duckvep_annotate_boolean(fields[i], row, &values[dest]) :
-                duckvep_annotate_number(fields[i], row, &values[dest]);
+            duckvep_annotate_option_cell(fields[i], row, &cells[i]);
+            options[i] = &cells[i];
         }
         duckvep_sql_text sql = {0};
-        size_t part_count = projected ? sizeof(duckvep_projected_parts) / sizeof(*duckvep_projected_parts) :
-            sizeof(duckvep_annotate_parts) / sizeof(*duckvep_annotate_parts);
-        for (size_t i = 0; ok && i < part_count; i++) {
-            const char *part = projected ? duckvep_projected_parts[i] : duckvep_annotate_parts[i];
-            while (ok && *part) {
-                const char *mark = strstr(part, "__DUCKVEP_");
-                if (!mark) { ok = duckvep_sql_append(&sql, part); break; }
-                size_t length = (size_t)(mark - part);
-                char *prefix = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
-                if (!prefix) { ok = false; break; }
-                memcpy(prefix, part, length); prefix[length] = 0;
-                ok = duckvep_sql_append(&sql, prefix); duckvep_budget_free(prefix);
-                size_t index = 0;
-                while (index < 6 && strncmp(mark, tokens[index], strlen(tokens[index])) != 0) index++;
-                if (index == 6) { ok = false; break; }
-                if (ok) ok = duckvep_sql_append(&sql, values[index].data);
-                part = mark + strlen(tokens[index]);
-            }
-        }
+        if (ok) ok = duckvep_core_annotate_sql(projected, names[0], names[1], options, &sql);
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
-        else duckvep_builder_set_error(info, "duckvep_annotate_sql: invalid input or allocation failure");
+        else duckvep_builder_set_error(info, duckvep_core_annotate_failed);
         duckvep_sql_free(&sql);
-        for (size_t i = 0; i < 6; i++) duckvep_sql_free(&values[i]);
         for (idx_t i = 0; i < 2; i++) duckvep_budget_free(names[i]);
         if (!ok) return;
     }
@@ -339,26 +274,6 @@ register_duckvep_sql_kernels(duckhts_registration_t *registration)
 	return true;
 }
 
-static bool
-duckvep_projection_table(duckvep_sql_text *sql, const char *name)
-{
-    const char *dot = strchr(name, '.');
-    if (dot) {
-        size_t length = (size_t)(dot - name);
-        char *schema = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
-        if (!schema) return false;
-        memcpy(schema, name, length);
-        schema[length] = 0;
-        bool ok = duckvep_sql_identifier(sql, schema) && duckvep_sql_append(sql, ".") &&
-            duckvep_sql_identifier(sql, dot + 1);
-        duckvep_budget_free(schema);
-        return ok;
-    }
-    return duckvep_sql_identifier(sql, name);
-}
-
-#include "duckvep_projection_template.h"
-
 static void
 duckvep_projection_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output)
 {
@@ -385,27 +300,9 @@ duckvep_projection_builder(duckdb_function_info info, duckdb_data_chunk input, d
             }
         }
         duckvep_sql_text sql = {0};
-        for (size_t i = 0; ok && i < sizeof(duckvep_projection_parts) / sizeof(*duckvep_projection_parts); i++) {
-            const char *part = duckvep_projection_parts[i];
-            while (ok && *part) {
-                const char *mark = strstr(part, "__DUCKVEP_");
-                if (!mark) { ok = duckvep_sql_append(&sql, part); break; }
-                size_t length = (size_t)(mark - part);
-                char *prefix = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
-                if (!prefix) { ok = false; break; }
-                memcpy(prefix, part, length); prefix[length] = 0;
-                ok = duckvep_sql_append(&sql, prefix); duckvep_budget_free(prefix);
-                const char *token = NULL; idx_t which = 0;
-                if (!strncmp(mark, "__DUCKVEP_EVENTS_TABLE__", strlen("__DUCKVEP_EVENTS_TABLE__"))) token = "__DUCKVEP_EVENTS_TABLE__";
-                else if (!strncmp(mark, "__DUCKVEP_ANNOTATIONS_TABLE__", strlen("__DUCKVEP_ANNOTATIONS_TABLE__"))) { token = "__DUCKVEP_ANNOTATIONS_TABLE__"; which = 1; }
-                else if (!strncmp(mark, "__DUCKVEP_TRANSCRIPTS_TABLE__", strlen("__DUCKVEP_TRANSCRIPTS_TABLE__"))) { token = "__DUCKVEP_TRANSCRIPTS_TABLE__"; which = 2; }
-                else ok = false;
-                if (ok) ok = duckvep_projection_table(&sql, names[which]);
-                if (token) part = mark + strlen(token);
-            }
-        }
+        if (ok) ok = duckvep_core_projection_sql((const char *const *)names, &sql);
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
-        else duckvep_builder_set_error(info, "duckvep_transcript_projection_sql: invalid table name, options, or allocation failure");
+        else duckvep_builder_set_error(info, duckvep_core_projection_failed);
         duckvep_sql_free(&sql);
         for (idx_t i = 0; i < 3; i++) duckvep_budget_free(names[i]);
         if (!ok) return;

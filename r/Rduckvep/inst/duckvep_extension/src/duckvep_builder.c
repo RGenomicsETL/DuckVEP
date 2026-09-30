@@ -1,5 +1,6 @@
 #include "duckvep_builder.h"
 #include "kernel/src/duckvep_budget.h"
+#include "core/duckvep_core_cells.h"
 DUCKDB_EXTENSION_EXTERN
 
 #include <stdint.h>
@@ -21,81 +22,8 @@ duckvep_builder_set_error(duckdb_function_info info, const char *message)
     duckdb_scalar_function_set_error(info, message);
 }
 
-static bool reserve(duckvep_sql_text *text, size_t extra) {
-    if (extra > SIZE_MAX - text->length - 1) return false;
-    size_t needed = text->length + extra + 1;
-    if (needed <= text->capacity) return true;
-    size_t capacity = text->capacity ? text->capacity : 128;
-    while (capacity < needed) {
-        if (capacity > SIZE_MAX / 2) { capacity = needed; break; }
-        capacity *= 2;
-    }
-    char *data = duckvep_budget_realloc(DUCKVEP_OWNER_CONTROL, text->data, capacity);
-    if (!data) return false;
-    text->data = data;
-    text->capacity = capacity;
-    return true;
-}
-
-bool duckvep_sql_append(duckvep_sql_text *text, const char *part) {
-    size_t size = strlen(part);
-    if (!reserve(text, size)) return false;
-    memcpy(text->data + text->length, part, size + 1);
-    text->length += size;
-    return true;
-}
-
-static bool quoted(duckvep_sql_text *text, const char *part, char mark) {
-    if (!part) return duckvep_sql_append(text, "NULL");
-    size_t size = strlen(part), duplicates = 0;
-    for (size_t i = 0; i < size; i++) if (part[i] == mark) duplicates++;
-    if (size > SIZE_MAX - duplicates - 2 || !reserve(text, size + duplicates + 2)) return false;
-    text->data[text->length++] = mark;
-    for (size_t i = 0; i < size; i++) {
-        text->data[text->length++] = part[i];
-        if (part[i] == mark) text->data[text->length++] = mark;
-    }
-    text->data[text->length++] = mark;
-    text->data[text->length] = '\0';
-    return true;
-}
-
-bool duckvep_sql_identifier(duckvep_sql_text *text, const char *name) {
-    return name && quoted(text, name, '"');
-}
-bool duckvep_sql_literal(duckvep_sql_text *text, const char *value) {
-    return quoted(text, value, '\'');
-}
-void duckvep_sql_free(duckvep_sql_text *text) {
-    duckvep_budget_free(text->data);
-    *text = (duckvep_sql_text){0};
-}
-
-/* A qualified name has exactly one schema separator; each component is quoted. */
-bool duckvep_sql_relation(duckvep_sql_text *sql, const char *name) {
-    const char *dot = strchr(name, '.');
-    if (!*name || (dot && (!dot[1] || dot == name || strchr(dot + 1, '.')))) return false;
-    if (!dot) return duckvep_sql_identifier(sql, name);
-    size_t size = (size_t)(dot - name);
-    char *schema = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, size + 1);
-    if (!schema) return false;
-    memcpy(schema, name, size); schema[size] = 0;
-    bool ok = duckvep_sql_identifier(sql, schema) && duckvep_sql_append(sql, ".") &&
-        duckvep_sql_identifier(sql, dot + 1);
-    duckvep_budget_free(schema);
-    return ok;
-}
-
 char *duckvep_builder_string(duckdb_string_t string) {
-    size_t length = duckdb_string_t_length(string);
-    const char *data = duckdb_string_t_data(&string);
-    if (memchr(data, 0, length)) return NULL;
-    char *copy = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
-    if (copy) {
-        memcpy(copy, data, length);
-        copy[length] = '\0';
-    }
-    return copy;
+    return duckvep_core_string_copy(duckdb_string_t_data(&string), duckdb_string_t_length(string));
 }
 
 bool duckvep_builder_option_vectors(duckdb_function_info info, duckdb_vector vector,
@@ -114,27 +42,24 @@ bool duckvep_builder_option_vectors(duckdb_function_info info, duckdb_vector vec
     for (idx_t i = 0; i < fields; i++) {
         char *key = duckdb_struct_type_child_name(type, i);
         duckdb_logical_type field_type = duckdb_struct_type_child_type(type, i);
-        size_t at = 0;
-        while (at < count && strcmp(key, names[at]) != 0) at++;
+        size_t at = duckvep_core_option_index(key, names, count);
         duckdb_type id = duckdb_get_type_id(field_type);
         bool integer = id >= DUCKDB_TYPE_TINYINT && id <= DUCKDB_TYPE_UBIGINT;
         bool numeric = integer || id == DUCKDB_TYPE_HUGEINT || id == DUCKDB_TYPE_DECIMAL ||
             id == DUCKDB_TYPE_FLOAT || id == DUCKDB_TYPE_DOUBLE;
-        bool permitted = at < count && (id == DUCKDB_TYPE_SQLNULL ||
-            (kinds[at] == DUCKVEP_OPTION_TEXT && id == DUCKDB_TYPE_VARCHAR) ||
-            (kinds[at] == DUCKVEP_OPTION_INTEGER && integer) ||
-            (kinds[at] == DUCKVEP_OPTION_BOOLEAN && id == DUCKDB_TYPE_BOOLEAN) ||
-            (kinds[at] == DUCKVEP_OPTION_NUMERIC && numeric));
-        if (!permitted) {
-            char message[256];
-            const char *type_name = at == count ? "" : kinds[at] == DUCKVEP_OPTION_TEXT ?
-                "VARCHAR" : kinds[at] == DUCKVEP_OPTION_INTEGER ? "INTEGER" :
-                kinds[at] == DUCKVEP_OPTION_BOOLEAN ? "BOOLEAN" : "numeric";
-            if (at == count || kinds[at] == DUCKVEP_OPTION_TEXT)
-                snprintf(message, sizeof(message), "DuckVEP builder: %s option '%s'",
-                         at == count ? "unknown" : "expected VARCHAR for", key);
-            else snprintf(message, sizeof(message), "DuckVEP builder: expected %s for option '%s'",
-                          type_name, key);
+        duckvep_core_field_type_t field = id == DUCKDB_TYPE_SQLNULL ? DUCKVEP_CORE_FIELD_SQLNULL :
+            id == DUCKDB_TYPE_VARCHAR ? DUCKVEP_CORE_FIELD_VARCHAR :
+            id == DUCKDB_TYPE_BOOLEAN ? DUCKVEP_CORE_FIELD_BOOLEAN :
+            integer ? DUCKVEP_CORE_FIELD_INTEGER : numeric ? DUCKVEP_CORE_FIELD_NUMERIC :
+            DUCKVEP_CORE_FIELD_OTHER;
+        duckvep_core_option_kind_t core_kinds[8];
+        for (size_t k = 0; k < count && k < 8; k++)
+            core_kinds[k] = kinds[k] == DUCKVEP_OPTION_TEXT ? DUCKVEP_CORE_OPTION_TEXT :
+                kinds[k] == DUCKVEP_OPTION_INTEGER ? DUCKVEP_CORE_OPTION_INTEGER :
+                kinds[k] == DUCKVEP_OPTION_BOOLEAN ? DUCKVEP_CORE_OPTION_BOOLEAN :
+                DUCKVEP_CORE_OPTION_NUMERIC;
+        char message[256];
+        if (!duckvep_core_option_permitted(key, at, count, core_kinds, field, message, sizeof(message))) {
             duckdb_scalar_function_set_error(info, message);
             duckdb_free(key);
             duckdb_destroy_logical_type(&field_type);
