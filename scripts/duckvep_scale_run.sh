@@ -27,14 +27,17 @@ usage: duckvep_scale_run.sh --jobs N --panel PANEL --out DIR [options]
   --out DIR                output directory (receipt, summary, per-job files); must be empty or new
   --model PATH             GRCh38 model DuckDB file
                            (default $DUCKVEP_SCALE_MODEL or /root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb)
-  --extension PATH         duckvep.duckdb_extension (default build/release/extension/duckvep/duckvep.duckdb_extension)
+  --extension PATH         duckvep.duckdb_extension (default build/release/extension/duckvep/duckvep.duckdb_extension).
+                           It is copied to OUT/artifacts/ and only the copy is loaded. A path under a build
+                           directory is refused unless --allow-live-extension is given.
+  --allow-live-extension   accept an extension under a build directory (the copy is still frozen)
   --threads-per-job T      DuckDB threads per job (default 6)
   --cgroup MODE            systemd | manual | none | auto (default auto: systemd, then manual)
   --allow-unenforced       required with --cgroup none; the receipt says "ceilings not enforced"
-  --min-free-gib G         disk that must stay free after the spill quotas (default 10)
+  --min-free-gib G         disk that must stay free after the spill quotas and the output budget (default 10)
   --oversubscribe          run although the host cannot hold N jobs at the ceilings
   --modes LIST             compact,complete17 (default both)
-  --spill-dir DIR          parent for per-job spill directories (default OUT)
+  --spill-dir DIR          parent for the campaign spill root DIR/<run-id> (default OUT)
   --keep-output            keep each job's output Parquet (default: checksum, then delete)
   --regulation             load the resident regulatory and motif feature intervals (default, the production configuration)
   --no-regulation          annotate without them
@@ -45,7 +48,9 @@ usage: duckvep_scale_run.sh --jobs N --panel PANEL --out DIR [options]
 Test overrides for the ceilings (defaults are the agreed values):
   --memory-max SIZE (16G)  --duckdb-memory-limit (8GB)  --max-temp (32GiB)
   --native-budget-mib (4096)  --workers (6)  --scratch-mib (128)  --emit-mib (256, the extension default; 64 fails complete-17 on gene-dense panels)
-Exit status: 0 all jobs ok; 2 usage or refused by the pre-flight; 3 some job was not ok.
+Exit status: 0 certified (every job and mode ok, checksums agree per mode, every mandatory counter present,
+swap disabled, ceilings enforced, artifacts unchanged); 2 usage or refused by the pre-flight; 3 not certified
+(the reason is in summary.md).
 EOF
 }
 die() { echo "duckvep_scale_run: $*" >&2; exit 2; }
@@ -114,7 +119,7 @@ fi
 # ---------------------------------------------------------------- arguments
 JOBS=1 PANEL="" OUT="" MODEL="${DUCKVEP_SCALE_MODEL:-/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb}"
 EXTENSION="$REPO/build/release/extension/duckvep/duckvep.duckdb_extension"
-THREADS=6 CGROUP=auto ALLOW_UNENFORCED=0 OVERSUBSCRIBE=0 MODES="compact,complete17" SPILL_PARENT="" KEEP=0
+ALLOW_LIVE=0 THREADS=6 CGROUP=auto ALLOW_UNENFORCED=0 OVERSUBSCRIBE=0 MODES="compact,complete17" SPILL_PARENT="" KEEP=0
 MIN_FREE_GIB=10 REGULATION=1 RETRY=0 LIMIT_ROWS="" MEMORY_MAX=16G DUCKDB_LIMIT=8GB MAX_TEMP=32GiB BUDGET_MIB=4096 WORKERS=6 SCRATCH_MIB=128 EMIT_MIB=256
 while [[ $# -gt 0 ]]; do
   need() { [[ $# -ge 2 ]] || die "missing value for $1"; }
@@ -124,6 +129,7 @@ while [[ $# -gt 0 ]]; do
     --out) need "$@"; OUT="$2"; shift 2 ;;
     --model) need "$@"; MODEL="$2"; shift 2 ;;
     --extension) need "$@"; EXTENSION="$2"; shift 2 ;;
+    --allow-live-extension) ALLOW_LIVE=1; shift ;;
     --threads-per-job) need "$@"; THREADS="$2"; shift 2 ;;
     --cgroup) need "$@"; CGROUP="$2"; shift 2 ;;
     --allow-unenforced) ALLOW_UNENFORCED=1; shift ;;
@@ -176,6 +182,10 @@ PANEL_FILE="$(resolve_panel "$PANEL")"
 PANEL_FILE="$(readlink -f "$PANEL_FILE")"
 [[ -r "$MODEL" ]] || die "model not readable: $MODEL"
 [[ -r "$EXTENSION" ]] || die "extension not found: $EXTENSION (run make release or pass --extension)"
+EXTENSION="$(readlink -f "$EXTENSION")"
+if (( ! ALLOW_LIVE )) && [[ "$EXTENSION" == */build/* || "$EXTENSION" == */build-*/* ]]; then
+  die "extension $EXTENSION is under a build directory; a rebuild would replace it while jobs run. Copy it somewhere immutable or pass --allow-live-extension"
+fi
 command -v Rscript >/dev/null || die "Rscript is required"
 
 # ---------------------------------------------------------------- pre-flight
@@ -185,9 +195,26 @@ mem_total=$(awk '/^MemTotal:/{print $2*1024}' /proc/meminfo)
 cores=$(nproc)
 mkdir -p "$OUT"
 if [[ -n "$(ls -A "$OUT" 2>/dev/null)" ]]; then die "--out $OUT is not empty"; fi
+RUN_ID="scale-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 SPILL_PARENT="${SPILL_PARENT:-$OUT}"
 mkdir -p "$SPILL_PARENT"
+SPILL_ROOT="$SPILL_PARENT/$RUN_ID"   # dedicated per campaign; only this directory is ever deleted
 disk_free=$(df -PB1 "$SPILL_PARENT" | awk 'NR==2{print $4}')
+out_free=$(df -PB1 "$OUT" | awk 'NR==2{print $4}')
+same_fs=0; [[ "$(stat -c %d "$SPILL_PARENT")" == "$(stat -c %d "$OUT")" ]] && same_fs=1
+# Output budget: bytes of output Parquet per input panel row, from the committed smoke receipts
+# (benchmarks/data/scale_contracts/runs/smoke-2x1M-regulation: compact 11.2 B/row, complete17 46.2 B/row,
+# rounded up), times a 1.5 margin. Each job writes every mode, and the output plus its .partial copy are
+# budgeted (the partial is renamed, but the hash query reads it while it is being finished).
+bytes_per_row() { case "$1" in compact) echo 12 ;; complete17) echo 48 ;; *) echo 60 ;; esac; }
+PANEL_ROWS=$(Rscript -e 'suppressMessages(library(DBI)); con <- dbConnect(duckdb::duckdb()); cat(dbGetQuery(con, paste0("SELECT count(*) FROM read_parquet(\x27", commandArgs(TRUE)[1], "\x27)"))[[1]])' "$PANEL_FILE" 2>/dev/null) || PANEL_ROWS=""
+[[ "$PANEL_ROWS" =~ ^[0-9]+$ ]] || die "cannot count the rows of $PANEL_FILE"
+if [[ -n "$LIMIT_ROWS" ]] && (( LIMIT_ROWS < PANEL_ROWS )); then EST_ROWS="$LIMIT_ROWS"; else EST_ROWS="$PANEL_ROWS"; fi
+per_job_output=0
+IFS=, read -r -a mode_list <<<"$MODES"
+for m in "${mode_list[@]}"; do per_job_output=$((per_job_output + EST_ROWS * $(bytes_per_row "$m"))); done
+per_job_output=$((per_job_output * 2 * 3 / 2))
+OUTPUT_BUDGET=$((JOBS * per_job_output))
 have_v2=0; [[ "$(stat -fc %T /sys/fs/cgroup 2>/dev/null)" == cgroup2fs ]] && have_v2=1
 have_systemd_run=0
 if command -v systemd-run >/dev/null && [[ -d /run/systemd/system ]] && [[ "$(id -u)" == 0 || -n "${XDG_RUNTIME_DIR:-}" ]]; then have_systemd_run=1; fi
@@ -208,8 +235,15 @@ if (( ! OVERSUBSCRIBE )); then
   need_mem=$((JOBS * MEMORY_MAX_BYTES + 4 * GIB))
   (( mem_total >= need_mem )) || problems+=("$JOBS jobs x $MEMORY_MAX need $((need_mem / GIB)) GiB with 4 GiB for the OS; host RAM is $((mem_total / GIB)) GiB")
   (( JOBS * THREADS <= cores )) || problems+=("$JOBS jobs x $THREADS threads = $((JOBS * THREADS)) exceed $cores cores")
-  need_disk=$((JOBS * MAX_TEMP_BYTES + MIN_FREE_GIB * GIB))
-  (( disk_free >= need_disk )) || problems+=("spill quotas need $((need_disk / GIB)) GiB ($JOBS x $MAX_TEMP plus $MIN_FREE_GIB GiB kept free) but $SPILL_PARENT has $((disk_free / GIB)) GiB free")
+  need_spill=$((JOBS * MAX_TEMP_BYTES))
+  if (( same_fs )); then
+    need_disk=$((need_spill + OUTPUT_BUDGET + MIN_FREE_GIB * GIB))
+    (( disk_free >= need_disk )) || problems+=("spill quotas ($JOBS x $MAX_TEMP) plus the output budget ($((OUTPUT_BUDGET / 1048576)) MiB: $JOBS jobs x est. output x 2 for .partial x 1.5) plus $MIN_FREE_GIB GiB kept free need $((need_disk / GIB)) GiB but $SPILL_PARENT has $((disk_free / GIB)) GiB free")
+  else
+    need_disk=$((need_spill + MIN_FREE_GIB * GIB)); need_out=$((OUTPUT_BUDGET + MIN_FREE_GIB * GIB))
+    (( disk_free >= need_disk )) || problems+=("spill quotas need $((need_disk / GIB)) GiB ($JOBS x $MAX_TEMP plus $MIN_FREE_GIB GiB kept free) but $SPILL_PARENT has $((disk_free / GIB)) GiB free")
+    (( out_free >= need_out )) || problems+=("output budget needs $((need_out / GIB)) GiB but $OUT has $((out_free / GIB)) GiB free")
+  fi
 fi
 if ((${#problems[@]})); then
   echo "duckvep_scale_run: refusing to start:" >&2
@@ -220,15 +254,26 @@ fi
 ENFORCED=yes; [[ "$CGROUP" == none ]] && ENFORCED="no: ceilings not enforced"
 
 # ---------------------------------------------------------------- run
-RUN_ID="scale-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+# Freeze the artifacts: the extension is copied and only the copy is loaded; the model and panel are
+# hashed once now and once after the jobs (a change during the run fails the certification).
+mkdir -p "$OUT/artifacts" "$SPILL_ROOT"
+sha() { sha256sum "$1" | cut -c1-64; }
+EXTENSION_SRC="$EXTENSION"
+EXTENSION="$OUT/artifacts/$(basename "$EXTENSION_SRC")"
+cp -- "$EXTENSION_SRC" "$EXTENSION"; chmod a-w "$EXTENSION"
+EXT_SHA="$(sha "$EXTENSION")"
+[[ "$EXT_SHA" == "$(sha "$EXTENSION_SRC")" ]] || die "extension copy differs from $EXTENSION_SRC (it changed while copying); retry"
+MODEL_SHA="$(sha "$MODEL")"
+PANEL_SHA="$(sha "$PANEL_FILE")"
 {
   printf 'key\tvalue\n'
   printf 'run_id\t%s\nstarted_utc\t%s\nhost\t%s\nkernel\t%s\ncores\t%s\nmem_total_bytes\t%s\n' \
     "$RUN_ID" "$(date -u +%FT%TZ)" "$(hostname)" "$(uname -r)" "$cores" "$mem_total"
   printf 'jobs\t%s\npanel\t%s\npanel_file\t%s\npanel_bytes\t%s\npanel_sha256\t%s\n' \
-    "$JOBS" "$PANEL" "$PANEL_FILE" "$(stat -c %s "$PANEL_FILE")" "$(sha256sum "$PANEL_FILE" | cut -c1-64)"
-  printf 'model\t%s\nmodel_sha256\t%s\nextension\t%s\nextension_sha256\t%s\n' "$MODEL" \
-    "$(sha256sum "$MODEL" | cut -c1-64)" "$EXTENSION" "$(sha256sum "$EXTENSION" | cut -c1-64)"
+    "$JOBS" "$PANEL" "$PANEL_FILE" "$(stat -c %s "$PANEL_FILE")" "$PANEL_SHA"
+  printf 'model\t%s\nmodel_sha256\t%s\nextension\t%s\nextension_source\t%s\nextension_sha256\t%s\n' "$MODEL" \
+    "$MODEL_SHA" "$EXTENSION" "$EXTENSION_SRC" "$EXT_SHA"
+  printf 'spill_root\t%s\npanel_rows_estimate\t%s\noutput_budget_bytes\t%s\n' "$SPILL_ROOT" "$EST_ROWS" "$OUTPUT_BUDGET"
   printf 'git_revision\t%s\ngit_dirty\t%s\n' "$(git -C "$REPO" rev-parse HEAD 2>/dev/null || echo unknown)" \
     "$(git -C "$REPO" status --porcelain 2>/dev/null | wc -l)"
   printf 'cgroup_mode\t%s\nenforced\t%s\noversubscribed\t%s\n' "$CGROUP" "$ENFORCED" "$OVERSUBSCRIBE"
@@ -264,7 +309,7 @@ for ((i = 1; i <= JOBS; i++)); do
   jobdir="$OUT/job-$i"
   mkdir -p "$jobdir"
   export SCALE_CGROUP_MODE="$CGROUP"
-  export SCALE_SPILL_DIR="$SPILL_PARENT/spill-job-$i"
+  export SCALE_SPILL_DIR="$SPILL_ROOT/spill-job-$i"
   case "$CGROUP" in
     systemd)
       systemd-run --scope -q -p "MemoryMax=$MEMORY_MAX_BYTES" -p MemorySwapMax=0 -p OOMPolicy=continue \
@@ -286,7 +331,11 @@ done
 for p in "${pids[@]}"; do wait "$p" || true; done
 wall_end=$(date +%s.%N)
 printf 'wall_s\t%s\nfinished_utc\t%s\n' "$(awk -v a="$wall_start" -v b="$wall_end" 'BEGIN{printf "%.3f", b-a}')" "$(date -u +%FT%TZ)" >>"$OUT/run.tsv"
-for ((i = 1; i <= JOBS; i++)); do rm -rf "$SPILL_PARENT/spill-job-$i" "$OUT/job-$i/spill"; done
+for ((i = 1; i <= JOBS; i++)); do rm -rf "$SPILL_ROOT/spill-job-$i" "$OUT/job-$i/spill"; done
+rmdir "$SPILL_ROOT" 2>/dev/null || true
+# Second look at the frozen artifacts, once each (not per job).
+printf 'model_sha256_end\t%s\npanel_sha256_end\t%s\nextension_sha256_end\t%s\n' \
+  "$(sha "$MODEL")" "$(sha "$PANEL_FILE")" "$(sha "$EXTENSION")" >>"$OUT/run.tsv"
 
 status=0
 Rscript "$SCRIPT_DIR/duckvep_scale_aggregate.R" "$OUT" || status=$?
