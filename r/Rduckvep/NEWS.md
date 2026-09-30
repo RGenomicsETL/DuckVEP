@@ -1,5 +1,9 @@
 # Rduckvep
 
+- `rduckvep_lof_sql()` wraps the native `duckvep_lof_sql()` builder, LOFTEE's HC/LC loss-of-function call with its filters, flags and info as a relation
+  over `duckvep_annotate_projected_sql` rows. No rules live in R; options (`gerp`, `ancestor`, `phylocsf`, `min_intron_size`,
+  `gerp_end_trunc_cutoff`, `check_complete_cds`) are forwarded as the builder's STRUCT.
+
 - `rduckvep_coding_calls()` wraps the new SQL table function `duckvep_coding_calls(model, path)`: a fused native reader of a
   (bgzipped) VCF or BCF that discards records outside coding sequence before decoding genotypes and returns the calls relation of
   `rduckvep_haplotypes()` (same discovery as `rduckvep_coding_transcripts()`, output identical to building the calls in SQL). The

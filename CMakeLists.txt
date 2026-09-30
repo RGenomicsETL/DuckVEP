@@ -48,6 +48,7 @@ set(EXTENSION_SOURCES
     src/duckvep_builder.c
     src/duckvep_prepare_sql.c
     src/duckvep_structural_sql.c
+    src/duckvep_lof_sql.c
     src/duckvep_repeat.c
     src/duckvep_annotate.c
     src/duckvep_budget_sql.c

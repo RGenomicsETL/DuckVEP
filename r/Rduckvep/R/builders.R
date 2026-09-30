@@ -11,6 +11,7 @@
 #' @param model_name Loaded model name.
 #' @param annotations_table Annotation relation name.
 #' @param transcripts_table Transcript relation name.
+#' @param reference_table Reference sequence chunk relation (`chrom`, `start`, `end`, `seq`).
 #' @param core_schema Ensembl core schema name.
 #' @param reference_chunks_table Reference chunk relation name.
 #' @param assembly Assembly name.
@@ -21,7 +22,9 @@
 #' @param transcript_filter Transcript selection description.
 #' @param ... Named builder options (for annotation: `hgvs`, `rich`,
 #'   `upstream_distance`, `downstream_distance`; for Ensembl regions and
-#'   transcripts: `species_id`; for receipts: `regulation_features_table`).
+#'   transcripts: `species_id`; for receipts: `regulation_features_table`; for
+#'   the loss-of-function relation: `gerp`, `ancestor`, `phylocsf`,
+#'   `min_intron_size`, `gerp_end_trunc_cutoff`, `check_complete_cds`).
 #'   Other builders accept no options. Each value must be a length-one string,
 #'   logical, integer, double or `NA`.
 #' @return A length-one SQL string.
@@ -68,6 +71,13 @@ rduckvep_transcript_projection_sql <- function(con, events_table, annotations_ta
                                                 transcripts_table, ...) {
   .duckvep_builder_sql(con, "duckvep_transcript_projection_sql",
                        list(events_table, annotations_table, transcripts_table), list(...))
+}
+
+#' @rdname rduckvep_builders
+#' @export
+rduckvep_lof_sql <- function(con, annotations_table, transcripts_table, reference_table, ...) {
+  .duckvep_builder_sql(con, "duckvep_lof_sql",
+                       list(annotations_table, transcripts_table, reference_table), list(...))
 }
 
 #' @rdname rduckvep_builders
