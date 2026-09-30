@@ -58,3 +58,7 @@ SELECT CASE WHEN bool_and(a = b) THEN true ELSE error('repeat dictionary equals 
 SELECT CASE WHEN TRY(duckvep_repeat_alleles([{'unit': 'CXG', 'count': 3}], [{'unit': 'A', 'count': 4}], true)) IS NULL THEN true ELSE error('TRY absorbs repeat error') END;
 SELECT CASE WHEN TRY(duckvep_phase_call([0, -1], [false, true])) IS NULL THEN true ELSE error('TRY absorbs phase error') END;
 SELECT CASE WHEN (SELECT count(*) FROM duckdb_functions() WHERE function_name IN ('duckvep_repeat_alleles', 'duckvep_phase_call', '_duckvep_revcomp', '_duckvep_raw_gt', '_duckvep_record_order' ) AND function_type = 'scalar') >= 5 THEN true ELSE error('nested scalars registered') END;
+
+-- The twelve SQL builders are registered with and without the options argument.
+SELECT CASE WHEN (SELECT count(DISTINCT function_name) FROM duckdb_functions() WHERE function_name IN ('duckvep_ensembl_regions_sql', 'duckvep_ensembl_transcripts_sql', 'duckvep_ensembl_regulation_features_sql', 'duckvep_model_receipt_sql', 'duckvep_annotate_sql', 'duckvep_annotate_projected_sql', 'duckvep_transcript_projection_sql', 'duckvep_prepare_sv_geometry_sql', 'duckvep_prepare_expansionhunter_sql', 'duckvep_prepare_breakend_pairs_sql', 'duckvep_prepare_breakend_fusion_sql', 'duckvep_prepare_structural_hgvs_sql')) = 12 THEN true ELSE error('builders registered') END;
+SELECT CASE WHEN (SELECT count(*) FROM duckdb_functions() WHERE function_name LIKE 'duckvep_%_sql' AND function_type = 'scalar') = 24 THEN true ELSE error('two overloads per builder') END;

@@ -22,6 +22,7 @@ file(GLOB CORE_SOURCES CONFIGURE_DEPENDS "${DUCKVEP_ROOT}/src/core/*.c")
 add_library(duckvep SHARED
     host_v2.c
     host_v2_nested.c
+    host_v2_builders.c
     ${CORE_SOURCES}
     ${KERNEL_SOURCES})
 # The v1 build names its artifact duckvep too; this one lives in its own tree.

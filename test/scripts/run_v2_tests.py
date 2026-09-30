@@ -40,16 +40,36 @@ def quote(path):
 
 
 def parse_cases():
-    cases, name, lines = [], None, []
+    """(name, query) pairs. A "-- fixture:" block is one statement that every host runs
+    (as TEMP tables) before the cases; it is returned by parse_fixtures()."""
+    cases, name, lines, kind = [], None, [], None
     for line in CASES.read_text().splitlines():
-        if line.startswith("-- case:"):
-            if name:
+        if line.startswith("-- case:") or line.startswith("-- fixture:"):
+            if kind == "case" and name:
                 cases.append((name, " ".join(lines).strip()))
-            name, lines = line[len("-- case:"):].strip(), []
-        elif name and not line.startswith("--") and line.strip():
+            kind = "case" if line.startswith("-- case:") else "fixture"
+            name, lines = line.split(":", 1)[1].strip(), []
+        elif kind == "case" and not line.startswith("--") and line.strip():
             lines.append(line.strip())
-    cases.append((name, " ".join(lines).strip()))
+        elif kind == "fixture" and not line.startswith("--") and line.strip():
+            lines.append(line.strip())
+    if kind == "case":
+        cases.append((name, " ".join(lines).strip()))
     return cases
+
+
+def parse_fixtures():
+    fixtures, kind, lines = [], None, []
+    for line in CASES.read_text().splitlines():
+        if line.startswith("-- case:") or line.startswith("-- fixture:"):
+            if kind == "fixture":
+                fixtures.append(" ".join(lines).strip())
+            kind, lines = ("fixture" if line.startswith("-- fixture:") else "case"), []
+        elif kind == "fixture" and not line.startswith("--") and line.strip():
+            lines.append(line.strip())
+    if kind == "fixture":
+        fixtures.append(" ".join(lines).strip())
+    return fixtures
 
 
 def wrapped(query):
@@ -94,7 +114,8 @@ class V2Host:
         return f"LOAD '{quote(self.extension)}';\n"
 
     def case(self, query):
-        result = self.run(self.load() + wrapped(query) + ";", check=False)
+        setup = "".join(fixture.rstrip(";") + ";\n" for fixture in parse_fixtures())
+        result = self.run(self.load() + setup + wrapped(query) + ";", check=False)
         if result.returncode != 0:
             return outcome_error(result.stderr)
         return {"rows": [line.rstrip() for line in result.stdout.splitlines()]}
@@ -104,6 +125,8 @@ def v1_outcomes(extension, cases):
     import duckdb
     connection = duckdb.connect(config={"allow_unsigned_extensions": "true"})
     connection.execute(f"LOAD '{quote(Path(extension).resolve())}'")
+    for fixture in parse_fixtures():
+        connection.execute(fixture)
     outcomes = {}
     for name, query in cases:
         try:
