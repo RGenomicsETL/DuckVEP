@@ -58,6 +58,13 @@ jobs:
       - name: Build DuckDB at the pinned revision
         if: steps.duckdb-cache.outputs.cache-hit != 'true'
         run: python3 scripts/stage-v2-duckdb.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python tools for the footer writer
+        # extension-ci-tools' configure_helper.py detects the platform through the duckdb
+        # Python module; pin the same version the v1 test runner uses.
+        run: python -m pip install 'duckdb==1.5.6'
       - name: Build the v2 host, then check symbols, footer and headers
         run: |
           make release_v2
