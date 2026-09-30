@@ -6,9 +6,9 @@
            an imported DuckDB symbol would mean a v1-style or unstable linkage); mirrors
            `make test-extension-symbols` for the v1 binary
   footer   the appended metadata is ABI C_STRUCT (stable), extension API v2.0.0
-  static   the source uses only stable, non-deprecated duckdb_v2_* functions from the pinned
+  static   the host_v2 sources use only stable, non-deprecated duckdb_v2_* functions from the pinned
            headers, defines the unstable/deprecated opt-ins as 0, never includes the v1
-           headers, and keeps host_v2/core and src/kernel free of DuckDB
+           headers, and keeps src/core and src/kernel free of DuckDB
 """
 import hashlib
 import json
@@ -63,7 +63,8 @@ def footer():
 
 
 def static():
-    source = (ROOT / "host_v2/host_v2.c").read_text()
+    files = sorted((ROOT / "host_v2").glob("*.[ch]"))
+    source = "\n".join(path.read_text() for path in files)
     header = (ROOT / PIN["headers"] / "duckdb_v2.h").read_text()
     for name, expected in PIN["duckdb_sdk_sha256"].items():
         if hashlib.sha256((ROOT / PIN["headers"] / name).read_bytes()).hexdigest() != expected:
@@ -71,14 +72,14 @@ def static():
     for needle in ('#include "duckdb_extension_v2.h"', "#define DUCKDB_V2_API_ALLOW_UNSTABLE 0",
                    "#define DUCKDB_V2_API_ALLOW_DEPRECATED 0"):
         if needle not in source:
-            fail(f"host_v2.c lacks {needle}")
+            fail(f"host_v2 sources lack {needle}")
     if re.search(r'#include\s+[<"]duckdb(_extension)?\.h[>"]', source) or "DUCKDB_EXTENSION_API_VERSION_UNSTABLE" in source:
-        fail("host_v2.c references the v1 headers or the v1 unstable opt-in")
+        fail("host_v2 sources reference the v1 headers or the v1 unstable opt-in")
     code = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.S)
     called = set(re.findall(r"\b(duckdb_[a-z0-9_]+)\s*\(", code))
     stray = sorted(name for name in called if not name.startswith("duckdb_v2_"))
     if stray:
-        fail(f"non-v2 DuckDB calls in host_v2.c: {stray}")
+        fail(f"non-v2 DuckDB calls in host_v2: {stray}")
     for name in sorted(called):
         declaration = re.search(rf"DUCKDB_C_API[^;{{}}]*?\b{name}\s*\(", header, re.S)
         if not declaration:
@@ -88,12 +89,12 @@ def static():
         if "- stable: v2.0.0" not in history or re.search(r"unstable|deprecated", history, re.I):
             fail(f"{name} is not stable v2.0.0 in the pinned header: {history.strip()}")
     # duckdb_ext_api is the function table; no other DuckDB name may appear in host-neutral code.
-    for directory in ("host_v2/core", "src/kernel"):
+    for directory in ("src/core", "src/kernel"):
         for path in (ROOT / directory).rglob("*"):
             if path.suffix in (".c", ".h", ".inc") and re.search(r'duckdb(_extension)?\.h|\bduckdb_[a-z]+_?[a-z_]*\s*\(', path.read_text()):
                 fail(f"{path.relative_to(ROOT)} mentions the DuckDB API; it must stay host-neutral")
     print(f"static: {len(called)} duckdb_v2_* functions, all stable v2.0.0; unstable/deprecated opt-ins off; "
-          "host_v2/core and src/kernel host-neutral")
+          "src/core and src/kernel host-neutral")
 
 
 if __name__ == "__main__":

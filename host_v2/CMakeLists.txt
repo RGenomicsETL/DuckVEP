@@ -18,9 +18,11 @@ foreach(header duckdb_v2.h duckdb_extension_v2.h)
 endforeach()
 
 file(GLOB KERNEL_SOURCES CONFIGURE_DEPENDS "${DUCKVEP_ROOT}/src/kernel/src/*.c")
+file(GLOB CORE_SOURCES CONFIGURE_DEPENDS "${DUCKVEP_ROOT}/src/core/*.c")
 add_library(duckvep SHARED
     host_v2.c
-    core/duckvep_core_geometry.c
+    host_v2_nested.c
+    ${CORE_SOURCES}
     ${KERNEL_SOURCES})
 # The v1 build names its artifact duckvep too; this one lives in its own tree.
 set_target_properties(duckvep PROPERTIES PREFIX "lib" C_VISIBILITY_PRESET hidden)

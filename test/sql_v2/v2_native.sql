@@ -34,3 +34,27 @@ SELECT CASE WHEN TRY(duckvep_breakend_geometry('G]1:123[')) IS NULL THEN true EL
 -- Registered kinds.
 SELECT CASE WHEN (SELECT count(*) FROM duckdb_functions() WHERE function_name = 'duckvep_so_terms' AND function_type = 'table') = 1 THEN true ELSE error('so_terms registered as a table function') END;
 SELECT CASE WHEN (SELECT count(*) FROM duckdb_functions() WHERE function_name IN ('duckvep_allele_geometry', 'duckvep_breakend_geometry') AND function_type = 'scalar') = 2 THEN true ELSE error('geometry registered as scalar functions') END;
+
+-- Nested output beyond one vector (2,048) and beyond the list-child capacity of one chunk.
+SELECT CASE WHEN count(*) = 18000 AND sum(u.input_slot::BIGINT) = 27000 AND count(u.haplotype_lane) = 9000 THEN true ELSE error('phase output of 18,000 records') END FROM (SELECT unnest(duckvep_phase_call([i % 3, (i + 1) % 3], [false, i % 2 = 0])) AS u FROM range(9000) t(i));
+SELECT CASE WHEN count(*) = 5000 AND max(u.ploidy) = 5000 AND min(u.input_slot) = 1 AND max(u.input_slot) = 5000 THEN true ELSE error('phase single 5,000-slot list') END FROM (SELECT unnest(duckvep_phase_call(list_transform(range(5000), lambda x: x % 3), list_transform(range(5000), lambda x: true))) AS u);
+SELECT CASE WHEN length(g.reference) = 9998 AND g.reference_length = 9998 AND g.alternate_length = 3000 AND g.status = 'ok' THEN true ELSE error('repeat from 5,000-element lists') END FROM (SELECT duckvep_repeat_alleles(list_transform(range(5000), lambda x: {'unit': 'AC', 'count': x % 3}), list_transform(range(3000), lambda x: {'unit': 'G', 'count': 1}), true, {'max_allele_bases': 100000}) AS g);
+SELECT CASE WHEN length(g.alternate) = 2000007 AND g.length_change = 7 THEN true ELSE error('repeat long output') END FROM (SELECT duckvep_repeat_alleles([{'unit': 'ACGTN', 'count': 400000}], [{'unit': 'ACGTN', 'count': 400001}, {'unit': 'RY', 'count': 1}], true, {'max_allele_bases': 2100000}) AS g);
+
+-- NULLs inside lists and structs.
+SELECT CASE WHEN g[2].allele_index IS NULL AND g[1].allele_index = 0 AND g[3].allele_index = 1 AND len(g) = 3 THEN true ELSE error('phase NULL allele element') END FROM (SELECT duckvep_phase_call([0, NULL, 1], [NULL, true, false]) AS g);
+SELECT CASE WHEN g.status = 'incomplete_input' AND g.reference IS NULL AND g.length_change IS NULL THEN true ELSE error('repeat NULL unit') END FROM (SELECT duckvep_repeat_alleles([{'unit': NULL::VARCHAR, 'count': 3}], [{'unit': 'A', 'count': 4}], true) AS g);
+SELECT CASE WHEN g.status = 'incomplete_input' THEN true ELSE error('repeat NULL record') END FROM (SELECT duckvep_repeat_alleles([NULL::STRUCT(unit VARCHAR, count INTEGER)], [{'unit': 'A', 'count': 4}], true) AS g);
+SELECT CASE WHEN g IS NOT NULL AND g.status = 'incomplete_input' THEN true ELSE error('repeat untyped NULLs') END FROM (SELECT duckvep_repeat_alleles(NULL, NULL, true) AS g);
+SELECT CASE WHEN count(*) = 6000 AND count(r) = 5454 AND count(r.status) = 5454 AND count(r.allele0) = 5454 THEN true ELSE error('raw_gt NULL structs have NULL children') END FROM (SELECT _duckvep_raw_gt(CASE WHEN i % 11 = 0 THEN NULL ELSE '0/1' END, 1::UINTEGER) AS r FROM range(6000) t(i));
+SELECT CASE WHEN count(*) = 4000 AND count(s) = 3000 THEN true ELSE error('revcomp NULL rows') END FROM (SELECT _duckvep_revcomp(CASE WHEN i % 4 = 0 THEN NULL ELSE 'ACGT' END) AS s FROM range(4000) t(i));
+
+-- Constant, dictionary and selected inputs agree with row-wise evaluation.
+SELECT CASE WHEN (SELECT count(DISTINCT g) FROM (SELECT duckvep_phase_call([0, 1], [false, true]) AS g FROM range(5000))) = 1 THEN true ELSE error('phase constant input') END;
+SELECT CASE WHEN bool_and(a = b) THEN true ELSE error('phase filtered equals row-wise') END FROM (SELECT duckvep_phase_call([i % 2, 1], [false, i % 4 = 0]) AS a, (SELECT duckvep_phase_call([i % 2, 1], [false, i % 4 = 0])) AS b FROM range(6000) t(i) WHERE i % 13 = 3);
+SELECT CASE WHEN bool_and(a = b) THEN true ELSE error('repeat dictionary equals row-wise') END FROM (SELECT duckvep_repeat_alleles(d.r, d.a, true) AS a, (SELECT duckvep_repeat_alleles(d.r, d.a, true)) AS b FROM range(3000) k(i) JOIN (VALUES (0, [{'unit': 'CAG', 'count': 3}], [{'unit': 'CAG', 'count': 4}]), (1, [{'unit': 'A', 'count': 2}], [{'unit': 'T', 'count': 2}])) d(id, r, a) ON d.id = k.i % 2);
+
+-- A failed call leaves the connection usable.
+SELECT CASE WHEN TRY(duckvep_repeat_alleles([{'unit': 'CXG', 'count': 3}], [{'unit': 'A', 'count': 4}], true)) IS NULL THEN true ELSE error('TRY absorbs repeat error') END;
+SELECT CASE WHEN TRY(duckvep_phase_call([0, -1], [false, true])) IS NULL THEN true ELSE error('TRY absorbs phase error') END;
+SELECT CASE WHEN (SELECT count(*) FROM duckdb_functions() WHERE function_name IN ('duckvep_repeat_alleles', 'duckvep_phase_call', '_duckvep_revcomp', '_duckvep_raw_gt', '_duckvep_record_order' ) AND function_type = 'scalar') >= 5 THEN true ELSE error('nested scalars registered') END;

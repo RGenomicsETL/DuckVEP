@@ -5346,6 +5346,464 @@
    "{\"k\":0,\"p\":5,\"n\":41}"
   ]
  },
+ "phase allele and flag types": {
+  "rows": [
+   "{\"a\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"b\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"c\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"d\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"e\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}],\"f\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}"
+  ]
+ },
+ "phase bad allele text error": {
+  "error": "duckvep_phase_call: called allele indices must be non-negative INTEGER values"
+ },
+ "phase bad flag text error": {
+  "error": "duckvep_phase_call: phase_before elements must be BOOLEAN values"
+ },
+ "phase bad policy error": {
+  "error": "duckvep_phase_call: phase_policy must be 'strict' or 'vep116_compat'"
+ },
+ "phase constant lists": {
+  "rows": [
+   "{\"i\":0,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":1,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":2,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":3,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}"
+  ]
+ },
+ "phase decimal flag error": {
+  "error": "duckvep_phase_call: phase_before elements must be BOOLEAN values"
+ },
+ "phase dictionary join": {
+  "rows": [
+   "{\"i\":0,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":1,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":2,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":3,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":4,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":5,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":6,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":7,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":8,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":9,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":10,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":11,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":12,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":13,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":14,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":15,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":16,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":17,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":18,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":19,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":20,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":21,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":22,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":23,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":24,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":25,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":26,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":27,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":28,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":29,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":1,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}"
+  ]
+ },
+ "phase diploid phased and unphased": {
+  "rows": [
+   "{\"a\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"b\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}],\"c\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}"
+  ]
+ },
+ "phase empty list error": {
+  "error": "duckvep_phase_call: ploidy must be between 1 and 65535"
+ },
+ "phase error under TRY": {
+  "rows": [
+   "{\"a\":null,\"b\":2}"
+  ]
+ },
+ "phase filtered selection": {
+  "rows": [
+   "{\"i\":3,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":502,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}]}",
+   "{\"i\":1001,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":1500,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":1999,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":2498,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}]}",
+   "{\"i\":2997,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":3496,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":3995,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":4494,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}]}",
+   "{\"i\":4993,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}",
+   "{\"i\":5492,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":5991,\"g\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}]}"
+  ]
+ },
+ "phase flags without alleles error": {
+  "error": "duckvep_phase_call: allele and phase lists must have equal length"
+ },
+ "phase haploid and polyploid": {
+  "rows": [
+   "[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":3,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":3,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":3,\"allele_index\":2,\"haplotype_lane\":3,\"ploidy\":3,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]"
+  ]
+ },
+ "phase length mismatch error": {
+  "error": "duckvep_phase_call: allele and phase lists must have equal length"
+ },
+ "phase many rows beyond one vector": {
+  "rows": [
+   "{\"n\":18000,\"slots\":27000,\"alleles\":18000,\"lanes\":9000,\"sets\":40491000,\"statuses\":2}"
+  ]
+ },
+ "phase missing alleles and NULL flags": {
+  "rows": [
+   "{\"a\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":3,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":null,\"haplotype_lane\":2,\"ploidy\":3,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"missing\"},{\"input_slot\":3,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":3,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}],\"b\":[{\"input_slot\":1,\"allele_index\":null,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"missing\"},{\"input_slot\":2,\"allele_index\":null,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"missing\"}],\"c\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}]}"
+  ]
+ },
+ "phase negative allele error": {
+  "error": "duckvep_phase_call: called allele indices must be non-negative INTEGER values"
+ },
+ "phase null lists": {
+  "rows": [
+   "{\"a\":null,\"b\":null,\"c\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}],\"d\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}]}"
+  ]
+ },
+ "phase null of lists typed NULL elements": {
+  "rows": [
+   "{\"a\":[{\"input_slot\":1,\"allele_index\":null,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"missing\"},{\"input_slot\":2,\"allele_index\":null,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"missing\"}],\"b\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":null,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"unresolved\",\"status\":\"unphased\"}]}"
+  ]
+ },
+ "phase one row beyond one vector": {
+  "rows": [
+   "{\"n\":5000,\"slots\":12502500,\"called\":5000,\"lanes\":2500,\"ploidy\":5000,\"scopes\":2}"
+  ]
+ },
+ "phase option phase_set too large error": {
+  "error": "duckvep_phase_call: phase_set exceeds BIGINT range"
+ },
+ "phase options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "phase options phase_set and policy": {
+  "rows": [
+   "{\"a\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":5,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":5,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"b\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":9,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":9,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"c\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"allele_slot\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"allele_slot\",\"status\":\"called\"}],\"d\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"e\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}"
+  ]
+ },
+ "phase options with NULL struct rows": {
+  "rows": [
+   "{\"i\":0,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":1,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"allele_slot\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"allele_slot\",\"status\":\"called\"}]}",
+   "{\"i\":2,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":3,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"allele_slot\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"allele_slot\",\"status\":\"called\"}]}",
+   "{\"i\":4,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}",
+   "{\"i\":5,\"g\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"allele_slot\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"allele_slot\",\"status\":\"called\"}]}"
+  ]
+ },
+ "phase ploidy over limit error": {
+  "error": "duckvep_phase_call: ploidy must be between 1 and 65535"
+ },
+ "phase rows with mixed ploidy NULLs and errors avoided": {
+  "rows": [
+   "{\"rows\":7000,\"valid\":6000,\"slots\":14000,\"missing\":4000}"
+  ]
+ },
+ "phase unknown option error": {
+  "error": "DuckVEP builder: unknown option 'other'"
+ },
+ "phase wrong option type error": {
+  "error": "DuckVEP builder: expected INTEGER for option 'phase_set'"
+ },
+ "raw_gt forms": {
+  "rows": [
+   "{\"g\":\"0/1\",\"n\":1,\"r\":{\"status\":0,\"allele0\":0,\"allele1\":1,\"parsed_slots\":2,\"source_ploidy\":2,\"source_has_missing\":0,\"disposition\":3}}",
+   "{\"g\":\"1|0\",\"n\":1,\"r\":{\"status\":0,\"allele0\":1,\"allele1\":0,\"parsed_slots\":2,\"source_ploidy\":2,\"source_has_missing\":0,\"disposition\":3}}",
+   "{\"g\":\"0|1\",\"n\":2,\"r\":{\"status\":0,\"allele0\":0,\"allele1\":1,\"parsed_slots\":2,\"source_ploidy\":2,\"source_has_missing\":0,\"disposition\":3}}",
+   "{\"g\":\".\",\"n\":1,\"r\":{\"status\":0,\"allele0\":4294967295,\"allele1\":4294967295,\"parsed_slots\":0,\"source_ploidy\":1,\"source_has_missing\":1,\"disposition\":2}}",
+   "{\"g\":\"./.\",\"n\":1,\"r\":{\"status\":0,\"allele0\":4294967295,\"allele1\":4294967295,\"parsed_slots\":0,\"source_ploidy\":2,\"source_has_missing\":1,\"disposition\":2}}",
+   "{\"g\":\"1/2\",\"n\":2,\"r\":{\"status\":0,\"allele0\":1,\"allele1\":2,\"parsed_slots\":2,\"source_ploidy\":2,\"source_has_missing\":0,\"disposition\":3}}",
+   "{\"g\":\"|1\",\"n\":1,\"r\":{\"status\":0,\"allele0\":0,\"allele1\":1,\"parsed_slots\":2,\"source_ploidy\":1,\"source_has_missing\":0,\"disposition\":3}}",
+   "{\"g\":\"0/0\",\"n\":1,\"r\":{\"status\":0,\"allele0\":4294967295,\"allele1\":4294967295,\"parsed_slots\":0,\"source_ploidy\":2,\"source_has_missing\":0,\"disposition\":1}}",
+   "{\"g\":\"1\",\"n\":3,\"r\":{\"status\":0,\"allele0\":1,\"allele1\":4294967295,\"parsed_slots\":1,\"source_ploidy\":1,\"source_has_missing\":0,\"disposition\":3}}",
+   "{\"g\":\"2/2\",\"n\":2,\"r\":{\"status\":0,\"allele0\":2,\"allele1\":2,\"parsed_slots\":2,\"source_ploidy\":2,\"source_has_missing\":0,\"disposition\":3}}",
+   "{\"g\":\"1/1/1\",\"n\":1,\"r\":{\"status\":0,\"allele0\":1,\"allele1\":1,\"parsed_slots\":3,\"source_ploidy\":3,\"source_has_missing\":0,\"disposition\":3}}"
+  ]
+ },
+ "raw_gt many rows": {
+  "rows": [
+   "{\"n\":6000,\"ok\":5454,\"s\":0,\"a0\":3904125276609,\"a1\":3904125273882,\"p\":9090,\"d\":14544}"
+  ]
+ },
+ "raw_gt null inputs": {
+  "rows": [
+   "{\"a\":null,\"b\":null,\"c\":true,\"d\":true}"
+  ]
+ },
+ "record_order invalid ordinal error": {
+  "error": "duckvep_haplotypes: invalid source-buffer ordinal"
+ },
+ "record_order many rows": {
+  "rows": [
+   "{\"n\":5000,\"s\":127500,\"m\":50}"
+  ]
+ },
+ "record_order values": {
+  "rows": [
+   "{\"c\":1,\"o\":1,\"r\":1}",
+   "{\"c\":2,\"o\":1,\"r\":1}",
+   "{\"c\":2,\"o\":2,\"r\":2}",
+   "{\"c\":5,\"o\":3,\"r\":4}",
+   "{\"c\":100,\"o\":50,\"r\":52}",
+   "{\"c\":null,\"o\":1,\"r\":null}",
+   "{\"c\":3,\"o\":null,\"r\":null}"
+  ]
+ },
+ "record_order zero ordinal error": {
+  "error": "duckvep_haplotypes: invalid source-buffer ordinal"
+ },
+ "repeat bad cap fractional error": {
+  "error": "duckvep_repeat_alleles: max_allele_bases must be an integer from 0 through 2147483647"
+ },
+ "repeat bad cap negative error": {
+  "error": "duckvep_repeat_alleles: max_allele_bases must be an integer from 0 through 2147483647"
+ },
+ "repeat bad cap null error": {
+  "error": "duckvep_repeat_alleles: max_allele_bases must be an integer from 0 through 2147483647"
+ },
+ "repeat basic gain loss neutral": {
+  "rows": [
+   "{\"gain\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":15,\"length_change\":6,\"length_direction\":\"GAIN\",\"status\":\"ok\"},\"loss\":{\"reference\":\"CAGCAGCAGCAGCAG\",\"alternate\":\"CAGCAGCAG\",\"reference_length\":15,\"alternate_length\":9,\"length_change\":-6,\"length_direction\":\"LOSS\",\"status\":\"ok\"},\"neutral\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAG\",\"reference_length\":9,\"alternate_length\":9,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}"
+  ]
+ },
+ "repeat constant lists": {
+  "rows": [
+   "{\"i\":0,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":15,\"length_change\":6,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":1,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":15,\"length_change\":6,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":2,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":15,\"length_change\":6,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":3,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":15,\"length_change\":6,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}"
+  ]
+ },
+ "repeat count types": {
+  "rows": [
+   "{\"a\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"},\"b\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"},\"c\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"},\"d\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}"
+  ]
+ },
+ "repeat dictionary join": {
+  "rows": [
+   "{\"i\":0,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":1,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":2,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":3,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":4,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":5,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":6,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":7,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":8,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":9,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":10,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":11,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":12,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":13,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":14,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":15,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":16,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":17,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":18,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":19,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":20,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":21,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":22,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":23,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":24,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":25,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":26,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":27,\"g\":{\"reference\":\"CAGCAGCAG\",\"alternate\":\"CAGCAGCAGCAG\",\"reference_length\":9,\"alternate_length\":12,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":28,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":29,\"g\":{\"reference\":\"G\",\"alternate\":\"G\",\"reference_length\":1,\"alternate_length\":1,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}"
+  ]
+ },
+ "repeat empty lists": {
+  "rows": [
+   "{\"g\":{\"reference\":\"\",\"alternate\":\"AA\",\"reference_length\":0,\"alternate_length\":2,\"length_change\":2,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}"
+  ]
+ },
+ "repeat empty unit error": {
+  "error": "duckvep_repeat_alleles: repeat units must contain non-empty IUPAC DNA"
+ },
+ "repeat error under TRY": {
+  "rows": [
+   "{\"a\":null,\"b\":\"ok\"}"
+  ]
+ },
+ "repeat exceeds custom cap error": {
+  "error": "duckvep_repeat_alleles: reference requires 1.200000e+02 bases which exceeds max_allele_bases=100"
+ },
+ "repeat exceeds default cap error": {
+  "error": "duckvep_repeat_alleles: alternate requires 5.001000e+03 bases which exceeds max_allele_bases=5000"
+ },
+ "repeat filtered selection": {
+  "rows": [
+   "{\"i\":5,\"s\":\"ok\"}",
+   "{\"i\":618,\"s\":\"ok\"}",
+   "{\"i\":1231,\"s\":\"ok\"}",
+   "{\"i\":1844,\"s\":\"ok\"}",
+   "{\"i\":2457,\"s\":\"ok\"}",
+   "{\"i\":3070,\"s\":\"ok\"}",
+   "{\"i\":3683,\"s\":\"ok\"}",
+   "{\"i\":4296,\"s\":\"ok\"}",
+   "{\"i\":4909,\"s\":\"ok\"}",
+   "{\"i\":5522,\"s\":\"ok\"}"
+  ]
+ },
+ "repeat infinite count error": {
+  "error": "duckvep_repeat_alleles: repeat counts must be finite and nonnegative"
+ },
+ "repeat invalid unit error": {
+  "error": "duckvep_repeat_alleles: repeat units must contain non-empty IUPAC DNA"
+ },
+ "repeat long output beyond inline strings": {
+  "rows": [
+   "{\"r\":2000000,\"a\":2000019,\"c\":19,\"h\":\"8741b2ae7fee70654704e7f4f4828e60\"}"
+  ]
+ },
+ "repeat many rows beyond one vector": {
+  "rows": [
+   "{\"rows\":9000,\"ok\":8470,\"r\":127035,\"a\":156632,\"c\":29597,\"d\":3,\"s\":2}"
+  ]
+ },
+ "repeat mixed null and incomplete rows": {
+  "rows": [
+   "{\"i\":0,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":1,\"g\":{\"reference\":\"A\",\"alternate\":\"TT\",\"reference_length\":1,\"alternate_length\":2,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":2,\"g\":{\"reference\":\"AA\",\"alternate\":\"TT\",\"reference_length\":2,\"alternate_length\":2,\"length_change\":0,\"length_direction\":\"NEUTRAL\",\"status\":\"ok\"}}",
+   "{\"i\":3,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":4,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}",
+   "{\"i\":5,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}",
+   "{\"i\":6,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":7,\"g\":{\"reference\":\"AAAAAAA\",\"alternate\":\"TT\",\"reference_length\":7,\"alternate_length\":2,\"length_change\":-5,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":8,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}",
+   "{\"i\":9,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":10,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}",
+   "{\"i\":11,\"g\":{\"reference\":\"AAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":11,\"alternate_length\":2,\"length_change\":-9,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":12,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":13,\"g\":{\"reference\":\"AAAAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":13,\"alternate_length\":2,\"length_change\":-11,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":14,\"g\":{\"reference\":\"AAAAAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":14,\"alternate_length\":2,\"length_change\":-12,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":15,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":16,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}",
+   "{\"i\":17,\"g\":{\"reference\":\"AAAAAAAAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":17,\"alternate_length\":2,\"length_change\":-15,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":18,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":19,\"g\":{\"reference\":\"AAAAAAAAAAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":19,\"alternate_length\":2,\"length_change\":-17,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":20,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}",
+   "{\"i\":21,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":22,\"g\":{\"reference\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":22,\"alternate_length\":2,\"length_change\":-20,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":23,\"g\":{\"reference\":\"AAAAAAAAAAAAAAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":23,\"alternate_length\":2,\"length_change\":-21,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":24,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":25,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}",
+   "{\"i\":26,\"g\":{\"reference\":\"AAAAAAAAAAAAAAAAAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":26,\"alternate_length\":2,\"length_change\":-24,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}",
+   "{\"i\":27,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}",
+   "{\"i\":28,\"g\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}",
+   "{\"i\":29,\"g\":{\"reference\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"alternate\":\"TT\",\"reference_length\":29,\"alternate_length\":2,\"length_change\":-27,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}"
+  ]
+ },
+ "repeat multiple units and field order": {
+  "rows": [
+   "{\"g\":{\"reference\":\"CAGCAGCCG\",\"alternate\":\"acacacac\",\"reference_length\":9,\"alternate_length\":8,\"length_change\":-1,\"length_direction\":\"LOSS\",\"status\":\"ok\"}}"
+  ]
+ },
+ "repeat negative count error": {
+  "error": "duckvep_repeat_alleles: repeat counts must be finite and nonnegative"
+ },
+ "repeat nonintegral counts": {
+  "rows": [
+   "{\"a\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"nonintegral_count\"},\"b\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"nonintegral_count\"},\"c\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"nonintegral_count\"}}"
+  ]
+ },
+ "repeat not lists error": {
+  "error": "duckvep_repeat_alleles: expected lists of {unit VARCHAR, count numeric}"
+ },
+ "repeat null struct option rows": {
+  "rows": [
+   "{\"i\":0,\"g\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":1,\"g\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":2,\"g\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"i\":3,\"g\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}"
+  ]
+ },
+ "repeat one row beyond one vector of elements": {
+  "rows": [
+   "{\"r\":9998,\"n\":9998,\"h\":\"1c947aa48670ae72dc7778712211057d\",\"s\":\"ok\"}"
+  ]
+ },
+ "repeat options": {
+  "rows": [
+   "{\"a\":{\"reference\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"alternate\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"reference_length\":6000,\"alternate_length\":6001,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"},\"b\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"},\"c\":{\"reference\":\"AAA\",\"alternate\":\"AAAA\",\"reference_length\":3,\"alternate_length\":4,\"length_change\":1,\"length_direction\":\"GAIN\",\"status\":\"ok\"},\"d\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}"
+  ]
+ },
+ "repeat options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "repeat scalar not a list error": {
+  "error": "duckvep_repeat_alleles: expected lists of {unit VARCHAR, count numeric}"
+ },
+ "repeat sequence exact required error": {
+  "error": "duckvep_repeat_alleles: sequence_exact is required"
+ },
+ "repeat summary only and incomplete": {
+  "rows": [
+   "{\"a\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"},\"b\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"},\"c\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"},\"d\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"},\"e\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"}}"
+  ]
+ },
+ "repeat unit not text error": {
+  "error": "duckvep_repeat_alleles: expected lists of {unit VARCHAR, count numeric}"
+ },
+ "repeat unknown option error": {
+  "error": "DuckVEP builder: unknown option 'limit'"
+ },
+ "repeat untyped NULL lists": {
+  "rows": [
+   "{\"a\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"},\"b\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"incomplete_input\"},\"c\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}"
+  ]
+ },
+ "repeat wrong option type error": {
+  "error": "DuckVEP builder: expected numeric for option 'max_allele_bases'"
+ },
+ "repeat wrong struct names error": {
+  "error": "duckvep_repeat_alleles: expected lists of {unit VARCHAR, count numeric}"
+ },
+ "revcomp bases and case": {
+  "rows": [
+   "{\"s\":\"ACGT\",\"r\":\"ACGT\"}",
+   "{\"s\":\"acgtn\",\"r\":\"nacgt\"}",
+   "{\"s\":\"RYSWKMBDHVN\",\"r\":\"NBDHVKMWSRY\"}",
+   "{\"s\":\"ryswkmbdhvn\",\"r\":\"nbdhvkmwsry\"}",
+   "{\"s\":\"ACGU\",\"r\":\"UCGT\"}",
+   "{\"s\":\"\",\"r\":\"\"}",
+   "{\"s\":\"A\",\"r\":\"T\"}",
+   "{\"s\":null,\"r\":null}"
+  ]
+ },
+ "revcomp constant and filtered": {
+  "rows": [
+   "{\"i\":7,\"c\":\"TGTAATC\",\"f\":\"GTGTGTGTGTGTGT\"}",
+   "{\"i\":408,\"c\":\"TGTAATC\",\"f\":\"GTGTGTGTGTGTGTGT\"}",
+   "{\"i\":809,\"c\":\"TGTAATC\",\"f\":\"GTGTGTGTGTGTGTGTGT\"}",
+   "{\"i\":1210,\"c\":\"TGTAATC\",\"f\":\"\"}",
+   "{\"i\":1611,\"c\":\"TGTAATC\",\"f\":\"GT\"}",
+   "{\"i\":2012,\"c\":\"TGTAATC\",\"f\":\"GTGT\"}",
+   "{\"i\":2413,\"c\":\"TGTAATC\",\"f\":\"GTGTGT\"}",
+   "{\"i\":2814,\"c\":\"TGTAATC\",\"f\":\"GTGTGTGT\"}"
+  ]
+ },
+ "revcomp long inputs": {
+  "rows": [
+   "{\"n\":210003,\"h\":\"9aa07678dc5f43c7f9c26b4f18adbd1f\"}"
+  ]
+ },
+ "revcomp many rows": {
+  "rows": [
+   "{\"n\":6000,\"ok\":5333,\"total\":69333,\"h\":\"125c29401b0f2ed98abccbccdeee3b90\"}"
+  ]
+ },
+ "revcomp utf8 kept": {
+  "rows": [
+   "{\"a\":\"CA\u20ac\u00e9GT\",\"b\":\"GT\u672c\u65e5\",\"c\":\"AC\ud83d\ude00GT\"}"
+  ]
+ },
  "so_terms aggregate": {
   "rows": [
    "{\"n\":41,\"masks\":2199023255551,\"worst\":41,\"impacts\":4}"
