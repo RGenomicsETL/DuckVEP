@@ -28,6 +28,7 @@ add_library(duckvep SHARED
     host_v2_annotate.c
     host_v2_haplotypes.c
     host_v2_coding_calls.c
+    host_v2_budget.c
     ${CORE_SOURCES}
     ${KERNEL_SOURCES}
     "${DUCKVEP_ROOT}/src/duckvep_reference.c"

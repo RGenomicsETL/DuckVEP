@@ -1,5 +1,9 @@
 # DuckVEP
 
+## DuckDB C API v2 host, slice 6: resource control (issue #8)
+
+- `duckvep_native_budget`, `duckvep_native_budget_set`, `duckvep_native_budget_reset_high_water` and `duckvep_worker_limits_set` run on the v2 preview host through the shared `src/core/duckvep_core_budget.c` (v1 uses it too; its output is unchanged). The v2 model publish, annotation workers, haplotype scan and coding_calls reader are charged to the same budget, and over a tiny budget they give the explicit capacity error, publish nothing and leave the connection usable (`test/sql_v2/v2_budget.sql`). All 27 public functions now run on v2, with equality to v1 recorded; see the final status table in `docs/v2-host.md`.
+
 ## DuckDB C API v2 host, slice 5: haplotype capture (issue #8)
 
 - `duckvep_haplotypes`, `duckvep_coding_transcripts` and `duckvep_coding_calls` run on the v2 preview host. The replay stream, its bounded workspace and the result writers moved to `src/core/duckvep_core_haplotypes.c` (DuckDB only through the host layer), the fused VCF/BCF reader to `src/core/duckvep_core_coding_calls.c` and discovery to `src/core/duckvep_core_discovery.c`; v1 keeps its private-connection input and its named parameters and its output is unchanged (all v1 gates pass). v2 has no private connection, so `duckvep_haplotype_load_sql` returns the caller-side statements (the normalization v1 runs internally, wrapped around the caller's query), the `duckvep_stage` COPY format takes a `JOB` and captures the rows into spillable column collections, and `duckvep_haplotype_scan('<job>')` replays them once. Output equals v1 on the vertical, same-codon, frame, start/stop and NMD suites, 47 policy, limit and error cases and the discovery and `coding_calls` fixtures (full-row hashes), and HG002 through `duckvep_coding_calls` gives 157,986 rows with checksum `1456007180270799092358516`. See `docs/v2-host.md`.

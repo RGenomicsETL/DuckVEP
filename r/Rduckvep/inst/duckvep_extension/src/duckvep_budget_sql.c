@@ -3,6 +3,7 @@
 DUCKDB_EXTENSION_EXTERN
 
 #include "kernel/src/duckvep_budget.h"
+#include "core/duckvep_core_budget.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -67,21 +68,17 @@ duckvep_budget_scan(duckdb_function_info info, duckdb_data_chunk output)
 	charges = duckdb_vector_get_data(duckdb_data_chunk_get_vector(output, 4));
 	refusals = duckdb_vector_get_data(duckdb_data_chunk_get_vector(output, 5));
 	count = 0;
-	while (scan->offset <= DUCKVEP_OWNER_COUNT) {
-		int total = scan->offset == DUCKVEP_OWNER_COUNT;
+	while (scan->offset < DUCKVEP_CORE_BUDGET_ROWS) {
+		duckvep_core_budget_row_t row;
 
+		duckvep_core_budget_row((unsigned)scan->offset, &scan->stats, &row);
 		duckdb_vector_assign_string_element(
-		    duckdb_data_chunk_get_vector(output, 0), count,
-		    total ? "total" :
-		    duckvep_budget_owner_name((duckvep_budget_owner_t)scan->offset));
-		current[count] = total ? scan->stats.total_current :
-		    scan->stats.current[scan->offset];
-		high[count] = total ? scan->stats.total_high_water :
-		    scan->stats.high_water[scan->offset];
-		limit[count] = scan->stats.limit;
-		/* Process-wide counters: reported on the total row, zero elsewhere. */
-		charges[count] = total ? scan->stats.charges : 0;
-		refusals[count] = total ? scan->stats.refusals : 0;
+		    duckdb_data_chunk_get_vector(output, 0), count, row.owner);
+		current[count] = row.current;
+		high[count] = row.high_water;
+		limit[count] = row.limit;
+		charges[count] = row.charges;
+		refusals[count] = row.refusals;
 		count++;
 		scan->offset++;
 	}
@@ -113,21 +110,11 @@ duckvep_budget_set_scalar(duckdb_function_info info, duckdb_data_chunk input,
 	rows = duckdb_data_chunk_get_size(input);
 	result = duckdb_vector_get_data(output);
 	for (row = 0; row < rows; row++) {
-		int64_t value;
+		int64_t value = 0;
 		char message[256];
+		int present = duckvep_budget_int_arg(input, 0, row, &value);
 
-		if (!duckvep_budget_int_arg(input, 0, row, &value) || value <= 0) {
-			duckdb_scalar_function_set_error(info,
-			    "duckvep_native_budget_set: the budget must be a positive byte count");
-			return;
-		}
-		if (!duckvep_budget_set_limit((uint64_t)value)) {
-			duckvep_budget_stats_t stats;
-
-			duckvep_budget_stats(&stats);
-			(void)snprintf(message, sizeof(message),
-			    "duckvep_native_budget_set: capacity error: %lld bytes is below the %llu bytes already in use",
-			    (long long)value, (unsigned long long)stats.total_current);
+		if (!duckvep_core_budget_set(present, value, message, sizeof(message))) {
 			duckdb_scalar_function_set_error(info, message);
 			return;
 		}
@@ -145,24 +132,16 @@ duckvep_worker_limits_scalar(duckdb_function_info info,
 	rows = duckdb_data_chunk_get_size(input);
 	result = duckdb_vector_get_data(output);
 	for (row = 0; row < rows; row++) {
-		int64_t workers, scratch, emit, idle;
-		duckvep_budget_worker_limits_t limits;
+		int64_t value[4] = {0, 0, 0, 0};
+		int present[4];
+		char message[256];
 
-		if (!duckvep_budget_int_arg(input, 0, row, &workers) ||
-		    !duckvep_budget_int_arg(input, 1, row, &scratch) ||
-		    !duckvep_budget_int_arg(input, 2, row, &emit) ||
-		    !duckvep_budget_int_arg(input, 3, row, &idle) ||
-		    workers <= 0 || workers > 1024 || scratch < 0 || emit < 0 ||
-		    idle < 0) {
-			duckdb_scalar_function_set_error(info,
-			    "duckvep_worker_limits_set: workers must be 1..1024 and byte limits non-negative");
+		for (idx_t k = 0; k < 4; k++)
+			present[k] = duckvep_budget_int_arg(input, k, row, &value[k]);
+		if (!duckvep_core_worker_limits(present, value, message, sizeof(message))) {
+			duckdb_scalar_function_set_error(info, message);
 			return;
 		}
-		limits.max_workers = (uint32_t)workers;
-		limits.scratch_bytes = (uint64_t)scratch;
-		limits.emit_bytes = (uint64_t)emit;
-		limits.idle_bytes = (uint64_t)idle;
-		(void)duckvep_budget_set_worker_limits(&limits);
 		result[row] = true;
 	}
 }

@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CASES = ROOT / "test/sql_v2/equality_cases.sql"
 NATIVE = ROOT / "test/sql_v2/v2_native.sql"
 MODEL = ROOT / "test/sql_v2/v2_model.sql"
+BUDGET = ROOT / "test/sql_v2/v2_budget.sql"
 GOLDEN = ROOT / "test/sql_v2/equality_golden.json"
 PIN = json.loads((ROOT / "duckvep-package.json").read_text())["v2_host"]
 MESSAGE = re.compile(r"(?:duckvep_\w+|_duckvep_\w+|DuckVEP builder): [^\n]*")
@@ -225,11 +226,12 @@ def test_load(host):
     print("load: read-only and writable primary, repeated LOAD, no DDL, database bytes unchanged")
 
 
-def test_model(host):
+def test_model(host, script=None):
     """Model sink scenarios (test/sql_v2/v2_model.sql): statements run in one session without
     -bail; each `-- expect error: X` line must be followed by exactly that failure."""
+    source = script or MODEL
     script, expected = [], []
-    for line in MODEL.read_text().splitlines():
+    for line in source.read_text().splitlines():
         match = re.match(r"-- expect error: (.*)", line)
         if match:
             expected.append(match.group(1))
@@ -244,10 +246,10 @@ def test_model(host):
         if want not in got:
             raise AssertionError(f"expected an error containing {want!r}, got {got!r}")
     assertions = [line for line in result.stdout.splitlines() if line.strip() == "true"]
-    asserted = sum(1 for line in MODEL.read_text().splitlines() if line.startswith("SELECT CASE WHEN"))
+    asserted = sum(1 for line in source.read_text().splitlines() if line.startswith("SELECT CASE WHEN"))
     if len(assertions) < asserted:
         raise AssertionError(f"{len(assertions)} of {asserted} assertions passed:\n{result.stdout}\n{result.stderr}")
-    print(f"model: {len(expected)} expected failures, {asserted} assertions passed")
+    print(f"{source.stem}: {len(expected)} expected failures, {asserted} assertions passed")
 
 
 def test_native(host):
@@ -298,6 +300,7 @@ def main():
     test_load(host)
     test_native(host)
     test_model(host)
+    test_model(host, BUDGET)
     test_equality(host, golden)
     if Path(args.v1_extension).exists():
         live = v1_outcomes(args.v1_extension, parse_cases())
