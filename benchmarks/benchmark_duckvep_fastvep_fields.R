@@ -243,6 +243,17 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
   execute <- function(sql) invisible(DBI::dbExecute(con, sql))
   duckvep_fastvep_prepare_source(con, input)
   execute("SET preserve_insertion_order = false")
+  # Resolve each distinct CHROM to its model regions once, with the original
+  # name-or-name-without-"chr" rule, so the per-allele join is an equality
+  # (hash join) instead of a regex nested loop against every model region. A
+  # CHROM that matches several regions still yields several rows per allele,
+  # and one that matches none yields a NULL region, so the check below fails
+  # exactly as before.
+  execute("CREATE TEMP TABLE fastvep_chrom_region AS
+    SELECT c.chrom, r.seq_region
+    FROM (SELECT DISTINCT chrom FROM fastvep_source_spelling) c
+    LEFT JOIN duckvep_bench_regions r ON r.name = c.chrom
+      OR r.name = regexp_replace(c.chrom, '^chr', '')")
   execute("CREATE TEMP TABLE fastvep_events AS
     SELECT row_number() OVER (ORDER BY s.record_index, a.alt_index)::UBIGINT AS event_index,
       s.record_index, a.alt_index, r.seq_region, s.chrom, s.position, s.variant_id,
@@ -253,8 +264,7 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
       NULL::UBIGINT AS mate_position
     FROM fastvep_source_spelling s
     CROSS JOIN UNNEST(s.alternates) WITH ORDINALITY a(alternate, alt_index)
-    LEFT JOIN duckvep_bench_regions r ON r.name = s.chrom
-      OR r.name = regexp_replace(s.chrom, '^chr', '')
+    LEFT JOIN fastvep_chrom_region r ON r.chrom = s.chrom
     WHERE regexp_full_match(s.reference, '[ACGTNacgtn]+')
       AND regexp_full_match(a.alternate, '[ACGTNacgtn]+')
       AND upper(s.reference) <> upper(a.alternate)
@@ -265,10 +275,6 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
   if (invalid != 0) stop("literal input alleles need exactly one model region", call. = FALSE)
   execute("CREATE TEMP VIEW fastvep_ordered_events AS SELECT * FROM fastvep_events
     ORDER BY seq_region, position, record_index, alt_index")
-  execute("CREATE TEMP TABLE fastvep_metadata AS SELECT transcript_index,
-    NULL::VARCHAR AS symbol, NULL::BOOLEAN AS canonical, NULL::VARCHAR AS tsl,
-    NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds
-    FROM duckvep_bench_model.model_transcripts")
   core <- DBI::dbGetQuery(con, "SELECT table_name FROM information_schema.tables
     WHERE table_catalog = 'duckvep_bench_model' AND table_schema = 'ensembl_core'")$table_name
   if (all(c("transcript_attrib", "attrib_type", "gene") %in% core)) {
@@ -287,32 +293,59 @@ duckvep_fastvep_prepare_fields <- function(con, input, contract, distance, gff3 
       FROM duckvep_bench_model.ensembl_core.transcript_attrib t
       JOIN duckvep_bench_model.ensembl_core.attrib_type a USING(attrib_type_id)
       GROUP BY t.transcript_id")
-    execute("UPDATE fastvep_metadata m SET canonical =
-      t.source_transcript_id = g.canonical_transcript_id,
-      tsl = a.tsl, appris = a.appris, ccds = a.ccds
+    # Core values only for transcripts whose gene row exists, as the earlier
+    # UPDATE ... FROM did.
+    execute("CREATE TEMP TABLE fastvep_core_metadata AS
+      SELECT t.transcript_index,
+        t.source_transcript_id = g.canonical_transcript_id AS canonical,
+        CASE WHEN g.gene_id IS NOT NULL THEN a.tsl END AS tsl,
+        CASE WHEN g.gene_id IS NOT NULL THEN a.appris END AS appris,
+        CASE WHEN g.gene_id IS NOT NULL THEN a.ccds END AS ccds
       FROM duckvep_bench_model.model_transcripts t
-      JOIN duckvep_bench_model.ensembl_core.gene g ON g.gene_id = t.source_gene_id
-      LEFT JOIN fastvep_attributes a ON a.transcript_id = t.source_transcript_id
-      WHERE m.transcript_index = t.transcript_index")
+      LEFT JOIN duckvep_bench_model.ensembl_core.gene g ON g.gene_id = t.source_gene_id
+      LEFT JOIN fastvep_attributes a ON a.transcript_id = t.source_transcript_id")
+  } else {
+    execute("CREATE TEMP TABLE fastvep_core_metadata AS
+      SELECT transcript_index, NULL::BOOLEAN AS canonical, NULL::VARCHAR AS tsl,
+        NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds
+      FROM duckvep_bench_model.model_transcripts")
   }
   if (nzchar(gff3)) {
     execute(paste0("CREATE TEMP TABLE fastvep_gff AS SELECT feature, attributes_map AS attributes
       FROM read_gff(", q(gff3), ", attributes_map := TRUE, scan_mode := 'sequential')
       WHERE feature NOT IN ('exon', 'CDS', 'chromosome', 'biological_region',
         'five_prime_UTR', 'three_prime_UTR')"))
-    execute("UPDATE fastvep_metadata m SET symbol = g.attributes['Name']
-      FROM duckvep_bench_model.model_transcripts t JOIN fastvep_gff g
-      ON (g.feature IN ('gene', 'pseudogene') OR ends_with(g.feature, '_gene'))
-        AND regexp_replace(g.attributes['ID'], '^gene:', '') = t.gene_stable_id
-      WHERE m.transcript_index = t.transcript_index")
-    execute("UPDATE fastvep_metadata m SET
-      canonical = coalesce(m.canonical, list_contains(string_split(g.attributes['tag'], ','), 'Ensembl_canonical'), false),
-      tsl = coalesce(m.tsl, g.attributes['transcript_support_level']),
-      ccds = coalesce(m.ccds, g.attributes['ccdsid'])
-      FROM duckvep_bench_model.model_transcripts t JOIN fastvep_gff g
-      ON regexp_replace(g.attributes['ID'], '^transcript:', '') = t.transcript_stable_id
-      WHERE m.transcript_index = t.transcript_index")
+    # One row per stable ID so the joins below cannot multiply transcripts.
+    execute("CREATE TEMP TABLE fastvep_gff_genes AS
+      SELECT regexp_replace(attributes['ID'], '^gene:', '') AS gene_stable_id,
+        any_value(attributes['Name']) AS symbol
+      FROM fastvep_gff
+      WHERE feature IN ('gene', 'pseudogene') OR ends_with(feature, '_gene')
+      GROUP BY ALL")
+    execute("CREATE TEMP TABLE fastvep_gff_transcripts AS
+      SELECT regexp_replace(attributes['ID'], '^transcript:', '') AS transcript_stable_id,
+        any_value(list_contains(string_split(attributes['tag'], ','), 'Ensembl_canonical')) AS canonical,
+        any_value(attributes['transcript_support_level']) AS tsl,
+        any_value(attributes['ccdsid']) AS ccds
+      FROM fastvep_gff GROUP BY ALL")
+  } else {
+    execute("CREATE TEMP TABLE fastvep_gff_genes AS
+      SELECT NULL::VARCHAR AS gene_stable_id, NULL::VARCHAR AS symbol WHERE false")
+    execute("CREATE TEMP TABLE fastvep_gff_transcripts AS
+      SELECT NULL::VARCHAR AS transcript_stable_id, NULL::BOOLEAN AS canonical,
+        NULL::VARCHAR AS tsl, NULL::VARCHAR AS ccds WHERE false")
   }
+  # Core values win; GFF fills only what core leaves NULL, and only for
+  # transcripts the GFF names. All joins are equalities on stable IDs.
+  execute("CREATE TEMP TABLE fastvep_metadata AS
+    SELECT t.transcript_index, gg.symbol,
+      CASE WHEN gt.transcript_stable_id IS NOT NULL
+        THEN coalesce(c.canonical, gt.canonical, false) ELSE c.canonical END AS canonical,
+      coalesce(c.tsl, gt.tsl) AS tsl, c.appris AS appris, coalesce(c.ccds, gt.ccds) AS ccds
+    FROM duckvep_bench_model.model_transcripts t
+    JOIN fastvep_core_metadata c USING(transcript_index)
+    LEFT JOIN fastvep_gff_genes gg ON gg.gene_stable_id = t.gene_stable_id
+    LEFT JOIN fastvep_gff_transcripts gt ON gt.transcript_stable_id = t.transcript_stable_id")
   if (DBI::dbGetQuery(con, "SELECT count(*) n FROM fastvep_metadata WHERE canonical IS NULL")$n != 0) {
     stop("canonical status requires Ensembl core gene metadata or matching GFF transcripts", call. = FALSE)
   }
