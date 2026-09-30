@@ -132,6 +132,9 @@ static inline void fill_cell(const column *c, idx_t index, duckvep_cell_t *cell)
         cell->kind = DUCKVEP_CELL_UNSUPPORTED;
         return;
     }
+    if (!cell->valid) {
+        return; /* a NULL element's storage is uninitialized: do not read it */
+    }
     idx_t at = physical_row(&c->view, index);
     const void *data = c->view.data;
     switch (cell->kind) {
@@ -155,7 +158,7 @@ static inline void fill_cell(const column *c, idx_t index, duckvep_cell_t *cell)
         cell->text_length = text.len;
         break;
     }
-    case DUCKVEP_CELL_BOOLEAN: cell->boolean = ((const bool *)data)[at]; break;
+    case DUCKVEP_CELL_BOOLEAN: cell->boolean = ((const uint8_t *)data)[at] != 0; break;
     default: break;
     }
 }
