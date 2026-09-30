@@ -1,0 +1,2 @@
+PASS	cold	load=2.395	stage=3.076	predict=2.617
+BUDGET	pass_cur_model=1304.1;pass_cur_index=13.7;pass_cur_reference=0.0;pass_cur_workspace=0.0;pass_cur_scratch=0.0;pass_cur_emit=0.0;pass_cur_control=0.0;pass_cur_total=1317.9;pass_hw_model=1304.1;pass_hw_index=13.7;pass_hw_reference=0.0;pass_hw_workspace=332.8;pass_hw_scratch=0.0;pass_hw_emit=0.0;pass_hw_control=0.0;pass_hw_total=1650.7

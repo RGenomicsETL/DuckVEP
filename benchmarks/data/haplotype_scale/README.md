@@ -4,9 +4,44 @@ The last slice of the signed `duckvep-coding-v1` contract (`design/duckvep_haplo
 the pinned `bcftools csq` on identical input, transcript model and core, under the same caps, and must qualify a 5M-physical-variant single-sample
 GRCh38 job on the MANE-selected model.
 
+## 2026-09-30, issue #34 slice 1: the fused native reader (gate met)
+
+`duckvep_coding_calls(model, path)` reads the (bgzipped) VCF or BCF with the bundled zlib-only htslib, maps CHROM by name, runs the shared discovery (`duckvep_discovery.c`, the same code as `duckvep_coding_transcripts`) on every ALT allele
+and decodes FORMAT, GT and PS only for the records that touch coding sequence (25,969 of 4,023,088). It emits the calls relation of mode B. The measurement below is the unchanged gate: fresh process, one core (`taskset -c 6`, cgroup 16 GiB, native budget 4 GiB,
+DuckDB threads 1), median of three, csq (`-p a -Ou -o /dev/null`) alternating with DuckVEP, load at most 3 at each start (waited once for one minute), sibling thread 0% busy in every run. Files: `perf34_slice1/` (receipt `process.tsv`, per-run stage output, `identity.txt`).
+The harness is `benchmarks/haplotype_scale/cli_worker.sh` (DuckDB v1.5.1 CLI, no R); the R worker has the same pipeline as `--mode F`. Extension: release build of source tree `8713686b` (sha256 `ab4dc8e7...`), copied to an immutable file first.
+
+| | wall s (runs) | median | gate |
+|---|---|---|---|
+| pinned `bcftools csq -p a -Ou -o /dev/null` | 18.07 / 17.25 / 17.08 | **17.25** | target 0.5 x = 8.63 |
+| DuckVEP fused, staged (`--mode F`: calls table, then `duckvep_haplotypes` to Parquet), CLI | 8.23 / 8.21 / 8.15 | **8.21** (8.15 to 8.23) | **2.10x: met** |
+| DuckVEP fused, inline (`--mode I`: `duckvep_haplotypes` over the reader, nothing staged), CLI | 8.24 / 8.20 / 8.16 | 8.20 | 2.10x |
+| same pipeline from R (`worker.R --mode F`, R and DuckDB R package start-up included, reported separately) | 8.59 / 8.60 / 8.64 | 8.60 | 2.01x |
+
+Host note: csq ran 1.6 to 2.6 s faster than in the 2026-09-29 round (19.66 s) on a quieter host, so the ratio is judged inside this round. Against the old csq median the ratio would be 2.39x. Mode B on this round's host was not re-run for the gate; its last measure is 12.58 s.
+
+Stages, medians of the three staged CLI runs (the CLI's own timers; the wall clock adds about 0.1 s of start-up and shutdown):
+
+| stage | mode B (2026-09-29, R) | fused |
+|---|---|---|
+| model load | 2.60 | 2.40 |
+| decode, discovery, call construction (stage) | 6.38 | **3.08** |
+| discovery, prediction and complete Parquet output | 2.88 | 2.57 |
+| process wall | 12.58 | 8.21 |
+
+What remains in the 3.08 s stage is the zlib inflate of 2.9 GB (a diagnostic `gzip -dc` is 6.8 s of single-threaded zlib-ng-less work, `bgzip -dc` with libdeflate 1.0 s; htslib's BGZF inflate with zlib blocks lies between them) plus about 4 million line splits and interval lookups. Load (2.4 s) is the next lever and is outside this slice. Sys time is 1.6 s of the 8.2 (page faults of the model).
+
+Caps observed: memory.peak 3.83 GiB (4,107,853,824 bytes; cap 16 GiB), native pass total 1,651 MiB of 4,096 (model 1,304, index 14, workspace 333), DuckDB spill 0, all 15 processes exit 0.
+
+Output identity. The output of the fused pipeline has 157,986 rows and full-output checksum `1456007180270799092358516`, equal to slice 7's mode B, in all nine audited-by-checksum outputs (F, I and R, three each; the checksum is `sum(hash(row))` over the Parquet, as in `worker.R`). (The brief quoted 158,004 rows; the slice 7 receipts and this run both have 157,986, and the checksum is the same.) Stronger: `benchmarks/haplotype_scale/verify_coding_calls.sh` builds mode B's calls relation and the reader's in one session and compares them as multisets, every column: 247,374 calls each, 0 only in the reader, 0 only in mode B, equal order-independent hashes.
+
+Differences from the mode B SQL that cannot show in HG002's output, by design: the PS of a sample is read by FORMAT key (mode B takes the last `:` field, which is PS in HG002), the record ordinal counts every data record, a coding record without GT or a file without FORMAT/GT is an error (mode B would parse garbage), and multi-sample files give one row per sample with `sample_index` from 0 (mode B reads the first sample only).
+
+Gates: `make release`, `test_release` (31 SQL files including `duckvep_coding_calls.test`), `test_release_asan`, `test_properties`, `test_haplotype_contract`, `test_fault_injection` (861 failed allocations, all clean, including new call sites in the reader and the discovery module), `check-function-docs` (26 functions, 29 examples), R tinytests (10,711 expectations, all pass), `scripts/check-rduckvep-bundle.sh`, `git diff --check`, clang `-Werror=string-concatenation` on the new files.
+
 ## Verdict
 
-**The gate is not met.** The maintainer closed #2 on its correctness contract, and the gate moved unchanged to #34. Judged on mode B (identical unsorted VCF, decode through Parquet), cold process, model load included, whole-process wall clock
+**(Superseded by the 2026-09-30 section above: the gate is met with the fused reader.) As measured on 2026-09-29, the gate was not met.** The maintainer closed #2 on its correctness contract, and the gate moved unchanged to #34. Judged on mode B (identical unsorted VCF, decode through Parquet), cold process, model load included, whole-process wall clock
 (R and DuckDB start-up included), one core, three fresh processes each:
 
 | | wall s (median of 3) |
