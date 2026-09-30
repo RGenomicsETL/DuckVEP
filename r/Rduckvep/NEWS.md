@@ -1,5 +1,9 @@
 # Rduckvep
 
+- `rduckvep_coding_calls()` wraps the new SQL table function `duckvep_coding_calls(model, path)`: a fused native reader of a
+  (bgzipped) VCF or BCF that discards records outside coding sequence before decoding genotypes and returns the calls relation of
+  `rduckvep_haplotypes()` (same discovery as `rduckvep_coding_transcripts()`, output identical to building the calls in SQL). The
+  model must have been loaded with `seq_region_name` in its regions query.
 - `rduckvep_coding_transcripts()` wraps the SQL scalar `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)`:
   the (event, transcript) pairs of the annotation builder's CDS overlap, found from the resident interval index (the fast
   discovery route for haplotype calls on whole-genome input). The bundled extension also makes `rduckvep_haplotypes()`

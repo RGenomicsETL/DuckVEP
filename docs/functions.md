@@ -1,6 +1,6 @@
 # Function reference
 
-DuckVEP registers 25 public SQL functions: 21 scalar functions and 4 table functions. This page lists all of them, grouped by purpose. Internal helpers whose names start with `_duckvep_` or `__duckvep_` are implementation details and are not documented. `scripts/check-function-docs.py` (`make check-function-docs`) fails when this page misses or adds a public function relative to `duckdb_functions()`, and it runs every example below.
+DuckVEP registers 26 public SQL functions: 21 scalar functions and 5 table functions. This page lists all of them, grouped by purpose. Internal helpers whose names start with `_duckvep_` or `__duckvep_` are implementation details and are not documented. `scripts/check-function-docs.py` (`make check-function-docs`) fails when this page misses or adds a public function relative to `duckdb_functions()`, and it runs every example below.
 
 Every `sql` example on this page runs against the fixture model in `test/data/duckvep/readme.sql`, in the order it appears on the page: later examples use tables created by earlier ones. Blocks marked `sql no-run` are illustrative fragments or need external data.
 
@@ -16,7 +16,7 @@ FROM query(duckvep_annotate_sql('demo_events', 'demo', {hgvs: true}))
 
 **Options go in a trailing STRUCT.** Optional settings are the fields of one final STRUCT argument (`{hgvs: true}` or `struct_pack(hgvs := true)`), never named function parameters: the stable DuckDB C API used by this extension has no named scalar arguments, so `hgvs := true` written as a bare argument does not bind. An unknown field, or a field with the wrong type, is an error that names the option. A field set to NULL keeps the default. A builder that takes no options rejects any field.
 
-**Table functions take named parameters.** `duckvep_model_load` and `duckvep_haplotypes` are table functions and use ordinary `name := value` parameters.
+**Table functions take named parameters.** `duckvep_model_load` and `duckvep_haplotypes` are table functions and use ordinary `name := value` parameters (`duckvep_coding_calls` takes two positional arguments).
 
 **Unknown is a value.** When a result cannot be computed (a missing reference sequence, a reference mismatch, an unsupported allele) the row carries a status and a reason instead of a guess.
 
@@ -43,6 +43,7 @@ FROM query(duckvep_annotate_sql('demo_events', 'demo', {hgvs: true}))
 | | [`duckvep_repeat_alleles`](#duckvep_repeat_alleles) | scalar | Expand ordered repeat units and counts into reference and alternate sequences. |
 | [Haplotypes](#haplotypes) | [`duckvep_phase_call`](#duckvep_phase_call) | scalar | Assign genotype slots to haplotype lanes and phase sets. |
 | | [`duckvep_coding_transcripts`](#duckvep_coding_transcripts) | scalar | List the transcripts whose coding sequence a VCF record overlaps. |
+| | [`duckvep_coding_calls`](#duckvep_coding_calls) | table | Read a VCF or BCF into the calls of `duckvep_haplotypes`, decoding only records that touch coding sequence. |
 | | [`duckvep_haplotypes`](#duckvep_haplotypes) | table | Replay phased calls into whole-haplotype CDS, protein and consequence rows. |
 | [Geometry and helpers](#geometry-and-helpers) | [`duckvep_allele_geometry`](#duckvep_allele_geometry) | scalar | Normalized coordinates of one small allele. |
 | | [`duckvep_breakend_geometry`](#duckvep_breakend_geometry) | scalar | Parse a breakend ALT into its mate coordinate and replacement sequence. |
@@ -645,6 +646,51 @@ Returns: the ascending model transcript ordinals, as `UINTEGER[]`. The list is e
 SELECT event_index, unnest(duckvep_coding_transcripts('demo', seq_region, position, reference, alternate)) AS transcript_index
 FROM demo_events
 ORDER BY event_index;
+```
+
+<a id="duckvep_coding_calls"></a>
+
+### duckvep_coding_calls
+
+The fused reader for haplotypes: one pass over a (bgzipped) VCF or BCF that discards every record outside coding sequence before decoding genotypes, and returns the calls relation that `duckvep_haplotypes` consumes. The file is read with the bundled HTSlib (zlib). Each record's CHROM is mapped to the model's `seq_region` by `seq_region_name`, each ALT allele goes through the discovery of `duckvep_coding_transcripts` (the same code, so the same normalization and the same pairs), and only when an allele touches a coding sequence does the reader parse FORMAT and decode GT and PS. The other records, about 99% of a genome, cost one line read and a few interval lookups. `SELECT * FROM duckvep_coding_calls(...)` gives byte-identical `duckvep_haplotypes` output to building the calls with `read_csv`, `duckvep_coding_transcripts` and SQL genotype parsing.
+
+Signature:
+
+```text
+duckvep_coding_calls(model VARCHAR, path VARCHAR) -> TABLE
+```
+
+Parameters: `model` is a loaded model name without wrapped circular objects, loaded with `seq_region_name` in its regions query (the names are how CHROM is matched, exactly). `path` is a VCF, bgzipped VCF or BCF file.
+
+Returns one row per ALT allele, transcript and sample:
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `event_index` | BIGINT | `(record ordinal << 6) \| (ALT ordinal - 1)`. The ordinal is 1-based and counts every data record of the file, including records the model does not know. |
+| `seq_region` | INTEGER | The model region of the record's CHROM. |
+| `position` | BIGINT | One-based POS. |
+| `reference`, `alternate` | VARCHAR | REF and this ALT allele, as written, with the anchor base. |
+| `alt_index` | INTEGER | The ALT allele's one-based position in the ALT list. |
+| `transcript_index` | INTEGER | Model transcript ordinal whose CDS the normalized event touches. |
+| `sample_index` | INTEGER | The sample column, from 0. |
+| `alleles` | INTEGER[] | The GT allele numbers, NULL for a missing allele. |
+| `phase_before` | BOOLEAN[] | A leading `false`, then for each further lane whether the separator before it is `\|`. |
+| `phase_set` | BIGINT | The sample's `PS` when it is an integer; labels such as `PATMAT`, `.` and an absent `PS` are NULL. |
+
+Records on contigs the model does not know, records with no ALT and symbolic, breakend, missing or REF-identical alleles produce no rows, but every data record is counted in `event_index`. Unsupported input is an error, never a silent skip: a file that is not a VCF or BCF, a file without samples, a header that declares no `FORMAT/GT`, a record that touches coding sequence and has no GT, more than 64 ALT alleles in such a record, an invalid POS or a model loaded without region names. Allocation goes through the native budget (a fixed reservation stands in for HTSlib's own buffers). Rows come in file order; `duckvep_haplotypes` sorts its input.
+
+```sql
+SELECT loaded FROM duckvep_model_load('demo_named',
+  'SELECT seq_region, 300::UBIGINT AS sequence_length, ''chr'' || seq_region AS seq_region_name FROM readme_regions ORDER BY seq_region',
+  'SELECT * FROM readme_transcripts ORDER BY seq_region, transcript_start',
+  'SELECT * FROM readme_exons ORDER BY transcript_index, exon_start');
+
+SELECT event_index, position, reference, alternate, transcript_index, alleles, phase_before, phase_set
+FROM duckvep_coding_calls('demo_named', 'test/data/coding_calls/demo.vcf')
+ORDER BY event_index;
+
+SELECT carrier_count, prediction_status, haplotype_consequences
+FROM duckvep_haplotypes('SELECT * FROM duckvep_coding_calls(''demo_named'', ''test/data/coding_calls/demo.vcf'')', 'demo_named');
 ```
 
 <a id="duckvep_haplotypes"></a>

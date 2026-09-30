@@ -121,6 +121,13 @@ QUERIES = {
     "discovery": """SELECT 'RESULT discovery ' || count(*) || ' ' || hash(list(d ORDER BY hash(d))) FROM
  (SELECT event_index, duckvep_coding_transcripts('fm', seq_region::BIGINT, position::BIGINT,
   reference, alternate) AS transcripts FROM f_ev WHERE reference IS NOT NULL) d;""",
+    # The fused VCF reader (plain text and bgzipped): model pin, name table, discovery buffers, record buffers, genotype
+    # arrays, the htslib reservations, and the same records read through duckvep_haplotypes.
+    "coding_calls": """SELECT 'RESULT coding_calls ' || count(*) || ' ' || hash(list(d ORDER BY hash(d))) FROM
+ (SELECT * FROM duckvep_coding_calls('fm', '%s/test/data/coding_calls/fault.vcf')
+  UNION ALL SELECT * FROM duckvep_coding_calls('fm', '%s/test/data/coding_calls/fault.vcf.gz')) d;""" % (ROOT, ROOT),
+    "coding_calls_haplotype": """SELECT 'RESULT coding_calls_haplotype ' || count(*) || ' ' || hash(list(h ORDER BY hash(h))) FROM
+ duckvep_haplotypes('SELECT * FROM duckvep_coding_calls(''fm'', ''%s/test/data/coding_calls/fault.vcf'') WHERE sample_index = 0', 'fm') h;""" % ROOT,
     # Circular model executed on a lifted copy: lift_resolve and its HGVS and projection copies.
     "lifted_hgvs": """SELECT 'RESULT lifted_hgvs ' || count(*) || ' ' || hash(list(a ORDER BY hash(a))) FROM
  query(duckvep_annotate_sql('f_cev_full', 'fc', struct_pack(hgvs := true, upstream_distance := 0, downstream_distance := 0))) a;""",
@@ -130,7 +137,7 @@ QUERIES = {
  query(duckvep_annotate_projected_sql('f_cev', 'fc')) a;""",
 }
 # The model each annotation phase runs on, and the query that proves a load published nothing.
-MODEL_OF = {"haplotype": "fm", "discovery": "fm", "hgvs": "fm", "regulation": "fm", "projected": "fm",
+MODEL_OF = {"haplotype": "fm", "discovery": "fm", "coding_calls": "fm", "coding_calls_haplotype": "fm", "hgvs": "fm", "regulation": "fm", "projected": "fm",
             "lifted_hgvs": "fc", "lifted": "fc", "lifted_projected": "fc"}
 LOAD_PHASES = {"load": ("fm", "hgvs"), "load_circular": ("fc", "lifted_hgvs")}
 
@@ -299,7 +306,8 @@ def main():
     for site, count in sorted(sites.items(), key=lambda kv: str(kv[0])):
         print("  site %s x%d" % (site, count))
     # The new lifted-execution sites must actually have been failed.
-    for needed in ("duckvep_lift.c", "duckvep_scalar_lift_resolve", "duckvep_scalar_lift_reserve"):
+    for needed in ("duckvep_lift.c", "duckvep_scalar_lift_resolve", "duckvep_scalar_lift_reserve", "duckvep_coding_calls.c",
+                   "duckvep_discovery.c"):
         if not args.limit and not any(needed in "%s %s" % (site[0], site[1]) for site in sites if site):
             failures.append("no failed allocation at %s" % needed)
     if failures:
