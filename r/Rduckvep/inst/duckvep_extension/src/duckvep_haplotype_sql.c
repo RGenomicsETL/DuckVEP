@@ -14,6 +14,7 @@ DUCKDB_EXTENSION_EXTERN
 #include "kernel/src/duckvep_hgvs.h"
 #include "kernel/src/duckvep_annotation_internal.h"
 #include "kernel/src/duckvep_event.h"
+#include "duckvep_discovery.h"
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -1476,42 +1477,9 @@ static void haplotype_scan(duckdb_function_info info, duckdb_data_chunk output) 
     duckdb_data_chunk_set_size(output, rows);
 }
 
-/* Transcript discovery for phased calls: the transcripts of a loaded model whose coding sequence the event overlaps, in
- * ascending model ordinal, from the resident transcript interval index and the model's exon arrays.
- *
- * The event is a VCF record's REF and one ALT, and its span is normalized exactly as the annotation builder normalizes it
- * (duckvep_event_prepare_small): the shared prefix and suffix are trimmed, so the anchor base of an indel never creates an
- * overlap by itself. A substitution or deletion overlaps a CDS exon when a base of its differing span lies in a CDS base of an
- * exon; an insertion (an interbase event) is placed on the base the annotation builder places it on (the left flank, or the
- * right flank at an internal coding exon's entrance, at a transcript end or after the last CDS base) and is not a CDS event
- * at the outer CDS edges, which VEP assigns to the UTR. The list is the set of (event, transcript) pairs the annotation
- * builder reports with the CDS region bit; records that overlap no such exon, the large majority of a genome, give an empty
- * list. Transcripts without a CDS are never returned. Alleles that are not literal replacements (symbolic, breakend,
- * missing or identical to REF) give an empty list. Lifted circular models are refused, as by duckvep_haplotypes. */
-/* Defined in the vendored cgranges.c; the public header only exposes the by-name form. */
-int64_t cr_overlap_int(const cgranges_t *cr, int32_t ctg_id, int32_t st, int32_t en, int64_t **b_, int64_t *m_b_);
-
-typedef struct {
-    duckvep_registry_t *registry;
-    duckvep_model_entry_t *entry;
-    int64_t *hits;
-    int64_t hit_capacity;
-    uint32_t *found;
-    size_t found_capacity;
-} exon_discovery_t;
-
-static void exon_discovery_release(exon_discovery_t *d) {
-    if (d->entry) duckvep_registry_unpin(d->registry, d->entry);
-    d->entry = NULL;
-    duckvep_budget_free(d->hits);
-    duckvep_budget_free(d->found);
-    d->hits = NULL; d->found = NULL;
-}
-
-static int exon_u32_compare(const void *a, const void *b) {
-    uint32_t x = *(const uint32_t *)a, y = *(const uint32_t *)b;
-    return (x > y) - (x < y);
-}
+/* Transcript discovery for phased calls: the transcripts of a loaded model whose coding sequence the event (a VCF record's
+ * REF and one ALT) overlaps, in ascending model ordinal. The rules live in duckvep_discovery.c, shared with the fused
+ * reader duckvep_coding_calls. Lifted circular models are refused, as by duckvep_haplotypes. */
 
 /* The three numeric parameters are HUGEINT so that every integer type, and sums such as UBIGINT + BIGINT that DuckDB
  * widens, bind without a cast. Values outside int64 are rejected as malformed spans (regions: no such region). */
@@ -1521,58 +1489,20 @@ static int hugeint_to_i64(duckdb_hugeint value, int64_t *out) {
     return 0;
 }
 
-/* Is genomic base p a coding base of the exon layout of transcript t? */
-static int cds_exon_base(const duckvep_owned_model_t *m, uint32_t t, int64_t p) {
-    if (p < (int64_t)m->cds_starts[t] || p > (int64_t)m->cds_ends[t]) return 0;
-    uint32_t offset = m->exon_offsets[t], exons = m->exon_counts[t];
-    for (uint32_t e = 0u; e < exons; e++)
-        if ((int64_t)m->exon_starts[offset + e] <= p && (int64_t)m->exon_ends[offset + e] >= p) return 1;
-    return 0;
-}
+typedef struct {
+    duckvep_registry_t *registry;
+    duckvep_model_entry_t *entry;
+    duckvep_discovery_t scratch;
+} exon_discovery_t;
 
-/* Does [start, end] overlap (or, with inside, lie within) a gap of at most 13 bases between consecutive exons inside the CDS interval? */
-static int short_intron_overlap(const duckvep_owned_model_t *m, uint32_t t, int64_t start, int64_t end, int inside) {
-    uint32_t offset = m->exon_offsets[t], exons = m->exon_counts[t];
-    int64_t cs = m->cds_starts[t], ce = m->cds_ends[t];
-    for (uint32_t e = 0u; e + 1u < exons; e++) {
-        int64_t gap_start, gap_end;
-        if (m->strands[t] >= 0) {
-            gap_start = (int64_t)m->exon_ends[offset + e] + 1; gap_end = (int64_t)m->exon_starts[offset + e + 1] - 1;
-        } else {
-            gap_start = (int64_t)m->exon_ends[offset + e + 1] + 1; gap_end = (int64_t)m->exon_starts[offset + e] - 1;
-        }
-        if (gap_end < gap_start || gap_end - gap_start > 12) continue;
-        int64_t lo = gap_start > cs ? gap_start : cs, hi = gap_end < ce ? gap_end : ce;
-        if (inside ? (gap_start <= start && end <= gap_end && lo <= hi && lo <= start && end <= hi)
-                   : (lo <= hi && lo <= end && hi >= start)) return 1;
-    }
-    return 0;
-}
-
-/* One normalized event against one transcript that has a CDS. */
-static int event_overlaps_cds(const duckvep_owned_model_t *m, uint32_t t, const duckvep_event_t *event) {
-    if (!event->interbase) {
-        int64_t low = event->start1 > m->cds_starts[t] ? (int64_t)event->start1 : (int64_t)m->cds_starts[t];
-        int64_t high = event->end1 < m->cds_ends[t] ? (int64_t)event->end1 : (int64_t)m->cds_ends[t];
-        uint32_t offset = m->exon_offsets[t], exons = m->exon_counts[t];
-        if (low <= high)
-            for (uint32_t e = 0u; e < exons; e++)
-                if ((int64_t)m->exon_starts[offset + e] <= high && (int64_t)m->exon_ends[offset + e] >= low) return 1;
-        /* VEP treats an intron of at most 13 bases (a frameshift intron) inside the CDS as coding sequence: an event
-         * that overlaps such a gap, a deletion of the whole intron included, is a CDS event. */
-        return short_intron_overlap(m, t, (int64_t)event->start1, (int64_t)event->end1, 0);
-    }
-    int64_t left = (int64_t)event->insertion_boundary0, right = left + 1, cs = m->cds_starts[t], ce = m->cds_ends[t];
-    if (short_intron_overlap(m, t, left, right, 1)) return 1;   /* an insertion inside a frameshift intron */
-    if (left == ce || right == cs || left == (int64_t)m->transcript_ends[t]) return 0;   /* UTR: after_coding / before_coding */
-    int64_t point = left;
-    if (event->anchor_side == (uint8_t)DUCKVEP_EVENT_ANCHOR_LEFT && !cds_exon_base(m, t, left) && cds_exon_base(m, t, right))
-        point = right;   /* an internal coding exon's entrance */
-    return cds_exon_base(m, t, point);
+static void exon_discovery_release(exon_discovery_t *d) {
+    if (d->entry) duckvep_registry_unpin(d->registry, d->entry);
+    d->entry = NULL;
+    duckvep_discovery_release(&d->scratch);
 }
 
 static void coding_transcripts_scalar(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-    exon_discovery_t d = {duckdb_scalar_function_get_extra_info(info), NULL, NULL, 0, NULL, 0};
+    exon_discovery_t d = {duckdb_scalar_function_get_extra_info(info), NULL, {NULL, 0, UINT32_MAX, -1}};
     idx_t rows = duckdb_data_chunk_get_size(input);
     duckdb_vector name_vector = duckdb_data_chunk_get_vector(input, 0);
     duckdb_vector region_vector = duckdb_data_chunk_get_vector(input, 1);
@@ -1583,11 +1513,8 @@ static void coding_transcripts_scalar(duckdb_function_info info, duckdb_data_chu
     const duckdb_hugeint *starts = duckdb_vector_get_data(start_vector);
     const duckdb_string_t *refs = duckdb_vector_get_data(ref_vector), *alts = duckdb_vector_get_data(alt_vector);
     duckdb_list_entry *entries = duckdb_vector_get_data(output);
-    uint32_t *out = NULL;
-    size_t total = 0u, capacity = 0u;
+    duckvep_u32_list_t out = {NULL, 0u, 0u};
     char *current_name = NULL;
-    uint32_t cached_region = UINT32_MAX;
-    int32_t cached_contig = -1;
     const char *error = NULL;
     duckdb_vector_ensure_validity_writable(output);
     uint64_t *validity = duckdb_vector_get_validity(output);
@@ -1601,7 +1528,7 @@ static void coding_transcripts_scalar(duckdb_function_info info, duckdb_data_chu
             missing |= input_validity[k] && !duckdb_validity_row_is_valid(input_validity[k], row);
         if (missing) {
             duckdb_validity_set_row_invalid(validity, row);
-            entries[row].offset = total; entries[row].length = 0u;
+            entries[row].offset = out.count; entries[row].length = 0u;
             continue;
         }
         /* The model name is almost always one constant: compare in place and copy it only when it changes. */
@@ -1615,7 +1542,7 @@ static void coding_transcripts_scalar(duckdb_function_info info, duckdb_data_chu
             d.entry = duckvep_registry_pin(d.registry, name);
             duckvep_budget_free(current_name);
             current_name = name; current_length = strlen(name);
-            cached_region = UINT32_MAX;
+            duckvep_discovery_reset_model(&d.scratch);
             if (!d.entry) { error = "duckvep_coding_transcripts: unknown model name"; break; }
             if (d.entry->model.lifted) {
                 error = "duckvep_coding_transcripts: transcript discovery is not supported for models with wrapped circular objects";
@@ -1625,64 +1552,27 @@ static void coding_transcripts_scalar(duckdb_function_info info, duckdb_data_chu
         const duckvep_owned_model_t *m = &d.entry->model;
         int64_t start = 0, region = -1;
         duckdb_string_t ref_cell = refs[row], alt_cell = alts[row];
-        size_t ref_length = duckdb_string_t_length(ref_cell), alt_length = duckdb_string_t_length(alt_cell);
-        if (!hugeint_to_i64(starts[row], &start) || start < 1 || start > (int64_t)INT32_MAX ||
-            ref_length > UINT16_MAX || alt_length > UINT16_MAX) {
+        entries[row].offset = out.count; entries[row].length = 0u;
+        if (!hugeint_to_i64(starts[row], &start)) start = 0;
+        if (!hugeint_to_i64(regions[row], &region)) region = -1;
+        size_t added = 0u;
+        duckvep_discovery_status_t status = duckvep_discover_coding(m, &d.scratch, region, start,
+            (const uint8_t *)duckdb_string_t_data(&ref_cell), duckdb_string_t_length(ref_cell),
+            (const uint8_t *)duckdb_string_t_data(&alt_cell), duckdb_string_t_length(alt_cell), &out, &added);
+        if (status == DUCKVEP_DISCOVERY_BAD_SPAN)
             error = "duckvep_coding_transcripts: position must be from 1 through 2147483647 and alleles at most 65535 bases";
-            break;
-        }
-        entries[row].offset = total; entries[row].length = 0u;
-        duckvep_event_t event;
-        if (!ref_length || !alt_length || !duckvep_event_prepare_small((uint32_t)start,
-                (const uint8_t *)duckdb_string_t_data(&ref_cell), (uint16_t)ref_length,
-                (const uint8_t *)duckdb_string_t_data(&alt_cell), (uint16_t)alt_length, &event)) continue;
-        {   /* only literal replacements are events: symbolic, breakend and unspecified alleles are not */
-            const char *a = duckdb_string_t_data(&alt_cell);
-            int literal = 1;
-            for (size_t i = 0u; i < alt_length && literal; i++) literal = (a[i] | 0x20) >= 'a' && (a[i] | 0x20) <= 'z';
-            const char *r = duckdb_string_t_data(&ref_cell);
-            for (size_t i = 0u; i < ref_length && literal; i++) literal = (r[i] | 0x20) >= 'a' && (r[i] | 0x20) <= 'z';
-            if (!literal) continue;
-        }
-        if (!hugeint_to_i64(regions[row], &region) || !m->interval_index_complete || region < 0 || region > UINT16_MAX)
-            continue;
-        if ((uint32_t)region != cached_region) {
-            char region_name[16];
-            snprintf(region_name, sizeof region_name, "%u", (unsigned)region);
-            cached_contig = cr_get_ctg(m->interval_index, region_name);
-            cached_region = (uint32_t)region;
-        }
-        int64_t query_start = event.interbase ? (int64_t)event.insertion_boundary0 : (int64_t)event.start1;
-        int64_t query_end = event.interbase ? (int64_t)event.insertion_boundary0 + 1 : (int64_t)event.end1;
-        if (query_start < 1) query_start = 1;
-        int64_t count = cr_overlap_int(m->interval_index, cached_contig, (int32_t)(query_start - 1), (int32_t)query_end,
-            &d.hits, &d.hit_capacity);
-        if (count < 0) { error = "duckvep_coding_transcripts: out of memory collecting overlapping transcripts"; break; }
-        size_t first = total;
-        for (int64_t i = 0; i < count; i++) {
-            uint32_t transcript = (uint32_t)cr_label(m->interval_index, d.hits[i]);
-            if (!m->cds_sequence_lengths[transcript] || !m->cds_starts[transcript]) continue;
-            if (!event_overlaps_cds(m, transcript, &event)) continue;
-            if (total == capacity) {
-                size_t next = capacity ? capacity * 2u : 256u;
-                uint32_t *grown = duckvep_budget_realloc(DUCKVEP_OWNER_SCRATCH, out, next * sizeof *out);
-                if (!grown) { error = "duckvep_coding_transcripts: out of memory collecting transcripts"; break; }
-                out = grown; capacity = next;
-            }
-            out[total++] = transcript;
-        }
-        if (error) break;
-        if (total - first > 1u) qsort(out + first, total - first, sizeof *out, exon_u32_compare);
-        entries[row].length = total - first;
+        else if (status == DUCKVEP_DISCOVERY_NOMEM)
+            error = "duckvep_coding_transcripts: out of memory collecting transcripts";
+        else entries[row].length = added;
     }
-    if (!error && total) {
-        if (duckdb_list_vector_reserve(output, total) != DuckDBSuccess) error = "duckvep_coding_transcripts: out of memory";
+    if (!error && out.count) {
+        if (duckdb_list_vector_reserve(output, out.count) != DuckDBSuccess) error = "duckvep_coding_transcripts: out of memory";
         else {
-            memcpy(duckdb_vector_get_data(duckdb_list_vector_get_child(output)), out, total * sizeof *out);
-            duckdb_list_vector_set_size(output, total);
+            memcpy(duckdb_vector_get_data(duckdb_list_vector_get_child(output)), out.items, out.count * sizeof *out.items);
+            duckdb_list_vector_set_size(output, out.count);
         }
     } else if (!error) duckdb_list_vector_set_size(output, 0);
-    duckvep_budget_free(out);
+    duckvep_u32_list_release(&out);
     duckvep_budget_free(current_name);
     exon_discovery_release(&d);
     if (error) duckdb_scalar_function_set_error(info, error);
@@ -1737,4 +1627,5 @@ void duckvep_register_haplotypes(duckdb_connection connection, duckvep_registry_
     duckdb_destroy_logical_type(&string); duckdb_destroy_logical_type(&integer);
     duckdb_destroy_logical_type(&boolean);
     register_coding_transcripts(connection, registry);
+    duckvep_register_coding_calls(connection, registry);
 }

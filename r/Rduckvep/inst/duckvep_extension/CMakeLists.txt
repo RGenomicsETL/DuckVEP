@@ -52,6 +52,8 @@ set(EXTENSION_SOURCES
     src/duckvep_budget_sql.c
     src/duckvep_ensembl.c
     src/duckvep_haplotype_sql.c
+    src/duckvep_discovery.c
+    src/duckvep_coding_calls.c
     src/duckvep_model.c
     src/duckvep_phase_sql.c
     src/duckvep_reference.c
