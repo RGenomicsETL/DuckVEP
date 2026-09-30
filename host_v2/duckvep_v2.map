@@ -1,0 +1,4 @@
+{
+    global: duckvep_init_c_api_v2;
+    local: *;
+};
