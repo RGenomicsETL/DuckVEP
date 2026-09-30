@@ -1,0 +1,69 @@
+name: DuckDB C API v2 host (preview)
+
+# Builds host_v2/ against the pinned v2 SDK and tests it on a DuckDB built at that same
+# revision (the preview v2 ABI is not frozen across snapshots). The distributed v1 extension
+# is built and tested by MainDistributionPipeline and is not touched here.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'host_v2/**'
+      - 'src/kernel/**'
+      - 'duckdb_capi_v2/**'
+      - 'duckvep-package.json'
+      - 'test/sql_v2/**'
+      - 'test/scripts/run_v2_tests.py'
+      - 'test/scripts/check_v2_host.py'
+      - 'scripts/fetch-v2-sdk.py'
+      - 'scripts/stage-v2-duckdb.py'
+      - 'Makefile'
+      - '.github/workflows/v2-host.yml'
+  pull_request:
+    paths:
+      - 'host_v2/**'
+      - 'src/kernel/**'
+      - 'duckdb_capi_v2/**'
+      - 'duckvep-package.json'
+      - 'test/sql_v2/**'
+      - 'test/scripts/run_v2_tests.py'
+      - 'test/scripts/check_v2_host.py'
+      - 'scripts/fetch-v2-sdk.py'
+      - 'scripts/stage-v2-duckdb.py'
+      - 'Makefile'
+      - '.github/workflows/v2-host.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-v2-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The Makefile includes extension-ci-tools, which also supplies the footer writer.
+          submodules: true
+          persist-credentials: false
+      - name: Pinned SDK revision
+        id: pin
+        run: echo "revision=$(python3 -c 'import json; print(json.load(open("duckvep-package.json"))["v2_host"]["duckdb_sdk_revision"])')" >> "$GITHUB_OUTPUT"
+      - name: Cache the DuckDB CLI built at the pinned revision
+        id: duckdb-cache
+        uses: actions/cache@v4
+        with:
+          path: .deps-v2/duckdb-build/duckdb
+          key: duckdb-v2-ubuntu24.04-${{ runner.arch }}-${{ steps.pin.outputs.revision }}-json-shell-v1
+      - name: Build DuckDB at the pinned revision
+        if: steps.duckdb-cache.outputs.cache-hit != 'true'
+        run: python3 scripts/stage-v2-duckdb.py
+      - name: Build the v2 host, then check symbols, footer and headers
+        run: |
+          make release_v2
+          make test-extension-symbols-v2 check-v2-footer
+          python3 test/scripts/check_v2_host.py static
+      - name: Run the v2 tests
+        env:
+          DUCKVEP_V2_DUCKDB: ${{ github.workspace }}/.deps-v2/duckdb-build/duckdb
+        run: python3 test/scripts/run_v2_tests.py
