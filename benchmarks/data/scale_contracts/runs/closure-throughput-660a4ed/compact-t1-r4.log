@@ -1,0 +1,10 @@
+Warning message:
+package ‘duckdb’ was built under R version 4.6.1
+duckdb is storing downloaded extensions and secrets under ~/.duckdb:
+ℹ /root/.duckdb
+This persists across sessions and is shared with the DuckDB CLI and other clients.
+ℹ Run duckdb(shared_home = FALSE) to use a temporary directory instead.
+ℹ See ?duckdb_storage for details and alternatives.
+4,095,611 sorted variants; median 3.944 s; 963.0 ns/variant; 47,835,851 rows; 11.68 rows/variant
+model load: 3.156 s; input partitions: 1; transcript distance: 5,000 bases; complete coverage: true; complete transcript flanks: true; regulation features: 1,383,580
+history -> /root/duckvep/data/closure/g1/history.csv

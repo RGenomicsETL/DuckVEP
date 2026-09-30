@@ -2137,6 +2137,51 @@ the observed median changes are not an isolated estimate of this patch's cost
 and no host-isolation claim is made. No DuckHTS build, test or benchmark ran
 concurrently with the current matrix.
 
+### Closure refresh: standalone extension at 660a4ed
+
+    #> Measured source: 660a4ed9a6710846d4e92d14c0630df3cb129053
+    #> FastVEP source: 18177c26a0d1d2419fe43c3e8f6d4a0b5c4a3eb6
+    #> Output filesystem: tmpfs
+
+| Tool    | Contract      | Cores | Median seconds | Median peak GiB |       Rows | Output GiB |
+|:--------|:--------------|:------|---------------:|----------------:|-----------:|-----------:|
+| duckvep | native_tab17  | 1     |         154.15 |            7.18 | 47,629,345 |       5.90 |
+| fastvep | native_tab17  | 1     |         180.70 |            3.44 | 47,845,809 |       5.94 |
+
+Three alternating runs per tool on CPU 2 over the full GIAB HG002 v4.2.1
+VCF (runs 1 and 3 started with DuckVEP, run 2 with FastVEP). DuckVEP took
+153.78, 154.15 and 154.68 s; FastVEP took 180.12, 180.70 and 181.46 s, so
+DuckVEP is 1.17 times faster end to end with 2.1 times the peak memory.
+The DuckVEP extension is the immutable `make release` copy of 660a4ed
+(SHA-256 `c914483a...`). FastVEP was rebuilt from a clone at the pinned
+18177c26 with `-C target-cpu=native` (`cargo build --release --locked
+--offline`, rustc 1.98.1, binary SHA-256 `dffd9b0a...`) against the cache
+`aa843c11...` used by the earlier packs. The DuckVEP row count and its
+full-row fingerprint (XOR `6595502552192519429`) equal the previous row.
+The FastVEP row count at the pinned commit is 47,845,809, and its
+fingerprint equals the one recorded by the `field_contracts` pack taken at
+the same FastVEP commit; the 47,632,503 of the previous table row was not
+reproduced and its cause was not investigated. Every run passed the
+source-allele coverage check. Files are in
+[closure_660a4ed](data/duckvep_fastvep/closure_660a4ed), with the build
+receipt in `build_receipt.tsv`.
+
+`benchmarks/benchmark_duckvep_fastvep_run.R` could not drive this
+measurement: it sources the DuckHTS `r/duckhtsbench` helpers, which are not
+in this repository, and its worker expects DuckVEP inside the DuckHTS
+extension. The same worker and receipt scripts were driven by
+`benchmarks/benchmark_duckvep_fastvep_closure.sh`. DuckHTS embeds an older
+DuckVEP whose function names collide with the standalone extension, so it
+is loaded in a separate in-process DuckDB instance that decodes the VCF and
+the GFF3 to Parquet inside the timed process; the DuckVEP instance then
+reads that Parquet. This adds a Parquet round trip that FastVEP does not
+pay, and the previous DuckVEP row (144.50 s) was taken under DuckDB 1.5.3
+with the DuckHTS-embedded engine, so the 9.65 s difference is not
+attributable to the engine alone. The model is the 38da573c file of the
+earlier packs, without regulation features. The one-minute load average
+before the runs was 2.08 to 2.98, with an unrelated unpinned gnomAD staging
+job running on the host.
+
 Final CSQ files carry `record_index` and `alt_index` followed by the 32 common
 fields. Both engines write this 34-column transport; the native and operational
 contracts remain 17 columns. An independent source map retains every physical
