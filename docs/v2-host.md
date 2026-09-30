@@ -13,38 +13,47 @@ public functions.
 | Build | `make release` (the root `CMakeLists.txt`) | `make release_v2` (`host_v2/CMakeLists.txt`) |
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
 | Ships | yes: CRAN and the community repository | no: preview, waits for DuckDB 2.0.0 |
-| Functions | all 25 public functions | `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry` (slice 1) |
+| Functions | all 25 public functions | slices 1 and 2: `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order` |
 
-The v1 host is untouched by the v2 work: the root `CMakeLists.txt`, every
-`src/*.c`, `duckdb_capi/` and MainDistributionPipeline are unchanged, and the v2
-host is a separate CMake project, so a v1 build does not compile or link any v2
-file. The v2 host uses **stable v2 functions only**, compiled with
+The v2 host is a separate CMake project, so a v1 build does not compile or link
+any v2 file, and `duckdb_capi/` and MainDistributionPipeline are untouched. Since
+slice 2 the v1 host calls the same `src/core` row logic as the v2 host for the
+functions ported so far (its callbacks keep their own DuckDB vector reads and
+writes). The v2 host uses **stable v2 functions only**, compiled with
 `DUCKDB_V2_API_ALLOW_UNSTABLE=0` and `DUCKDB_V2_API_ALLOW_DEPRECATED=0`, against a
 **pinned** preview SDK. It is C only.
 
 ## Layout
 
 ```text
-src/kernel/          host-neutral kernel (already; no DuckDB symbol)
-host_v2/             DuckDB-facing v2 adapter: host_v2.c + its own CMakeLists.txt
-host_v2/core/        host-neutral row logic for the ported functions (no DuckDB symbol)
-src/*.c              DuckDB-facing v1 adapter (unchanged until a later slice factors it)
+src/kernel/          host-neutral kernel (no DuckDB symbol)
+src/core/            host-neutral row logic shared by both hosts (no DuckDB symbol)
+src/*.c              DuckDB-facing v1 adapter (+ src/duckvep_v1_cells.h, its cell reader)
+host_v2/             DuckDB-facing v2 adapter: host_v2.c, host_v2_nested.c,
+                     host_v2_common.h (helpers), and its own CMakeLists.txt
 duckdb_capi/         v1 headers (R bundle and CI depend on this path)
 duckdb_capi_v2/      pinned v2 headers, REVISION, LICENSE, README
 duckvep-package.json the pins for both hosts
 ```
 
-`host_v2/core/` exists so that logic that is now embedded in a v1 callback can be
-reached by both hosts. It lives outside `src/` on purpose: the R package bundles
-every tracked file under `src/`, and v2 files there would change the shipped R
-sources. When v1 adopts the core, it moves to `src/core/` together with the
-re-bundle. Slice 1 adds `duckvep_core_geometry.{c,h}`: the row logic of
-`duckvep_allele_geometry`, `duckvep_breakend_geometry` and `duckvep_so_terms`.
-It is currently a copy of what `src/duckvep_annotate.c` and `src/duckvep_sql.c`
-do in v1; the v1 callbacks are not edited in this slice (that would change the
-shipped host and need the R bundle regenerated). A later slice will make v1 call
-the core too, and then the copy ends. Until then the v1-vs-v2 equality test below
-is the parity guard.
+`src/core/` holds what used to be inside v1 callbacks, so that the two hosts
+cannot drift:
+
+| File | Logic |
+| --- | --- |
+| `duckvep_core_geometry.{c,h}` | `duckvep_so_terms` rows, `duckvep_allele_geometry`, the breakend messages |
+| `duckvep_core_cells.{c,h}` | typed cells (`duckvep_cell_t`: a host reads one vector element into one), numeric conversion of any integer, float, HUGEINT or scaled DECIMAL cell, the phase allele and flag conversions, and the option-STRUCT field checks |
+| `duckvep_core_repeat.{c,h}` | `duckvep_repeat_alleles`: option cap, row validation and status, required lengths, rendering, direction |
+| `duckvep_core_phase.{c,h}` | `duckvep_phase_call`: list checks, policy and phase-set options, the two-pass slot reducer with a reader interface (`allele`, `phase`, `emit` callbacks), and the `_duckvep_revcomp`, `_duckvep_raw_gt` and `_duckvep_record_order` kernels |
+
+A host's job is to turn vectors into cells (its type switch and its selection
+and validity handling), call the core, and write the results: v1 does this in
+`src/duckvep_repeat.c`, `src/duckvep_phase_sql.c`, `src/duckvep.c`,
+`src/duckvep_annotate.c` and `src/duckvep_sql.c`; v2 in `host_v2/`. `src/core` is
+under `src/`, so it is part of the R bundle (`Rscript r/Rduckvep/bootstrap.R .`).
+What is still embedded in v1 callbacks (the builders, the model, the haplotype
+scanner, the annotation natives) moves to the core as its slice reaches it.
+The v1-vs-v2 equality test is the parity guard for the ported functions.
 
 ## Pins
 
@@ -82,7 +91,7 @@ DUCKVEP_V2_DUCKDB=... make test_v2_asan           # the same tests under ASan an
 `make test_v2` runs `test/scripts/check_v2_host.py static` (only stable
 `duckdb_v2_*` calls, opt-ins off, `host_v2/core` and `src/kernel` free of DuckDB),
 then `test/scripts/run_v2_tests.py`: LOAD on a writable and a read-only primary
-(twice, no DDL, database bytes unchanged), `test/sql_v2/v2_native.sql`, and the 52
+(twice, no DDL, database bytes unchanged), `test/sql_v2/v2_native.sql`, and the 126
 cases of `test/sql_v2/equality_cases.sql` compared with the recorded v1 host
 (`equality_golden.json`, from `run_v2_tests.py --record`, also re-checked live
 against the v1 build when `build/release` exists). CI is `.github/workflows/v2-host.yml`.
@@ -103,7 +112,7 @@ slices are Astra's (memo section 4); slice 1 is this one.
 | Slice | Family | What it proves | Functions |
 | --- | --- | --- | --- |
 | 1 | ABI, vectors and types | entry point, footer, types, NULL/selection/constant/dictionary vectors, errors, table-function state | `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry` (done) |
-| 2 | Vectors and types | nested LIST/STRUCT input and output, list-child capacity, >2,048-element nested output, DECIMAL/HUGEINT, several overloads | `duckvep_repeat_alleles`, `duckvep_phase_call` (and internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order`) |
+| 2 | Vectors and types | nested LIST/STRUCT input and output, list-child capacity, >2,048-element nested output, DECIMAL/HUGEINT, ANY parameters and overloads, option STRUCTs (done) | `duckvep_repeat_alleles`, `duckvep_phase_call` (and internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order`) |
 | 3 | SQL-builder surface | builders only: VARCHAR and STRUCT option inputs, SQL text out, no macros, no DDL at LOAD | `duckvep_ensembl_regions_sql`, `duckvep_ensembl_transcripts_sql`, `duckvep_ensembl_regulation_features_sql`, `duckvep_model_receipt_sql`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql`, `duckvep_prepare_sv_geometry_sql`, `duckvep_prepare_breakend_pairs_sql`, `duckvep_prepare_breakend_fusion_sql`, `duckvep_prepare_structural_hgvs_sql`, `duckvep_prepare_expansionhunter_sql` |
 | 4 | Model sink (COPY staging) | stable-v2 COPY callbacks take the caller's relations; exact-size native arrays; explicit publish and drop; the internal annotation natives that read a pinned model | `duckvep_model_load`, `duckvep_model_drop` (and internal `_duckvep_annotate_*`, `__duckvep_projection_code`) |
 | 5 | Haplotype capture | caller-side normalization into spillable column collections, serial scanner, no appender | `duckvep_haplotypes`, `duckvep_coding_transcripts` |
@@ -129,37 +138,41 @@ Files not listed (`src/kernel/**`, `duckvep_reference.c`, `third_party/`,
 
 | File | DuckDB-facing surface | What the v2 adapter must supply |
 | --- | --- | --- |
-| `duckvep.c` | entry point, version gate, `_duckvep_revcomp`, registration order | the `duckdb_v2` entry point (`duckvep_init_c_api_v2`); no version check needed (the footer is the contract); no DDL at LOAD. Done for slice 1; the rest of the list comes with its slice |
+| `duckvep.c` | entry point, version gate, `_duckvep_revcomp` (done), registration order | the `duckdb_v2` entry point (`duckvep_init_c_api_v2`); no version check needed (the footer is the contract); no DDL at LOAD. Done; `_duckvep_revcomp` is in `host_v2_nested.c` |
 | `duckvep_registration.c` | `duckdb_query` of registration SQL, error reporting | nothing: LOAD runs no SQL in v2, so this file is not ported (the v1 build keeps it until its own cleanup) |
 | `duckvep_builder.c` / `.h` | scalar-function sets, option STRUCT reading, VARCHAR out | struct-input reading (`vector_get_child`, child type names from the logical type), NULL-aware option defaults, overload sets, SQL text into an arena-backed string |
 | `duckvep_sql.c` | `duckvep_so_terms`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql` | table-function bind/global state/exec (ported for `duckvep_so_terms`), builder adapter |
 | `duckvep_prepare_sql.c`, `duckvep_structural_sql.c` | five preparation builders | builder adapter |
 | `duckvep_ensembl.c` | four Ensembl/receipt builders | builder adapter |
 | `duckvep_annotate.c` | `duckvep_allele_geometry`, `duckvep_breakend_geometry` (ported), ten internal annotation natives (registry pin, `volatile`, extra info, STRUCT/LIST output) | scalar user data for the registry, STRUCT output, LIST output with child capacity, per-worker scratch |
-| `duckvep_repeat.c` | `duckvep_repeat_alleles` | LIST and STRUCT input, DECIMAL/HUGEINT, NULL-in-child propagation, LIST-of-STRUCT output |
-| `duckvep_phase_sql.c` | `duckvep_phase_call` and two internals | the same as repeat, plus list reserve |
+| `duckvep_repeat.c` | `duckvep_repeat_alleles` (done) | LIST and STRUCT input, DECIMAL/HUGEINT cells, NULL-in-child propagation, option STRUCT. Done in `host_v2_nested.c` |
+| `duckvep_phase_sql.c` | `duckvep_phase_call`, `_duckvep_raw_gt`, `_duckvep_record_order` (all done) | the same as repeat, plus LIST<STRUCT> output sized once per chunk. Done in `host_v2_nested.c` |
 | `duckvep_model.c` | `duckvep_model_load`/`_drop`: a private connection, `duckdb_query`, `duckdb_fetch_chunk`, prepared statements, named parameters | the replacement of private connections by COPY callbacks: COPY-from bind/global/exec, row and byte counting, spill, publish/drop lifecycle; named table-function parameters |
 | `duckvep_haplotype_sql.c` | `duckvep_haplotypes`, `duckvep_coding_transcripts`: private query/fetch, statement parsing, an appender, LIST-of-STRUCT output | column-data-collection capture in place of the appender, the native scan source over the captured input, LIST-of-STRUCT output, cancellation |
 | `duckvep_budget_sql.c` | four resource-control functions, `set_max_threads` | BIGINT scalar, table function with `max_threads`, volatile stability |
 
-The shared pieces a v2 adapter grows across slices, in the order they are needed:
-an error helper (done), vector views with selection and validity (done), string
-read and arena write (done), struct output (done), list output, struct and list
-input, scalar user data and init data, table-function bind/global/local state,
-named parameters, COPY callbacks, column-data-collection capture.
+The shared pieces of the v2 adapter, in `host_v2/host_v2_common.h` and
+`host_v2_nested.c`: an error helper, vector views with selection and validity,
+string read and arena write, struct output, `register_scalar` (overloads are
+repeated registrations of one name; `ANY` parameters), typed columns with
+logical-type inspection (DECIMAL storage kind and scale), nested column opening,
+cell reading, option-STRUCT reading and LIST<STRUCT> output. Still to grow: scalar
+user data and init data, table-function named parameters and local state, COPY
+callbacks, column-data-collection capture.
 
 ## What the v2 SDK lacks, for later slices
 
-Read from the pinned headers and the slice-1 experience:
+Read from the pinned headers and the slice-1 and slice-2 experience:
 
 - **No appender.** `column_data_collection_{create_with_context,append}` replaces
   buffering, not insertion; haplotype capture (slice 5) removes its appender use
   and any insertion goes through caller-side `INSERT ... SELECT` or COPY.
-- **No separate list-child reserve.** `vector_set_size` is documented as reserving
-  space for the new size (the memo saw it not allocate on another snapshot, and a
-  reserve call was dropped from the upstream asks for that reason). Slice 2 must test
-  nested output beyond 2,048 elements on the pinned revision before relying on it, and
-  refresh every borrowed child pointer after each resize.
+- **No separate list-child reserve, and none is needed on the pinned revision.**
+  `vector_set_size` reserves space for the new size (the memo saw it not allocate on
+  another snapshot). Slice 2 sizes a list's child once per chunk and writes through
+  it: 18,000 `duckvep_phase_call` records from 9,000 rows, a single row of 5,000
+  slots, and lists of 5,000 elements as input all pass on the pinned build and under
+  ASan. Borrowed child pointers must still be taken after the `set_size` calls.
 - **No cost hint** for scalar and aggregate functions (only a cast cost exists).
   Planner behavior for the annotation natives is therefore volatile-or-not and nothing
   finer.
@@ -174,6 +187,12 @@ Read from the pinned headers and the slice-1 experience:
   invalidate a view taken earlier over an aliased buffer (the adapter takes views twice
   and keeps the second set). A NULL struct row needs NULL children: write it through
   `vector_set_null`, not a raw mask.
+- **Type inspection costs a value per parameter.** A DECIMAL's width and scale, and a
+  STRUCT's field names, come from `logical_type_get_param` as owned values that must
+  be destroyed; `ANY` parameters exist only in signatures (`create_type_from_id`), so
+  a function that takes `ANY` reads each argument's type at execution, as v1 does.
+  Nested arguments are flattened (children too) before their children are addressed
+  by list offset; there is no per-chunk bind-time type hook that is cheaper.
 - **Error text is per call.** Every fallible call can return its own error handle;
   the adapter copies it into the callback's borrowed handle.
 - **The CLI of the pinned snapshot swallows statement errors** in its streaming output
