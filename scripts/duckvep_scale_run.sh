@@ -207,7 +207,7 @@ same_fs=0; [[ "$(stat -c %d "$SPILL_PARENT")" == "$(stat -c %d "$OUT")" ]] && sa
 # rounded up), times a 1.5 margin. Each job writes every mode, and the output plus its .partial copy are
 # budgeted (the partial is renamed, but the hash query reads it while it is being finished).
 bytes_per_row() { case "$1" in compact) echo 12 ;; complete17) echo 48 ;; *) echo 60 ;; esac; }
-PANEL_ROWS=$(Rscript -e 'suppressMessages(library(DBI)); con <- dbConnect(duckdb::duckdb()); cat(dbGetQuery(con, paste0("SELECT count(*) FROM read_parquet(\x27", commandArgs(TRUE)[1], "\x27)"))[[1]])' "$PANEL_FILE" 2>/dev/null) || PANEL_ROWS=""
+PANEL_ROWS=$(Rscript -e 'suppressMessages(library(DBI)); con <- dbConnect(duckdb::duckdb()); cat(format(dbGetQuery(con, paste0("SELECT count(*) FROM read_parquet(\x27", commandArgs(TRUE)[1], "\x27)"))[[1]], scientific = FALSE))' "$PANEL_FILE" 2>/dev/null) || PANEL_ROWS=""
 [[ "$PANEL_ROWS" =~ ^[0-9]+$ ]] || die "cannot count the rows of $PANEL_FILE"
 if [[ -n "$LIMIT_ROWS" ]] && (( LIMIT_ROWS < PANEL_ROWS )); then EST_ROWS="$LIMIT_ROWS"; else EST_ROWS="$PANEL_ROWS"; fi
 per_job_output=0
