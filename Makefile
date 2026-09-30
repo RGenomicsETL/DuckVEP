@@ -123,6 +123,55 @@ test-extension-symbols:
 			nm -D -u "$$file" | awk '$$NF ~ /^duckdb_/ {print "Unexpected DuckDB API import: " $$0; bad=1} END {exit bad}'; \
 		fi; \
 		test "$$actual" = duckvep_init_c_api || { printf 'Unexpected exports: %s\n' "$$actual"; exit 1; }
+# ---- DuckDB C API v2 host (preview; issue #8) ------------------------------------
+# A separate CMake project (host_v2/) against the pinned v2 SDK in duckdb_capi_v2.
+# The v1 targets above are unaffected. The footer is C_STRUCT, extension API v2.0.0.
+V2_BUILD := build/cmake_v2
+V2_OUT := build/release_v2
+V2_API_VERSION := v2.0.0
+V2_LIB := $(if $(filter Darwin,$(shell uname -s)),libduckvep.dylib,libduckvep.so)
+.PHONY: check-v2-sdk release_v2 test_v2 test-extension-symbols-v2 check-v2-footer
+check-v2-sdk:
+	python3 scripts/fetch-v2-sdk.py
+release_v2: check-v2-sdk
+	cmake -S host_v2 -B $(V2_BUILD) -DCMAKE_BUILD_TYPE=Release
+	cmake --build $(V2_BUILD) --parallel
+	mkdir -p $(V2_OUT) build/configure_v2
+	python3 extension-ci-tools/scripts/configure_helper.py -p -ev -o build/configure_v2
+	python3 extension-ci-tools/scripts/append_extension_metadata.py \
+		-l $(V2_BUILD)/$(V2_LIB) -o $(V2_OUT)/duckvep.duckdb_extension \
+		-n duckvep -dv $(V2_API_VERSION) --abi-type C_STRUCT \
+		-evf build/configure_v2/extension_version.txt -pf build/configure_v2/platform.txt
+test-extension-symbols-v2:
+	python3 test/scripts/check_v2_host.py symbols
+check-v2-footer:
+	python3 test/scripts/check_v2_host.py footer
+# Needs a DuckDB CLI built at the pinned SDK revision (V2_DUCKDB) for the v2 tests; it may also
+# be run through the PyPI preview wheel, see test/sql_v2/README.md. V1_DUCKDB is the v1 CLI
+# the equality test compares against.
+# AddressSanitizer + UBSan build of the v2 host, run by the same tests; the runtimes are preloaded
+# into the (unsanitized) DuckDB CLI. Linux/GCC-compatible hosts. Leak checking is off because the
+# host process is not leak-clean.
+V2_ASAN_BUILD := build/cmake_v2_asan
+.PHONY: test_v2_asan
+test_v2_asan: check-v2-sdk
+	cmake -S host_v2 -B $(V2_ASAN_BUILD) -DCMAKE_BUILD_TYPE=Debug \
+		"-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -O1 -g" \
+		-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined
+	cmake --build $(V2_ASAN_BUILD) --parallel
+	mkdir -p build/asan_v2 build/configure_v2
+	python3 extension-ci-tools/scripts/configure_helper.py -p -ev -o build/configure_v2
+	python3 extension-ci-tools/scripts/append_extension_metadata.py \
+		-l $(V2_ASAN_BUILD)/$(V2_LIB) -o build/asan_v2/duckvep.duckdb_extension \
+		-n duckvep -dv $(V2_API_VERSION) --abi-type C_STRUCT \
+		-evf build/configure_v2/extension_version.txt -pf build/configure_v2/platform.txt
+	LD_PRELOAD="$$(gcc -print-file-name=libasan.so) $$(gcc -print-file-name=libubsan.so)" \
+		ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+		python3 test/scripts/run_v2_tests.py --v2-extension build/asan_v2/duckvep.duckdb_extension
+
+test_v2: release_v2 test-extension-symbols-v2 check-v2-footer
+	python3 test/scripts/check_v2_host.py static
+	python3 test/scripts/run_v2_tests.py
 readme: release
 	Rscript scripts/render-readme.R
 
