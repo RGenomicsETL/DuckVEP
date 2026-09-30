@@ -2399,3 +2399,55 @@ SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM
 
 -- case: haplotypes from coding_calls demo rows
 SELECT * FROM hap_cc_demo()
+
+-- Resource control (issue #8 slice 6): the four budget functions on both hosts.
+-- case: budget owners and default limit
+SELECT owner, limit_bytes FROM duckvep_native_budget() ORDER BY owner
+
+-- case: budget schema
+SELECT column_name, column_type FROM (DESCRIBE SELECT * FROM duckvep_native_budget())
+
+-- case: budget charges a loaded model
+SELECT max(current_bytes) FILTER (WHERE owner = 'model') > 1000 AS model_charged, max(current_bytes) FILTER (WHERE owner = 'total') >= max(current_bytes) FILTER (WHERE owner = 'model') AS total_covers, max(high_water_bytes) FILTER (WHERE owner = 'total') >= max(current_bytes) FILTER (WHERE owner = 'total') AS high_water_covers FROM duckvep_native_budget() WHERE owner IN ('model', 'total') OR true
+
+-- case: budget rows filter and aggregate
+SELECT count(*) AS n, count(DISTINCT limit_bytes) AS limits, sum(charges) >= 0 AS charges_ok FROM duckvep_native_budget() WHERE owner <> 'total'
+
+-- case: budget set returns the new limit and restores
+SELECT duckvep_native_budget_set(8589934592) AS raised, duckvep_native_budget_set(4294967296) AS restored
+
+-- case: budget set is visible in the table
+SELECT duckvep_native_budget_set(6442450944) AS v, (SELECT min(limit_bytes) FROM duckvep_native_budget()) AS seen
+
+-- case: budget set zero error
+SELECT duckvep_native_budget_set(0)
+
+-- case: budget set negative error
+SELECT duckvep_native_budget_set(-5)
+
+-- case: budget set null
+SELECT duckvep_native_budget_set(NULL) AS v
+
+-- case: worker limits set
+SELECT duckvep_worker_limits_set(6, 134217728, 67108864, 0) AS a, duckvep_worker_limits_set(1, 0, 0, 0) AS b, duckvep_worker_limits_set(1024, 1, 1, 1) AS c
+
+-- case: worker limits zero workers error
+SELECT duckvep_worker_limits_set(0, 1, 1, 1)
+
+-- case: worker limits too many workers error
+SELECT duckvep_worker_limits_set(1025, 1, 1, 1)
+
+-- case: worker limits negative scratch error
+SELECT duckvep_worker_limits_set(2, -1, 1, 1)
+
+-- case: worker limits negative idle error
+SELECT duckvep_worker_limits_set(2, 1, 1, -1)
+
+-- case: worker limits null
+SELECT duckvep_worker_limits_set(2, NULL, 1, 1) AS v
+
+-- case: worker limits over rows
+SELECT count(*) AS n, bool_and(duckvep_worker_limits_set(1 + i % 6, 1000, 1000, 0)) AS ok FROM range(3000) t(i)
+
+-- case: reset high water
+SELECT duckvep_native_budget_reset_high_water() AS r
