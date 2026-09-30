@@ -939,6 +939,78 @@ earlier packs, without regulation features. The one-minute load average
 before the runs was 2.08 to 2.98, with an unrelated unpinned gnomAD staging
 job running on the host.
 
+### Setup fix: the 1.17 times was dominated by harness setup (2026-09-30)
+
+The 1.17 times above measured the harness as much as DuckVEP. Timing each
+statement of the one-core worker (`worker_timed.R`, DBI calls wrapped) showed
+that the final `COPY ... FROM query(duckvep_annotate_projected_sql(...))`
+took 46.6 s of the 156 s, and about 100 s was setup SQL in
+`benchmark_duckvep_fastvep_fields.R` and the worker: 51.1 s joining 4M alleles
+to the model regions with `r.name = s.chrom OR r.name = regexp_replace(...)`
+(a regex nested loop), 29.1 s in `UPDATE fastvep_metadata ... FROM` over 645k
+transcripts, 16.2 s decoding the GFF3, and 5.1 s decoding the VCF. Four
+harness changes, with no change to the extension or to `src/`:
+
+1. each distinct `CHROM` is mapped to its `seq_region` once, with the same
+   OR rule, and alleles equi-join on `CHROM` (a hash join), keeping the
+   exactly-one-region error;
+2. `fastvep_metadata` is one `CREATE TABLE AS` of hash joins with the same
+   precedence (core values first, GFF fallback through `coalesce`) and the
+   same conflict and canonical-status checks;
+3. the model's `ensembl_core` has no `xref` table, so SYMBOL cannot come from
+   it and the GFF3 stays; the reader instance now reads only the 0.7M gene and
+   transcript lines and splits out the five keys used (`ID`, `Name`, `tag`,
+   `transcript_support_level`, `ccdsid`), because `read_gff` builds
+   `attributes_map` for all 10.7M lines before any filter applies (checked
+   equal to `attributes_map` on every kept line);
+4. with `--threads` above 1 the VCF decode uses htslib decompression threads.
+   The GIAB VCF has no index, so DuckHTS has no contig-parallel scan for it;
+   the one-core path is unchanged.
+
+Output is unchanged. The one-core file is byte-identical to the closure
+file (SHA-256 `cef1ba4d...`), and every run's full-row fingerprint (XOR
+`6595502552192519429`), 47,629,345 rows, and source-allele coverage
+(4,095,611 of 4,095,611 eligible alleles, no unknown or ambiguous
+output) equal the closure receipts; FastVEP's rows and fingerprint equal its
+closure values. The receipts were checked before any timing was read.
+
+| Threads | DuckVEP median s (range) | FastVEP median s (range) | FastVEP / DuckVEP | DuckVEP peak GiB | FastVEP peak GiB |
+|--------:|:-------------------------|:-------------------------|------------------:|-----------------:|-----------------:|
+| 1       | 76.28 (76.07 to 76.65)   | 179.56 (178.40 to 181.23) | 2.35             | 7.10             | 3.44             |
+| 4       | 31.11 (31.10 to 31.35)   | 78.04 (75.07 to 78.06)    | 2.51             | 7.06             | 3.44             |
+| 8       | 25.26 (24.95 to 25.45)   | 65.85 (62.48 to 68.07)    | 2.61             | 7.10             | 3.44             |
+
+Three alternating runs per tool and thread count (`native_tab17`, tmpfs
+output, `benchmark_duckvep_fastvep_closure.sh` with `THREADS` and `CPU`; cores
+2, then 2,4,6,8, then 2,4,8,10,12,14,16,18; FastVEP with `RAYON_NUM_THREADS`,
+DuckVEP with `--threads`). One-minute load before each run was 2.13 to 2.97
+with an unpinned gnomAD staging job running. Same extension, DuckHTS build,
+model, input and FastVEP binary as the closure refresh. At one core, DuckVEP
+went from 154.15 s to 76.28 s and is now 2.35 times faster than FastVEP,
+not 1.17 times.
+
+Per-statement time after the fixes, from one profiled run at each thread
+count (`statement_times_t1.txt`, `statement_times_t8.txt`; the 8-thread
+profile ran at load 4.5, so it is not a median):
+
+| Step                                              | 1 core, before | 1 core, after | 8 threads, after |
+|:--------------------------------------------------|---------------:|--------------:|-----------------:|
+| Allele events and region join                     |          51.1  |         12.8  |             3.3  |
+| Transcript metadata (attributes, core, GFF joins) |          29.1  |          1.1  |             0.5  |
+| GFF3 decode in the reader instance                |          13.8  |          4.3  |             4.3  |
+| GFF3 table and `fastvep_gff` step                 |           2.4  |           0.2 |             0.1  |
+| VCF decode                                        |           5.1  |          5.0  |             4.5  |
+| Model load                                        |           3.4  |          3.0  |             1.8  |
+| Source and spelling tables                        |           2.5  |          2.3  |             0.8  |
+| Final `COPY` (the annotation)                     |          46.6  |         47.7  |             9.7  |
+
+What remains is the annotation `COPY` (47.7 s on one core, 9.7 s on eight)
+plus a serial 4 to 5 s each for the VCF and GFF3 decode, 12.8 s for the
+sorted event table on one core, and the 3 s model load. The FastVEP times
+include no comparable setup, so the ratio above is now mostly annotation
+against annotation. Receipts, timing files and logs are in
+[setup_fix_f70ba40](data/duckvep_fastvep/setup_fix_f70ba40).
+
 Final CSQ files carry `record_index` and `alt_index` followed by the 32
 common fields. Both engines write this 34-column transport; the native
 and operational contracts remain 17 columns. An independent source map
