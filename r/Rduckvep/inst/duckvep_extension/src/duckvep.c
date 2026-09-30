@@ -3,6 +3,7 @@
 #include "kernel/src/duckvep_budget.h"
 #include "duckvep_registration.h"
 #include "duckvep_sql.h"
+#include "core/duckvep_core_phase.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,9 +14,14 @@ static void duckvep_revcomp(duckdb_function_info info, duckdb_data_chunk input,
                             duckdb_vector output) {
     duckdb_vector sequences = duckdb_data_chunk_get_vector(input, 0);
     duckdb_string_t *values = duckdb_vector_get_data(sequences);
-    const char *source = "ACGTRYSWKMBDHVNacgtryswkmbdhvn";
-    const char *target = "TGCAYRSWMKVHDBNtgcayrswmkvhdbn";
+    uint64_t *validity = duckdb_vector_get_validity(sequences);
+    /* A NULL row's string slot is uninitialized memory: never read it. */
+    duckdb_vector_ensure_validity_writable(output);
     for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
+        if (validity && !duckdb_validity_row_is_valid(validity, row)) {
+            duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
+            continue;
+        }
         idx_t length = duckdb_string_t_length(values[row]);
         const char *sequence = duckdb_string_t_data(&values[row]);
         char *reversed = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length ? length : 1);
@@ -23,22 +29,7 @@ static void duckvep_revcomp(duckdb_function_info info, duckdb_data_chunk input,
             duckdb_scalar_function_set_error(info, "_duckvep_revcomp: allocation failed");
             return;
         }
-        idx_t end = length, at = 0;
-        while (end) {
-            idx_t first = end - 1;
-            while (first && ((unsigned char)sequence[first] & 0xc0) == 0x80)
-                first--;
-            idx_t width = end - first;
-            if (width == 1) {
-                char base = sequence[first];
-                const char *match = base ? strchr(source, base) : NULL;
-                reversed[at] = match ? target[match - source] : base;
-            } else {
-                memcpy(reversed + at, sequence + first, width);
-            }
-            at += width;
-            end = first;
-        }
+        duckvep_core_revcomp(sequence, length, reversed);
         duckdb_vector_assign_string_element_len(output, row, reversed, length);
         duckvep_budget_free(reversed);
     }
@@ -50,6 +41,7 @@ static bool duckvep_register_revcomp(duckdb_connection connection) {
     duckdb_scalar_function_set_name(function, "_duckvep_revcomp");
     duckdb_scalar_function_add_parameter(function, text);
     duckdb_scalar_function_set_return_type(function, text);
+    duckdb_scalar_function_set_special_handling(function);
     duckdb_scalar_function_set_function(function, duckvep_revcomp);
     duckdb_state state = duckdb_register_scalar_function(connection, function);
     duckdb_destroy_scalar_function(&function);

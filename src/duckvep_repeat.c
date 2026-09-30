@@ -1,7 +1,9 @@
 #include "duckdb_extension.h"
 #include "kernel/src/duckvep_budget.h"
 #include "duckvep_builder.h"
+#include "core/duckvep_core_repeat.h"
 DUCKDB_EXTENSION_EXTERN
+#include "duckvep_v1_cells.h"
 
 #include <math.h>
 #include <stdbool.h>
@@ -20,65 +22,6 @@ typedef struct {
 static bool valid(duckdb_vector vector, idx_t row) {
     uint64_t *mask = duckdb_vector_get_validity(vector);
     return !mask || duckdb_validity_row_is_valid(mask, row);
-}
-
-static bool huge_fractional(duckdb_hugeint n, uint8_t scale) {
-    uint64_t high = (uint64_t)n.upper, low = n.lower;
-    if (n.upper < 0) {
-        low = ~low + 1;
-        high = ~high + (low == 0);
-    }
-    uint32_t limbs[4] = {(uint32_t)(high >> 32), (uint32_t)high,
-        (uint32_t)(low >> 32), (uint32_t)low};
-    for (uint8_t digit = 0; digit < scale; digit++) {
-        uint64_t remainder = 0;
-        for (idx_t i = 0; i < 4; i++) {
-            uint64_t value = (remainder << 32) | limbs[i];
-            limbs[i] = (uint32_t)(value / 10);
-            remainder = value % 10;
-        }
-        if (remainder) return true;
-    }
-    return false;
-}
-
-static bool numeric(duckdb_vector vector, duckdb_logical_type type, idx_t at,
-                    long double *number, bool *fractional) {
-    if (!vector || !valid(vector, at)) return false;
-    duckdb_type id = duckdb_get_type_id(type);
-    uint8_t scale = 0;
-    if (id == DUCKDB_TYPE_DECIMAL) {
-        scale = duckdb_decimal_scale(type);
-        id = duckdb_decimal_internal_type(type);
-    }
-    void *data = duckdb_vector_get_data(vector);
-    switch (id) {
-    case DUCKDB_TYPE_TINYINT: *number = ((int8_t *)data)[at]; break;
-    case DUCKDB_TYPE_SMALLINT: *number = ((int16_t *)data)[at]; break;
-    case DUCKDB_TYPE_INTEGER: *number = ((int32_t *)data)[at]; break;
-    case DUCKDB_TYPE_BIGINT: *number = ((int64_t *)data)[at]; break;
-    case DUCKDB_TYPE_UTINYINT: *number = ((uint8_t *)data)[at]; break;
-    case DUCKDB_TYPE_USMALLINT: *number = ((uint16_t *)data)[at]; break;
-    case DUCKDB_TYPE_UINTEGER: *number = ((uint32_t *)data)[at]; break;
-    case DUCKDB_TYPE_UBIGINT: *number = ((uint64_t *)data)[at]; break;
-    case DUCKDB_TYPE_FLOAT: *number = ((float *)data)[at]; break;
-    case DUCKDB_TYPE_DOUBLE: *number = ((double *)data)[at]; break;
-    case DUCKDB_TYPE_HUGEINT: {
-        duckdb_hugeint n = ((duckdb_hugeint *)data)[at];
-        *number = (long double)n.upper * 18446744073709551616.0L + n.lower;
-        if (scale) *fractional = huge_fractional(n, scale);
-        break;
-    }
-    default: return false;
-    }
-    if (scale) {
-        long double base = 1;
-        for (uint8_t i = 0; i < scale; i++) base *= 10;
-        if (id != DUCKDB_TYPE_HUGEINT)
-            *fractional = fmodl(*number, base) != 0;
-        *number /= base;
-    } else *fractional = isfinite(*number) && truncl(*number) != *number;
-    return true;
 }
 
 static bool axis_init(duckdb_vector vector, repeat_axis *axis) {
@@ -123,19 +66,37 @@ static void axis_destroy(repeat_axis *axis) {
     if (axis->count_type) duckdb_destroy_logical_type(&axis->count_type);
 }
 
-static bool dna(duckdb_string_t unit) {
-    const char *data = duckdb_string_t_data(&unit);
-    uint32_t length = duckdb_string_t_length(unit);
-    if (!length) return false;
-    for (uint32_t i = 0; i < length; i++) {
-        char c = data[i];
-        if (!strchr("ACGTRYSWKMBDHVNacgtryswkmbdhvn", c) || !c) return false;
-    }
-    return true;
-}
-
 static void set_error(duckdb_function_info info, const char *message) {
     duckvep_builder_set_error(info, message);
+}
+
+/* Reads one list row of an axis into neutral elements (grown on demand). */
+static bool axis_row(repeat_axis *axis, idx_t row, duckdb_type count_id, uint8_t count_scale,
+                     duckvep_repeat_element_t **elements, size_t *capacity,
+                     duckvep_repeat_axis_t *out) {
+    *out = (duckvep_repeat_axis_t){0};
+    if (!axis->entries || !valid(axis->list, row) || !axis->units) return true;
+    duckdb_list_entry list = axis->entries[row];
+    if (list.length > *capacity) {
+        duckvep_repeat_element_t *grown = duckvep_budget_realloc(DUCKVEP_OWNER_CONTROL, *elements,
+            list.length * sizeof(**elements));
+        if (!grown) return false;
+        *elements = grown;
+        *capacity = list.length;
+    }
+    for (idx_t i = 0; i < list.length; i++) {
+        idx_t at = list.offset + i;
+        duckvep_repeat_element_t *element = &(*elements)[i];
+        *element = (duckvep_repeat_element_t){0};
+        element->present = valid(axis->records, at) && valid(axis->units, at) && valid(axis->counts, at);
+        element->unit = duckdb_string_t_data(&axis->strings[at]);
+        element->unit_length = duckdb_string_t_length(axis->strings[at]);
+        duckvep_v1_fill_cell(axis->counts, count_id, count_scale, at, &element->count);
+    }
+    out->usable = true;
+    out->elements = *elements;
+    out->count = list.length;
+    return true;
 }
 
 static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
@@ -143,10 +104,22 @@ static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, du
     idx_t argc = duckdb_data_chunk_get_column_count(input);
     for (idx_t i = 0; i < argc; i++) args[i] = duckdb_data_chunk_get_vector(input, i);
     repeat_axis axes[2] = {{0}};
+    duckvep_repeat_element_t *buffers[2] = {NULL, NULL};
+    size_t capacities[2] = {0, 0};
+    duckdb_type count_ids[2] = {DUCKDB_TYPE_INVALID, DUCKDB_TYPE_INVALID};
+    uint8_t count_scales[2] = {0, 0};
     if (!axis_init(args[0], &axes[0]) || !axis_init(args[1], &axes[1])) {
-        set_error(info, "duckvep_repeat_alleles: expected lists of {unit VARCHAR, count numeric}");
+        set_error(info, duckvep_core_repeat_expected_lists);
         axis_destroy(&axes[0]); axis_destroy(&axes[1]);
         return;
+    }
+    for (idx_t axis = 0; axis < 2; axis++) {
+        if (!axes[axis].count_type) continue;
+        count_ids[axis] = duckdb_get_type_id(axes[axis].count_type);
+        if (count_ids[axis] == DUCKDB_TYPE_DECIMAL) {
+            count_scales[axis] = duckdb_decimal_scale(axes[axis].count_type);
+            count_ids[axis] = duckdb_decimal_internal_type(axes[axis].count_type);
+        }
     }
     duckdb_vector fields[7];
     for (idx_t i = 0; i < 7; i++) {
@@ -159,104 +132,68 @@ static void repeat_scalar(duckdb_function_info info, duckdb_data_chunk input, du
     for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
         duckdb_vector cap_vector = NULL;
         if (argc == 4 && !duckvep_builder_option_vectors(info, args[3], row, keys, kinds, 1, &cap_vector)) break;
-        duckdb_logical_type cap_type = cap_vector ? duckdb_vector_get_column_type(cap_vector) : NULL;
         if (!valid(args[2], row)) {
-            set_error(info, "duckvep_repeat_alleles: sequence_exact is required");
+            set_error(info, duckvep_core_repeat_exact_required);
             break;
         }
         long double cap = 5000;
-        bool cap_frac = false;
-        bool cap_ok = !cap_vector || (numeric(cap_vector, cap_type, row, &cap, &cap_frac) &&
-            isfinite(cap) && cap >= 0 && cap <= INT32_MAX && !cap_frac);
-        if (cap_type) duckdb_destroy_logical_type(&cap_type);
-        if (!cap_ok) {
-            set_error(info, "duckvep_repeat_alleles: max_allele_bases must be an integer from 0 through 2147483647");
+        duckvep_cell_t cap_cell;
+        if (cap_vector) {
+            duckdb_logical_type cap_type = duckdb_vector_get_column_type(cap_vector);
+            duckdb_type cap_id = duckdb_get_type_id(cap_type);
+            uint8_t cap_scale = 0;
+            if (cap_id == DUCKDB_TYPE_DECIMAL) {
+                cap_scale = duckdb_decimal_scale(cap_type);
+                cap_id = duckdb_decimal_internal_type(cap_type);
+            }
+            duckdb_destroy_logical_type(&cap_type);
+            duckvep_v1_fill_cell(cap_vector, cap_id, cap_scale, row, &cap_cell);
+        }
+        if (!duckvep_core_repeat_cap(cap_vector ? &cap_cell : NULL, &cap)) {
+            set_error(info, duckvep_core_repeat_cap_invalid);
             break;
         }
-        bool incomplete = false, fractional = false, invalid_unit = false, invalid_count = false;
-        long double required[2] = {0, 0};
-        for (idx_t axis = 0; axis < 2; axis++) {
-            repeat_axis *part = &axes[axis];
-            if (!part->entries || !valid(part->list, row) || !part->units) { incomplete = true; continue; }
-            duckdb_list_entry list = part->entries[row];
-            for (idx_t i = 0; i < list.length; i++) {
-                idx_t at = list.offset + i;
-                if (!valid(part->records, at) || !valid(part->units, at) ||
-                    !valid(part->counts, at)) { incomplete = true; continue; }
-                duckdb_string_t unit = part->strings[at];
-                if (!dna(unit)) invalid_unit = true;
-                long double n = 0;
-                bool frac = false;
-                if (!numeric(part->counts, part->count_type, at, &n, &frac)) {
-                    incomplete = true;
-                    continue;
-                }
-                if (!isfinite(n) || n < 0) invalid_count = true;
-                if (frac) fractional = true;
-                required[axis] += duckdb_string_t_length(unit) * n;
-            }
-        }
-        if (invalid_unit || invalid_count) {
-            set_error(info, invalid_unit ? "duckvep_repeat_alleles: repeat units must contain non-empty IUPAC DNA" :
-                "duckvep_repeat_alleles: repeat counts must be finite and nonnegative");
+        duckvep_repeat_axis_t rows[2];
+        if (!axis_row(&axes[0], row, count_ids[0], count_scales[0], &buffers[0], &capacities[0], &rows[0]) ||
+            !axis_row(&axes[1], row, count_ids[1], count_scales[1], &buffers[1], &capacities[1], &rows[1])) {
+            set_error(info, "duckvep_repeat_alleles: allocation failed");
             break;
         }
-        const char *status = !exact[row] ? "summary_only" : incomplete ? "incomplete_input" :
-            fractional ? "nonintegral_count" : "ok";
-        if (strcmp(status, "ok") == 0) {
-            idx_t bad = required[0] > cap ? 0 : required[1] > cap ? 1 : 2;
-            if (bad != 2) {
-                char error[240];
-                /* Print as double: MinGW's 80-bit long double does not match the
-                 * Windows C runtime's printf, which reads long double as double. */
-                snprintf(error, sizeof(error), "duckvep_repeat_alleles: %s requires %.6e bases which exceeds max_allele_bases=%.0f",
-                    bad ? "alternate" : "reference", (double)required[bad], (double)cap);
-                set_error(info, error);
-                break;
-            }
+        duckvep_repeat_plan_t plan;
+        char error[240];
+        duckvep_core_repeat_plan(rows, exact[row], cap, &plan, error, sizeof(error));
+        if (plan.error) {
+            set_error(info, plan.error);
+            break;
         }
         for (idx_t i = 0; i < 7; i++)
             duckdb_validity_set_row_valid(duckdb_vector_get_validity(fields[i]), row);
-        duckdb_vector_assign_string_element(fields[6], row, status);
-        if (strcmp(status, "ok") != 0) {
+        duckdb_vector_assign_string_element(fields[6], row, plan.status);
+        if (strcmp(plan.status, "ok") != 0) {
             for (idx_t i = 0; i < 6; i++)
                 duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[i]), row);
             continue;
         }
+        bool failed = false;
         for (idx_t axis = 0; axis < 2; axis++) {
-            repeat_axis *part = &axes[axis];
-            size_t length = (size_t)required[axis];
+            size_t length = (size_t)plan.required[axis];
             char *text = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + 1);
             if (!text) {
                 set_error(info, "duckvep_repeat_alleles: allocation failed");
-                if (cap_type) duckdb_destroy_logical_type(&cap_type);
-                axis_destroy(&axes[0]); axis_destroy(&axes[1]);
-                return;
+                failed = true;
+                break;
             }
-            size_t written = 0;
-            duckdb_list_entry list = part->entries[row];
-            for (idx_t i = 0; i < list.length; i++) {
-                idx_t at = list.offset + i;
-                duckdb_string_t unit = part->strings[at];
-                size_t width = duckdb_string_t_length(unit);
-                long double n = 0;
-                bool frac = false;
-                numeric(part->counts, part->count_type, at, &n, &frac);
-                for (size_t j = 0; j < (size_t)n; j++) {
-                    memcpy(text + written, duckdb_string_t_data(&unit), width);
-                    written += width;
-                }
-            }
-            text[written] = '\0';
+            size_t written = duckvep_core_repeat_render(&rows[axis], text);
             duckdb_vector_assign_string_element_len(fields[axis], row, text, written);
             duckvep_budget_free(text);
         }
-        ((uint64_t *)duckdb_vector_get_data(fields[2]))[row] = (uint64_t)required[0];
-        ((uint64_t *)duckdb_vector_get_data(fields[3]))[row] = (uint64_t)required[1];
-        ((int64_t *)duckdb_vector_get_data(fields[4]))[row] = (int64_t)required[1] - (int64_t)required[0];
-        duckdb_vector_assign_string_element(fields[5], row, required[1] > required[0] ? "GAIN" :
-            required[1] < required[0] ? "LOSS" : "NEUTRAL");
+        if (failed) break;
+        ((uint64_t *)duckdb_vector_get_data(fields[2]))[row] = (uint64_t)plan.required[0];
+        ((uint64_t *)duckdb_vector_get_data(fields[3]))[row] = (uint64_t)plan.required[1];
+        ((int64_t *)duckdb_vector_get_data(fields[4]))[row] = (int64_t)plan.required[1] - (int64_t)plan.required[0];
+        duckdb_vector_assign_string_element(fields[5], row, duckvep_core_repeat_direction(&plan));
     }
+    duckvep_budget_free(buffers[0]); duckvep_budget_free(buffers[1]);
     axis_destroy(&axes[0]); axis_destroy(&axes[1]);
 }
 

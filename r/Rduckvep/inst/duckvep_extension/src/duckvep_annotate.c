@@ -15,6 +15,7 @@ DUCKDB_EXTENSION_EXTERN
 #include "kernel/src/duckvep_workspace_internal.h"
 #include "kernel/include/duckvep_kernel.h"
 #include "kernel/include/duckvep_so.h"
+#include "core/duckvep_core_geometry.h"
 
 #include <limits.h>
 #include <stdint.h>
@@ -710,31 +711,7 @@ enum duckvep_allele_geometry_field {
 	DUCKVEP_GEOMETRY_FIELD_COUNT
 };
 
-static const char *duckvep_allele_geometry_field_names[] = {
-	"kind_code", "interbase", "anchor_side_code", "raw_start0",
-	"raw_end0", "feature_start0", "feature_end0", "edit_start0",
-	"edit_end0", "insertion_boundary0", "reference_difference_offset",
-	"reference_difference_length", "alternate_difference_offset",
-	"alternate_difference_length"
-};
-
-static int
-duckvep_scalar_dna_valid(const char *sequence, size_t length)
-{
-	size_t index;
-
-	if (sequence == NULL || length == 0 || length > UINT16_MAX)
-		return 0;
-	for (index = 0; index < length; index++) {
-		unsigned char base = (unsigned char)sequence[index];
-		if (base >= 'a' && base <= 'z')
-			base = (unsigned char)(base - ('a' - 'A'));
-		if (base != 'A' && base != 'C' && base != 'G' &&
-		    base != 'T' && base != 'N')
-			return 0;
-	}
-	return 1;
-}
+#define duckvep_allele_geometry_field_names ((const char **)duckvep_core_allele_geometry_fields)
 
 static void
 duckvep_allele_geometry_scalar(duckdb_function_info info,
@@ -760,7 +737,7 @@ duckvep_allele_geometry_scalar(duckdb_function_info info,
 	    fields[DUCKVEP_GEOMETRY_INSERTION_BOUNDARY0]);
 	rows = duckdb_data_chunk_get_size(input);
 	for (row = 0; row < rows; row++) {
-		duckvep_event_t event;
+		duckvep_core_allele_geometry_t g;
 		const char *reference, *alternate;
 		size_t reference_length, alternate_length;
 
@@ -778,43 +755,34 @@ duckvep_allele_geometry_scalar(duckdb_function_info info,
 		alternate = duckdb_string_t_data(&alternates[row]);
 		reference_length = (size_t)duckdb_string_t_length(references[row]);
 		alternate_length = (size_t)duckdb_string_t_length(alternates[row]);
-		if (positions[row] == 0 || positions[row] > UINT32_MAX ||
-		    !duckvep_scalar_dna_valid(reference, reference_length) ||
-		    !duckvep_scalar_dna_valid(alternate, alternate_length) ||
-		    !duckvep_event_prepare_small(
-		        (uint32_t)positions[row], (const uint8_t *)reference,
-		        (uint16_t)reference_length, (const uint8_t *)alternate,
-		        (uint16_t)alternate_length, &event)) {
+		if (!duckvep_core_allele_geometry(positions[row], reference,
+		    reference_length, alternate, alternate_length, &g)) {
 			duckdb_scalar_function_set_error(info,
-			    "duckvep_allele_geometry: position must fit UINTEGER and REF/ALT must be distinct non-empty A/C/G/T/N alleles of at most 65,535 bases");
+			    duckvep_core_allele_geometry_error);
 			return;
 		}
 		((uint8_t *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_KIND_CODE]))[row] = event.kind;
+		    fields[DUCKVEP_GEOMETRY_KIND_CODE]))[row] = g.kind_code;
 		((bool *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_INTERBASE]))[row] = event.interbase != 0u;
+		    fields[DUCKVEP_GEOMETRY_INTERBASE]))[row] = g.interbase;
 		((uint8_t *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_ANCHOR_SIDE_CODE]))[row] = event.anchor_side;
+		    fields[DUCKVEP_GEOMETRY_ANCHOR_SIDE_CODE]))[row] = g.anchor_side_code;
 		((uint64_t *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_RAW_START0]))[row] =
-		    (uint64_t)event.raw_start1 - 1u;
+		    fields[DUCKVEP_GEOMETRY_RAW_START0]))[row] = g.raw_start0;
 		((uint64_t *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_RAW_END0]))[row] = event.raw_end1;
+		    fields[DUCKVEP_GEOMETRY_RAW_END0]))[row] = g.raw_end0;
 		((uint64_t *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_FEATURE_START0]))[row] =
-		    (uint64_t)event.feature_start1 - 1u;
+		    fields[DUCKVEP_GEOMETRY_FEATURE_START0]))[row] = g.feature_start0;
 		((uint64_t *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_FEATURE_END0]))[row] = event.feature_end1;
+		    fields[DUCKVEP_GEOMETRY_FEATURE_END0]))[row] = g.feature_end0;
 		((uint64_t *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_EDIT_START0]))[row] = event.interbase
-		    ? event.insertion_boundary0 : (uint64_t)event.start1 - 1u;
+		    fields[DUCKVEP_GEOMETRY_EDIT_START0]))[row] = g.edit_start0;
 		((uint64_t *)duckdb_vector_get_data(
-		    fields[DUCKVEP_GEOMETRY_EDIT_END0]))[row] = event.interbase
-		    ? event.insertion_boundary0 : (uint64_t)event.end1;
-		if (event.interbase) {
+		    fields[DUCKVEP_GEOMETRY_EDIT_END0]))[row] = g.edit_end0;
+		if (g.has_insertion_boundary0) {
 			((uint64_t *)duckdb_vector_get_data(
 			    fields[DUCKVEP_GEOMETRY_INSERTION_BOUNDARY0]))[row] =
-			    event.insertion_boundary0;
+			    g.insertion_boundary0;
 		} else {
 			duckdb_validity_set_row_invalid(
 			    duckdb_vector_get_validity(
@@ -822,16 +790,16 @@ duckvep_allele_geometry_scalar(duckdb_function_info info,
 		}
 		((uint16_t *)duckdb_vector_get_data(
 		    fields[DUCKVEP_GEOMETRY_REF_DIFF_OFFSET]))[row] =
-		    event.ref_diff_offset;
+		    g.reference_difference_offset;
 		((uint16_t *)duckdb_vector_get_data(
 		    fields[DUCKVEP_GEOMETRY_REF_DIFF_LENGTH]))[row] =
-		    event.ref_diff_length;
+		    g.reference_difference_length;
 		((uint16_t *)duckdb_vector_get_data(
 		    fields[DUCKVEP_GEOMETRY_ALT_DIFF_OFFSET]))[row] =
-		    event.alt_diff_offset;
+		    g.alternate_difference_offset;
 		((uint16_t *)duckdb_vector_get_data(
 		    fields[DUCKVEP_GEOMETRY_ALT_DIFF_LENGTH]))[row] =
-		    event.alt_diff_length;
+		    g.alternate_difference_length;
 	}
 }
 
@@ -879,9 +847,7 @@ duckvep_breakend_geometry_scalar(duckdb_function_info info,
 		}
 		if (status != DUCKVEP_BREAKEND_OK) {
 			duckdb_scalar_function_set_error(info,
-			    status == DUCKVEP_BREAKEND_POSITION_OVERFLOW
-			    ? "duckvep_breakend_geometry: mate position exceeds UBIGINT"
-			    : "duckvep_breakend_geometry: malformed BND ALT; expected two matching brackets around chrom:position, or a single leading/trailing dot, with non-empty A/C/G/T/N replacement sequence");
+			    duckvep_core_breakend_error(status));
 			return;
 		}
 		duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
