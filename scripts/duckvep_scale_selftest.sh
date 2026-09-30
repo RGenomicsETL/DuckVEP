@@ -16,13 +16,18 @@ while [[ $# -gt 0 ]]; do
     --out) OUT="$2"; shift 2 ;;
     --panel) PANEL="$2"; shift 2 ;;
     --extension|--model|--cgroup) EXTRA+=("$1" "$2"); shift 2 ;;
-    --allow-unenforced) EXTRA+=("$1"); shift ;;
+    --allow-unenforced|--allow-live-extension) EXTRA+=("$1"); shift ;;
     *) echo "self-test: unknown argument $1" >&2; exit 2 ;;
   esac
 done
+# The runner copies the extension into OUT/artifacts and loads the copy; the default extension lives in
+# the build directory, which the runner refuses unless told (the copy is still what the jobs load).
+[[ " ${EXTRA[*]} " == *" --extension "* ]] || EXTRA+=(--allow-live-extension)
 OUT="${OUT:-$(mktemp -d /tmp/duckvep-scale-selftest.XXXXXX)}"
 mkdir -p "$OUT"
 fail=0
+# 0. Aggregator guards on synthetic receipts (no DuckVEP run).
+if "$(dirname "$RUNNER")/duckvep_scale_selftest_aggregate.sh"; then echo "PASS  aggregator guards"; else echo "FAIL  aggregator guards"; fail=1; fi
 field() { Rscript -e 'r <- read.csv(commandArgs(TRUE)[1], colClasses = "character", na.strings = ""); v <- r[[commandArgs(TRUE)[2]]][1]; cat(if (is.na(v)) "" else v)' "$1" "$2"; }
 result_field() { Rscript -e 'r <- read.delim(commandArgs(TRUE)[1], colClasses = "character", na.strings = "", quote = ""); v <- r[[commandArgs(TRUE)[2]]][1]; cat(if (is.na(v)) "" else v)' "$1" "$2"; }
 check() {  # name, detail shown on failure, then the command that must succeed

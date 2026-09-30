@@ -19,6 +19,7 @@ num <- function(x) suppressWarnings(as.numeric(x))
 first <- function(x, name, default = NA_character_) {
   if (is.null(x) || !name %in% names(x) || nrow(x) == 0L) default else x[[name]][1L]
 }
+getinfo <- function(k, default = NA_character_) if (k %in% names(info)) info[[k]] else default
 enforced <- identical(info[["enforced"]], "yes")
 max_temp <- num(info[["max_temp_bytes"]])
 budget_bytes <- num(info[["native_budget_mib"]]) * 1048576
@@ -42,10 +43,23 @@ for (j in jobs) {
     hw_total <- num(first(r, "native_hw_total", NA))
     checks <- character()
     if (!is.na(oom_kill) && oom_kill > 0) { outcome <- "failed"; checks <- c(checks, paste0("cgroup oom_kill=", oom_kill)) }
-    if (enforced && (is.na(peak) || is.na(mmax))) checks <- c(checks, "cgroup counters unavailable")
     if (!is.na(peak) && !is.na(mmax) && peak > mmax) checks <- c(checks, "memory.peak above memory.max")
     if (!is.na(spill) && spill > max_temp) checks <- c(checks, "spill above quota")
     if (!is.na(hw_total) && hw_total > budget_bytes) checks <- c(checks, "native budget exceeded")
+    # Mandatory evidence: a row that is ok but lacks any of these cannot certify.
+    if (outcome == "ok") {
+      missing <- c(if (is.na(hw_total)) "native_hw_total", if (is.na(spill)) "spill peak",
+        if (is.na(num(first(r, "mode_s", NA)))) "mode seconds",
+        if (anyNA(c(first(r, "out_rows", NA), first(r, "hash_sum", NA), first(r, "hash_xor", NA)))) "checksum")
+      if (enforced) {
+        swapmax <- first(cg, "memory_swap_max", NA)
+        missing <- c(missing, if (is.na(peak)) "memory.peak", if (is.na(mmax)) "memory.max",
+          if (is.na(swapmax)) "memory.swap.max", if (is.na(oom_kill)) "oom_kill")
+        if (!is.na(swapmax) && !identical(trimws(swapmax), "0")) checks <- c(checks, "swap not disabled")
+      }
+      if (length(missing)) checks <- c(checks, paste0(missing, " missing for job ", j))
+    }
+    if (enforced && (is.na(peak) || is.na(mmax))) checks <- unique(c(checks, "cgroup counters unavailable"))
     if (length(checks) && outcome == "ok") outcome <- "failed"
     if (length(checks)) reason <- paste(c(if (nzchar(reason)) reason, checks), collapse = "; ")
     row <- data.frame(run_id = info[["run_id"]], job = j, mode = m, outcome = outcome, reason = reason,
@@ -56,7 +70,7 @@ for (j in jobs) {
       alleles_per_s = first(r, "alleles_per_s"), out_rows = first(r, "out_rows"),
       out_bytes = first(r, "out_bytes"), hash_sum = first(r, "hash_sum"), hash_xor = first(r, "hash_xor"),
       memory_peak_bytes = first(cg, "memory_peak"), memory_max_bytes = first(cg, "memory_max"),
-      memory_swap_peak_bytes = first(cg, "memory_swap_peak"), oom_kill = first(cg, "oom_kill"),
+      memory_swap_max = first(cg, "memory_swap_max"), memory_swap_peak_bytes = first(cg, "memory_swap_peak"), oom_kill = first(cg, "oom_kill"),
       spill_peak_bytes = first(cg, "spill_peak_bytes"), rss_peak_kib = first(r, "rss_peak_kib"),
       stringsAsFactors = FALSE)
     for (o in c("model", "index", "reference", "workspace", "scratch", "emit", "control", "total")) {
@@ -85,8 +99,24 @@ agg <- do.call(rbind, lapply(modes, function(m) {
     job_wall_s_p50 = pct(w, 0.5), job_wall_s_max = if (any(!is.na(w))) max(w, na.rm = TRUE) else NA_real_,
     checksums_agree = agree, stringsAsFactors = FALSE)
 }))
-all_met <- all(receipt$outcome == "ok") && enforced
+# Certification: every job and mode ok, checksums agree within each mode (2 or more ok jobs), the
+# ceilings were enforced, and the frozen artifacts did not change. Anything else is exit 3 with a reason.
+cert_reasons <- character()
+if (!enforced) cert_reasons <- c(cert_reasons, "ceilings not enforced")
+if (any(receipt$outcome != "ok")) cert_reasons <- c(cert_reasons, "not every job and mode is ok")
+for (m in modes) {
+  s <- receipt[receipt$mode == m & receipt$outcome == "ok", ]
+  if (nrow(s) >= 2L && length(unique(paste(s$out_rows, s$hash_sum, s$hash_xor))) > 1L)
+    cert_reasons <- c(cert_reasons, paste0("checksums disagree in ", m))
+}
+for (a in c("model", "panel", "extension")) {
+  start <- getinfo(paste0(a, "_sha256")); end <- getinfo(paste0(a, "_sha256_end"))
+  if (is.na(start) || is.na(end)) cert_reasons <- c(cert_reasons, paste0(a, " hash missing at start or end"))
+  else if (!identical(start, end)) cert_reasons <- c(cert_reasons, paste0(a, " changed during the run"))
+}
+all_met <- length(cert_reasons) == 0L
 counts <- table(factor(receipt$outcome, c("ok", "capacity_error", "failed")))
+hashes <- function(a) paste0(getinfo(paste0(a, "_sha256"), "missing"), " / ", getinfo(paste0(a, "_sha256_end"), "missing"))
 tbl <- function(df) {
   c(paste0("| ", paste(names(df), collapse = " | "), " |"),
     paste0("|", paste(rep("---", ncol(df)), collapse = "|"), "|"),
@@ -94,17 +124,18 @@ tbl <- function(df) {
 }
 lines <- c(paste0("# DuckVEP scale run ", info[["run_id"]]), "",
   if (!enforced) c("**ceilings not enforced** (`--cgroup none`): the process memory and swap ceilings were not applied.", ""),
-  paste0("Every job met every ceiling: **", if (all_met) "yes" else "no", "**. Outcomes: ok ", counts[["ok"]],
+  paste0("Certified: **", if (all_met) "yes" else "no", "**. Outcomes: ok ", counts[["ok"]],
     ", capacity_error ", counts[["capacity_error"]], ", failed ", counts[["failed"]], "."), "",
+  if (length(cert_reasons)) c("Not certified:", paste0("- ", cert_reasons), ""),
   "## Run", "",
   tbl(data.frame(item = c("host", "cores", "RAM (GiB)", "kernel", "jobs x threads", "panel", "panel rows",
-    "regulation (resident features)", "panel sha256", "model sha256", "extension sha256", "git revision (dirty files)", "cgroup mode", "wall (s)",
+    "regulation (resident features)", "panel sha256 (start / end)", "model sha256 (start / end)", "extension sha256 (start / end)", "git revision (dirty files)", "cgroup mode", "wall (s)",
     "load average at start"),
     value = c(info[["host"]], info[["cores"]], gib(info[["mem_total_bytes"]]), info[["kernel"]],
       paste0(info[["jobs"]], " x ", info[["threads_per_job"]]), paste0(info[["panel"]], " (", info[["limit_rows"]], ")"),
       first(receipt[ok, , drop = FALSE], "panel_rows", "n/a"),
-      if (identical(info[["regulation"]], "1")) paste0("on (", first(receipt, "regulation_features"), ")") else "off", info[["panel_sha256"]], info[["model_sha256"]],
-      info[["extension_sha256"]], paste0(info[["git_revision"]], " (", info[["git_dirty"]], ")"),
+      if (identical(info[["regulation"]], "1")) paste0("on (", first(receipt, "regulation_features"), ")") else "off", 
+      hashes("panel"), hashes("model"), hashes("extension"), paste0(info[["git_revision"]], " (", info[["git_dirty"]], ")"),
       info[["cgroup_mode"]], info[["wall_s"]], info[["loadavg_at_start"]]), stringsAsFactors = FALSE)), "",
   "## Ceilings", "",
   paste0("Process memory.max ", gib(info[["memory_max_bytes"]]), " GiB with memory.swap.max 0; DuckDB memory_limit ",

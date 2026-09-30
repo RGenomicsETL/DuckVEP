@@ -20,6 +20,11 @@ endif
 include extension-ci-tools/makefiles/c_api_extensions/base.Makefile
 include extension-ci-tools/makefiles/c_api_extensions/c_cpp.Makefile
 
+# Scale-runner aggregator guards: synthetic receipts, no DuckVEP run.
+.PHONY: test_scale_aggregate
+test_scale_aggregate:
+	scripts/duckvep_scale_selftest_aggregate.sh
+
 .PHONY: all test test_debug test_release test_fault_injection build_fault_injection test_haplotype_contract test-extension-symbols test_mane_grch37 test_mane_grch37_receipt readme build_asan test_release_asan test_properties test_properties_sanitized
 all: configure release
 configure: venv platform extension_version
