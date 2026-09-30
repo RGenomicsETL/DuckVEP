@@ -1,0 +1,2 @@
+run	kind	loftee_only_filters	duckvep_only_filters	loftee_only_flags	duckvep_only_flags	pairs
+real, check_complete_cds (informational)	different	INCOMPLETE_CDS				36058

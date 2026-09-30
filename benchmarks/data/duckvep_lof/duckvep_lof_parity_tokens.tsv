@@ -1,0 +1,118 @@
+run	field	token	pairs
+real	filter	3UTR_SPLICE	29
+real	filter	5UTR_SPLICE	410
+real	filter	END_TRUNC	5525
+real	filter	GC_TO_GT_DONOR	7
+real	flag	NAGNAG_SITE	372
+real	flag	NON_CAN_SPLICE	57
+real	flag	NO_EXON_NUMBER	203
+real	flag	SINGLE_EXON	9
+real, GERP relation (constant -1000), full info	filter	3UTR_SPLICE	29
+real, GERP relation (constant -1000), full info	filter	5UTR_SPLICE	410
+real, GERP relation (constant -1000), full info	filter	END_TRUNC	5525
+real, GERP relation (constant -1000), full info	filter	GC_TO_GT_DONOR	7
+real, GERP relation (constant -1000), full info	flag	NAGNAG_SITE	372
+real, GERP relation (constant -1000), full info	flag	NON_CAN_SPLICE	57
+real, GERP relation (constant -1000), full info	flag	NO_EXON_NUMBER	203
+real, GERP relation (constant -1000), full info	flag	SINGLE_EXON	9
+real, check_complete_cds (informational)	filter	3UTR_SPLICE	29
+real, check_complete_cds (informational)	filter	5UTR_SPLICE	410
+real, check_complete_cds (informational)	filter	END_TRUNC	5525
+real, check_complete_cds (informational)	filter	GC_TO_GT_DONOR	7
+real, check_complete_cds (informational)	filter	INCOMPLETE_CDS	1975
+real, check_complete_cds (informational)	flag	NAGNAG_SITE	372
+real, check_complete_cds (informational)	flag	NON_CAN_SPLICE	57
+real, check_complete_cds (informational)	flag	NO_EXON_NUMBER	203
+real, check_complete_cds (informational)	flag	SINGLE_EXON	9
+synthetic	filter	5UTR_SPLICE	57
+synthetic	filter	END_TRUNC	238
+synthetic	filter	GC_TO_GT_DONOR	83
+synthetic	flag	NAGNAG_SITE	396
+synthetic	flag	NON_CAN_SPLICE	503
+synthetic	flag	NO_EXON_NUMBER	100
+synthetic	flag	SINGLE_EXON	12
+synthetic min_intron_size=59 (introns of 60 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=59 (introns of 60 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=59 (introns of 60 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=59 (introns of 60 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=59 (introns of 60 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=59 (introns of 60 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=59 (introns of 60 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=60 (introns of 60 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=60 (introns of 60 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=60 (introns of 60 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=60 (introns of 60 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=60 (introns of 60 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=60 (introns of 60 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=60 (introns of 60 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=61 (introns of 60 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=61 (introns of 60 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=61 (introns of 60 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=61 (introns of 60 nt)	filter	SMALL_INTRON	2
+synthetic min_intron_size=61 (introns of 60 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=61 (introns of 60 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=61 (introns of 60 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=61 (introns of 60 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=73 (introns of 74 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=73 (introns of 74 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=73 (introns of 74 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=73 (introns of 74 nt)	filter	SMALL_INTRON	2
+synthetic min_intron_size=73 (introns of 74 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=73 (introns of 74 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=73 (introns of 74 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=73 (introns of 74 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=74 (introns of 74, 75 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=74 (introns of 74, 75 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=74 (introns of 74, 75 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=74 (introns of 74, 75 nt)	filter	SMALL_INTRON	2
+synthetic min_intron_size=74 (introns of 74, 75 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=74 (introns of 74, 75 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=74 (introns of 74, 75 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=74 (introns of 74, 75 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=75 (introns of 74, 75 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=75 (introns of 74, 75 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=75 (introns of 74, 75 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=75 (introns of 74, 75 nt)	filter	SMALL_INTRON	34
+synthetic min_intron_size=75 (introns of 74, 75 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=75 (introns of 74, 75 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=75 (introns of 74, 75 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=75 (introns of 74, 75 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=76 (introns of 75 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=76 (introns of 75 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=76 (introns of 75 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=76 (introns of 75 nt)	filter	SMALL_INTRON	36
+synthetic min_intron_size=76 (introns of 75 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=76 (introns of 75 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=76 (introns of 75 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=76 (introns of 75 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=77 (introns of 78 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=77 (introns of 78 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=77 (introns of 78 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=77 (introns of 78 nt)	filter	SMALL_INTRON	36
+synthetic min_intron_size=77 (introns of 78 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=77 (introns of 78 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=77 (introns of 78 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=77 (introns of 78 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=78 (introns of 78 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=78 (introns of 78 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=78 (introns of 78 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=78 (introns of 78 nt)	filter	SMALL_INTRON	36
+synthetic min_intron_size=78 (introns of 78 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=78 (introns of 78 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=78 (introns of 78 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=78 (introns of 78 nt)	flag	SINGLE_EXON	12
+synthetic min_intron_size=79 (introns of 78 nt)	filter	5UTR_SPLICE	57
+synthetic min_intron_size=79 (introns of 78 nt)	filter	END_TRUNC	238
+synthetic min_intron_size=79 (introns of 78 nt)	filter	GC_TO_GT_DONOR	83
+synthetic min_intron_size=79 (introns of 78 nt)	filter	SMALL_INTRON	64
+synthetic min_intron_size=79 (introns of 78 nt)	flag	NAGNAG_SITE	396
+synthetic min_intron_size=79 (introns of 78 nt)	flag	NON_CAN_SPLICE	503
+synthetic min_intron_size=79 (introns of 78 nt)	flag	NO_EXON_NUMBER	100
+synthetic min_intron_size=79 (introns of 78 nt)	flag	SINGLE_EXON	12
+synthetic, GERP relation (constant -1000), full info	filter	5UTR_SPLICE	57
+synthetic, GERP relation (constant -1000), full info	filter	END_TRUNC	238
+synthetic, GERP relation (constant -1000), full info	filter	GC_TO_GT_DONOR	83
+synthetic, GERP relation (constant -1000), full info	flag	NAGNAG_SITE	396
+synthetic, GERP relation (constant -1000), full info	flag	NON_CAN_SPLICE	503
+synthetic, GERP relation (constant -1000), full info	flag	NO_EXON_NUMBER	100
+synthetic, GERP relation (constant -1000), full info	flag	SINGLE_EXON	12

@@ -1,0 +1,16 @@
+run,gate,variants,loftee_pairs,duckvep_pairs,exact,missing,extra,different,info_exact,lof_hc,lof_lc
+real,yes,6845,59668,59668,59668,0,0,0,59668,53697,5971
+synthetic,yes,177,2499,2499,2499,0,0,0,2499,2122,377
+synthetic min_intron_size=59 (introns of 60 nt),yes,177,2499,2499,2499,0,0,0,2499,2122,377
+synthetic min_intron_size=60 (introns of 60 nt),yes,177,2499,2499,2499,0,0,0,2499,2122,377
+synthetic min_intron_size=61 (introns of 60 nt),yes,177,2499,2499,2499,0,0,0,2499,2120,379
+synthetic min_intron_size=73 (introns of 74 nt),yes,177,2499,2499,2499,0,0,0,2499,2120,379
+"synthetic min_intron_size=74 (introns of 74, 75 nt)",yes,177,2499,2499,2499,0,0,0,2499,2120,379
+"synthetic min_intron_size=75 (introns of 74, 75 nt)",yes,177,2499,2499,2499,0,0,0,2499,2088,411
+synthetic min_intron_size=76 (introns of 75 nt),yes,177,2499,2499,2499,0,0,0,2499,2086,413
+synthetic min_intron_size=77 (introns of 78 nt),yes,177,2499,2499,2499,0,0,0,2499,2086,413
+synthetic min_intron_size=78 (introns of 78 nt),yes,177,2499,2499,2499,0,0,0,2499,2086,413
+synthetic min_intron_size=79 (introns of 78 nt),yes,177,2499,2499,2499,0,0,0,2499,2058,441
+"real, GERP relation (constant -1000), full info",yes,6845,59668,59668,59668,0,0,0,59668,53697,5971
+"synthetic, GERP relation (constant -1000), full info",yes,177,2499,2499,2499,0,0,0,2499,2122,377
+"real, check_complete_cds (informational)",no,6845,59668,59668,23610,0,0,36058,59668,52110,7558
