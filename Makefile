@@ -130,6 +130,12 @@ readme: release
 check-rduckvep-bundle:
 	scripts/check-rduckvep-bundle.sh
 
+# docs/functions.md must list exactly the public functions the built extension
+# registers, and every SQL example in it must run against build/release.
+.PHONY: check-function-docs
+check-function-docs: venv
+	$(PYTHON_VENV_BIN) scripts/check-function-docs.py
+
 .PHONY: site site-check
 site:
 	Rscript scripts/build-site.R
