@@ -1,5 +1,9 @@
 # DuckVEP
 
+## DuckDB C API v2 host, slice 5: haplotype capture (issue #8)
+
+- `duckvep_haplotypes`, `duckvep_coding_transcripts` and `duckvep_coding_calls` run on the v2 preview host. The replay stream, its bounded workspace and the result writers moved to `src/core/duckvep_core_haplotypes.c` (DuckDB only through the host layer), the fused VCF/BCF reader to `src/core/duckvep_core_coding_calls.c` and discovery to `src/core/duckvep_core_discovery.c`; v1 keeps its private-connection input and its named parameters and its output is unchanged (all v1 gates pass). v2 has no private connection, so `duckvep_haplotype_load_sql` returns the caller-side statements (the normalization v1 runs internally, wrapped around the caller's query), the `duckvep_stage` COPY format takes a `JOB` and captures the rows into spillable column collections, and `duckvep_haplotype_scan('<job>')` replays them once. Output equals v1 on the vertical, same-codon, frame, start/stop and NMD suites, 47 policy, limit and error cases and the discovery and `coding_calls` fixtures (full-row hashes), and HG002 through `duckvep_coding_calls` gives 157,986 rows with checksum `1456007180270799092358516`. See `docs/v2-host.md`.
+
 ## `duckvep_lof_sql` on the v2 host (issue #8)
 
 - The text assembly and option rules of `duckvep_lof_sql` moved to `src/core/duckvep_core_lof.c` and both hosts call it; its text is byte-identical on v1 and v2 over a 34-case option matrix, and its SQL runs on v2 over the README and rich models with rows equal to v1's. A DECIMAL is not accepted as a number option on either host.

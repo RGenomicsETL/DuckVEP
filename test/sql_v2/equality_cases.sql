@@ -1532,3 +1532,870 @@ SELECT * FROM query(duckvep_lof_sql('lof_ann_rich', 'lof_tx_rich', 'lof_ref_rich
 
 -- case: lof executes rich model check cds hashes
 SELECT count(*) AS n, count(lof) AS calls, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h, t.lof FROM query(duckvep_lof_sql('lof_ann_rich', 'lof_tx_rich', 'lof_ref_rich', {'check_complete_cds': true, 'min_intron_size': 100})) t)
+
+-- Haplotype fixtures: the model, transcripts, exons and phased calls of the haplotype suites (test/sql/duckvep_haplotype_*.test),
+-- read from test/data/haplotype. "-- job:" blocks are haplotype inputs: v1 reads the query itself (duckvep_haplotypes), v2 stages it with
+-- the statements of duckvep_haplotype_load_sql and scans it (duckvep_haplotype_scan); both are reached through the table macro of the job name.
+
+-- fixture: haplotype vt tx
+CREATE TABLE vt_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region, transcript_start::UBIGINT transcript_start,transcript_end::UBIGINT transcript_end,strand::TINYINT strand, seq_region::UINTEGER gene_index,3::UBIGINT transcript_flags,transcript_start::UBIGINT cds_start, transcript_end::UBIGINT cds_end,cds_sequence::BLOB cds_sequence,1::UTINYINT codon_table, ''::BLOB pre_cds_sequence,''::BLOB post_cds_sequence,"case" AS case_name FROM read_csv('test/data/haplotype/vertical_transcripts.tsv',delim='\t',header=true)
+
+-- fixture: haplotype vt exons
+CREATE TABLE vt_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start::UBIGINT exon_start, exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,exon_cdna_end::UBIGINT exon_cdna_end, phase::TINYINT phase,end_phase::TINYINT end_phase FROM read_csv('test/data/haplotype/vertical_exons.tsv',delim='\t',header=true)
+
+-- fixture: haplotype vt vcf
+CREATE TABLE vt_vcf AS SELECT string_split(line,chr(9)) f FROM (SELECT unnest(string_split(content,chr(10))) line FROM read_text('test/data/haplotype/vertical.vcf')) WHERE line<>'' AND NOT starts_with(line,'#')
+
+-- fixture: haplotype vt calls
+CREATE TABLE vt_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq_region::INT seq_region, v.f[2]::BIGINT AS position,v.f[4] AS reference,v.f[5] AS alternate,1 AS alt_index,t.transcript_index::INT transcript_index, 0 sample_index,(CASE v.f[10] WHEN '1|0' THEN [1,0] WHEN '0|1' THEN [0,1] ELSE [1,1] END)::INTEGER[] alleles, [false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set FROM vt_vcf v JOIN vt_tx t ON t.case_name=v.f[1]
+
+-- fixture-v1: haplotype vt model
+SELECT loaded FROM duckvep_model_load('vt', 'SELECT i::UINTEGER seq_region FROM range(13) t(i)', 'SELECT * EXCLUDE(case_name) FROM vt_tx ORDER BY transcript_index', 'SELECT * FROM vt_exons ORDER BY transcript_index,exon_cdna_start')
+
+-- fixture-v2: haplotype vt stage regions
+COPY (
+SELECT i::UINTEGER seq_region FROM range(13) t(i)
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'vt', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype vt stage transcripts
+COPY (
+SELECT * EXCLUDE(case_name) FROM vt_tx ORDER BY transcript_index
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'vt', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype vt stage exons
+COPY (
+SELECT * FROM vt_exons ORDER BY transcript_index,exon_cdna_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'vt', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype vt publish
+SELECT duckvep_model_publish('vt')
+
+-- job: hap_vt vt
+SELECT * FROM vt_calls
+
+-- fixture: haplotype sc tx
+CREATE TABLE sc_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region, transcript_start::UBIGINT transcript_start,transcript_end::UBIGINT transcript_end,strand::TINYINT strand, seq_region::UINTEGER gene_index,3::UBIGINT transcript_flags,transcript_start::UBIGINT cds_start, transcript_end::UBIGINT cds_end,cds_sequence::BLOB cds_sequence,1::UTINYINT codon_table, ''::BLOB pre_cds_sequence,''::BLOB post_cds_sequence,"case" AS case_name FROM read_csv('test/data/haplotype/same_codon_transcripts.tsv',delim='\t',header=true)
+
+-- fixture: haplotype sc exons
+CREATE TABLE sc_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start::UBIGINT exon_start, exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,exon_cdna_end::UBIGINT exon_cdna_end, phase::TINYINT phase,end_phase::TINYINT end_phase FROM read_csv('test/data/haplotype/same_codon_exons.tsv',delim='\t',header=true)
+
+-- fixture: haplotype sc vcf
+CREATE TABLE sc_vcf AS SELECT string_split(line,chr(9)) f FROM (SELECT unnest(string_split(content,chr(10))) line FROM read_text('test/data/haplotype/same_codon.vcf')) WHERE line<>'' AND NOT starts_with(line,'#')
+
+-- fixture: haplotype sc calls
+CREATE TABLE sc_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq_region::INT seq_region, v.f[2]::BIGINT AS position,v.f[4] AS reference,v.f[5] AS alternate,1 AS alt_index,t.transcript_index::INT transcript_index, 0 sample_index,(CASE v.f[10] WHEN '1|0' THEN [1,0] WHEN '0|1' THEN [0,1] ELSE [1,1] END)::INTEGER[] alleles, [false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set FROM sc_vcf v JOIN sc_tx t ON t.case_name=v.f[1]
+
+-- fixture-v1: haplotype sc model
+SELECT loaded FROM duckvep_model_load('sc', 'SELECT i::UINTEGER seq_region FROM range(138) t(i)', 'SELECT * EXCLUDE(case_name) FROM sc_tx ORDER BY transcript_index', 'SELECT * FROM sc_exons ORDER BY transcript_index,exon_cdna_start')
+
+-- fixture-v2: haplotype sc stage regions
+COPY (
+SELECT i::UINTEGER seq_region FROM range(138) t(i)
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'sc', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype sc stage transcripts
+COPY (
+SELECT * EXCLUDE(case_name) FROM sc_tx ORDER BY transcript_index
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'sc', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype sc stage exons
+COPY (
+SELECT * FROM sc_exons ORDER BY transcript_index,exon_cdna_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'sc', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype sc publish
+SELECT duckvep_model_publish('sc')
+
+-- job: hap_sc sc
+SELECT * FROM sc_calls
+
+-- fixture: haplotype fr tx
+CREATE TABLE fr_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region, transcript_start::UBIGINT transcript_start,transcript_end::UBIGINT transcript_end,strand::TINYINT strand, seq_region::UINTEGER gene_index,3::UBIGINT transcript_flags,transcript_start::UBIGINT cds_start, transcript_end::UBIGINT cds_end,cds_sequence::BLOB cds_sequence,1::UTINYINT codon_table, ''::BLOB pre_cds_sequence,''::BLOB post_cds_sequence,"case" AS case_name FROM read_csv('test/data/haplotype/frame_transcripts.tsv',delim='\t',header=true)
+
+-- fixture: haplotype fr exons
+CREATE TABLE fr_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start::UBIGINT exon_start, exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,exon_cdna_end::UBIGINT exon_cdna_end, phase::TINYINT phase,end_phase::TINYINT end_phase FROM read_csv('test/data/haplotype/frame_exons.tsv',delim='\t',header=true)
+
+-- fixture: haplotype fr vcf
+CREATE TABLE fr_vcf AS SELECT string_split(line,chr(9)) f FROM (SELECT unnest(string_split(content,chr(10))) line FROM read_text('test/data/haplotype/frame.vcf')) WHERE line<>'' AND NOT starts_with(line,'#')
+
+-- fixture: haplotype fr calls
+CREATE TABLE fr_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq_region::INT seq_region, v.f[2]::BIGINT AS position,v.f[4] AS reference,v.f[5] AS alternate,1 AS alt_index,t.transcript_index::INT transcript_index, 0 sample_index,(CASE v.f[10] WHEN '1|0' THEN [1,0] WHEN '0|1' THEN [0,1] ELSE [1,1] END)::INTEGER[] alleles, [false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set FROM fr_vcf v JOIN fr_tx t ON t.case_name=v.f[1]
+
+-- fixture-v1: haplotype fr model
+SELECT loaded FROM duckvep_model_load('fr', 'SELECT i::UINTEGER seq_region FROM range(180) t(i)', 'SELECT * EXCLUDE(case_name) FROM fr_tx ORDER BY transcript_index', 'SELECT * FROM fr_exons ORDER BY transcript_index,exon_cdna_start')
+
+-- fixture-v2: haplotype fr stage regions
+COPY (
+SELECT i::UINTEGER seq_region FROM range(180) t(i)
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'fr', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype fr stage transcripts
+COPY (
+SELECT * EXCLUDE(case_name) FROM fr_tx ORDER BY transcript_index
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'fr', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype fr stage exons
+COPY (
+SELECT * FROM fr_exons ORDER BY transcript_index,exon_cdna_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'fr', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype fr publish
+SELECT duckvep_model_publish('fr')
+
+-- job: hap_fr fr
+SELECT * FROM fr_calls
+
+-- fixture: haplotype ss tx
+CREATE TABLE ss_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region, transcript_start::UBIGINT transcript_start,transcript_end::UBIGINT transcript_end,strand::TINYINT strand, seq_region::UINTEGER gene_index,3::UBIGINT transcript_flags,transcript_start::UBIGINT cds_start, transcript_end::UBIGINT cds_end,cds_sequence::BLOB cds_sequence,1::UTINYINT codon_table, ''::BLOB pre_cds_sequence,''::BLOB post_cds_sequence,"case" AS case_name FROM read_csv('test/data/haplotype/startstop_transcripts.tsv',delim='\t',header=true)
+
+-- fixture: haplotype ss exons
+CREATE TABLE ss_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start::UBIGINT exon_start, exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,exon_cdna_end::UBIGINT exon_cdna_end, phase::TINYINT phase,end_phase::TINYINT end_phase FROM read_csv('test/data/haplotype/startstop_exons.tsv',delim='\t',header=true)
+
+-- fixture: haplotype ss vcf
+CREATE TABLE ss_vcf AS SELECT string_split(line,chr(9)) f FROM (SELECT unnest(string_split(content,chr(10))) line FROM read_text('test/data/haplotype/startstop.vcf')) WHERE line<>'' AND NOT starts_with(line,'#')
+
+-- fixture: haplotype ss calls
+CREATE TABLE ss_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq_region::INT seq_region, v.f[2]::BIGINT AS position,v.f[4] AS reference,v.f[5] AS alternate,1 AS alt_index,t.transcript_index::INT transcript_index, 0 sample_index,(CASE v.f[10] WHEN '1|0' THEN [1,0] WHEN '0|1' THEN [0,1] ELSE [1,1] END)::INTEGER[] alleles, [false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set FROM ss_vcf v JOIN ss_tx t ON t.case_name=v.f[1]
+
+-- fixture-v1: haplotype ss model
+SELECT loaded FROM duckvep_model_load('ss', 'SELECT i::UINTEGER seq_region FROM range(348) t(i)', 'SELECT * EXCLUDE(case_name) FROM ss_tx ORDER BY transcript_index', 'SELECT * FROM ss_exons ORDER BY transcript_index,exon_cdna_start')
+
+-- fixture-v2: haplotype ss stage regions
+COPY (
+SELECT i::UINTEGER seq_region FROM range(348) t(i)
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'ss', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype ss stage transcripts
+COPY (
+SELECT * EXCLUDE(case_name) FROM ss_tx ORDER BY transcript_index
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'ss', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype ss stage exons
+COPY (
+SELECT * FROM ss_exons ORDER BY transcript_index,exon_cdna_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'ss', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype ss publish
+SELECT duckvep_model_publish('ss')
+
+-- job: hap_ss ss
+SELECT * FROM ss_calls
+
+-- fixture: haplotype nm tx
+CREATE TABLE nm_tx AS SELECT seq_region::UINTEGER transcript_index,seq_region::UINTEGER seq_region, transcript_start::UBIGINT transcript_start,transcript_end::UBIGINT transcript_end,strand::TINYINT strand, seq_region::UINTEGER gene_index,3::UBIGINT transcript_flags,cds_start::UBIGINT cds_start, cds_end::UBIGINT cds_end,cds_sequence::BLOB cds_sequence,1::UTINYINT codon_table, coalesce(nullif(pre_cds_sequence,'.'),'')::BLOB pre_cds_sequence,coalesce(nullif(post_cds_sequence,'.'),'')::BLOB post_cds_sequence,"case" AS case_name FROM read_csv('test/data/haplotype/nmd_transcripts.tsv',delim='\t',header=true)
+
+-- fixture: haplotype nm exons
+CREATE TABLE nm_exons AS SELECT seq_region::UINTEGER transcript_index,exon_start::UBIGINT exon_start, exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,exon_cdna_end::UBIGINT exon_cdna_end, phase::TINYINT phase,end_phase::TINYINT end_phase FROM read_csv('test/data/haplotype/nmd_exons.tsv',delim='\t',header=true)
+
+-- fixture: haplotype nm vcf
+CREATE TABLE nm_vcf AS SELECT string_split(line,chr(9)) f FROM (SELECT unnest(string_split(content,chr(10))) line FROM read_text('test/data/haplotype/nmd.vcf')) WHERE line<>'' AND NOT starts_with(line,'#')
+
+-- fixture: haplotype nm calls
+CREATE TABLE nm_calls AS SELECT (row_number() OVER ())::BIGINT event_index,t.seq_region::INT seq_region, v.f[2]::BIGINT AS position,v.f[4] AS reference,v.f[5] AS alternate,1 AS alt_index,t.transcript_index::INT transcript_index, 0 sample_index,(CASE v.f[10] WHEN '1|0' THEN [1,0] WHEN '0|1' THEN [0,1] ELSE [1,1] END)::INTEGER[] alleles, [false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set FROM nm_vcf v JOIN nm_tx t ON t.case_name=v.f[1]
+
+-- fixture-v1: haplotype nm model
+SELECT loaded FROM duckvep_model_load('nm', 'SELECT i::UINTEGER seq_region FROM range(238) t(i)', 'SELECT * EXCLUDE(case_name) FROM nm_tx ORDER BY transcript_index', 'SELECT * FROM nm_exons ORDER BY transcript_index,exon_cdna_start')
+
+-- fixture-v2: haplotype nm stage regions
+COPY (
+SELECT i::UINTEGER seq_region FROM range(238) t(i)
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'nm', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype nm stage transcripts
+COPY (
+SELECT * EXCLUDE(case_name) FROM nm_tx ORDER BY transcript_index
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'nm', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype nm stage exons
+COPY (
+SELECT * FROM nm_exons ORDER BY transcript_index,exon_cdna_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'nm', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: haplotype nm publish
+SELECT duckvep_model_publish('nm')
+
+-- job: hap_nm nm
+SELECT * FROM nm_calls
+
+
+-- Haplotype cases. Each table macro is scanned once per case.
+-- case: haplotypes vt full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x, count(DISTINCT transcript_index) AS transcripts FROM (SELECT * FROM hap_vt()) h
+
+-- case: haplotypes vt first rows
+SELECT * FROM hap_vt() LIMIT 3
+
+-- case: haplotypes vt status counts
+SELECT prediction_status, prediction_reason, haplotype_impact, count(*) AS n FROM hap_vt() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes vt nested carriers
+SELECT transcript_index, c.sample_index, c.haplotype_lane, c.prediction_status, c.haplotype_impact, c.haplotype_consequences, c.nmd_prediction, c.nmd_stop_position, c.nmd_junction_position FROM (SELECT transcript_index, unnest(carrier_predictions) AS c FROM hap_vt()) ORDER BY ALL
+
+-- case: haplotypes sc full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x, count(DISTINCT transcript_index) AS transcripts FROM (SELECT * FROM hap_sc()) h
+
+-- case: haplotypes sc first rows
+SELECT * FROM hap_sc() LIMIT 3
+
+-- case: haplotypes sc status counts
+SELECT prediction_status, prediction_reason, haplotype_impact, count(*) AS n FROM hap_sc() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes sc nested carriers
+SELECT transcript_index, c.sample_index, c.haplotype_lane, c.prediction_status, c.haplotype_impact, c.haplotype_consequences, c.nmd_prediction, c.nmd_stop_position, c.nmd_junction_position FROM (SELECT transcript_index, unnest(carrier_predictions) AS c FROM hap_sc()) ORDER BY ALL
+
+-- case: haplotypes fr full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x, count(DISTINCT transcript_index) AS transcripts FROM (SELECT * FROM hap_fr()) h
+
+-- case: haplotypes fr first rows
+SELECT * FROM hap_fr() LIMIT 3
+
+-- case: haplotypes fr status counts
+SELECT prediction_status, prediction_reason, haplotype_impact, count(*) AS n FROM hap_fr() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes fr nested carriers
+SELECT transcript_index, c.sample_index, c.haplotype_lane, c.prediction_status, c.haplotype_impact, c.haplotype_consequences, c.nmd_prediction, c.nmd_stop_position, c.nmd_junction_position FROM (SELECT transcript_index, unnest(carrier_predictions) AS c FROM hap_fr()) ORDER BY ALL
+
+-- case: haplotypes ss full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x, count(DISTINCT transcript_index) AS transcripts FROM (SELECT * FROM hap_ss()) h
+
+-- case: haplotypes ss first rows
+SELECT * FROM hap_ss() LIMIT 3
+
+-- case: haplotypes ss status counts
+SELECT prediction_status, prediction_reason, haplotype_impact, count(*) AS n FROM hap_ss() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes ss nested carriers
+SELECT transcript_index, c.sample_index, c.haplotype_lane, c.prediction_status, c.haplotype_impact, c.haplotype_consequences, c.nmd_prediction, c.nmd_stop_position, c.nmd_junction_position FROM (SELECT transcript_index, unnest(carrier_predictions) AS c FROM hap_ss()) ORDER BY ALL
+
+-- case: haplotypes nm full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x, count(DISTINCT transcript_index) AS transcripts FROM (SELECT * FROM hap_nm()) h
+
+-- case: haplotypes nm first rows
+SELECT * FROM hap_nm() LIMIT 3
+
+-- case: haplotypes nm status counts
+SELECT prediction_status, prediction_reason, haplotype_impact, count(*) AS n FROM hap_nm() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes nm nested carriers
+SELECT transcript_index, c.sample_index, c.haplotype_lane, c.prediction_status, c.haplotype_impact, c.haplotype_consequences, c.nmd_prediction, c.nmd_stop_position, c.nmd_junction_position FROM (SELECT transcript_index, unnest(carrier_predictions) AS c FROM hap_nm()) ORDER BY ALL
+
+-- case: haplotypes vt schema
+SELECT column_name, column_type FROM (DESCRIBE SELECT * FROM hap_vt())
+
+-- case: haplotypes vt projected list columns
+SELECT transcript_index, len(coding_blocks) AS blocks, len(contributors) AS contributors, len(cds_differences) AS cds_diffs, len(protein_differences) AS protein_diffs, len(normalized_edits) AS edits, nmd_contributors FROM hap_vt() ORDER BY transcript_index
+
+-- case: haplotypes vt filter after the scan
+SELECT count(*) AS n FROM hap_vt() WHERE prediction_status = 'predicted'
+
+-- case: haplotypes vt limit one
+SELECT transcript_index FROM hap_vt() LIMIT 1
+
+-- case: haplotypes nmd distinct reasons
+SELECT DISTINCT nmd_prediction, nmd_rule FROM hap_nm() ORDER BY ALL
+
+-- Discovery and coding_calls fixtures: the model of test/sql/duckvep_coding_calls.test (region names c0 to c2).
+
+-- fixture: discovery tx
+CREATE TABLE cc_tx AS SELECT * FROM (VALUES (0::UINTEGER, 0::UINTEGER, 100::UBIGINT, 132::UBIGINT, 1::TINYINT, 0::UINTEGER, 3::UBIGINT, 103::UBIGINT, 129::UBIGINT, 'ATGAAACCCGGGTTTTAA'::BLOB, 1::UTINYINT, 'AAA'::BLOB, 'CCC'::BLOB), (1::UINTEGER, 0::UINTEGER, 104::UBIGINT, 131::UBIGINT, 1::TINYINT, 1::UINTEGER, 3::UBIGINT, 104::UBIGINT, 131::UBIGINT, 'ATGAAACCCTAA'::BLOB, 1::UTINYINT, ''::BLOB, ''::BLOB), (2::UINTEGER, 0::UINTEGER, 105::UBIGINT, 115::UBIGINT, 1::TINYINT, 2::UINTEGER, 0::UBIGINT, NULL::UBIGINT, NULL::UBIGINT, NULL::BLOB, NULL::UTINYINT, NULL::BLOB, NULL::BLOB), (3::UINTEGER, 1::UINTEGER, 200::UBIGINT, 232::UBIGINT, -1::TINYINT, 3::UINTEGER, 3::UBIGINT, 203::UBIGINT, 229::UBIGINT, 'ATGAAACCCGGGTTTTAA'::BLOB, 1::UTINYINT, 'GGG'::BLOB, 'TTT'::BLOB), (4::UINTEGER, 2::UINTEGER, 300::UBIGINT, 349::UBIGINT, 1::TINYINT, 4::UINTEGER, 3::UBIGINT, 300::UBIGINT, 349::UBIGINT, 'ATGAAACCCGGGTTTAAACC'::BLOB, 1::UTINYINT, ''::BLOB, ''::BLOB), (5::UINTEGER, 2::UINTEGER, 400::UBIGINT, 449::UBIGINT, -1::TINYINT, 5::UINTEGER, 3::UBIGINT, 400::UBIGINT, 449::UBIGINT, 'ATGAAACCCGGGTTTAAACC'::BLOB, 1::UTINYINT, ''::BLOB, ''::BLOB) ) t(transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence)
+
+-- fixture: discovery exons
+CREATE TABLE cc_ex AS SELECT * FROM (VALUES (0::UINTEGER, 100::UBIGINT, 110::UBIGINT, 1::UBIGINT, 11::UBIGINT, -1::TINYINT, 2::TINYINT), (0::UINTEGER, 120::UBIGINT, 132::UBIGINT, 12::UBIGINT, 24::UBIGINT, 2::TINYINT, -1::TINYINT), (1::UINTEGER, 104::UBIGINT, 108::UBIGINT, 1::UBIGINT, 5::UBIGINT, 0::TINYINT, 2::TINYINT), (1::UINTEGER, 125::UBIGINT, 131::UBIGINT, 6::UBIGINT, 12::UBIGINT, 2::TINYINT, 0::TINYINT), (2::UINTEGER, 105::UBIGINT, 115::UBIGINT, 1::UBIGINT, 11::UBIGINT, -1::TINYINT, -1::TINYINT), (3::UINTEGER, 220::UBIGINT, 232::UBIGINT, 1::UBIGINT, 13::UBIGINT, -1::TINYINT, 1::TINYINT), (3::UINTEGER, 200::UBIGINT, 210::UBIGINT, 14::UBIGINT, 24::UBIGINT, 1::TINYINT, -1::TINYINT), (4::UINTEGER, 300::UBIGINT, 309::UBIGINT, 1::UBIGINT, 10::UBIGINT, 0::TINYINT, 1::TINYINT), (4::UINTEGER, 340::UBIGINT, 349::UBIGINT, 11::UBIGINT, 20::UBIGINT, 1::TINYINT, 2::TINYINT), (5::UINTEGER, 440::UBIGINT, 449::UBIGINT, 1::UBIGINT, 10::UBIGINT, 0::TINYINT, 1::TINYINT), (5::UINTEGER, 400::UBIGINT, 409::UBIGINT, 11::UBIGINT, 20::UBIGINT, 1::TINYINT, 2::TINYINT) ) e(transcript_index, exon_start, exon_end, exon_cdna_start, exon_cdna_end, phase, end_phase)
+
+-- fixture: discovery alleles
+CREATE TABLE dc_alleles AS SELECT * FROM (VALUES ('snv', 'A', 'C'), ('mnv', 'AG', 'CT'), ('del1', 'AC', 'A'), ('del2', 'ACG', 'A'), ('del3', 'ACGT', 'A'), ('del5', 'ACGTAC', 'A'), ('ins1', 'A', 'AT'), ('ins2', 'A', 'ATG'), ('indel', 'ACG', 'AT'), ('delins', 'ACG', 'TT')) v(shape, reference, alternate)
+
+-- fixture: discovery events
+CREATE TABLE dc_ev AS SELECT (row_number() OVER ())::UBIGINT event_index, r::UINTEGER seq_region, p::UBIGINT AS position, reference, alternate, NULL::UBIGINT end_position, NULL::VARCHAR structural_type, NULL::VARCHAR copy_change, NULL::UINTEGER mate_seq_region, NULL::UBIGINT mate_position FROM range(0, 3) a(r), range(90, 440) b(p), dc_alleles
+
+-- fixture-v1: discovery model
+SELECT loaded FROM duckvep_model_load('cc', 'SELECT i::UINTEGER seq_region, 1000::UBIGINT sequence_length, (''c'' || i) seq_region_name FROM range(3) t(i)', 'SELECT * FROM cc_tx ORDER BY seq_region, transcript_start, transcript_index', 'SELECT * FROM cc_ex ORDER BY transcript_index, exon_cdna_start', transcript_coverage_complete := TRUE)
+
+-- fixture-v2: discovery stage regions
+COPY (
+SELECT i::UINTEGER seq_region, 1000::UBIGINT sequence_length, ('c' || i) seq_region_name FROM range(3) t(i)
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'cc', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: discovery stage transcripts
+COPY (
+SELECT * FROM cc_tx ORDER BY seq_region, transcript_start, transcript_index
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'cc', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: discovery stage exons
+COPY (
+SELECT * FROM cc_ex ORDER BY transcript_index, exon_cdna_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'cc', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: discovery publish
+SELECT duckvep_model_publish('cc', {'transcript_coverage_complete': true})
+
+-- job: hap_cc_cases cc
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf')
+
+-- job: hap_cc_multi cc
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/multi.vcf')
+
+-- job: hap_cc_demo cc
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/demo.vcf')
+
+-- job: hap_cc_bcf cc
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.bcf')
+
+
+-- Policy, limit and error cases of test/sql/duckvep_haplotypes.test on its model "hap" (calls tables hap_calls, hap_raw_overlap, hap_raw).
+
+-- fixture: policy hap_tx
+CREATE TABLE hap_tx AS SELECT 0::UINTEGER transcript_index, 0::UINTEGER seq_region, 100::UBIGINT transcript_start, 111::UBIGINT transcript_end, 1::TINYINT strand, 0::UINTEGER gene_index, 3::UBIGINT transcript_flags, 100::UBIGINT cds_start, 111::UBIGINT cds_end, 'AAAAAAAAAAAA'::BLOB cds_sequence, 1::UTINYINT codon_table
+
+-- fixture: policy hap_exons
+CREATE TABLE hap_exons AS SELECT 0::UINTEGER transcript_index, 100::UBIGINT exon_start, 111::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 12::UBIGINT exon_cdna_end, 0::TINYINT phase, 0::TINYINT end_phase
+
+-- fixture: policy hap_calls
+CREATE TABLE hap_calls AS SELECT event_index, 0::UINTEGER seq_region, position, 'A' reference, alternate, 1::UINTEGER alt_index, 0::UINTEGER transcript_index, 0::UINTEGER sample_index, alleles, [true,true] phase_before, phase_set FROM (VALUES (1::UBIGINT,100::UBIGINT,'C',[1,1],NULL::BIGINT), (2,101,'G',[1,0],10), (3,102,'C',[0,1],20)) v(event_index,position,alternate,alleles,phase_set)
+
+-- fixture: policy hap_raw_overlap
+CREATE TABLE hap_raw_overlap AS SELECT event_index,0 seq_region,position,reference, alternates,0 transcript_index,0 sample_index,gt FROM (VALUES (1,100,'AAA',['CAA'],'0|1'),(2,101,'A',['G'],'1|1')) v(event_index,position,reference,alternates,gt)
+
+-- fixture: policy hap_raw
+CREATE TABLE hap_raw AS SELECT i event_index,0 seq_region,99+i AS position,'A' AS reference, CASE i WHEN 1 THEN ['C','T'] ELSE ['G'] END alternates,0 transcript_index,0 sample_index, CASE i WHEN 1 THEN '.|1' ELSE '1|1' END gt FROM range(1,3) r(i)
+
+-- fixture-v1: policy model
+SELECT loaded FROM duckvep_model_load('hap', 'SELECT i::UINTEGER seq_region FROM range(2) r(i)', 'SELECT * FROM hap_tx', 'SELECT * FROM hap_exons')
+
+-- fixture-v2: policy stage regions
+COPY (
+SELECT i::UINTEGER seq_region FROM range(2) r(i)
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'hap', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: policy stage transcripts
+COPY (
+SELECT * FROM hap_tx
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'hap', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: policy stage exons
+COPY (
+SELECT * FROM hap_exons
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'hap', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: policy publish
+SELECT duckvep_model_publish('hap')
+
+-- job: hap_p01 hap
+SELECT * FROM hap_calls ORDER BY event_index DESC
+
+-- job: hap_p02 hap
+SELECT * FROM hap_calls
+
+-- job: hap_p03 hap max_alignment_cells=39
+SELECT 1 event_index,0 seq_region,105 AS position,'A' AS reference,'AA' alternate,
+ 1 alt_index,0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+
+-- job: hap_p04 hap max_alignment_cells=38
+SELECT 1 event_index,0 seq_region,105 AS position,'A' AS reference,'AA' alternate,
+ 1 alt_index,0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+
+-- job: hap_p05 hap max_leaf_differences=1
+SELECT * FROM hap_calls
+
+-- job: hap_p06 hap max_alignment_cells=1 max_leaf_differences=1
+SELECT event_index,0 seq_region,position,reference,alternate,
+ 1 alt_index,0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+ FROM (VALUES (1,101,'A','AA'),(2,108,'AA','A'))
+ v(event_index,position,reference,alternate)
+
+-- job: hap_p07 hap phase_policy='vep116_compat'
+SELECT * FROM hap_calls
+
+-- job: hap_p08 hap
+SELECT * REPLACE(CASE WHEN event_index=3 THEN [false,false] ELSE phase_before END AS phase_before) FROM hap_calls
+
+-- job: hap_p09 hap
+SELECT * REPLACE([NULL,NULL]::INTEGER[] AS alleles) FROM hap_calls
+
+-- job: hap_p10 hap
+SELECT * FROM hap_calls UNION ALL SELECT * FROM hap_calls
+
+-- job: hap_p11 hap
+SELECT * REPLACE([0,0] AS alleles) FROM hap_calls UNION ALL SELECT * REPLACE([0,0] AS alleles) FROM hap_calls
+
+-- job: hap_p12 hap
+SELECT * FROM hap_calls UNION ALL SELECT * REPLACE(1 AS sample_index,position+1 AS position) FROM hap_calls
+
+-- job: hap_p13 hap phase_policy='vep116_compat'
+SELECT * FROM hap_calls UNION ALL SELECT * REPLACE(1 AS sample_index,2 AS alt_index) FROM hap_calls
+
+-- job: hap_p14 hap
+SELECT * REPLACE(NULL::UINTEGER AS sample_index) FROM hap_calls
+
+-- job: hap_p15 hap
+SELECT * REPLACE(NULL::UBIGINT AS event_index) FROM hap_calls
+
+-- job: hap_p16 hap
+SELECT * REPLACE(CASE WHEN event_index=3 THEN [1] ELSE alleles END AS alleles, NULL::BOOLEAN[] AS phase_before) FROM hap_calls
+
+-- job: hap_p17 hap
+SELECT * FROM hap_calls UNION ALL SELECT * REPLACE(1 AS sample_index,[1] AS alleles,[true] AS phase_before) FROM hap_calls
+
+-- job: hap_p18 hap workspace_limit=1
+SELECT * FROM hap_calls
+
+-- job: hap_p19 hap max_ploidy=1
+SELECT * FROM hap_calls
+
+-- job: hap_p20 hap
+SELECT * FROM hap_calls WHERE false
+
+-- job: hap_p21 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * FROM hap_raw_overlap ORDER BY event_index DESC
+
+-- job: hap_p22 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * FROM hap_raw_overlap
+
+-- job: hap_p23 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(CASE event_index WHEN 1 THEN '.|.' ELSE gt END AS gt)
+ FROM hap_raw_overlap
+
+-- job: hap_p24 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(100 AS position,'A' AS reference,'1|1' AS gt,
+ CASE event_index WHEN 1 THEN ['C'] ELSE ['G'] END AS alternates) FROM hap_raw_overlap
+
+-- job: hap_p25 hap input_mode='source_records' phase_policy='vep116_compat' max_leaf_edits=1
+SELECT * FROM hap_raw_overlap
+
+-- job: hap_p26 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT event_index,0 seq_region,position,reference,alternates,0 transcript_index,0 sample_index,gt
+ FROM (VALUES (1,100,'A',['C'],'1|1'),(2,100,'A',['G'],'1|1'),
+ (3,109,'A',['T'],'0|0')) r(event_index,position,reference,alternates,gt) ORDER BY event_index DESC
+
+-- job: hap_p27 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT event_index,0 seq_region,100 AS position,'A' AS reference,['C'] alternates,
+ 0 transcript_index,0 sample_index,gt FROM (VALUES (1,'1|0'),(2,'0|1')) r(event_index,gt)
+
+-- job: hap_p28 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT event_index,0 seq_region,100 AS position,'A' AS reference,alternates,
+ 0 transcript_index,0 sample_index,'1|1' gt
+ FROM (VALUES (1,['C','G']),(2,['C','T'])) r(event_index,alternates)
+
+-- job: hap_p29 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * FROM hap_raw ORDER BY event_index DESC
+
+-- job: hap_p30 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * FROM hap_raw
+
+-- job: hap_p31 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(CASE event_index WHEN 1 THEN '|0|1' ELSE gt END AS gt) FROM hap_raw
+
+-- job: hap_p32 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(CASE event_index WHEN 1 THEN '0|1' ELSE gt END AS gt) FROM hap_raw
+
+-- job: hap_p33 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(CASE event_index WHEN 1 THEN '.' ELSE gt END AS gt) FROM hap_raw
+
+-- job: hap_p34 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE('T' AS reference,'.' AS gt) FROM hap_raw WHERE event_index=1
+
+-- job: hap_p35 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * FROM hap_raw UNION ALL SELECT * FROM hap_raw
+
+-- job: hap_p36 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(['C',NULL] AS alternates) FROM hap_raw
+
+-- job: hap_p37 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(NULL AS alternates) FROM hap_raw
+
+-- job: hap_p38 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE('3|1' AS gt) FROM hap_raw
+
+-- job: hap_p39 hap max_ploidy=1 input_mode='source_records' phase_policy='vep116_compat'
+SELECT * FROM hap_raw
+
+-- job: hap_p40 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * EXCLUDE(i) REPLACE(s.i AS sample_index) FROM hap_raw CROSS JOIN range(4097) s(i)
+
+-- job: hap_p41 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(NULL AS event_index) FROM hap_raw
+
+-- job: hap_p42 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(NULL AS sample_index) FROM hap_raw
+
+-- job: hap_p43 hap input_mode='source_records' phase_policy='vep116_compat'
+SELECT * REPLACE(NULL AS transcript_index) FROM hap_raw
+
+-- job: hap_p44 hap max_active_events=1
+SELECT * FROM hap_calls
+
+-- job: hap_p45 hap max_sequence_bases=11
+SELECT * FROM hap_calls
+
+-- job: hap_p46 hap
+SELECT event_index,0 seq_region,100 AS position,'A' AS reference,alternate,
+  1 alt_index,0 transcript_index,sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+  FROM (VALUES (1,0,'TA'),(2,1,'AT')) v(event_index,sample_index,alternate)
+
+-- job: hap_p47 hap
+SELECT event_index,0 seq_region,100 AS position,'A' AS reference,alternate,
+  1 alt_index,0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+  FROM (VALUES (1,'C'),(2,'G')) v(event_index,alternate)
+
+-- case: haplotypes policy 01
+SELECT * FROM hap_p01()
+
+-- case: haplotypes policy 02
+SELECT * FROM hap_p02()
+
+-- case: haplotypes policy 03
+SELECT * FROM hap_p03()
+
+-- case: haplotypes policy 04 error
+SELECT * FROM hap_p04()
+
+-- case: haplotypes policy 05 error
+SELECT * FROM hap_p05()
+
+-- case: haplotypes policy 06
+SELECT * FROM hap_p06()
+
+-- case: haplotypes policy 07
+SELECT * FROM hap_p07()
+
+-- case: haplotypes policy 08
+SELECT * FROM hap_p08()
+
+-- case: haplotypes policy 09
+SELECT * FROM hap_p09()
+
+-- case: haplotypes policy 10 error
+SELECT * FROM hap_p10()
+
+-- case: haplotypes policy 11 error
+SELECT * FROM hap_p11()
+
+-- case: haplotypes policy 12 error
+SELECT * FROM hap_p12()
+
+-- case: haplotypes policy 13 error
+SELECT * FROM hap_p13()
+
+-- case: haplotypes policy 14 error
+SELECT * FROM hap_p14()
+
+-- case: haplotypes policy 15 error
+SELECT * FROM hap_p15()
+
+-- case: haplotypes policy 16 error
+SELECT * FROM hap_p16()
+
+-- case: haplotypes policy 17
+SELECT * FROM hap_p17()
+
+-- case: haplotypes policy 18 error
+SELECT * FROM hap_p18()
+
+-- case: haplotypes policy 19 error
+SELECT * FROM hap_p19()
+
+-- case: haplotypes policy 20
+SELECT * FROM hap_p20()
+
+-- case: haplotypes policy 21
+SELECT * FROM hap_p21()
+
+-- case: haplotypes policy 22
+SELECT * FROM hap_p22()
+
+-- case: haplotypes policy 23
+SELECT * FROM hap_p23()
+
+-- case: haplotypes policy 24
+SELECT * FROM hap_p24()
+
+-- case: haplotypes policy 25 error
+SELECT * FROM hap_p25()
+
+-- case: haplotypes policy 26
+SELECT * FROM hap_p26()
+
+-- case: haplotypes policy 27
+SELECT * FROM hap_p27()
+
+-- case: haplotypes policy 28
+SELECT * FROM hap_p28()
+
+-- case: haplotypes policy 29
+SELECT * FROM hap_p29()
+
+-- case: haplotypes policy 30
+SELECT * FROM hap_p30()
+
+-- case: haplotypes policy 31
+SELECT * FROM hap_p31()
+
+-- case: haplotypes policy 32
+SELECT * FROM hap_p32()
+
+-- case: haplotypes policy 33
+SELECT * FROM hap_p33()
+
+-- case: haplotypes policy 34
+SELECT * FROM hap_p34()
+
+-- case: haplotypes policy 35 error
+SELECT * FROM hap_p35()
+
+-- case: haplotypes policy 36 error
+SELECT * FROM hap_p36()
+
+-- case: haplotypes policy 37 error
+SELECT * FROM hap_p37()
+
+-- case: haplotypes policy 38 error
+SELECT * FROM hap_p38()
+
+-- case: haplotypes policy 39 error
+SELECT * FROM hap_p39()
+
+-- case: haplotypes policy 40
+SELECT * FROM hap_p40()
+
+-- case: haplotypes policy 41 error
+SELECT * FROM hap_p41()
+
+-- case: haplotypes policy 42 error
+SELECT * FROM hap_p42()
+
+-- case: haplotypes policy 43 error
+SELECT * FROM hap_p43()
+
+-- case: haplotypes policy 44 error
+SELECT * FROM hap_p44()
+
+-- case: haplotypes policy 45 error
+SELECT * FROM hap_p45()
+
+-- case: haplotypes policy 46
+SELECT * FROM hap_p46()
+
+-- case: haplotypes policy 47
+SELECT * FROM hap_p47()
+
+-- job: hap_vt_compat vt phase_policy='vep116_compat'
+SELECT * FROM vt_calls
+
+-- job: hap_vt_hgvs vt hgvs=true
+SELECT * FROM vt_calls
+
+-- job: hap_vt_limit vt max_active_events=1
+SELECT * FROM vt_calls
+
+-- job: hap_vt_dup vt
+SELECT * FROM vt_calls UNION ALL SELECT * FROM vt_calls
+
+-- job: hap_vt_null vt
+SELECT * REPLACE(NULL::UINTEGER AS sample_index) FROM vt_calls
+
+-- job: hap_vt_ploidy vt max_ploidy=1
+SELECT * FROM vt_calls
+
+-- job: hap_vt_sets vt
+SELECT * REPLACE(CASE WHEN event_index % 2 = 0 THEN 7 ELSE 9 END::BIGINT AS phase_set) FROM vt_calls
+
+-- job: hap_vt_unphased vt
+SELECT * REPLACE([false, false] AS phase_before) FROM vt_calls
+
+-- job: hap_vt_missing vt
+SELECT * REPLACE(CASE WHEN event_index % 3 = 0 THEN [NULL, 1]::INTEGER[] ELSE alleles END AS alleles) FROM vt_calls
+
+-- job: hap_vt_triploid vt
+SELECT * REPLACE([1, 0, 1] AS alleles, [false, true, true] AS phase_before) FROM vt_calls
+
+-- job: hap_vt_shuffled vt
+SELECT * FROM vt_calls ORDER BY hash(event_index)
+
+-- job: hap_nm_hgvs nm hgvs=true
+SELECT * FROM nm_calls
+
+-- job: hap_nm_compat nm phase_policy='vep116_compat'
+SELECT * FROM nm_calls
+
+-- job: hap_nm_events nm max_leaf_events=1
+SELECT * FROM nm_calls
+
+-- job: hap_nm_empty nm
+SELECT * FROM nm_calls WHERE false
+
+-- case: haplotypes vt compat full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_vt_compat()) h
+
+-- case: haplotypes vt compat status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_vt_compat() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes vt hgvs full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_vt_hgvs()) h
+
+-- case: haplotypes vt hgvs status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_vt_hgvs() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes vt shuffled full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_vt_shuffled()) h
+
+-- case: haplotypes vt shuffled status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_vt_shuffled() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes vt sets full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_vt_sets()) h
+
+-- case: haplotypes vt sets status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_vt_sets() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes vt unphased full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_vt_unphased()) h
+
+-- case: haplotypes vt unphased status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_vt_unphased() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes vt missing full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_vt_missing()) h
+
+-- case: haplotypes vt missing status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_vt_missing() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes vt triploid full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_vt_triploid()) h
+
+-- case: haplotypes vt triploid status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_vt_triploid() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes nm hgvs full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_nm_hgvs()) h
+
+-- case: haplotypes nm hgvs status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_nm_hgvs() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes nm compat full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_nm_compat()) h
+
+-- case: haplotypes nm compat status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_nm_compat() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes nm empty full-row hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_nm_empty()) h
+
+-- case: haplotypes nm empty status counts
+SELECT prediction_status, prediction_reason, hgvsp_status, count(*) AS n FROM hap_nm_empty() GROUP BY ALL ORDER BY ALL
+
+-- case: haplotypes vt hgvs rows
+SELECT transcript_index, hgvsp, hgvsp_status FROM hap_vt_hgvs() ORDER BY transcript_index
+
+-- case: haplotypes vt limit error
+SELECT count(*) FROM hap_vt_limit()
+
+-- case: haplotypes vt duplicate calls error
+SELECT count(*) FROM hap_vt_dup()
+
+-- case: haplotypes vt null sample error
+SELECT count(*) FROM hap_vt_null()
+
+-- case: haplotypes vt ploidy error
+SELECT count(*) FROM hap_vt_ploidy()
+
+-- case: haplotypes nm leaf events error
+SELECT count(*) FROM hap_nm_events()
+
+-- case: discovery all events
+SELECT count(*) AS events, sum(len(t)) AS pairs, sum(hash(t)::HUGEINT) AS h FROM (SELECT duckvep_coding_transcripts('cc', seq_region, position, reference, alternate) AS t FROM dc_ev)
+
+-- case: discovery unnested pairs
+SELECT event_index, unnest(duckvep_coding_transcripts('cc', seq_region, position, reference, alternate)) AS transcript_index FROM dc_ev WHERE position BETWEEN 100 AND 112
+
+-- case: discovery named cases
+SELECT duckvep_coding_transcripts('cc', 0, 129, 'AGG', 'A') AS a, duckvep_coding_transcripts('cc', 0, 102, 'TAA', 'T') AS b, duckvep_coding_transcripts('cc', 0, 110, 'AGG', 'A') AS c, duckvep_coding_transcripts('cc', 0, 119, 'AGG', 'A') AS d, duckvep_coding_transcripts('cc', 2, 449, 'AGG', 'A') AS e, duckvep_coding_transcripts('cc', 1, 229, 'T', 'TA') AS f
+
+-- case: discovery non literal alleles
+SELECT duckvep_coding_transcripts('cc', 0, 103, 'A', 'C') AS snv, duckvep_coding_transcripts('cc', 0, 103, 'A', 'A') AS same, duckvep_coding_transcripts('cc', 0, 104, 'A', '<DEL>') AS symbolic, duckvep_coding_transcripts('cc', 0, 104, 'A', '*') AS star, duckvep_coding_transcripts('cc', 7, 104, 'A', 'C') AS unknown_region
+
+-- case: discovery null arguments
+SELECT duckvep_coding_transcripts('cc', NULL, 103, 'A', 'C') AS a, duckvep_coding_transcripts(NULL, 0, 103, 'A', 'C') AS b, duckvep_coding_transcripts('cc', 0, NULL, 'A', 'C') AS c, duckvep_coding_transcripts('cc', 0, 103, NULL, 'C') AS d, duckvep_coding_transcripts('cc', 0, 103, 'A', NULL) AS e
+
+-- case: discovery constant and varying model columns
+SELECT sum(len(duckvep_coding_transcripts(m, 0, 100 + i, 'A', 'C'))) AS n FROM (SELECT 'cc' AS m, i FROM range(40) t(i))
+
+-- case: discovery unknown model error
+SELECT duckvep_coding_transcripts('nope', 0, 103, 'A', 'C')
+
+-- case: discovery bad position error
+SELECT duckvep_coding_transcripts('cc', 0, 0, 'A', 'C')
+
+-- case: discovery long allele error
+SELECT duckvep_coding_transcripts('cc', 0, 103, repeat('A', 65536), 'C')
+
+-- case: coding_calls cases.vcf rows
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf')
+
+-- case: coding_calls multi.vcf rows
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/multi.vcf')
+
+-- case: coding_calls cases.bcf rows
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.bcf')
+
+-- case: coding_calls cases.vcf.gz rows
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf.gz')
+
+-- case: coding_calls demo.vcf rows
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/demo.vcf')
+
+-- case: coding_calls many alts error
+SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/many_alts.vcf')
+
+-- case: coding_calls schema
+SELECT column_name, column_type FROM (DESCRIBE SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf'))
+
+-- case: coding_calls hash
+SELECT count(*) AS n, sum(hash(c)::HUGEINT) AS total, bit_xor(hash(c)) AS x FROM (SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf')) c
+
+-- case: coding_calls filter and limit
+SELECT event_index, transcript_index FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf') WHERE sample_index = 0 LIMIT 5
+
+-- case: coding_calls self join
+SELECT count(*) AS n FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf') a JOIN duckvep_coding_calls('cc', 'test/data/coding_calls/multi.vcf') b USING (event_index)
+
+-- case: coding_calls plain versus gzip versus bcf
+SELECT (SELECT sum(hash(c)::HUGEINT) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf') c) = (SELECT sum(hash(c)::HUGEINT) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf.gz') c) AS gz_equal, (SELECT sum(hash(c)::HUGEINT) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.vcf') c) = (SELECT sum(hash(c)::HUGEINT) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.bcf') c) AS bcf_equal
+
+-- case: coding_calls bad position error
+SELECT count(*) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/bad_pos.vcf')
+
+-- case: coding_calls no GT header error
+SELECT count(*) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/no_gt_header.vcf')
+
+-- case: coding_calls no GT record error
+SELECT count(*) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/no_gt_record.vcf')
+
+-- case: coding_calls no samples error
+SELECT count(*) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/no_samples.vcf')
+
+-- case: coding_calls not a vcf error
+SELECT count(*) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/not_a_vcf.txt')
+
+-- case: coding_calls missing file error
+SELECT count(*) FROM duckvep_coding_calls('cc', 'test/data/coding_calls/missing.vcf')
+
+-- case: coding_calls unknown model error
+SELECT count(*) FROM duckvep_coding_calls('nope', 'test/data/coding_calls/cases.vcf')
+
+-- case: coding_calls empty path error
+SELECT count(*) FROM duckvep_coding_calls('cc', '')
+
+-- case: haplotypes from coding_calls cases error
+SELECT * FROM hap_cc_cases()
+
+-- case: haplotypes from coding_calls multi rows
+SELECT * FROM hap_cc_multi()
+
+-- case: haplotypes from coding_calls bcf error
+SELECT * FROM hap_cc_bcf()
+
+-- case: haplotypes from coding_calls demo hash
+SELECT count(*) AS n, sum(hash(h)::HUGEINT) AS total, bit_xor(hash(h)) AS x FROM (SELECT * FROM hap_cc_demo()) h
+
+-- case: haplotypes from coding_calls demo rows
+SELECT * FROM hap_cc_demo()

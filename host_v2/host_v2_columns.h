@@ -172,7 +172,7 @@ static inline duckdb_v2_list_entry list_at(const column *c, idx_t index) {
 static inline void report(duckdb_v2_error_info_handle target, const char *message) {
     char capacity[192], text[768];
     if (duckvep_budget_take_failure(capacity, sizeof capacity)) {
-        (void)snprintf(text, sizeof text, "%s (%s)", capacity, message);
+        (void)snprintf(text, sizeof text, "%s (%.500s)", capacity, message);
         message = text;
     }
     set_error(target, DUCKDB_V2_ERROR_INPUT_INVALID, message);
@@ -182,7 +182,7 @@ static inline void report(duckdb_v2_error_info_handle target, const char *messag
  * Option STRUCT arguments
  * ------------------------------------------------------------------------- */
 
-#define MAX_OPTIONS 6
+#define MAX_OPTIONS 24
 
 typedef struct {
     column record;

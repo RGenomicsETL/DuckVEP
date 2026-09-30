@@ -20,8 +20,8 @@ typedef struct v2_vec {
     struct v2_call *call;
 } v2_vec;
 
-#define V2_CALL_INPUTS 12
-#define V2_CALL_POOL 96
+#define V2_CALL_INPUTS 32
+#define V2_CALL_POOL 192
 
 typedef struct v2_call {
     duckdb_v2_scalar_function_exec_info_handle info;
@@ -108,6 +108,8 @@ static inline v2_vec *v2_child_of(v2_vec *parent, size_t index, size_t size, boo
 #define duckvep_h_chunk_vector(c, i) (&(c)->inputs[i])
 #define duckvep_h_chunk_rows(c) ((c)->rows)
 #define duckvep_h_chunk_columns(c) ((c)->argc)
+#define duckvep_h_set_valid(v, row) mark_valid((v)->validity, (row))
+#define duckvep_h_set_null(v, row) mark_null((v)->validity, (row))
 #define duckvep_h_set_error(info, message) set_error(*(info)->error, DUCKDB_V2_ERROR_INPUT_INVALID, (message))
 #define duckvep_h_extra_info(info) host_v2_registry_of((info)->user_data)
 #define duckvep_h_vector_size() ((size_t)2048)
@@ -118,6 +120,14 @@ static inline v2_vec *v2_child_of(v2_vec *parent, size_t index, size_t size, boo
 static inline v2_vec *duckvep_h_list_child(v2_vec *list) {
     size_t capacity = list->child_capacity > list->child_size ? list->child_capacity : list->child_size;
     v2_vec *child = v2_child_of(list, 0, capacity, false);
+    child->final_size = list->child_size;
+    return child;
+}
+
+/* The element vector of a list of primitives or text: a leaf, so it has data. */
+static inline v2_vec *duckvep_h_list_values(v2_vec *list) {
+    size_t capacity = list->child_capacity > list->child_size ? list->child_capacity : list->child_size;
+    v2_vec *child = v2_child_of(list, 0, capacity, true);
     child->final_size = list->child_size;
     return child;
 }
@@ -151,6 +161,18 @@ static inline int duckvep_h_list_reserve(v2_vec *list, size_t count) {
 
 static inline int duckvep_h_list_set_size(v2_vec *list, size_t count) {
     list->child_size = count;
+    return 1;
+}
+
+/* Appends `count` elements to a result list and returns where they start. A v2 list's child is opened once,
+ * for its final size, after every extension: a chunk that extends one list more than once (several rows
+ * sharing a list) must be written one row at a time. */
+static inline int duckvep_h_list_extend(v2_vec *list, size_t count, duckdb_v2_list_entry *entry) {
+    if (count > SIZE_MAX - list->child_size) return 0;
+    entry->offset = list->child_size;
+    entry->length = count;
+    list->child_size += count;
+    if (list->child_capacity < list->child_size) list->child_capacity = list->child_size;
     return 1;
 }
 

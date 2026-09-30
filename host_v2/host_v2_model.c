@@ -10,40 +10,20 @@
  * that fails or is cancelled destroys its rows; publish consumes the staging,
  * whether it succeeds or not. */
 #include "host_v2_columns.h"
-#include "host_v2_model.h"
+#include "host_v2_stage.h"
 
 #include "core/duckvep_core_model.h"
 #include "core/duckvep_core_model_script.h"
 
 #include <pthread.h>
 
-#define MAX_STAGE_COLUMNS 16
 
 /* ---------------------------------------------------------------------------
  * State shared by the model functions of one database
  * ------------------------------------------------------------------------- */
 
-typedef struct stage {
-    char *model;
-    char *relation;
-    duckdb_v2_column_data_collection_handle collection; /* NULL: no rows */
-    size_t columns;
-    duckvep_ctype_t ctypes[MAX_STAGE_COLUMNS];
-    char *names[MAX_STAGE_COLUMNS];
-    duckdb_v2_logical_type_handle types[MAX_STAGE_COLUMNS];
-    uint64_t rows;
-    struct stage *next;
-} stage;
-
-struct model_state {
-    pthread_mutex_t lock;
-    stage *stages;
-    duckvep_registry_t *registry;
-    size_t references;
-};
-
-static void stage_destroy(stage *s) {
-    if (!s) {
+void host_v2_stage_destroy(stage *s) {
+    if (!s || __atomic_sub_fetch(&s->refs, 1, __ATOMIC_ACQ_REL) != 0) {
         return;
     }
     if (s->collection) {
@@ -55,6 +35,7 @@ static void stage_destroy(stage *s) {
     }
     free(s->model);
     free(s->relation);
+    free(s->hap_model);
     free(s);
 }
 
@@ -78,7 +59,7 @@ void host_v2_state_release(void *pointer) {
     }
     while (state->stages) {
         stage *next = state->stages->next;
-        stage_destroy(state->stages);
+        host_v2_stage_destroy(state->stages);
         state->stages = next;
     }
     duckvep_registry_release(state->registry);
@@ -87,7 +68,7 @@ void host_v2_state_release(void *pointer) {
 }
 
 /* Removes and returns the stage of (model, relation), or NULL. */
-static stage *state_take_stage(model_state *state, const char *model, const char *relation) {
+stage *host_v2_stage_take(model_state *state, const char *model, const char *relation) {
     stage **link;
     pthread_mutex_lock(&state->lock);
     for (link = &state->stages; *link; link = &(*link)->next) {
@@ -103,11 +84,43 @@ static stage *state_take_stage(model_state *state, const char *model, const char
     return NULL;
 }
 
+static char *copy_text(const char *text, size_t length);
+
+stage *host_v2_stage_acquire(model_state *state, const char *key, const char *relation) {
+    stage *found = NULL;
+    pthread_mutex_lock(&state->lock);
+    for (stage *s = state->stages; s; s = s->next) {
+        if (strcmp(s->model, key) == 0 && strcmp(s->relation, relation) == 0) {
+            __atomic_add_fetch(&s->refs, 1, __ATOMIC_ACQ_REL);
+            found = s;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&state->lock);
+    return found;
+}
+
+bool host_v2_stage_peek_job(model_state *state, const char *job, const char *relation, char **model,
+                            duckvep_hap_config_t *config) {
+    bool found = false;
+    pthread_mutex_lock(&state->lock);
+    for (stage *s = state->stages; s; s = s->next) {
+        if (strcmp(s->model, job) == 0 && strcmp(s->relation, relation) == 0 && s->hap_model) {
+            *model = copy_text(s->hap_model, strlen(s->hap_model));
+            *config = s->hap;
+            found = *model != NULL;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&state->lock);
+    return found;
+}
+
 static void state_discard_model(model_state *state, const char *model) {
     stage *s;
     for (size_t i = 0; i < 6; ++i) {
-        while ((s = state_take_stage(state, model, duckvep_model_relations[i])) != NULL) {
-            stage_destroy(s);
+        while ((s = host_v2_stage_take(state, model, duckvep_model_relations[i])) != NULL) {
+            host_v2_stage_destroy(s);
         }
     }
 }
@@ -163,7 +176,7 @@ typedef struct {
 static void stage_bind_destroy(void *pointer) {
     stage_bind *bind = pointer;
     if (bind) {
-        stage_destroy(bind->layout);
+        host_v2_stage_destroy(bind->layout);
         free(bind);
     }
 }
@@ -208,27 +221,37 @@ static bool identifier_is(const duckdb_v2_identifier_t *name, const char *text) 
 
 static void stage_bind_exec(duckdb_v2_copy_to_bind_info_handle info, duckdb_v2_context_handle context,
                             duckdb_v2_error_info_handle *error) {
-    (void)context;
     duckdb_v2_error_info_handle detail = NULL;
     model_state *state = NULL;
     stage_bind *bind = NULL;
     duckdb_v2_value_handle value = NULL;
     idx_t options = 0, columns = 0;
     char *model = NULL, *relation = NULL;
-    bool owned = false;
+    hap_bind *hap = NULL;
+    bool owned = false, job = false;
     DUCKDB_CALL(duckdb_v2_copy_to_bind_get_user_data(info, (void **)&state, &detail));
     DUCKDB_CALL(duckdb_v2_copy_to_bind_get_option_count(info, &options, &detail));
+    hap = host_v2_hap_bind_create();
+    if (!hap) {
+        set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_stage: out of memory");
+        goto cleanup;
+    }
     for (idx_t i = 0; i < options; ++i) {
         duckdb_v2_identifier_t name;
         duckdb_v2_str text;
-        bool is_model, is_relation;
+        bool is_model, is_relation, consumed = false;
         DUCKDB_CALL(duckdb_v2_copy_to_bind_get_option_name(info, i, &name, &detail));
         is_model = identifier_is(&name, "model");
         is_relation = identifier_is(&name, "relation");
+        DUCKDB_CALL(duckdb_v2_copy_to_bind_get_option_value(info, i, &value, &detail));
         if (!is_model && !is_relation) {
+            /* The options of a haplotype job (JOB, STAGE, PHASE_POLICY, ...); anything else is DuckDB's own. */
+            if (!host_v2_hap_bind_option(hap, &name, value, &consumed, error)) {
+                goto cleanup;
+            }
+            DUCKDB_CALL(duckdb_v2_value_destroy(&value));
             continue;
         }
-        DUCKDB_CALL(duckdb_v2_copy_to_bind_get_option_value(info, i, &value, &detail));
         DUCKDB_CALL(duckdb_v2_value_get_varchar(value, &text, &detail));
         if (is_model) {
             free(model);
@@ -239,38 +262,46 @@ static void stage_bind_exec(duckdb_v2_copy_to_bind_info_handle info, duckdb_v2_c
         }
         DUCKDB_CALL(duckdb_v2_value_destroy(&value));
     }
-    if (!model || !*model || !relation) {
-        INPUT_ERROR("duckvep_stage: MODEL and RELATION options are required");
-    }
-    {
-        bool known = false;
-        for (size_t i = 0; i < 6; ++i) {
-            known = known || strcmp(relation, duckvep_model_relations[i]) == 0;
+    job = host_v2_hap_bind_is_job(hap);
+    if (!job) {
+        if (!model || !*model || !relation) {
+            INPUT_ERROR("duckvep_stage: MODEL and RELATION options are required");
         }
-        if (!known) {
-            INPUT_ERROR("duckvep_stage: RELATION must be regions, transcripts, exons, mature_mirna, "
-                        "peptide_edits or interval_features");
+        {
+            bool known = false;
+            for (size_t i = 0; i < 6; ++i) {
+                known = known || strcmp(relation, duckvep_model_relations[i]) == 0;
+            }
+            if (!known) {
+                INPUT_ERROR("duckvep_stage: RELATION must be regions, transcripts, exons, mature_mirna, "
+                            "peptide_edits or interval_features");
+            }
         }
-    }
-    if (model_exists(state, model)) {
-        INPUT_ERROR("duckvep_stage: model name already exists");
+        if (model_exists(state, model)) {
+            INPUT_ERROR("duckvep_stage: model name already exists");
+        }
     }
     DUCKDB_CALL(duckdb_v2_copy_to_bind_get_column_count(info, &columns, &detail));
     if (columns == 0 || columns > MAX_STAGE_COLUMNS) {
-        INPUT_ERROR("duckvep_stage: the query must return between 1 and 16 columns");
+        INPUT_ERROR("duckvep_stage: the query must return between 1 and 20 columns");
     }
     bind = calloc(1, sizeof(*bind));
     if (bind) {
         bind->layout = calloc(1, sizeof(*bind->layout));
+        if (bind->layout) {
+            bind->layout->refs = 1;
+        }
     }
     if (!bind || !bind->layout) {
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_stage: out of memory");
         goto cleanup;
     }
     bind->state = state;
-    bind->layout->model = model;
-    bind->layout->relation = relation;
-    model = relation = NULL;
+    if (!job) {
+        bind->layout->model = model;
+        bind->layout->relation = relation;
+        model = relation = NULL;
+    }
     for (idx_t i = 0; i < columns; ++i) {
         duckdb_v2_identifier_t name;
         duckdb_v2_logical_type_handle type = NULL;
@@ -287,6 +318,9 @@ static void stage_bind_exec(duckdb_v2_copy_to_bind_info_handle info, duckdb_v2_c
             goto cleanup;
         }
     }
+    if (job && !host_v2_hap_bind_finish(hap, state, context, bind->layout, model, error)) {
+        goto cleanup;
+    }
     {
         duckdb_v2_opaque data = {bind, stage_bind_destroy, NULL};
         DUCKDB_CALL(duckdb_v2_copy_to_bind_set_bind_data(info, &data, &detail));
@@ -296,6 +330,7 @@ cleanup:
     if (!owned) {
         stage_bind_destroy(bind);
     }
+    host_v2_hap_bind_destroy(hap);
     free(model);
     free(relation);
     (void)duckdb_v2_value_destroy(&value);
@@ -380,13 +415,20 @@ static void stage_finalize_exec(duckdb_v2_copy_to_finalize_info_handle info,
     DUCKDB_CALL(duckdb_v2_copy_to_finalize_get_init_data(info, (void **)&init, &detail));
     bind = init->bind;
     entry = calloc(1, sizeof(*entry));
+    if (entry) {
+        entry->refs = 1;
+    }
     if (!entry) {
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_stage: out of memory");
         goto cleanup;
     }
     entry->model = copy_text(bind->layout->model, strlen(bind->layout->model));
     entry->relation = copy_text(bind->layout->relation, strlen(bind->layout->relation));
-    if (!entry->model || !entry->relation) {
+    if (bind->layout->hap_model) {
+        entry->hap_model = copy_text(bind->layout->hap_model, strlen(bind->layout->hap_model));
+        entry->hap = bind->layout->hap;
+    }
+    if (!entry->model || !entry->relation || (bind->layout->hap_model && !entry->hap_model)) {
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_stage: out of memory");
         goto cleanup;
     }
@@ -406,15 +448,15 @@ static void stage_finalize_exec(duckdb_v2_copy_to_finalize_info_handle info,
     entry->collection = init->collection;
     init->collection = NULL;
     /* Staging the same relation again replaces the earlier rows. */
-    previous = state_take_stage(bind->state, entry->model, entry->relation);
-    stage_destroy(previous);
+    previous = host_v2_stage_take(bind->state, entry->model, entry->relation);
+    host_v2_stage_destroy(previous);
     pthread_mutex_lock(&bind->state->lock);
     entry->next = bind->state->stages;
     bind->state->stages = entry;
     pthread_mutex_unlock(&bind->state->lock);
     entry = NULL;
 cleanup:
-    stage_destroy(entry);
+    host_v2_stage_destroy(entry);
     (void)duckdb_v2_error_info_destroy(&detail);
 }
 
@@ -608,7 +650,7 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
         }
         /* The staging is consumed by this call, whatever its outcome. */
         for (size_t i = 0; i < 6; ++i) {
-            staged[i] = state_take_stage(state, name, duckvep_model_relations[i]);
+            staged[i] = host_v2_stage_take(state, name, duckvep_model_relations[i]);
         }
         for (size_t i = 0; i < 3; ++i) {
             if (!staged[i]) {
@@ -636,7 +678,7 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
         ok = duckvep_core_model_install(state->registry, name, &model_sources, "duckvep_model_publish",
                                         message, sizeof message) != 0;
         for (size_t i = 0; i < 6; ++i) {
-            stage_destroy(staged[i]);
+            host_v2_stage_destroy(staged[i]);
             staged[i] = NULL;
         }
         if (!ok) {
@@ -650,7 +692,7 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
     }
 cleanup:
     for (size_t i = 0; i < 6; ++i) {
-        stage_destroy(staged[i]);
+        host_v2_stage_destroy(staged[i]);
     }
     duckvep_budget_free(name);
     duckvep_budget_free(reference);
@@ -1048,6 +1090,7 @@ bool host_v2_register_model(duckdb_v2_extension_handle extension, duckdb_v2_cont
          register_model_scalar(extension, context, NULL, "duckvep_model_load_sql", load_types, load_names, 5,
                                "VARCHAR[]", load_sql_exec, error);
     ok = ok && host_v2_register_annotate(extension, context, state, error);
+    ok = ok && host_v2_register_haplotypes(extension, context, state, error);
     host_v2_state_release(state); /* the registrations hold their own references */
     return ok;
 }

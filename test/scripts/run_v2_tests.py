@@ -45,7 +45,7 @@ def parse_cases():
     (as TEMP tables) before the cases; it is returned by parse_fixtures()."""
     cases, name, lines, kind = [], None, [], None
     for line in CASES.read_text().splitlines():
-        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2):", line)
+        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2|job):", line)
         if marker:
             if kind == "case" and name:
                 cases.append((name, " ".join(lines).strip()))
@@ -60,20 +60,49 @@ def parse_cases():
 
 def parse_fixtures(host):
     """Statements run before the cases: "-- fixture:" on every host, "-- fixture-v1:" and
-    "-- fixture-v2:" on one (the model is loaded differently on each)."""
-    fixtures, wanted, lines = [], False, []
+    "-- fixture-v2:" on one (the model is loaded differently on each). A "-- job: <name> <model>
+    [key=value ...]" block is a haplotype input: its lines are the calls query, and the item is a dict
+    (see haplotype_job_v1 and V2Host.job_statements)."""
+    fixtures, wanted, lines, job = [], False, [], None
+
+    def flush():
+        if job is not None:
+            fixtures.append({"name": job[0], "model": job[1], "options": job[2], "query": "\n".join(lines).strip()})
+        elif wanted:
+            fixtures.append("\n".join(lines).strip())
+
     for line in CASES.read_text().splitlines():
-        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2):", line)
+        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2|job):(.*)", line)
         if marker:
-            if wanted:
-                fixtures.append("\n".join(lines).strip())
+            flush()
+            job = None
+            if marker.group(1) == "job":
+                fields = marker.group(2).split()
+                job = (fields[0], fields[1], fields[2:])
             wanted = marker.group(1) in ("fixture", "fixture-" + host)
             lines = []
-        elif wanted and not line.startswith("--") and line.strip():
+        elif (wanted or job is not None) and not line.startswith("--") and line.strip():
             lines.append(line)
-    if wanted:
-        fixtures.append("\n".join(lines).strip())
+    flush()
     return fixtures
+
+
+def sql_text(text):
+    return "'" + text.replace("'", "''") + "'"
+
+
+def haplotype_job_v1(job):
+    """v1 reads the calls query itself: a table macro over duckvep_haplotypes with the options as named parameters."""
+    named = "".join(", " + option.replace("=", " := ", 1) for option in job["options"])
+    return (f"CREATE MACRO {job['name']}() AS TABLE SELECT * FROM duckvep_haplotypes("
+            f"{sql_text(job['query'])}, {sql_text(job['model'])}{named})")
+
+
+def job_options_struct(job):
+    if not job["options"]:
+        return ""
+    return ", {" + ", ".join("'" + option.split("=", 1)[0] + "': " + option.split("=", 1)[1]
+                             for option in job["options"]) + "}"
 
 
 def wrapped(query):
@@ -98,6 +127,7 @@ class V2Host:
     def __init__(self, cli, extension):
         self.cli = str(cli)
         self.extension = Path(extension).resolve()
+        self.jobs = {}
 
     # -column: the pinned snapshot's CLI swallows statement errors (exit 0) in its streaming
     # output modes (-list, -csv, -json, -line), but reports them in -column, -table and -box.
@@ -119,13 +149,35 @@ class V2Host:
     def load(self):
         return f"LOAD '{quote(self.extension)}';\n"
 
+    def job_statements(self, job):
+        """The caller-side statements of a job (duckvep_haplotype_load_sql), then a macro over the scan."""
+        if job["name"] not in self.jobs:
+            call = (f"SELECT CAST(to_json(duckvep_haplotype_load_sql({sql_text(job['query'])}, {sql_text(job['model'])}, "
+                    f"{sql_text(job['name'])}{job_options_struct(job)})) AS VARCHAR)")
+            result = self.run(self.load() + call + ";", check=True)
+            statements = json.loads(result.stdout.strip())
+            statements.append(f"CREATE MACRO {job['name']}() AS TABLE SELECT * FROM duckvep_haplotype_scan({sql_text(job['name'])})")
+            self.jobs[job["name"]] = statements
+        return self.jobs[job["name"]]
+
     def case(self, query):
-        setup = "".join(fixture.rstrip(";") + ";\n" for fixture in parse_fixtures("v2"))
+        pieces = []
+        for fixture in parse_fixtures("v2"):
+            if isinstance(fixture, dict):
+                # A job is scanned once, so only the jobs the case names are staged.
+                if fixture["name"] + "()" in query:
+                    pieces.extend(self.job_statements(fixture))
+            else:
+                pieces.append(fixture)
+        setup = "".join(piece.rstrip(";") + ";\n" for piece in pieces)
         # Fixture output (a publish returns a row) must not reach the case's rows.
         quiet = ".output /dev/null\n" + setup + ".output stdout\n" if setup else ""
-        result = self.run(self.load() + quiet + wrapped(query) + ";", check=False)
+        script = self.load() + quiet + wrapped(query) + ";"
+        if os.environ.get("DUCKVEP_DUMP_CASE"):
+            Path(os.environ["DUCKVEP_DUMP_CASE"]).write_text(script)
+        result = self.run(script, check=False)
         if result.returncode != 0:
-            return outcome_error(result.stderr)
+            return outcome_error(result.stderr or f"duckvep: the DuckDB process exited with status {result.returncode}")
         return {"rows": [line.rstrip() for line in result.stdout.splitlines()]}
 
 
@@ -134,7 +186,7 @@ def v1_outcomes(extension, cases):
     connection = duckdb.connect(config={"allow_unsigned_extensions": "true"})
     connection.execute(f"LOAD '{quote(Path(extension).resolve())}'")
     for fixture in parse_fixtures("v1"):
-        connection.execute(fixture)
+        connection.execute(haplotype_job_v1(fixture) if isinstance(fixture, dict) else fixture)
     outcomes = {}
     for name, query in cases:
         try:
@@ -221,6 +273,7 @@ def main():
     parser.add_argument("--v2-extension", default=ROOT / "build/release_v2/duckvep.duckdb_extension")
     parser.add_argument("--v2-duckdb", default=os.environ.get("DUCKVEP_V2_DUCKDB"))
     parser.add_argument("--v1-extension", default=ROOT / "build/release/duckvep.duckdb_extension")
+    parser.add_argument("--only", help="run only the equality cases whose name contains this text, print differences and exit")
     parser.add_argument("--record", action="store_true", help="write the golden file from the v1 host and exit")
     args = parser.parse_args()
     if args.record:
@@ -234,6 +287,14 @@ def main():
     host = V2Host(args.v2_duckdb, args.v2_extension)
     check_engine(host)
     golden = json.loads(GOLDEN.read_text())
+    if args.only:
+        for name, query in parse_cases():
+            if args.only in name:
+                outcome = host.case(query)
+                print(("ok       " if golden.get(name) == outcome else "MISMATCH ") + name)
+                if golden.get(name) != outcome:
+                    print("  v1:", str(golden.get(name))[:400], "\n  v2:", str(outcome)[:400])
+        return
     test_load(host)
     test_native(host)
     test_model(host)
