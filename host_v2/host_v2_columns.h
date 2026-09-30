@@ -181,7 +181,7 @@ static inline void report(duckdb_v2_error_info_handle target, const char *messag
  * Option STRUCT arguments
  * ------------------------------------------------------------------------- */
 
-#define MAX_OPTIONS 4
+#define MAX_OPTIONS 6
 
 typedef struct {
     column record;

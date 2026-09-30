@@ -1,5 +1,9 @@
 # DuckVEP
 
+## DuckDB C API v2 host, slice 4a: the model sink (issue #8)
+
+- The resident model (arrays, the six relation loaders and their validation, FASTA check, lifting, kernel, registry) moved to `src/core` and reads *row sources*; v1 backs them with its private-connection queries and loads exactly as before. The v2 preview host loads through `COPY ... (FORMAT duckvep_stage)` into spillable staging in the caller's own transaction (TEMP tables and uncommitted rows are visible), then `duckvep_model_publish()` builds and installs the model; `duckvep_model_load_sql()` returns the statements, and `rduckvep_load_model()` runs either form. A failed or cancelled COPY stages nothing and a failed publish installs nothing. Both hosts load byte-equal models: the new internal `_duckvep_model_fingerprint()` is equal for three fixture models. `docs/v2-host.md` lists the user-facing differences.
+
 ## DuckDB C API v2 host, slice 3 (issue #8)
 
 - The text assembly of the twelve SQL builders (`duckvep_ensembl_*_sql`, `duckvep_model_receipt_sql`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql`, the five `duckvep_prepare_*_sql`) moved to `src/core`, and both hosts call it. The text each builder returns is byte-identical to the previous build over a 192-case matrix (every option key, defaults, invalid options, identifier quoting, NULL arguments). The v2 preview host serves all twelve; the preparation builders' SQL runs there and gives the v1 rows.

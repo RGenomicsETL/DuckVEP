@@ -13,7 +13,7 @@ public functions.
 | Build | `make release` (the root `CMakeLists.txt`) | `make release_v2` (`host_v2/CMakeLists.txt`) |
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
 | Ships | yes: CRAN and the community repository | no: preview, waits for DuckDB 2.0.0 |
-| Functions | all 26 public functions | slices 1 to 3: `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the twelve `duckvep_*_sql` builders, and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order` |
+| Functions | all 26 public functions | slices 1 to 4a: `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the twelve `duckvep_*_sql` builders, `duckvep_model_load` / `duckvep_model_drop` (as the COPY sink below), and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order` |
 
 The v2 host is a separate CMake project, so a v1 build does not compile or link
 any v2 file, and `duckdb_capi/` and MainDistributionPipeline are untouched. Since
@@ -48,6 +48,8 @@ cannot drift:
 | `duckvep_core_annotate.{c,h}` | `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql`: templates and option rendering |
 | `duckvep_core_ensembl.{c,h}` | the three Ensembl builders and `duckvep_model_receipt_sql`: templates, species option, receipt body |
 | `duckvep_core_prepare.{c,h}` | `duckvep_prepare_sv_geometry_sql`, `duckvep_prepare_expansionhunter_sql` and the BND identity, breakend gene and structural HGVS builders, with the `max_span` option |
+| `duckvep_core_model.{c,h}` | the resident model: arrays, the six relation loaders and their validation, FASTA check, publication, lifting of circular regions, kernel open, the model registry, and the fingerprint. Loaders read *row sources* (`duckvep_source_t`: typed, flat column batches) and never a DuckDB result |
+| `duckvep_core_model_script.{c,h}` | the statements of the v2 load (below) |
 | `duckvep_core_phase.{c,h}` | `duckvep_phase_call`: list checks, policy and phase-set options, the two-pass slot reducer with a reader interface (`allele`, `phase`, `emit` callbacks), and the `_duckvep_revcomp`, `_duckvep_raw_gt` and `_duckvep_record_order` kernels |
 
 A host's job is to turn vectors into cells (its type switch and its selection
@@ -118,7 +120,8 @@ slices are Astra's (memo section 4); slice 1 is this one.
 | 1 | ABI, vectors and types | entry point, footer, types, NULL/selection/constant/dictionary vectors, errors, table-function state | `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry` (done) |
 | 2 | Vectors and types | nested LIST/STRUCT input and output, list-child capacity, >2,048-element nested output, DECIMAL/HUGEINT, ANY parameters and overloads, option STRUCTs (done) | `duckvep_repeat_alleles`, `duckvep_phase_call` (and internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order`) |
 | 3 | SQL-builder surface | builders only: VARCHAR and STRUCT option inputs, SQL text out, no macros, no DDL at LOAD (done) | `duckvep_ensembl_regions_sql`, `duckvep_ensembl_transcripts_sql`, `duckvep_ensembl_regulation_features_sql`, `duckvep_model_receipt_sql`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql`, `duckvep_prepare_sv_geometry_sql`, `duckvep_prepare_breakend_pairs_sql`, `duckvep_prepare_breakend_fusion_sql`, `duckvep_prepare_structural_hgvs_sql`, `duckvep_prepare_expansionhunter_sql` |
-| 4 | Model sink (COPY staging) | stable-v2 COPY callbacks take the caller's relations; exact-size native arrays; explicit publish and drop; the internal annotation natives that read a pinned model | `duckvep_model_load`, `duckvep_model_drop` (and internal `_duckvep_annotate_*`, `__duckvep_projection_code`) |
+| 4a | Model sink (COPY staging) | stable-v2 COPY callbacks take the caller's relations; exact-size native arrays; explicit publish and drop (done) | `duckvep_model_load`, `duckvep_model_drop` |
+| 4b | Annotation natives | the internal natives that read a pinned model; then `duckvep_annotate_sql` and the projection builders execute on v2 | internal `_duckvep_annotate_*`, `__duckvep_projection_code` |
 | 5 | Haplotype capture | caller-side normalization into spillable column collections, serial scanner, no appender | `duckvep_haplotypes`, `duckvep_coding_transcripts`, `duckvep_coding_calls` (all three share `src/duckvep_discovery.c`, which reads the model) |
 | 6 | Bounded parallelism | partitioned workers, spill, cancellation and cleanup, quota accounting; 5M variants and a ten-job stress | `duckvep_native_budget`, `duckvep_native_budget_set`, `duckvep_native_budget_reset_high_water`, `duckvep_worker_limits_set` |
 
@@ -151,7 +154,7 @@ Files not listed (`src/kernel/**`, `duckvep_reference.c`, `third_party/`,
 | `duckvep_annotate.c` | `duckvep_allele_geometry`, `duckvep_breakend_geometry` (ported), ten internal annotation natives (registry pin, `volatile`, extra info, STRUCT/LIST output) | scalar user data for the registry, STRUCT output, LIST output with child capacity, per-worker scratch |
 | `duckvep_repeat.c` | `duckvep_repeat_alleles` (done) | LIST and STRUCT input, DECIMAL/HUGEINT cells, NULL-in-child propagation, option STRUCT. Done in `host_v2_nested.c` |
 | `duckvep_phase_sql.c` | `duckvep_phase_call`, `_duckvep_raw_gt`, `_duckvep_record_order` (all done) | the same as repeat, plus LIST<STRUCT> output sized once per chunk. Done in `host_v2_nested.c` |
-| `duckvep_model.c` | `duckvep_model_load`/`_drop`: a private connection, `duckdb_query`, `duckdb_fetch_chunk`, prepared statements, named parameters | the replacement of private connections by COPY callbacks: COPY-from bind/global/exec, row and byte counting, spill, publish/drop lifecycle; named table-function parameters |
+| `duckvep_model.c` | `duckvep_model_load`/`_drop` and the registry with its private connection (v1 only; the model itself is `src/core`) | done for v2 in `host_v2_model.c`: COPY-to bind/init/batch/flush/finalize, ordered merge into a column-data collection, scan sources, publish/drop/fingerprint, the statement builder |
 | `duckvep_haplotype_sql.c`, `duckvep_coding_calls.c`, `duckvep_discovery.c` | `duckvep_haplotypes`, `duckvep_coding_transcripts`, `duckvep_coding_calls`: private query/fetch, statement parsing, an appender, LIST-of-STRUCT output | column-data-collection capture in place of the appender, the native scan source over the captured input, LIST-of-STRUCT output, cancellation |
 | `duckvep_budget_sql.c` | four resource-control functions, `set_max_threads` | BIGINT scalar, table function with `max_threads`, volatile stability |
 
@@ -163,6 +166,54 @@ logical-type inspection (DECIMAL storage kind and scale), nested column opening,
 cell reading, option-STRUCT reading and LIST<STRUCT> output. Still to grow: scalar
 user data and init data, table-function named parameters and local state, COPY
 callbacks, column-data-collection capture.
+
+## The model sink on v2 (slice 4a)
+
+v1's `duckvep_model_load(name, regions_query, transcripts_query, exons_query, ...)` runs the
+caller's queries on a **private connection** inside its own transaction and stays exactly as it
+is. v2 cannot run them there (a private connection inside a callback is not allowed), so the load
+becomes caller-side statements plus one native call, all in the caller's own transaction:
+
+| Step | v1 | v2 |
+| --- | --- | --- |
+| build | `SELECT loaded FROM duckvep_model_load(name, regions_q, transcripts_q, exons_q, mature_mirna_query := ..., peptide_edit_query := ..., interval_feature_query := ..., reference_fasta := ..., transcript_coverage_complete := ...)` | `SELECT unnest(duckvep_model_load_sql(name, regions_q, transcripts_q, exons_q [, {mature_mirna_query: ..., peptide_edit_query: ..., interval_feature_query: ..., reference_fasta: ..., transcript_coverage_complete: ...}]))` returns the statements to run, in order |
+| stage | (inside the call) | one `COPY (<query>) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL '<name>', RELATION '<relation>', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)` per relation |
+| publish | (inside the call) | `SELECT duckvep_model_publish('<name>' [, {reference_fasta: ..., transcript_coverage_complete: ...}])`, which returns `true` |
+| drop | `SELECT duckvep_model_drop(name)` | the same; it also discards rows staged for that name |
+
+`rduckvep_load_model(con, name, regions_query, ...)` hides the difference: it detects the host and
+runs the right form, so R code is the same on both.
+
+Differences a user can see:
+
+- **Visibility.** On v2 the queries run in the caller's session and transaction, so TEMP tables and
+  uncommitted rows are visible to them; on v1 they see only committed, permanent relations.
+  (Publishing itself is not transactional: a model stays installed if the surrounding transaction rolls back,
+  on both hosts. Drop it explicitly.)
+- **Shape.** v1 is one table-function call with named parameters; v2 is a list of statements (from a
+  scalar with an options STRUCT, like the other builders) plus the publish call. The `COPY`s are ordinary SQL and
+  cannot run inside `query()`, which is why `duckvep_model_load_sql` returns text to execute instead of executing it.
+- **Errors.** Validation errors are the same text (the loaders are the same code); the publish
+  call reports them under `duckvep_model_publish:`.
+
+How it works: `COPY ... (FORMAT duckvep_stage)` runs the caller's typed, ordered SELECT and merges its
+ordered batches into a DuckDB column-data collection (buffer-manager backed, so it spills under the
+memory limit and is counted against DuckDB's, not the native budget). A COPY that fails or is cancelled
+destroys its rows and stages nothing; a finished COPY replaces earlier rows of the same relation. Publish
+takes the staged relations out (whatever the outcome: a failed publish publishes nothing and consumes the
+staging), scans them through the same `src/core` loaders v1 uses, allocates the exact-size native arrays
+charged to the native budget (an exhausted budget is the same named capacity error), validates, builds the
+kernel, and installs the model under the registry lock. The SDK exposes neither bytes nor a size hint for a
+collection, so staging is bounded by its row counts (the loaders' `uint32` limits) and DuckDB's memory limit.
+
+`_duckvep_model_fingerprint(name)` (internal, on both hosts) is an FNV-1a hash of the loaded arrays. The equality
+suite loads the README model, a richer model (strands, a non-coding transcript, flanks, mature miRNA, peptide edits,
+regulatory features, complete coverage) and a model with a reference FASTA on both hosts, and requires equal
+fingerprints. `test/sql_v2/v2_model.sql` covers what only v2 has: TEMP and uncommitted visibility, a failed COPY,
+invalid staged rows, a wrong column type, discard by drop, and option errors.
+
+v2 does not yet have `duckvep_native_budget_set` (slice 6), so the budget refusal of a model load is tested on v1
+(`make test_fault_injection` fails every allocation of a load in turn) and shared by v2 through the same loaders.
 
 ## Builders: text equality, and what runs on v2
 

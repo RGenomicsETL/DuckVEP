@@ -61,4 +61,4 @@ SELECT CASE WHEN (SELECT count(*) FROM duckdb_functions() WHERE function_name IN
 
 -- The twelve SQL builders are registered with and without the options argument.
 SELECT CASE WHEN (SELECT count(DISTINCT function_name) FROM duckdb_functions() WHERE function_name IN ('duckvep_ensembl_regions_sql', 'duckvep_ensembl_transcripts_sql', 'duckvep_ensembl_regulation_features_sql', 'duckvep_model_receipt_sql', 'duckvep_annotate_sql', 'duckvep_annotate_projected_sql', 'duckvep_transcript_projection_sql', 'duckvep_prepare_sv_geometry_sql', 'duckvep_prepare_expansionhunter_sql', 'duckvep_prepare_breakend_pairs_sql', 'duckvep_prepare_breakend_fusion_sql', 'duckvep_prepare_structural_hgvs_sql')) = 12 THEN true ELSE error('builders registered') END;
-SELECT CASE WHEN (SELECT count(*) FROM duckdb_functions() WHERE function_name LIKE 'duckvep_%_sql' AND function_type = 'scalar') = 24 THEN true ELSE error('two overloads per builder') END;
+SELECT CASE WHEN (SELECT count(*) FROM duckdb_functions() WHERE function_name LIKE 'duckvep_%_sql' AND function_type = 'scalar') = 26 THEN true ELSE error('two overloads per builder, plus load_sql') END;

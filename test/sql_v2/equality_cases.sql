@@ -1004,3 +1004,138 @@ SELECT * FROM query(duckvep_prepare_expansionhunter_sql('eh_records', 'eh_refere
 
 -- case: builder executes expansionhunter into repeat alleles
 SELECT event_index, status, duckvep_repeat_alleles([reference_components], [alternate_components], sequence_exact) AS r FROM query(duckvep_prepare_expansionhunter_sql('eh_records', 'eh_reference')) ORDER BY event_index
+
+-- fixture: model relations (README model)
+CREATE TABLE readme_regions AS SELECT * FROM (VALUES (0::UINTEGER), (1::UINTEGER)) t(seq_region)
+
+-- fixture: model README transcripts
+CREATE TABLE readme_transcripts AS SELECT 0::UINTEGER transcript_index, 1::UINTEGER seq_region, 100::UBIGINT transcript_start, 250::UBIGINT transcript_end, 1::TINYINT strand, 0::UINTEGER gene_index, 3::UBIGINT transcript_flags, 120::UBIGINT cds_start, 240::UBIGINT cds_end, 'ATGGTACGTACGTACGTACGTACGTACGTACTACGTACGTACGTACGTACGTACGTACGTACGTACTGGTAA'::BLOB cds_sequence, 1::UTINYINT codon_table, 'TACGTACGTACGTACGTACG'::BLOB pre_cds_sequence, 'ACGTACGTAC'::BLOB post_cds_sequence
+
+-- fixture: model README exons
+CREATE TABLE readme_exons AS SELECT * FROM (VALUES (0::UINTEGER, 100::UBIGINT, 150::UBIGINT, 1::UBIGINT, 51::UBIGINT, 0::TINYINT, 0::TINYINT), (0::UINTEGER, 200::UBIGINT, 250::UBIGINT, 52::UBIGINT, 102::UBIGINT, 0::TINYINT, 0::TINYINT)) t(transcript_index, exon_start, exon_end, exon_cdna_start, exon_cdna_end, phase, end_phase)
+
+-- fixture: model rich regions
+CREATE TABLE rich_regions AS SELECT * FROM (VALUES (0::UINTEGER, 100000::UBIGINT, 'chr0', false), (1::UINTEGER, 100000::UBIGINT, 'chr1', false)) t(seq_region, sequence_length, seq_region_name, circular)
+
+-- fixture: model rich transcripts
+CREATE TABLE rich_transcripts AS SELECT * FROM (VALUES (0::UINTEGER, 0::UINTEGER, 50::UBIGINT, 200::UBIGINT, 1::TINYINT, 0::UINTEGER, 3::UBIGINT, 61::UBIGINT, 190::UBIGINT, ('ATG' || repeat('GCA', 25) || 'TAA')::BLOB, 1::UTINYINT, 'ACGTACGTACG'::BLOB, 'TTGACCAGTA'::BLOB), (1::UINTEGER, 1::UINTEGER, 100::UBIGINT, 250::UBIGINT, 1::TINYINT, 1::UINTEGER, 3::UBIGINT, 120::UBIGINT, 240::UBIGINT, 'ATGGTACGTACGTACGTACGTACGTACGTACTACGTACGTACGTACGTACGTACGTACGTACGTACTGGTAA'::BLOB, 1::UTINYINT, 'TACGTACGTACGTACGTACG'::BLOB, 'ACGTACGTAC'::BLOB), (2::UINTEGER, 1::UINTEGER, 300::UBIGINT, 400::UBIGINT, -1::TINYINT, 2::UINTEGER, 3::UBIGINT, 310::UBIGINT, 390::UBIGINT, ('ATG' || repeat('CCA', 25) || 'TGA')::BLOB, 2::UTINYINT, 'GGGGGGGGGG'::BLOB, 'CCCCCCCCCC'::BLOB), (3::UINTEGER, 1::UINTEGER, 500::UBIGINT, 600::UBIGINT, 1::TINYINT, 3::UINTEGER, 8::UBIGINT, NULL::UBIGINT, NULL::UBIGINT, NULL::BLOB, NULL::UTINYINT, NULL::BLOB, NULL::BLOB)) t(transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence)
+
+-- fixture: model rich exons
+CREATE TABLE rich_exons AS SELECT * FROM (VALUES (0::UINTEGER, 50::UBIGINT, 100::UBIGINT, 1::UBIGINT, 51::UBIGINT, 0::TINYINT, 0::TINYINT), (0::UINTEGER, 150::UBIGINT, 200::UBIGINT, 52::UBIGINT, 102::UBIGINT, 0::TINYINT, 0::TINYINT), (1::UINTEGER, 100::UBIGINT, 150::UBIGINT, 1::UBIGINT, 51::UBIGINT, 0::TINYINT, 0::TINYINT), (1::UINTEGER, 200::UBIGINT, 250::UBIGINT, 52::UBIGINT, 102::UBIGINT, 0::TINYINT, 0::TINYINT), (2::UINTEGER, 300::UBIGINT, 400::UBIGINT, 1::UBIGINT, 101::UBIGINT, 0::TINYINT, 0::TINYINT), (3::UINTEGER, 500::UBIGINT, 600::UBIGINT, 1::UBIGINT, 101::UBIGINT, -1::TINYINT, -1::TINYINT)) t(transcript_index, exon_start, exon_end, exon_cdna_start, exon_cdna_end, phase, end_phase)
+
+-- fixture: model rich mature miRNA
+CREATE TABLE rich_mirna AS SELECT * FROM (VALUES (3::UINTEGER, 510::UBIGINT, 530::UBIGINT), (3::UINTEGER, 550::UBIGINT, 570::UBIGINT)) t(transcript_index, mature_mirna_start, mature_mirna_end)
+
+-- fixture: model rich peptide edits
+CREATE TABLE rich_peptides AS SELECT * FROM (VALUES (1::UINTEGER, 3::UINTEGER, 'W'), (1::UINTEGER, 9::UINTEGER, 'K')) t(transcript_index, protein_position, alternate_amino_acid)
+
+-- fixture: model rich regulation
+CREATE TABLE rich_regulation AS SELECT * FROM (VALUES (0::UINTEGER, 1::UINTEGER, 1000::UINTEGER, 1020::UINTEGER, 1::UTINYINT), (1::UINTEGER, 1::UINTEGER, 1000::UINTEGER, 1020::UINTEGER, 2::UTINYINT), (2::UINTEGER, 1::UINTEGER, 5000::UINTEGER, 5100::UINTEGER, 1::UTINYINT)) t(regulation_feature_index, seq_region, feature_start, feature_end, feature_kind)
+
+-- fixture: model reference regions
+CREATE TABLE ref_regions AS SELECT * FROM (VALUES (0::UINTEGER, 1::UBIGINT, 'chrEmpty'), (1::UINTEGER, 260::UBIGINT, 'chrDuck')) t(seq_region, sequence_length, seq_region_name)
+
+-- fixture: model reference transcripts
+CREATE TABLE ref_transcripts AS SELECT 0::UINTEGER transcript_index, 1::UINTEGER seq_region, 11::UBIGINT transcript_start, 22::UBIGINT transcript_end, 1::TINYINT strand, 0::UINTEGER gene_index, 3::UBIGINT transcript_flags, 11::UBIGINT cds_start, 22::UBIGINT cds_end, 'ATGAAACCCGGG'::BLOB cds_sequence, 1::UTINYINT codon_table, ''::BLOB pre_cds_sequence, ''::BLOB post_cds_sequence
+
+-- fixture: model reference exons
+CREATE TABLE ref_exons AS SELECT 0::UINTEGER transcript_index, 11::UBIGINT exon_start, 22::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 12::UBIGINT exon_cdna_end, 0::TINYINT phase, 0::TINYINT end_phase
+
+-- fixture-v1: load README model on the v1 host (private connection: permanent tables only)
+SELECT loaded FROM duckvep_model_load('readme', 'SELECT * FROM readme_regions ORDER BY seq_region', 'SELECT * FROM readme_transcripts ORDER BY seq_region, transcript_start', 'SELECT * FROM readme_exons ORDER BY transcript_index, exon_start')
+
+-- fixture-v1: load rich model on the v1 host
+SELECT loaded FROM duckvep_model_load('rich', 'SELECT * FROM rich_regions ORDER BY seq_region', 'SELECT * FROM rich_transcripts ORDER BY seq_region, transcript_start', 'SELECT * FROM rich_exons ORDER BY transcript_index, exon_start', mature_mirna_query := 'SELECT * FROM rich_mirna ORDER BY transcript_index, mature_mirna_start', peptide_edit_query := 'SELECT * FROM rich_peptides ORDER BY transcript_index, protein_position', interval_feature_query := 'SELECT * FROM rich_regulation ORDER BY seq_region, feature_start, regulation_feature_index', transcript_coverage_complete := true)
+
+-- fixture-v1: load reference model on the v1 host
+SELECT loaded FROM duckvep_model_load('withref', 'SELECT * FROM ref_regions ORDER BY seq_region', 'SELECT * FROM ref_transcripts ORDER BY seq_region, transcript_start', 'SELECT * FROM ref_exons ORDER BY transcript_index, exon_start', reference_fasta := 'test/data/duckvep/minimal.fa')
+
+-- fixture-v2: stage readme regions
+COPY (
+SELECT * FROM readme_regions ORDER BY seq_region
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'readme', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage readme transcripts
+COPY (
+SELECT * FROM readme_transcripts ORDER BY seq_region, transcript_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'readme', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage readme exons
+COPY (
+SELECT * FROM readme_exons ORDER BY transcript_index, exon_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'readme', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: publish readme
+SELECT duckvep_model_publish('readme')
+
+-- fixture-v2: stage rich regions
+COPY (
+SELECT * FROM rich_regions ORDER BY seq_region
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'rich', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage rich transcripts
+COPY (
+SELECT * FROM rich_transcripts ORDER BY seq_region, transcript_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'rich', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage rich exons
+COPY (
+SELECT * FROM rich_exons ORDER BY transcript_index, exon_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'rich', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage rich mature_mirna
+COPY (
+SELECT * FROM rich_mirna ORDER BY transcript_index, mature_mirna_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'rich', RELATION 'mature_mirna', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage rich peptide_edits
+COPY (
+SELECT * FROM rich_peptides ORDER BY transcript_index, protein_position
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'rich', RELATION 'peptide_edits', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage rich interval_features
+COPY (
+SELECT * FROM rich_regulation ORDER BY seq_region, feature_start, regulation_feature_index
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'rich', RELATION 'interval_features', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: publish rich
+SELECT duckvep_model_publish('rich', {'transcript_coverage_complete': true})
+
+-- fixture-v2: stage withref regions
+COPY (
+SELECT * FROM ref_regions ORDER BY seq_region
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'withref', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage withref transcripts
+COPY (
+SELECT * FROM ref_transcripts ORDER BY seq_region, transcript_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'withref', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: stage withref exons
+COPY (
+SELECT * FROM ref_exons ORDER BY transcript_index, exon_start
+) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'withref', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: publish withref
+SELECT duckvep_model_publish('withref', {'reference_fasta': 'test/data/duckvep/minimal.fa'})
+
+-- case: model fingerprint readme
+SELECT _duckvep_model_fingerprint('readme') AS f
+
+-- case: model fingerprint rich
+SELECT _duckvep_model_fingerprint('rich') AS f
+
+-- case: model fingerprint with reference
+SELECT _duckvep_model_fingerprint('withref') AS f
+
+-- case: model fingerprints differ
+SELECT count(DISTINCT f) AS n FROM (SELECT _duckvep_model_fingerprint(m) AS f FROM (VALUES ('readme'), ('rich'), ('withref')) v(m))
+
+-- case: model fingerprint of an unknown model is null
+SELECT _duckvep_model_fingerprint('no-such-model') IS NULL AS missing, _duckvep_model_fingerprint(NULL) IS NULL AS null_name
+
+-- case: model drop of an unknown model
+SELECT duckvep_model_drop('no-such-model') AS dropped
+
+-- case: model drop empty name error
+SELECT duckvep_model_drop('') AS dropped

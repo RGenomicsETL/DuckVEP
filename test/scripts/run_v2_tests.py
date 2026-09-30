@@ -30,6 +30,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 CASES = ROOT / "test/sql_v2/equality_cases.sql"
 NATIVE = ROOT / "test/sql_v2/v2_native.sql"
+MODEL = ROOT / "test/sql_v2/v2_model.sql"
 GOLDEN = ROOT / "test/sql_v2/equality_golden.json"
 PIN = json.loads((ROOT / "duckvep-package.json").read_text())["v2_host"]
 MESSAGE = re.compile(r"(?:duckvep_\w+|_duckvep_\w+|DuckVEP builder): [^\n]*")
@@ -44,31 +45,34 @@ def parse_cases():
     (as TEMP tables) before the cases; it is returned by parse_fixtures()."""
     cases, name, lines, kind = [], None, [], None
     for line in CASES.read_text().splitlines():
-        if line.startswith("-- case:") or line.startswith("-- fixture:"):
+        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2):", line)
+        if marker:
             if kind == "case" and name:
                 cases.append((name, " ".join(lines).strip()))
-            kind = "case" if line.startswith("-- case:") else "fixture"
+            kind = "case" if marker.group(1) == "case" else "fixture"
             name, lines = line.split(":", 1)[1].strip(), []
         elif kind == "case" and not line.startswith("--") and line.strip():
-            lines.append(line.strip())
-        elif kind == "fixture" and not line.startswith("--") and line.strip():
             lines.append(line.strip())
     if kind == "case":
         cases.append((name, " ".join(lines).strip()))
     return cases
 
 
-def parse_fixtures():
-    fixtures, kind, lines = [], None, []
+def parse_fixtures(host):
+    """Statements run before the cases: "-- fixture:" on every host, "-- fixture-v1:" and
+    "-- fixture-v2:" on one (the model is loaded differently on each)."""
+    fixtures, wanted, lines = [], False, []
     for line in CASES.read_text().splitlines():
-        if line.startswith("-- case:") or line.startswith("-- fixture:"):
-            if kind == "fixture":
-                fixtures.append(" ".join(lines).strip())
-            kind, lines = ("fixture" if line.startswith("-- fixture:") else "case"), []
-        elif kind == "fixture" and not line.startswith("--") and line.strip():
-            lines.append(line.strip())
-    if kind == "fixture":
-        fixtures.append(" ".join(lines).strip())
+        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2):", line)
+        if marker:
+            if wanted:
+                fixtures.append("\n".join(lines).strip())
+            wanted = marker.group(1) in ("fixture", "fixture-" + host)
+            lines = []
+        elif wanted and not line.startswith("--") and line.strip():
+            lines.append(line)
+    if wanted:
+        fixtures.append("\n".join(lines).strip())
     return fixtures
 
 
@@ -98,8 +102,10 @@ class V2Host:
     # -column: the pinned snapshot's CLI swallows statement errors (exit 0) in its streaming
     # output modes (-list, -csv, -json, -line), but reports them in -column, -table and -box.
     # -column pads lines, so callers strip trailing whitespace.
-    def run(self, sql, database=":memory:", readonly=False, check=True):
-        command = [self.cli, "-unsigned", "-no-init", "-batch", "-bail", "-noheader", "-column"]
+    def run(self, sql, database=":memory:", readonly=False, check=True, bail=True):
+        command = [self.cli, "-unsigned", "-no-init", "-batch", "-noheader", "-column"]
+        if bail:
+            command.insert(-2, "-bail")
         if readonly:
             command.append("-readonly")
         command.append(str(database))
@@ -114,8 +120,10 @@ class V2Host:
         return f"LOAD '{quote(self.extension)}';\n"
 
     def case(self, query):
-        setup = "".join(fixture.rstrip(";") + ";\n" for fixture in parse_fixtures())
-        result = self.run(self.load() + setup + wrapped(query) + ";", check=False)
+        setup = "".join(fixture.rstrip(";") + ";\n" for fixture in parse_fixtures("v2"))
+        # Fixture output (a publish returns a row) must not reach the case's rows.
+        quiet = ".output /dev/null\n" + setup + ".output stdout\n" if setup else ""
+        result = self.run(self.load() + quiet + wrapped(query) + ";", check=False)
         if result.returncode != 0:
             return outcome_error(result.stderr)
         return {"rows": [line.rstrip() for line in result.stdout.splitlines()]}
@@ -125,7 +133,7 @@ def v1_outcomes(extension, cases):
     import duckdb
     connection = duckdb.connect(config={"allow_unsigned_extensions": "true"})
     connection.execute(f"LOAD '{quote(Path(extension).resolve())}'")
-    for fixture in parse_fixtures():
+    for fixture in parse_fixtures("v1"):
         connection.execute(fixture)
     outcomes = {}
     for name, query in cases:
@@ -163,6 +171,31 @@ def test_load(host):
             host.run(absent, database, readonly)
             assert hashlib.sha256(database.read_bytes()).hexdigest() == digest, "LOAD changed the database file"
     print("load: read-only and writable primary, repeated LOAD, no DDL, database bytes unchanged")
+
+
+def test_model(host):
+    """Model sink scenarios (test/sql_v2/v2_model.sql): statements run in one session without
+    -bail; each `-- expect error: X` line must be followed by exactly that failure."""
+    script, expected = [], []
+    for line in MODEL.read_text().splitlines():
+        match = re.match(r"-- expect error: (.*)", line)
+        if match:
+            expected.append(match.group(1))
+            script.append(".print ERROR-EXPECTED")
+        else:
+            script.append(line)
+    result = host.run(host.load() + "\n".join(script) + "\n", check=False, bail=False)
+    errors = [part for part in re.split(r"\n(?=[A-Za-z ]*Error: )", result.stderr.strip()) if part.strip()]
+    if len(errors) != len(expected):
+        raise AssertionError(f"expected {len(expected)} failures, got {len(errors)}:\n{result.stderr}\n{result.stdout}")
+    for want, got in zip(expected, errors):
+        if want not in got:
+            raise AssertionError(f"expected an error containing {want!r}, got {got!r}")
+    assertions = [line for line in result.stdout.splitlines() if line.strip() == "true"]
+    asserted = sum(1 for line in MODEL.read_text().splitlines() if line.startswith("SELECT CASE WHEN"))
+    if len(assertions) < asserted:
+        raise AssertionError(f"{len(assertions)} of {asserted} assertions passed:\n{result.stdout}\n{result.stderr}")
+    print(f"model: {len(expected)} expected failures, {asserted} assertions passed")
 
 
 def test_native(host):
@@ -203,6 +236,7 @@ def main():
     golden = json.loads(GOLDEN.read_text())
     test_load(host)
     test_native(host)
+    test_model(host)
     test_equality(host, golden)
     if Path(args.v1_extension).exists():
         live = v1_outcomes(args.v1_extension, parse_cases())

@@ -1,5 +1,5 @@
 #include "duckvep_reference.h"
-#include "duckvep_model.h"
+#include "core/duckvep_core_model.h"
 #include "kernel/src/duckvep_budget.h"
 
 #include <errno.h>

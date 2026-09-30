@@ -6219,6 +6219,39 @@
    "{\"k\":0,\"p\":5,\"n\":41}"
   ]
  },
+ "model drop empty name error": {
+  "error": "duckvep_model_drop: name must be a non-empty string"
+ },
+ "model drop of an unknown model": {
+  "rows": [
+   "{\"dropped\":false}"
+  ]
+ },
+ "model fingerprint of an unknown model is null": {
+  "rows": [
+   "{\"missing\":true,\"null_name\":true}"
+  ]
+ },
+ "model fingerprint readme": {
+  "rows": [
+   "{\"f\":16162758230738989510}"
+  ]
+ },
+ "model fingerprint rich": {
+  "rows": [
+   "{\"f\":8168162222420923201}"
+  ]
+ },
+ "model fingerprint with reference": {
+  "rows": [
+   "{\"f\":4260643584162803961}"
+  ]
+ },
+ "model fingerprints differ": {
+  "rows": [
+   "{\"n\":3}"
+  ]
+ },
  "phase allele and flag types": {
   "rows": [
    "{\"a\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"b\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"c\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"d\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}],\"e\":[{\"input_slot\":1,\"allele_index\":1,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"all_phase_sets\",\"status\":\"called\"}],\"f\":[{\"input_slot\":1,\"allele_index\":0,\"haplotype_lane\":1,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"},{\"input_slot\":2,\"allele_index\":1,\"haplotype_lane\":2,\"ploidy\":2,\"phase_set\":null,\"phase_scope\":\"phase_set\",\"status\":\"called\"}]}"
