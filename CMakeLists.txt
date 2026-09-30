@@ -41,6 +41,7 @@ if(DUCKVEP_WEBR_EXTENSION)
     set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
 endif()
 file(GLOB KERNEL_SOURCES CONFIGURE_DEPENDS src/kernel/src/*.c)
+file(GLOB CORE_SOURCES CONFIGURE_DEPENDS src/core/*.c)
 set(EXTENSION_SOURCES
     src/duckvep.c
     src/duckvep_registration.c
@@ -59,6 +60,7 @@ set(EXTENSION_SOURCES
     src/duckvep_reference.c
     src/duckvep_sql.c
     third_party/cgranges/cgranges.c
+    ${CORE_SOURCES}
     ${KERNEL_SOURCES}
 )
 if(DUCKDB_WASM_EXTENSION AND NOT DUCKVEP_WEBR_EXTENSION)

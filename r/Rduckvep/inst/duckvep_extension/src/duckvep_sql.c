@@ -14,6 +14,7 @@ DUCKDB_EXTENSION_EXTERN
 #include "duckvep_codon.h"
 #include "duckvep_sql.h"
 #include "duckvep_builder.h"
+#include "core/duckvep_core_geometry.h"
 
 typedef struct {
 	idx_t offset;
@@ -89,23 +90,19 @@ duckvep_so_terms_scan(duckdb_function_info info, duckdb_data_chunk output)
 	tiers = duckdb_vector_get_data(tier_vector);
 	vector_size = duckdb_vector_size();
 	count = 0;
-	while (count < vector_size && scan->offset < DUCKVEP_SO_BIT_COUNT) {
-		duckvep_so_bit_t bit;
-		duckvep_impact_t impact;
-		const char *name;
+	while (count < vector_size && scan->offset < duckvep_core_so_term_count()) {
+		duckvep_core_so_term_t term;
 
-		bit = (duckvep_so_bit_t)scan->offset;
-		impact = duckvep_so_bit_impact(bit);
-		name = duckvep_so_name(bit);
-		bits[count] = (uint8_t)bit;
-		masks[count] = DUCKVEP_SO(bit);
-		impact_codes[count] = (uint8_t)impact;
-		ranks[count] = duckvep_so_rank(bit);
-		tiers[count] = duckvep_so_tier(bit);
+		(void)duckvep_core_so_term((size_t)scan->offset, &term);
+		bits[count] = term.bit_index;
+		masks[count] = term.consequence_mask;
+		impact_codes[count] = term.impact_code;
+		ranks[count] = term.severity_rank;
+		tiers[count] = term.evaluator_tier;
 		duckdb_vector_assign_string_element(consequence_vector, count,
-		    name != NULL ? name : "");
+		    term.consequence);
 		duckdb_vector_assign_string_element(impact_vector, count,
-		    duckvep_impact_name(impact));
+		    term.impact);
 		count++;
 		scan->offset++;
 	}

@@ -1,10 +1,12 @@
 /* GT phase assignments use DuckDB list storage and the native lane reducer. */
 #include "duckdb_extension.h"
 DUCKDB_EXTENSION_EXTERN
+#include "duckvep_v1_cells.h"
 
 #include "duckvep_phase.h"
 #include "duckvep_sql.h"
 #include "duckvep_builder.h"
+#include "core/duckvep_core_phase.h"
 #include "kernel/src/duckvep_haplotype_stream.h"
 
 #include <stdbool.h>
@@ -19,74 +21,57 @@ static bool phase_valid(duckdb_vector vector, idx_t row) {
     return !validity || duckdb_validity_row_is_valid(validity, row);
 }
 
-static bool phase_allele(duckdb_vector vector, duckdb_type type, uint8_t scale, idx_t at, int32_t *out) {
-    void *data = duckdb_vector_get_data(vector);
-    long double number;
-    switch (type) {
-    case DUCKDB_TYPE_TINYINT: number = ((int8_t *)data)[at]; break;
-    case DUCKDB_TYPE_SMALLINT: number = ((int16_t *)data)[at]; break;
-    case DUCKDB_TYPE_INTEGER: number = ((int32_t *)data)[at]; break;
-    case DUCKDB_TYPE_BIGINT: number = ((int64_t *)data)[at]; break;
-    case DUCKDB_TYPE_UTINYINT: number = ((uint8_t *)data)[at]; break;
-    case DUCKDB_TYPE_USMALLINT: number = ((uint16_t *)data)[at]; break;
-    case DUCKDB_TYPE_UINTEGER: number = ((uint32_t *)data)[at]; break;
-    case DUCKDB_TYPE_UBIGINT: number = ((uint64_t *)data)[at]; break;
-    case DUCKDB_TYPE_FLOAT: number = ((float *)data)[at]; break;
-    case DUCKDB_TYPE_DOUBLE: number = ((double *)data)[at]; break;
-    case DUCKDB_TYPE_HUGEINT: {
-        duckdb_hugeint value = ((duckdb_hugeint *)data)[at];
-        number = (long double)value.upper * 18446744073709551616.0L + value.lower;
-        break;
+typedef struct {
+    duckdb_function_info info;
+    duckdb_vector allele_values, phase_values;
+    duckdb_type allele_id, phase_id;
+    uint8_t allele_scale;
+    bool null_alleles, null_phases;
+    idx_t allele_base, phase_base, at;
+    duckdb_vector fields[7];
+    bool has_phase_set;
+    int64_t phase_set;
+} phase_row_context;
+
+static void phase_allele_cell(void *pointer, size_t slot, duckvep_cell_t *cell) {
+    phase_row_context *context = pointer;
+    if (context->null_alleles) {
+        *cell = (duckvep_cell_t){0};
+        return;
     }
-    case DUCKDB_TYPE_VARCHAR: {
-        duckdb_string_t string = ((duckdb_string_t *)data)[at];
-        size_t length = duckdb_string_t_length(string);
-        if (!length || length >= 32) return false;
-        char text[32];
-        memcpy(text, duckdb_string_t_data(&string), length);
-        text[length] = '\0';
-        char *end;
-        long value = strtol(text, &end, 10);
-        if (end != text + length || value < INT32_MIN || value > INT32_MAX) return false;
-        *out = (int32_t)value;
-        return true;
-    }
-    default: return false;
-    }
-    for (uint8_t i = 0; i < scale; i++) number /= 10;
-    if (!isfinite(number) || number < INT32_MIN - 0.5L || number >= INT32_MAX + 0.5L)
-        return false;
-    *out = (int32_t)roundl(number);
-    return true;
+    duckvep_v1_fill_cell(context->allele_values, context->allele_id, context->allele_scale,
+                         context->allele_base + slot, cell);
 }
 
-static bool phase_flag(duckdb_vector vector, duckdb_type type, idx_t at, bool *result) {
-    if (type == DUCKDB_TYPE_BOOLEAN) {
-        *result = ((bool *)duckdb_vector_get_data(vector))[at];
-        return true;
+static void phase_flag_cell(void *pointer, size_t slot, duckvep_cell_t *cell) {
+    phase_row_context *context = pointer;
+    if (context->null_phases) {
+        *cell = (duckvep_cell_t){0};
+        return;
     }
-    if (type == DUCKDB_TYPE_VARCHAR) {
-        duckdb_string_t string = ((duckdb_string_t *)duckdb_vector_get_data(vector))[at];
-        const char *data = duckdb_string_t_data(&string);
-        uint32_t length = duckdb_string_t_length(string);
-        if (length == 4 || length == 5) {
-            const char *expected = length == 4 ? "true" : "false";
-            bool matches = true;
-            for (uint32_t i = 0; i < length; i++) {
-                char c = data[i];
-                if (c >= 'A' && c <= 'Z') c = (char)(c + ('a' - 'A'));
-                if (c != expected[i]) { matches = false; break; }
-            }
-            if (matches) { *result = length == 4; return true; }
-        }
-        if (length == 1 && (*data == '1' || *data == '0')) {
-            *result = *data == '1'; return true;
-        }
-        return false;
+    duckvep_v1_fill_cell(context->phase_values, context->phase_id, 0,
+                         context->phase_base + slot, cell);
+}
+
+static bool phase_emit(void *pointer, size_t slot, const duckvep_core_phase_slot_t *out) {
+    phase_row_context *context = pointer;
+    idx_t at = context->at + slot;
+    duckdb_vector *fields = context->fields;
+    for (idx_t i = 0u; i < 7u; i++)
+        duckdb_validity_set_row_valid(duckdb_vector_get_validity(fields[i]), at);
+    ((uint16_t *)duckdb_vector_get_data(fields[0]))[at] = out->input_slot;
+    ((int32_t *)duckdb_vector_get_data(fields[1]))[at] = out->allele_index;
+    if (!out->allele_called) duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[1]), at);
+    ((uint16_t *)duckdb_vector_get_data(fields[2]))[at] = out->lane;
+    if (!out->lane) duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[2]), at);
+    ((uint16_t *)duckdb_vector_get_data(fields[3]))[at] = out->ploidy;
+    if (out->phase_set_applies && context->has_phase_set) {
+        ((int64_t *)duckdb_vector_get_data(fields[4]))[at] = context->phase_set;
+    } else {
+        duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[4]), at);
     }
-    int32_t value = 0;
-    if (!phase_allele(vector, type, 0, at, &value)) return false;
-    *result = value != 0;
+    duckdb_vector_assign_string_element(fields[5], at, out->scope);
+    duckdb_vector_assign_string_element(fields[6], at, out->status);
     return true;
 }
 
@@ -118,22 +103,17 @@ static void phase_scalar(duckdb_function_info info, duckdb_data_chunk input,
     if (phase_child_type) duckdb_destroy_logical_type(&phase_child_type);
     duckdb_destroy_logical_type(&allele_type);
     duckdb_destroy_logical_type(&phase_type);
-    idx_t rows = duckdb_data_chunk_get_size(input), total = 0u;
+    idx_t rows = duckdb_data_chunk_get_size(input);
+    size_t total = 0u;
 
     for (idx_t row = 0u; row < rows; row++) {
         bool have_gt = allele_list && phase_valid(alleles, row), have_phase = phase_list && phase_valid(phases, row);
-        if ((!have_gt && have_phase) ||
-            (have_gt && have_phase && allele_lists[row].length != phase_lists[row].length)) {
-            duckdb_scalar_function_set_error(info, "duckvep_phase_call: allele and phase lists must have equal length");
+        const char *message = duckvep_core_phase_check_row(have_gt, have_phase,
+            have_gt ? allele_lists[row].length : 0, have_phase ? phase_lists[row].length : 0, &total);
+        if (message) {
+            duckdb_scalar_function_set_error(info, message);
             return;
         }
-        if (!have_gt) continue;
-        idx_t count = allele_lists[row].length;
-        if (!count || count > UINT16_MAX || count > UINT64_MAX - total) {
-            duckdb_scalar_function_set_error(info, "duckvep_phase_call: ploidy must be between 1 and 65535");
-            return;
-        }
-        total += count;
     }
     if (duckdb_list_vector_reserve(output, total) != DuckDBSuccess ||
         duckdb_list_vector_set_size(output, total) != DuckDBSuccess) {
@@ -142,10 +122,12 @@ static void phase_scalar(duckdb_function_info info, duckdb_data_chunk input,
     }
     duckdb_vector_ensure_validity_writable(output);
     duckdb_list_entry *lists = duckdb_vector_get_data(output);
-    duckdb_vector records = duckdb_list_vector_get_child(output), fields[7];
+    duckdb_vector records = duckdb_list_vector_get_child(output);
+    phase_row_context context = {info, allele_values, phase_values, allele_id, phase_id, allele_scale,
+        null_alleles, null_phases, 0, 0, 0, {0}, false, 0};
     for (idx_t i = 0u; i < 7u; i++) {
-        fields[i] = duckdb_struct_vector_get_child(records, i);
-        duckdb_vector_ensure_validity_writable(fields[i]);
+        context.fields[i] = duckdb_struct_vector_get_child(records, i);
+        duckdb_vector_ensure_validity_writable(context.fields[i]);
     }
     idx_t at = 0u;
     for (idx_t row = 0u; row < rows; row++) {
@@ -166,41 +148,21 @@ static void phase_scalar(duckdb_function_info info, duckdb_data_chunk input,
         int64_t phase_set = 0;
         if (ps) {
             duckdb_logical_type set_type = duckdb_vector_get_column_type(ps);
-            duckdb_type id = duckdb_get_type_id(set_type);
-            void *data = duckdb_vector_get_data(ps);
-            switch (id) {
-            case DUCKDB_TYPE_TINYINT: phase_set = ((int8_t *)data)[row]; break;
-            case DUCKDB_TYPE_SMALLINT: phase_set = ((int16_t *)data)[row]; break;
-            case DUCKDB_TYPE_INTEGER: phase_set = ((int32_t *)data)[row]; break;
-            case DUCKDB_TYPE_BIGINT: phase_set = ((int64_t *)data)[row]; break;
-            case DUCKDB_TYPE_UTINYINT: phase_set = ((uint8_t *)data)[row]; break;
-            case DUCKDB_TYPE_USMALLINT: phase_set = ((uint16_t *)data)[row]; break;
-            case DUCKDB_TYPE_UINTEGER: phase_set = ((uint32_t *)data)[row]; break;
-            case DUCKDB_TYPE_UBIGINT: {
-                uint64_t value = ((uint64_t *)data)[row];
-                if (value > INT64_MAX) {
-                    duckdb_scalar_function_set_error(info, "duckvep_phase_call: phase_set exceeds BIGINT range");
-                    duckdb_destroy_logical_type(&set_type);
-                    return;
-                }
-                phase_set = (int64_t)value;
-                break;
-            }
-            default: break;
-            }
+            duckvep_cell_t cell;
+            duckvep_v1_fill_cell(ps, duckdb_get_type_id(set_type), 0, row, &cell);
             duckdb_destroy_logical_type(&set_type);
+            if (!duckvep_core_phase_set(&cell, &phase_set)) {
+                duckdb_scalar_function_set_error(info, duckvep_core_phase_set_error);
+                return;
+            }
         }
         duckdb_string_t *policy_names = policies ? duckdb_vector_get_data(policies) : NULL;
         duckvep_phase_policy_t policy = DUCKVEP_PHASE_STRICT;
-        if (policies) {
-            const char *name = duckdb_string_t_data(&policy_names[row]);
-            uint32_t length = duckdb_string_t_length(policy_names[row]);
-            if (length == 13u && !memcmp(name, "vep116_compat", 13u)) {
-                policy = DUCKVEP_PHASE_VEP116_COMPAT;
-            } else if (length != 6u || memcmp(name, "strict", 6u)) {
-                duckdb_scalar_function_set_error(info, "duckvep_phase_call: phase_policy must be 'strict' or 'vep116_compat'");
-                return;
-            }
+        if (policies &&
+            !duckvep_core_phase_policy(duckdb_string_t_data(&policy_names[row]),
+                                       duckdb_string_t_length(policy_names[row]), &policy)) {
+            duckdb_scalar_function_set_error(info, duckvep_core_phase_policy_error);
+            return;
         }
         lists[row] = (duckdb_list_entry){at, 0u};
         if (!allele_list || !phase_valid(alleles, row)) {
@@ -208,72 +170,22 @@ static void phase_scalar(duckdb_function_info info, duckdb_data_chunk input,
             continue;
         }
         duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
-        duckvep_phase_summary_t summary = {0};
-        idx_t count = allele_lists[row].length, base = allele_lists[row].offset;
+        idx_t count = allele_lists[row].length;
         bool have_phase = phase_list && phase_valid(phases, row);
-        idx_t phase_base = have_phase ? phase_lists[row].offset : 0u;
-        for (idx_t slot = 0u; slot < count; slot++) {
-            bool called = !null_alleles && phase_valid(allele_values, base + slot);
-            int32_t allele = -1;
-            if (called && !phase_allele(allele_values, allele_id, allele_scale, base + slot, &allele)) {
-                duckdb_scalar_function_set_error(info, "duckvep_phase_call: called allele indices must be non-negative INTEGER values");
-                return;
-            }
-            bool phased = false;
-            if (have_phase && !null_phases && phase_valid(phase_values, phase_base + slot) &&
-                !phase_flag(phase_values, phase_id, phase_base + slot, &phased)) {
-                duckdb_scalar_function_set_error(info, "duckvep_phase_call: phase_before elements must be BOOLEAN values");
-                return;
-            }
-            if ((called && allele < 0) ||
-                duckvep_phase_observe(&summary, allele, phased) != DUCKVEP_PHASE_OK) {
-                duckdb_scalar_function_set_error(info, "duckvep_phase_call: called allele indices must be non-negative INTEGER values");
-                return;
-            }
+        context.allele_base = allele_lists[row].offset;
+        context.phase_base = have_phase ? phase_lists[row].offset : 0u;
+        context.at = at;
+        context.has_phase_set = ps != NULL;
+        context.phase_set = phase_set;
+        const char *message = NULL;
+        duckvep_core_phase_result_t result = duckvep_core_phase_row(&(duckvep_core_phase_reader_t){
+            &context, phase_allele_cell, phase_flag_cell, phase_emit}, count, have_phase, policy, &message);
+        if (result != DUCKVEP_CORE_PHASE_OK) {
+            duckdb_scalar_function_set_error(info, message);
+            return;
         }
         lists[row].length = count;
-        uint16_t called_before = 0u;
-        for (idx_t slot = 0u; slot < count; slot++, at++) {
-            bool called = !null_alleles && phase_valid(allele_values, base + slot);
-            int32_t allele = -1;
-            if (called && !phase_allele(allele_values, allele_id, allele_scale, base + slot, &allele)) {
-                duckdb_scalar_function_set_error(info, "duckvep_phase_call: called allele indices must be non-negative INTEGER values");
-                return;
-            }
-            bool phased = false;
-            if (have_phase && !null_phases && phase_valid(phase_values, phase_base + slot) &&
-                !phase_flag(phase_values, phase_id, phase_base + slot, &phased)) {
-                duckdb_scalar_function_set_error(info, "duckvep_phase_call: phase_before elements must be BOOLEAN values");
-                return;
-            }
-            duckvep_phase_assignment_t assignment;
-            if (duckvep_phase_assign(&summary, (uint16_t)(slot + 1u), called_before, allele, phased,
-                                     policy, &assignment) != DUCKVEP_PHASE_OK) {
-                duckdb_scalar_function_set_error(info, "duckvep_phase_call: invalid decoded phase state");
-                return;
-            }
-            if (called) called_before++;
-            for (idx_t i = 0u; i < 7u; i++)
-                duckdb_validity_set_row_valid(duckdb_vector_get_validity(fields[i]), at);
-            ((uint16_t *)duckdb_vector_get_data(fields[0]))[at] = (uint16_t)(slot + 1u);
-            ((int32_t *)duckdb_vector_get_data(fields[1]))[at] = allele;
-            if (!called) duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[1]), at);
-            ((uint16_t *)duckdb_vector_get_data(fields[2]))[at] = assignment.lane;
-            if (!assignment.lane) duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[2]), at);
-            ((uint16_t *)duckdb_vector_get_data(fields[3]))[at] = summary.ploidy;
-            if (assignment.scope == DUCKVEP_PHASE_SET && ps) {
-                ((int64_t *)duckdb_vector_get_data(fields[4]))[at] = phase_set;
-            } else {
-                duckdb_validity_set_row_invalid(duckdb_vector_get_validity(fields[4]), at);
-            }
-            const char *scope = assignment.scope == DUCKVEP_PHASE_SET ? "phase_set" :
-                assignment.scope == DUCKVEP_PHASE_ALL_SETS ? "all_phase_sets" :
-                assignment.scope == DUCKVEP_PHASE_ALLELE_SLOT ? "allele_slot" : "unresolved";
-            const char *status = assignment.status == DUCKVEP_PHASE_CALLED ? "called" :
-                assignment.status == DUCKVEP_PHASE_MISSING ? "missing" : "unphased";
-            duckdb_vector_assign_string_element(fields[5], at, scope);
-            duckdb_vector_assign_string_element(fields[6], at, status);
-        }
+        at += count;
     }
 }
 
@@ -285,23 +197,27 @@ static void raw_gt_scalar(duckdb_function_info info, duckdb_data_chunk input,
     duckdb_string_t *strings = duckdb_vector_get_data(text);
     uint32_t *counts = duckdb_vector_get_data(count_vector);
     uint32_t *fields[7];
-    for (idx_t i = 0u; i < 7u; i++)
-        fields[i] = duckdb_vector_get_data(duckdb_struct_vector_get_child(output, i));
+    duckdb_vector children[7];
+    for (idx_t i = 0u; i < 7u; i++) {
+        children[i] = duckdb_struct_vector_get_child(output, i);
+        fields[i] = duckdb_vector_get_data(children[i]);
+        duckdb_vector_ensure_validity_writable(children[i]);
+    }
     duckdb_vector_ensure_validity_writable(output);
     for (idx_t row = 0u; row < duckdb_data_chunk_get_size(input); row++) {
         if (!phase_valid(text, row) || !phase_valid(count_vector, row)) {
+            /* A NULL STRUCT row must null its children too, or field reads
+             * and vector copies see uninitialized values. */
             duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
+            for (idx_t i = 0u; i < 7u; i++)
+                duckdb_validity_set_row_invalid(duckdb_vector_get_validity(children[i]), row);
             continue;
         }
         duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
-        duckvep_raw_gt_t call = {0};
-        duckvep_raw_gt_status_t status = duckvep_phase_parse_vep116_raw(
-            (const uint8_t *)duckdb_string_t_data(&strings[row]),
-            duckdb_string_t_length(strings[row]), counts[row], &call);
-        fields[0][row] = (uint32_t)status;
-        fields[1][row] = call.allele_index[0]; fields[2][row] = call.allele_index[1];
-        fields[3][row] = call.parsed_slots; fields[4][row] = call.source_ploidy;
-        fields[5][row] = call.source_has_missing; fields[6][row] = (uint32_t)call.disposition;
+        uint32_t values[7];
+        duckvep_core_raw_gt(duckdb_string_t_data(&strings[row]),
+            duckdb_string_t_length(strings[row]), counts[row], values);
+        for (idx_t i = 0u; i < 7u; i++) fields[i][row] = values[i];
     }
 }
 
@@ -319,9 +235,9 @@ static void record_order_scalar(duckdb_function_info info, duckdb_data_chunk inp
             continue;
         }
         duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
-        ranks[row] = duckvep_haplotype_record_order(counts[row], ordinals[row]);
+        ranks[row] = duckvep_core_record_order(counts[row], ordinals[row]);
         if (!ranks[row]) {
-            duckdb_scalar_function_set_error(info, "duckvep_haplotypes: invalid source-buffer ordinal");
+            duckdb_scalar_function_set_error(info, duckvep_core_record_order_error);
             return;
         }
     }
