@@ -1,6 +1,6 @@
 # Function reference
 
-DuckVEP registers 26 public SQL functions: 21 scalar functions and 5 table functions. This page lists all of them, grouped by purpose. Internal helpers whose names start with `_duckvep_` or `__duckvep_` are implementation details and are not documented. `scripts/check-function-docs.py` (`make check-function-docs`) fails when this page misses or adds a public function relative to `duckdb_functions()`, and it runs every example below.
+DuckVEP registers 27 public SQL functions: 22 scalar functions and 5 table functions. This page lists all of them, grouped by purpose. Internal helpers whose names start with `_duckvep_` or `__duckvep_` are implementation details and are not documented. `scripts/check-function-docs.py` (`make check-function-docs`) fails when this page misses or adds a public function relative to `duckdb_functions()`, and it runs every example below.
 
 Every `sql` example on this page runs against the fixture model in `test/data/duckvep/readme.sql`, in the order it appears on the page: later examples use tables created by earlier ones. Blocks marked `sql no-run` are illustrative fragments or need external data.
 
@@ -35,6 +35,7 @@ FROM query(duckvep_annotate_sql('demo_events', 'demo', {hgvs: true}))
 | [Annotation: SQL builders](#annotation-sql-builders) | [`duckvep_annotate_sql`](#duckvep_annotate_sql) | scalar | SQL that annotates a relation of alleles with consequences, impact and HGVS. |
 | | [`duckvep_annotate_projected_sql`](#duckvep_annotate_projected_sql) | scalar | SQL that annotates ordered small variants and returns projected-edit facts. |
 | | [`duckvep_transcript_projection_sql`](#duckvep_transcript_projection_sql) | scalar | SQL that presents transcript positions, codons and peptides for annotated events. |
+| [Loss of function](#loss-of-function) | [`duckvep_lof_sql`](#duckvep_lof_sql) | scalar | SQL that derives LOFTEE's HC/LC loss-of-function call, filters and flags from annotation rows. |
 | [Structural and repeat preparation](#structural-and-repeat-preparation) | [`duckvep_prepare_sv_geometry_sql`](#duckvep_prepare_sv_geometry_sql) | scalar | SQL that normalizes VCF structural geometry and insertion provenance. |
 | | [`duckvep_prepare_breakend_pairs_sql`](#duckvep_prepare_breakend_pairs_sql) | scalar | SQL that validates BND mate and event identity. |
 | | [`duckvep_prepare_breakend_fusion_sql`](#duckvep_prepare_breakend_fusion_sql) | scalar | SQL that joins BND identity with endpoint genes. |
@@ -413,6 +414,87 @@ SELECT * FROM query(duckvep_annotate_sql('demo_events', 'demo'));
 SELECT event_index, reference_amino_acids, alternate_amino_acids, reference_codons, alternate_codons
 FROM query(duckvep_transcript_projection_sql(
   'demo_events', 'demo_annotations', 'readme_projection_transcripts'))
+ORDER BY event_index;
+```
+
+---
+
+## Loss of function
+
+LOFTEE's loss-of-function (LoF) call is a predicate over facts DuckVEP already produces: consequence, transcript, exon and intron rank and count, CDS position, strand and transcript flags, plus exon geometry and reference bases. The builder below states those predicates as joins and a `CASE`. It follows konradjk/loftee at commit `a46b502` and is checked against the plugin itself in `benchmarks/duckvep_lof.md`.
+
+<a id="duckvep_lof_sql"></a>
+
+### duckvep_lof_sql
+
+Builds the SQL that classifies annotation rows as high-confidence (HC) or low-confidence (LC) loss of function, one row per variant and transcript, with LOFTEE's filter, flag and info strings.
+
+Signatures:
+
+```text
+duckvep_lof_sql(annotations_table VARCHAR, transcripts_table VARCHAR, reference_table VARCHAR) -> VARCHAR
+duckvep_lof_sql(annotations_table VARCHAR, transcripts_table VARCHAR, reference_table VARCHAR, options STRUCT) -> VARCHAR
+```
+
+Parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `annotations_table` | The output of [`duckvep_annotate_projected_sql`](#duckvep_annotate_projected_sql), materialized or as a view. `duckvep_annotate_sql` does not carry the exon, intron and geometry columns, so the projected relation is the input. The builder reads `event_index`, `transcript_index`, `consequence`, `reference`, `alternate`, `geometry`, `exon_first`, `exon_last`, `exon_total`, `intron_first`, `intron_total`, `cds_start`, `cds_end`, `interbase`, `cds_start_nf` and `cds_end_nf`. |
+| `transcripts_table` | The transcript relation of the model, as [`duckvep_ensembl_transcripts_sql`](#duckvep_ensembl_transcripts_sql) produces it: `transcript_index`, `seq_region_name`, `strand`, `cds_start`, `cds_end` (genomic), `transcript_biotype` and the list column `exons` of structs with `exon_start` and `exon_end`. With the `phylocsf` option it also needs `transcript_stable_id`. |
+| `reference_table` | Reference sequence as chunks, the relation of [`duckvep_ensembl_regions_sql`](#duckvep_ensembl_regions_sql): `chrom`, `start` (zero-based), `end` (exclusive) and `seq`. A chrom name must equal `seq_region_name`. Chunks may split a window; it is stitched. |
+
+Options:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `gerp` | VARCHAR | none | Relation of GERP scores: `chrom`, `start` (zero-based), `end` (exclusive) and `score`. Turns on the GERP-weighted END_TRUNC rule. |
+| `ancestor` | VARCHAR | none | Relation of human ancestor bases in the shape of `reference_table`. Turns on ANC_ALLELE. |
+| `phylocsf` | VARCHAR | none | Relation with `transcript` (stable ID), `exon`, `corresponding_orf_score` and `max_score`, LOFTEE's `phylocsf_summary`. Turns on the PhyloCSF flags. |
+| `min_intron_size` | INTEGER | 15 | SMALL_INTRON when the intron is shorter than this. |
+| `gerp_end_trunc_cutoff` | numeric | -58 | END_TRUNC needs a GERP-weighted distance at or below this when `gerp` is given. |
+| `check_complete_cds` | BOOLEAN | false | Also filter INCOMPLETE_CDS (`cds_start_nf` or `cds_end_nf`). |
+
+Returns: `event_index`, `transcript_index`, `lof`, `lof_filter`, `lof_flags`, `lof_info` and `lof_unchecked`, one row per annotation row that has a transcript. `lof` is `HC` or `LC` for protein-coding transcripts whose consequences include `stop_gained`, `frameshift_variant`, `splice_acceptor_variant` or `splice_donor_variant`, and NULL for every other row, like LOFTEE's empty result. A filter makes a call LC; a flag does not. The three strings are comma-joined in LOFTEE's order and are NULL when empty. `lof_unchecked` lists the checks that could not run for the row, so a missing resource or missing geometry is unknown and never a guess: `GERP_END_TRUNC` (only the unweighted rule ran), `PHYLOCSF`, `ANC_ALLELE` (no `ancestor` relation, or no base at the position), `NON_CAN_SPLICE`, `NAGNAG_SITE` and `GC_TO_GT_DONOR` (reference bases missing), and `END_TRUNC` and `SMALL_INTRON` (the transcript has no exon list).
+
+Rules, each with LOFTEE's own convention:
+
+| Name | Kind | Rule |
+| --- | --- | --- |
+| END_TRUNC | filter | Stop or frameshift in an exon. The distance from the variant to the stop codon, summed as `end - start` per exon (one less than the exon length, and counting exons after the stop exon), minus the coding length of the stop exon measured the same way, is at most 50. With `gerp`, the GERP-weighted distance must also be at most `gerp_end_trunc_cutoff`. |
+| NO_EXON_NUMBER | flag | Stop or frameshift with a CDS position and no exon number. |
+| SINGLE_EXON | flag | Stop or frameshift in a one-exon transcript. |
+| EXON_INTRON_UNDEF | filter | An exon or intron rank without its count. LOFTEE's own test cannot fail; here it guards malformed input. |
+| INCOMPLETE_CDS | filter | With `check_complete_cds`, a non-single-exon stop or frameshift in a transcript flagged `cds_start_NF` or `cds_end_NF`. |
+| SMALL_INTRON | filter | The intron holding the variant is shorter than `min_intron_size`. |
+| GC_TO_GT_DONOR | filter | Splice donor, intron starting `GC`, reference `C` to alternate `T` on the transcript strand. |
+| 5UTR_SPLICE, 3UTR_SPLICE | filter | Splice donor or acceptor variant entirely before the CDS start or after the CDS end. |
+| ANC_ALLELE | filter | With `ancestor`, an SNV whose alternate allele is the ancestral base. |
+| NON_CAN_SPLICE | flag | Splice donor or acceptor variant in an intron that is not `GT`...`AG` on the transcript strand. |
+| NAGNAG_SITE | flag | Splice acceptor variant whose 9-base reference window (4 bases either side, transcript strand) contains `AG.AG`; only for a one-base variant. |
+| PHYLOCSF_WEAK, PHYLOCSF_UNLIKELY_ORF | flag | With `phylocsf`, the exon's corresponding ORF score is negative; UNLIKELY_ORF when the maximum score is positive. |
+
+`lof_info` holds `PERCENTILE`, `GERP_DIST` (with `gerp`), `BP_DIST`, `DIST_FROM_LAST_EXON`, `50_BP_RULE`, `ANN_ORF` and `MAX_ORF` or `PHYLOCSF_TOO_SHORT`, and `INTRON_SIZE`, as LOFTEE prints them. The MaxEntScan splice-prediction extensions, which LOFTEE leaves off by default, are not implemented.
+
+```sql
+CREATE TABLE demo_lof_annotations AS
+SELECT * FROM query(duckvep_annotate_projected_sql('demo_events', 'demo'));
+
+CREATE TABLE demo_lof_transcripts AS
+SELECT t.transcript_index, '1' AS seq_region_name, t.strand, t.cds_start, t.cds_end,
+       'protein_coding' AS transcript_biotype,
+       (SELECT list(struct_pack(exon_start := e.exon_start, exon_end := e.exon_end) ORDER BY e.exon_start)
+        FROM readme_exons e WHERE e.transcript_index = t.transcript_index) AS exons
+FROM readme_transcripts t;
+
+CREATE TABLE demo_lof_reference AS
+SELECT '1' AS chrom, 0 AS "start", 300 AS "end",
+       repeat('A', 150) || 'GT' || repeat('T', 45) || 'AG' || repeat('A', 101) AS seq;
+
+SELECT event_index, consequence, lof, lof_filter, lof_flags, lof_info
+FROM query(duckvep_lof_sql('demo_lof_annotations', 'demo_lof_transcripts', 'demo_lof_reference'))
+JOIN demo_lof_annotations USING (event_index, transcript_index)
+WHERE lof IS NOT NULL
 ORDER BY event_index;
 ```
 

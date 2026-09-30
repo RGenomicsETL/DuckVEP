@@ -1,0 +1,265 @@
+# duckvep_lof_sql on a hand-built two-strand fixture: a plus-strand gene with introns of 14, 15, 16 and 20 nt
+# (GT..AG, NAGNAG acceptor, AT..AC, GC donor) and a 3' UTR exon variant, a minus-strand mirror, a single-exon
+# gene and a non-coding transcript. Every expected value was worked out from the LOFTEE rules
+# (konradjk/loftee a46b502), then checked against the builder; see benchmarks/duckvep_lof.md.
+
+require duckvep
+
+statement ok
+CREATE TABLE lof_ref AS SELECT * FROM (VALUES
+  ('1', 0::BIGINT, 1000::BIGINT, repeat('C', 200) || 'G' || repeat('T', 11) || 'A' || 'G' || repeat('C', 100) || 'G' || repeat('T', 9) || 'A' || 'G' || 'T' || 'A' || 'G' || repeat('C', 100) || 'A' || repeat('T', 13) || 'A' || repeat('C', 101) || 'G' || 'C' || repeat('T', 16) || 'A' || 'G' || repeat('C', 100) || 'G' || repeat('T', 21) || 'A' || 'G' || repeat('C', 311)),
+  ('1', 1000::BIGINT, 2000::BIGINT, repeat('C', 470) || 'T' || 'A' || 'C' || 'T' || repeat('A', 10) || repeat('C', 102) || 'T' || repeat('A', 11) || 'G' || repeat('C', 401))) t(chrom, "start", "end", seq);
+
+statement ok
+CREATE TABLE lof_tx AS SELECT * FROM (VALUES
+  (0, '1', 1, 220, 600, 'protein_coding', 'T_P', [{'exon_start': 101, 'exon_end': 200}, {'exon_start': 215, 'exon_end': 314}, {'exon_start': 330, 'exon_end': 429}, {'exon_start': 446, 'exon_end': 545}, {'exon_start': 566, 'exon_end': 665}]),
+  (1, '1', -1, 1420, 1700, 'protein_coding', 'T_M', [{'exon_start': 1601, 'exon_end': 1700}, {'exon_start': 1486, 'exon_end': 1585}, {'exon_start': 1391, 'exon_end': 1469}]),
+  (2, '1', 1, 220, 600, 'protein_coding', 'T_P6', [{'exon_start': 101, 'exon_end': 200}, {'exon_start': 215, 'exon_end': 314}, {'exon_start': 330, 'exon_end': 429}, {'exon_start': 446, 'exon_end': 545}, {'exon_start': 566, 'exon_end': 665}, {'exon_start': 690, 'exon_end': 760}]),
+  (3, '1', 1, 1811, 1889, 'protein_coding', 'T_S', [{'exon_start': 1801, 'exon_end': 1900}]),
+  (4, '1', 1, 220, 600, 'lncRNA', 'T_NC', [{'exon_start': 101, 'exon_end': 200}, {'exon_start': 215, 'exon_end': 314}]),
+  (6, '1', 1, 220, 600, 'protein_coding', 'T_NOEXONS', NULL::STRUCT(exon_start INTEGER, exon_end INTEGER)[]),
+  (5, '1', 1, 220, 600, 'protein_coding', 'T_NF', [{'exon_start': 101, 'exon_end': 200}, {'exon_start': 215, 'exon_end': 314}, {'exon_start': 330, 'exon_end': 429}, {'exon_start': 446, 'exon_end': 545}, {'exon_start': 566, 'exon_end': 665}])
+) t(transcript_index, seq_region_name, strand, cds_start, cds_end, transcript_biotype, transcript_stable_id, exons);
+
+statement ok
+CREATE TABLE lof_ann AS SELECT event_index::UBIGINT AS event_index, transcript_index::UINTEGER AS transcript_index, consequence,
+  ref AS reference, alt AS alternate,
+  struct_pack(feature_start0 := (vs - 1)::UBIGINT, feature_end0 := ve::UBIGINT, reference_difference_offset := 0::USMALLINT,
+    reference_difference_length := length(ref)::USMALLINT, alternate_difference_offset := 0::USMALLINT,
+    alternate_difference_length := length(alt)::USMALLINT) AS geometry,
+  exon_first::UINTEGER AS exon_first, exon_last::UINTEGER AS exon_last, exon_total::UINTEGER AS exon_total,
+  intron_first::UINTEGER AS intron_first, intron_first::UINTEGER AS intron_last, intron_total::UINTEGER AS intron_total,
+  cds_end::UINTEGER AS cds_start, cds_end::UINTEGER AS cds_end, false AS interbase, cds_start_nf, false AS cds_end_nf
+FROM (VALUES
+  (1, 0, 'frameshift_variant', 'C', '', 496, 496, 4, 4, 5, NULL, NULL, 246, false),
+  (2, 0, 'frameshift_variant', 'C', '', 495, 495, 4, 4, 5, NULL, NULL, 245, false),
+  (3, 0, 'frameshift_variant', 'C', '', 494, 494, 4, 4, 5, NULL, NULL, 244, false),
+  (4, 0, 'frameshift_variant', 'C', '', 580, 580, 5, 5, 5, NULL, NULL, 310, false),
+  (5, 0, 'splice_donor_variant&intron_variant', 'G', 'A', 201, 201, NULL, NULL, NULL, 1, 4, NULL, false),
+  (6, 0, 'splice_donor_variant&intron_variant', 'G', 'A', 315, 315, NULL, NULL, NULL, 2, 4, NULL, false),
+  (7, 0, 'splice_donor_variant&intron_variant', 'A', 'G', 430, 430, NULL, NULL, NULL, 3, 4, NULL, false),
+  (8, 0, 'splice_acceptor_variant&intron_variant', 'G', 'A', 329, 329, NULL, NULL, NULL, 2, 4, NULL, false),
+  (9, 0, 'splice_acceptor_variant&intron_variant', 'G', 'A', 214, 214, NULL, NULL, NULL, 1, 4, NULL, false),
+  (10, 0, 'splice_acceptor_variant&intron_variant', 'A', 'C', 328, 328, NULL, NULL, NULL, 2, 4, NULL, false),
+  (11, 0, 'splice_acceptor_variant&intron_variant', 'G', '', 329, 329, NULL, NULL, NULL, 2, 4, NULL, false),
+  (12, 0, 'splice_acceptor_variant&intron_variant', '', 'G', 330, 329, NULL, NULL, NULL, 2, 4, NULL, false),
+  (13, 0, 'splice_donor_variant&intron_variant', 'C', 'T', 547, 547, NULL, NULL, NULL, 4, 4, NULL, false),
+  (14, 0, 'splice_donor_variant&intron_variant', 'C', 'A', 547, 547, NULL, NULL, NULL, 4, 4, NULL, false),
+  (15, 0, 'splice_donor_variant&intron_variant', 'G', 'A', 546, 546, NULL, NULL, NULL, 4, 4, NULL, false),
+  (16, 0, 'frameshift_variant', 'G', '', 201, 201, NULL, NULL, NULL, 1, 4, 50, false),
+  (17, 0, 'stop_gained', 'C', 'A', 400, 400, 3, 3, 5, NULL, NULL, 166, false),
+  (18, 2, 'frameshift_variant', 'C', '', 496, 496, 4, 4, 6, NULL, NULL, 246, false),
+  (19, 2, 'splice_donor_variant&intron_variant', 'G', 'A', 666, 666, NULL, NULL, NULL, 5, 5, NULL, false),
+  (20, 1, 'frameshift_variant', 'C', '', 1535, 1535, 2, 2, 3, NULL, NULL, 151, false),
+  (21, 1, 'frameshift_variant', 'C', '', 1536, 1536, 2, 2, 3, NULL, NULL, 150, false),
+  (22, 1, 'frameshift_variant', 'C', '', 1537, 1537, 2, 2, 3, NULL, NULL, 149, false),
+  (23, 1, 'splice_donor_variant&intron_variant', 'G', 'A', 1599, 1599, NULL, NULL, NULL, 1, 2, NULL, false),
+  (24, 1, 'splice_donor_variant&intron_variant', 'G', 'C', 1599, 1599, NULL, NULL, NULL, 1, 2, NULL, false),
+  (25, 1, 'splice_acceptor_variant&intron_variant', 'C', 'T', 1470, 1470, NULL, NULL, NULL, 2, 2, NULL, false),
+  (26, 1, 'splice_donor_variant&intron_variant', 'A', 'G', 1485, 1485, NULL, NULL, NULL, 2, 2, NULL, false),
+  (27, 1, 'splice_acceptor_variant&intron_variant', 'C', 'A', 1586, 1586, NULL, NULL, NULL, 1, 2, NULL, false),
+  (28, 3, 'frameshift_variant', 'C', '', 1850, 1850, 1, 1, 1, NULL, NULL, 40, false),
+  (29, 4, 'stop_gained', 'C', 'A', 230, 230, 2, 2, 2, NULL, NULL, 11, false),
+  (30, 5, 'stop_gained', 'C', 'A', 400, 400, 3, 3, 5, NULL, NULL, 166, true),
+  (31, 6, 'frameshift_variant', 'C', '', 495, 495, 4, 4, 5, NULL, NULL, 245, false),
+  (32, 6, 'splice_donor_variant&intron_variant', 'C', 'T', 547, 547, NULL, NULL, NULL, 4, 4, NULL, false)
+) t(event_index, transcript_index, consequence, ref, alt, vs, ve, exon_first, exon_last, exon_total, intron_first, intron_total, cds_end, cds_start_nf);
+
+statement ok
+CREATE TABLE lof_gerp_neg AS SELECT '1' AS chrom, 0::BIGINT AS "start", 2000::BIGINT AS "end", -1.0 AS score;
+
+statement ok
+CREATE TABLE lof_gerp_pos AS SELECT * FROM (VALUES ('1', 0, 1000, 0.5), ('1', 1000, 2000, 0.5)) t(chrom, "start", "end", score);
+
+statement ok
+CREATE TABLE lof_ancestor AS SELECT * FROM (VALUES ('1', 398, 402, 'cacc')) t(chrom, "start", "end", seq);
+
+statement ok
+CREATE TABLE lof_phylocsf AS SELECT * FROM (VALUES ('T_P', 2, 1.0, 1.0), ('T_P', 3, -1.5, 2.0), ('T_P', 4, -0.5, -0.1)) t(transcript, exon, corresponding_orf_score, max_score);
+
+# Defaults: the unweighted 50 bp rule, 15 nt minimum intron, no ancestor, no PhyloCSF, no INCOMPLETE_CDS check.
+query IITTTT
+SELECT event_index, transcript_index, lof, lof_filter, lof_flags, lof_info FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref')) ORDER BY event_index, transcript_index
+----
+1	0	LC	END_TRUNC	NULL	PERCENTILE:0.745454545454545,BP_DIST:83,DIST_FROM_LAST_EXON:49,50_BP_RULE:FAIL
+2	0	LC	END_TRUNC	NULL	PERCENTILE:0.742424242424242,BP_DIST:84,DIST_FROM_LAST_EXON:50,50_BP_RULE:FAIL
+3	0	HC	NULL	NULL	PERCENTILE:0.739393939393939,BP_DIST:85,DIST_FROM_LAST_EXON:51,50_BP_RULE:PASS
+4	0	LC	END_TRUNC	NULL	PERCENTILE:0.939393939393939,BP_DIST:20,DIST_FROM_LAST_EXON:-14,50_BP_RULE:FAIL
+5	0	LC	SMALL_INTRON,5UTR_SPLICE	NULL	INTRON_SIZE:14
+6	0	HC	NULL	NULL	INTRON_SIZE:15
+7	0	HC	NULL	NON_CAN_SPLICE	INTRON_SIZE:16
+8	0	HC	NULL	NAGNAG_SITE	INTRON_SIZE:15
+9	0	LC	SMALL_INTRON,5UTR_SPLICE	NULL	INTRON_SIZE:14
+10	0	HC	NULL	NAGNAG_SITE	INTRON_SIZE:15
+11	0	HC	NULL	NAGNAG_SITE	INTRON_SIZE:15
+12	0	HC	NULL	NULL	INTRON_SIZE:15
+13	0	LC	GC_TO_GT_DONOR	NON_CAN_SPLICE	INTRON_SIZE:20
+14	0	HC	NULL	NON_CAN_SPLICE	INTRON_SIZE:20
+15	0	HC	NULL	NON_CAN_SPLICE	INTRON_SIZE:20
+16	0	LC	SMALL_INTRON	NO_EXON_NUMBER	PERCENTILE:0.151515151515152,BP_DIST:331,INTRON_SIZE:14
+17	0	HC	NULL	NULL	PERCENTILE:0.503030303030303,BP_DIST:162,DIST_FROM_LAST_EXON:128,50_BP_RULE:PASS
+18	2	HC	NULL	NULL	PERCENTILE:0.745454545454545,BP_DIST:153,DIST_FROM_LAST_EXON:119,50_BP_RULE:PASS
+19	2	LC	3UTR_SPLICE	NULL	INTRON_SIZE:24
+20	1	LC	END_TRUNC	NULL	PERCENTILE:0.604,BP_DIST:98,DIST_FROM_LAST_EXON:49,50_BP_RULE:FAIL
+21	1	LC	END_TRUNC	NULL	PERCENTILE:0.6,BP_DIST:99,DIST_FROM_LAST_EXON:50,50_BP_RULE:FAIL
+22	1	HC	NULL	NULL	PERCENTILE:0.596,BP_DIST:100,DIST_FROM_LAST_EXON:51,50_BP_RULE:PASS
+23	1	LC	GC_TO_GT_DONOR	NON_CAN_SPLICE	INTRON_SIZE:15
+24	1	HC	NULL	NON_CAN_SPLICE	INTRON_SIZE:15
+25	1	HC	NULL	NAGNAG_SITE	INTRON_SIZE:16
+26	1	HC	NULL	NULL	INTRON_SIZE:16
+27	1	HC	NULL	NON_CAN_SPLICE	INTRON_SIZE:15
+28	3	LC	END_TRUNC	SINGLE_EXON	PERCENTILE:0.506329113924051,BP_DIST:39,DIST_FROM_LAST_EXON:-49,50_BP_RULE:FAIL
+29	4	NULL	NULL	NULL	NULL
+30	5	HC	NULL	NULL	PERCENTILE:0.503030303030303,BP_DIST:162,DIST_FROM_LAST_EXON:128,50_BP_RULE:PASS
+31	6	HC	NULL	NULL	NULL
+32	6	HC	NULL	NULL	NULL
+
+# Which checks could not run: no resource (rows 1, 5, 17), no exon geometry for the transcript (31, 32)
+query ITT
+SELECT event_index, lof, lof_unchecked FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref')) WHERE event_index IN (1, 5, 12, 17, 31, 32) ORDER BY event_index, transcript_index
+----
+1	LC	GERP_END_TRUNC,PHYLOCSF
+5	LC	ANC_ALLELE
+12	HC	NULL
+17	HC	GERP_END_TRUNC,PHYLOCSF,ANC_ALLELE
+31	HC	END_TRUNC,PHYLOCSF
+32	HC	SMALL_INTRON,GC_TO_GT_DONOR,ANC_ALLELE,NON_CAN_SPLICE
+
+# Intron size threshold: strict less-than, both strands
+query ITT
+SELECT event_index, lof, lof_filter FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {min_intron_size: 16})) WHERE event_index IN (5, 6, 7, 8, 23, 25, 26, 27) ORDER BY event_index, transcript_index
+----
+5	LC	SMALL_INTRON,5UTR_SPLICE
+6	LC	SMALL_INTRON
+7	HC	NULL
+8	LC	SMALL_INTRON
+23	LC	SMALL_INTRON,GC_TO_GT_DONOR
+25	HC	NULL
+26	HC	NULL
+27	LC	SMALL_INTRON
+
+query ITT
+SELECT event_index, lof, lof_filter FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {min_intron_size: 17})) WHERE event_index IN (5, 6, 7, 8, 23, 25, 26, 27) ORDER BY event_index, transcript_index
+----
+5	LC	SMALL_INTRON,5UTR_SPLICE
+6	LC	SMALL_INTRON
+7	LC	SMALL_INTRON
+8	LC	SMALL_INTRON
+23	LC	SMALL_INTRON,GC_TO_GT_DONOR
+25	LC	SMALL_INTRON
+26	LC	SMALL_INTRON
+27	LC	SMALL_INTRON
+
+query ITT
+SELECT event_index, lof, lof_filter FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {min_intron_size: 0})) WHERE event_index IN (5, 9) ORDER BY event_index, transcript_index
+----
+5	LC	5UTR_SPLICE
+9	LC	5UTR_SPLICE
+
+# INCOMPLETE_CDS follows cds_start_NF or cds_end_NF when asked for
+query ITT
+SELECT event_index, lof, lof_filter FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {check_complete_cds: true})) WHERE event_index IN (17, 30) ORDER BY event_index, transcript_index
+----
+17	HC	NULL
+30	LC	INCOMPLETE_CDS
+
+# GERP-weighted END_TRUNC: the filter needs the weighted distance to be at most the cutoff
+query ITTTT
+SELECT event_index, lof, lof_filter, lof_info, lof_unchecked FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {gerp: 'lof_gerp_neg'})) WHERE event_index IN (1, 3, 4, 20, 28) ORDER BY event_index, transcript_index
+----
+1	LC	END_TRUNC	PERCENTILE:0.745454545454545,GERP_DIST:-85,BP_DIST:83,DIST_FROM_LAST_EXON:49,50_BP_RULE:FAIL	PHYLOCSF
+3	HC	NULL	PERCENTILE:0.739393939393939,GERP_DIST:-87,BP_DIST:85,DIST_FROM_LAST_EXON:51,50_BP_RULE:PASS	PHYLOCSF
+4	HC	NULL	PERCENTILE:0.939393939393939,GERP_DIST:-21,BP_DIST:20,DIST_FROM_LAST_EXON:-14,50_BP_RULE:FAIL	PHYLOCSF
+20	LC	END_TRUNC	PERCENTILE:0.604,GERP_DIST:-100,BP_DIST:98,DIST_FROM_LAST_EXON:49,50_BP_RULE:FAIL	PHYLOCSF
+28	HC	NULL	PERCENTILE:0.506329113924051,GERP_DIST:-40,BP_DIST:39,DIST_FROM_LAST_EXON:-49,50_BP_RULE:FAIL	PHYLOCSF
+
+query ITTT
+SELECT event_index, lof, lof_filter, lof_info FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {gerp: 'lof_gerp_pos'})) WHERE event_index IN (1, 2, 20) ORDER BY event_index, transcript_index
+----
+1	HC	NULL	PERCENTILE:0.745454545454545,GERP_DIST:42.5,BP_DIST:83,DIST_FROM_LAST_EXON:49,50_BP_RULE:FAIL
+2	HC	NULL	PERCENTILE:0.742424242424242,GERP_DIST:43,BP_DIST:84,DIST_FROM_LAST_EXON:50,50_BP_RULE:FAIL
+20	HC	NULL	PERCENTILE:0.604,GERP_DIST:50,BP_DIST:98,DIST_FROM_LAST_EXON:49,50_BP_RULE:FAIL
+
+query ITTT
+SELECT event_index, lof, lof_filter, lof_info FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {gerp: 'lof_gerp_pos', gerp_end_trunc_cutoff: 50})) WHERE event_index IN (1, 3) ORDER BY event_index, transcript_index
+----
+1	LC	END_TRUNC	PERCENTILE:0.745454545454545,GERP_DIST:42.5,BP_DIST:83,DIST_FROM_LAST_EXON:49,50_BP_RULE:FAIL
+3	HC	NULL	PERCENTILE:0.739393939393939,GERP_DIST:43.5,BP_DIST:85,DIST_FROM_LAST_EXON:51,50_BP_RULE:PASS
+
+# ANC_ALLELE: SNVs whose alternate allele is the ancestral base; uncovered SNVs are reported unchecked
+query ITTT
+SELECT event_index, lof, lof_filter, lof_unchecked FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {ancestor: 'lof_ancestor'})) WHERE event_index IN (5, 12, 14, 17, 30) ORDER BY event_index, transcript_index
+----
+5	LC	SMALL_INTRON,5UTR_SPLICE	ANC_ALLELE
+12	HC	NULL	NULL
+14	HC	NULL	ANC_ALLELE
+17	LC	ANC_ALLELE	GERP_END_TRUNC,PHYLOCSF
+30	LC	ANC_ALLELE	GERP_END_TRUNC,PHYLOCSF
+
+# PhyloCSF flags and info
+query ITTTT
+SELECT event_index, lof, lof_filter, lof_flags, lof_info FROM query(duckvep_lof_sql('lof_ann', 'lof_tx', 'lof_ref', {phylocsf: 'lof_phylocsf'})) WHERE event_index IN (1, 3, 4, 17, 28) ORDER BY event_index, transcript_index
+----
+1	LC	END_TRUNC	PHYLOCSF_WEAK	PERCENTILE:0.745454545454545,BP_DIST:83,DIST_FROM_LAST_EXON:49,50_BP_RULE:FAIL,ANN_ORF:-0.5,MAX_ORF:-0.1
+3	HC	NULL	PHYLOCSF_WEAK	PERCENTILE:0.739393939393939,BP_DIST:85,DIST_FROM_LAST_EXON:51,50_BP_RULE:PASS,ANN_ORF:-0.5,MAX_ORF:-0.1
+4	LC	END_TRUNC	NULL	PERCENTILE:0.939393939393939,BP_DIST:20,DIST_FROM_LAST_EXON:-14,50_BP_RULE:FAIL,PHYLOCSF_TOO_SHORT
+17	HC	NULL	PHYLOCSF_UNLIKELY_ORF	PERCENTILE:0.503030303030303,BP_DIST:162,DIST_FROM_LAST_EXON:128,50_BP_RULE:PASS,ANN_ORF:-1.5,MAX_ORF:2
+28	LC	END_TRUNC	SINGLE_EXON	PERCENTILE:0.506329113924051,BP_DIST:39,DIST_FROM_LAST_EXON:-49,50_BP_RULE:FAIL,PHYLOCSF_TOO_SHORT
+
+# Builder contract
+query I
+SELECT contains(duckvep_lof_sql('a";λ', 't";λ', 'r";λ', {gerp: 'g";λ'}), '"a"";λ"')
+    AND contains(duckvep_lof_sql('a";λ', 't";λ', 'r";λ', {gerp: 'g";λ'}), '"g"";λ"');
+----
+true
+
+query I
+SELECT duckvep_lof_sql('a', 't', 'r') = duckvep_lof_sql('a', 't', 'r', {gerp: NULL, ancestor: NULL, phylocsf: NULL,
+    min_intron_size: NULL, gerp_end_trunc_cutoff: NULL, check_complete_cds: NULL});
+----
+true
+
+statement error
+SELECT duckvep_lof_sql(NULL, 't', 'r');
+----
+duckvep_lof_sql: invalid relation name
+
+statement error
+SELECT duckvep_lof_sql('a', 't', '');
+----
+duckvep_lof_sql: invalid relation name
+
+statement error
+SELECT duckvep_lof_sql('a', 't', 'r', {bogus: 1});
+----
+unknown option 'bogus'
+
+statement error
+SELECT duckvep_lof_sql('a', 't', 'r', {gerp: 1});
+----
+expected VARCHAR for option 'gerp'
+
+statement error
+SELECT duckvep_lof_sql('a', 't', 'r', {min_intron_size: -1});
+----
+min_intron_size must be an integer
+
+statement error
+SELECT duckvep_lof_sql('a', 't', 'r', {min_intron_size: 'x'});
+----
+expected INTEGER for option 'min_intron_size'
+
+statement error
+SELECT duckvep_lof_sql('a', 't', 'r', {gerp_end_trunc_cutoff: 'NaN'::DOUBLE});
+----
+gerp_end_trunc_cutoff must be a finite number
+
+statement error
+SELECT duckvep_lof_sql('a', 't', 'r', {check_complete_cds: 1});
+----
+expected BOOLEAN for option 'check_complete_cds'
+
+statement error
+SELECT * FROM query(duckvep_lof_sql('no_such_annotations', 'lof_tx', 'lof_ref'));
+----
+no_such_annotations

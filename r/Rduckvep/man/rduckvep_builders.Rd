@@ -4,6 +4,7 @@
 \alias{rduckvep_builders}
 \alias{rduckvep_annotate_sql}
 \alias{rduckvep_transcript_projection_sql}
+\alias{rduckvep_lof_sql}
 \alias{rduckvep_ensembl_regions_sql}
 \alias{rduckvep_ensembl_transcripts_sql}
 \alias{rduckvep_ensembl_regulation_features_sql}
@@ -17,6 +18,14 @@ rduckvep_transcript_projection_sql(
   events_table,
   annotations_table,
   transcripts_table,
+  ...
+)
+
+rduckvep_lof_sql(
+  con,
+  annotations_table,
+  transcripts_table,
+  reference_table,
   ...
 )
 
@@ -65,13 +74,17 @@ rduckvep_model_receipt_sql(
 
 \item{...}{Named builder options (for annotation: `hgvs`, `rich`,
 `upstream_distance`, `downstream_distance`; for Ensembl regions and
-transcripts: `species_id`; for receipts: `regulation_features_table`).
+transcripts: `species_id`; for receipts: `regulation_features_table`; for
+the loss-of-function relation: `gerp`, `ancestor`, `phylocsf`,
+`min_intron_size`, `gerp_end_trunc_cutoff`, `check_complete_cds`).
 Other builders accept no options. Each value must be a length-one string,
 logical, integer, double or `NA`.}
 
 \item{annotations_table}{Annotation relation name.}
 
 \item{transcripts_table}{Transcript relation name.}
+
+\item{reference_table}{Reference sequence chunk relation (`chrom`, `start`, `end`, `seq`).}
 
 \item{core_schema}{Ensembl core schema name.}
 

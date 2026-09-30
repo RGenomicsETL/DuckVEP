@@ -796,6 +796,15 @@ local({
   expect_true(grepl("SELECT", rduckvep_transcript_projection_sql(
     con, "duckvep_r_public_events", "duckvep_r_public_events",
     "duckvep_r_ensembl_transcripts"), fixed = TRUE))
+  expect_identical(
+    rduckvep_lof_sql(con, "a", "t", "r", gerp = "g", min_intron_size = 20L,
+                     gerp_end_trunc_cutoff = -10, check_complete_cds = TRUE),
+    dbGetQuery(con, paste0("SELECT duckvep_lof_sql('a', 't', 'r', {gerp: 'g', min_intron_size: 20,",
+                           " gerp_end_trunc_cutoff: -10, check_complete_cds: true}) AS sql"))$sql[[1L]]
+  )
+  expect_identical(rduckvep_lof_sql(con, "a", "t", "r"),
+                   dbGetQuery(con, "SELECT duckvep_lof_sql('a', 't', 'r') AS sql")$sql[[1L]])
+  expect_error(rduckvep_lof_sql(con, "a", "t", "r", bogus = 1L), "unknown option")
   expect_true(grepl("SELECT", rduckvep_ensembl_regions_sql(
     con, "duckvep_r_core", "duckvep_r_reference", "GRCh38"), fixed = TRUE))
   expect_true(grepl("SELECT", rduckvep_ensembl_transcripts_sql(
