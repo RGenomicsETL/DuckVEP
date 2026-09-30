@@ -7,6 +7,7 @@
 
 #include "core/duckvep_core_annotate.h"
 #include "core/duckvep_core_ensembl.h"
+#include "core/duckvep_core_lof.h"
 #include "core/duckvep_core_prepare.h"
 
 #define MAX_ARGS 10
@@ -545,6 +546,71 @@ static void hgvs_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb_v2
 }
 
 /* ---------------------------------------------------------------------------
+ * duckvep_lof_sql(annotations, transcripts, reference [, options])
+ * ------------------------------------------------------------------------- */
+
+static void lof_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb_v2_context_handle context,
+                     duckdb_v2_error_info_handle *error) {
+    (void)context;
+    call c;
+    options option;
+    if (!call_open(info, 3, &c, error)) {
+        return;
+    }
+    if (!options_open(c.argc == 4 ? call_argument(info, 3, error) : NULL, duckvep_core_lof_option_names,
+                      duckvep_core_lof_option_kinds, DUCKVEP_LOF_OPTIONS, &option, error)) {
+        return;
+    }
+    for (idx_t row = 0; row < c.rows; ++row) {
+        char *names[3] = {0};
+        duckvep_lof_options_t parsed;
+        bool ok = true;
+        duckvep_sql_text sql = {0};
+        memset(&parsed, 0, sizeof parsed);
+        for (idx_t i = 0; ok && i < 3; ++i) {
+            names[i] = copy_argument(&c, i, row);
+            ok = names[i] != NULL;
+        }
+        if (!ok) {
+            report(*error, duckvep_core_lof_names_failed);
+        }
+        if (ok && c.argc == 4) {
+            duckvep_cell_t cells[DUCKVEP_LOF_OPTIONS];
+            const duckvep_cell_t *pointers[DUCKVEP_LOF_OPTIONS] = {0};
+            const char *message;
+            if (!options_check(&option, row, error)) {
+                free_all(names, 3);
+                return;
+            }
+            for (size_t i = 0; i < DUCKVEP_LOF_OPTIONS; ++i) {
+                pointers[i] = option_or_null(&option, i, row, &cells[i]);
+            }
+            message = duckvep_core_lof_read_options(pointers, &parsed);
+            if (message) {
+                report(*error, message);
+                ok = false;
+            }
+        } else if (ok) {
+            const duckvep_cell_t *none[DUCKVEP_LOF_OPTIONS] = {0};
+            (void)duckvep_core_lof_read_options(none, &parsed);
+        }
+        if (ok && !duckvep_core_lof_sql(names, &parsed, &sql)) {
+            report(*error, duckvep_core_lof_names_failed);
+            ok = false;
+        }
+        if (ok) {
+            ok = write_sql(&c, row, &sql);
+        }
+        duckvep_sql_free(&sql);
+        duckvep_core_lof_free_options(&parsed);
+        free_all(names, 3);
+        if (!ok) {
+            return;
+        }
+    }
+}
+
+/* ---------------------------------------------------------------------------
  * Registration: `required` VARCHAR parameters, plus an optional options STRUCT
  * (an ANY parameter), as two overloads.
  * ------------------------------------------------------------------------- */
@@ -583,5 +649,6 @@ bool host_v2_register_builders(duckdb_v2_extension_handle extension, duckdb_v2_c
                             prepare_expansionhunter_exec, error) &&
            register_builder(extension, context, "duckvep_prepare_breakend_pairs_sql", 1, pairs_exec, error) &&
            register_builder(extension, context, "duckvep_prepare_breakend_fusion_sql", 2, fusion_exec, error) &&
-           register_builder(extension, context, "duckvep_prepare_structural_hgvs_sql", 2, hgvs_exec, error);
+           register_builder(extension, context, "duckvep_prepare_structural_hgvs_sql", 2, hgvs_exec, error) &&
+           register_builder(extension, context, "duckvep_lof_sql", 3, lof_exec, error);
 }

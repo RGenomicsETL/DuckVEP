@@ -127,6 +127,7 @@ static inline void fill_cell(const column *c, idx_t index, duckvep_cell_t *cell)
     *cell = (duckvep_cell_t){0};
     cell->kind = c->type.kind;
     cell->scale = c->type.scale;
+    cell->decimal = c->type.id == DUCKDB_V2_LOGICAL_TYPE_ID_DECIMAL;
     cell->valid = column_valid(c, index);
     if (!c->has_view) {
         cell->kind = DUCKVEP_CELL_UNSUPPORTED;
