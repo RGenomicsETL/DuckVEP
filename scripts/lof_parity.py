@@ -316,7 +316,7 @@ def main():
         digests.append((name, hashlib.sha256(body.encode()).hexdigest(),
                         hashlib.sha256(open(out_json, 'rb').read()).hexdigest()))
     with open(os.path.join(args.out, 'duckvep_lof_parity_summary.csv'), 'w', newline='') as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(summary[0]))
+        writer = csv.DictWriter(handle, fieldnames=list(summary[0]), lineterminator="\n")
         writer.writeheader()
         writer.writerows(summary)
     with open(os.path.join(args.out, 'duckvep_lof_parity_disagreements.tsv'), 'w') as handle:
