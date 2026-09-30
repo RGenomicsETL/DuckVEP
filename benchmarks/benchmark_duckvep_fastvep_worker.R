@@ -23,6 +23,13 @@ op <- add_option(
   "--extension",
   default = file.path(root, "build", "release", "duckhts.duckdb_extension")
 )
+op <- add_option(
+  op,
+  "--duckhts-extension",
+  dest = "duckhts_extension",
+  default = "",
+  help = "DuckHTS extension, loaded in a separate in-process instance, that decodes the VCF and GFF3 when --extension is the standalone duckvep extension"
+)
 op <- add_option(op, "--model", default = "")
 op <- add_option(op, "--input", default = "")
 op <- add_option(op, "--output", default = "")
@@ -56,6 +63,7 @@ if (opt$output_contract == "vep_csq" && (!nzchar(opt$fasta) || !nzchar(opt$gff3)
 }
 
 required <- c(opt$extension, opt$model, opt$input,
+  if (nzchar(opt$duckhts_extension)) opt$duckhts_extension,
   c(opt$fasta, opt$gff3)[nzchar(c(opt$fasta, opt$gff3))])
 missing <- required[!nzchar(required) | !file.exists(required)]
 if (length(missing) != 0L) {
@@ -86,6 +94,39 @@ on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
 sql_q <- function(x) as.character(dbQuoteString(con, x))
 
 invisible(dbExecute(con, glue("LOAD {sql_q(extension)}")))
+# DuckHTS embeds an older DuckVEP whose function names collide with the
+# standalone extension, so it never shares a database instance with it. When
+# --duckhts-extension is given, a second in-process instance decodes the VCF and
+# the GFF3 into Parquet (inside this timed process, on the same pinned CPUs) and
+# read_bcf/read_gff are bound to those files for the field builders.
+if (nzchar(opt$duckhts_extension)) {
+  stage_dir <- file.path(tempdir(), "duckhts-stage")
+  dir.create(stage_dir, recursive = TRUE)
+  staged_vcf <- file.path(stage_dir, "source.parquet")
+  staged_gff <- file.path(stage_dir, "gff.parquet")
+  reader_drv <- duckdb(dbdir = ":memory:", config = list(allow_unsigned_extensions = "true"))
+  reader <- dbConnect(reader_drv)
+  reader_q <- function(x) as.character(dbQuoteString(reader, x))
+  invisible(dbExecute(reader, glue("LOAD {reader_q(normalizePath(opt$duckhts_extension))}")))
+  invisible(dbExecute(reader, glue("PRAGMA threads={opt$threads}")))
+  invisible(dbExecute(reader, glue("SET memory_limit = {reader_q(opt$memory_limit)}")))
+  invisible(dbExecute(reader, "SET preserve_insertion_order = true"))
+  invisible(dbExecute(reader, glue("COPY (SELECT CHROM, POS, ID, REF, ALT
+    FROM read_bcf({reader_q(input)}, scan_mode := 'sequential', decompression_threads := 0))
+    TO {reader_q(staged_vcf)} (FORMAT PARQUET)")))
+  if (nzchar(opt$gff3)) {
+    invisible(dbExecute(reader, glue("COPY (SELECT feature, attributes_map
+      FROM read_gff({reader_q(normalizePath(opt$gff3))}, attributes_map := TRUE,
+        scan_mode := 'sequential')) TO {reader_q(staged_gff)} (FORMAT PARQUET)")))
+  }
+  dbDisconnect(reader, shutdown = TRUE)
+  invisible(dbExecute(con, glue("CREATE TEMP MACRO read_bcf(path, scan_mode := 'sequential',
+    decompression_threads := 0) AS TABLE SELECT * FROM read_parquet({sql_q(staged_vcf)})")))
+  if (nzchar(opt$gff3)) {
+    invisible(dbExecute(con, glue("CREATE TEMP MACRO read_gff(path, attributes_map := TRUE,
+      scan_mode := 'sequential') AS TABLE SELECT * FROM read_parquet({sql_q(staged_gff)})")))
+  }
+}
 invisible(dbExecute(con, glue("PRAGMA threads={opt$threads}")))
 invisible(dbExecute(con, glue("SET memory_limit = {sql_q(opt$memory_limit)}")))
 invisible(dbExecute(con, glue("SET max_temp_directory_size = {sql_q(opt$max_spill)}")))
@@ -104,8 +145,38 @@ invisible(dbExecute(
   con,
   glue("ATTACH {sql_q(model)} AS duckvep_bench_model (READ_ONLY)")
 ))
-source(file.path(root, "r/duckhtsbench/R/duckvep_relations.R"), local = TRUE)
-model_relations <- duckhts_bench_duckvep_relations(con, "duckvep_bench_model")
+relations_source <- file.path(root, "r/duckhtsbench/R/duckvep_relations.R")
+if (file.exists(relations_source)) {
+  source(relations_source, local = TRUE)
+  model_relations <- duckhts_bench_duckvep_relations(con, "duckvep_bench_model")
+} else {
+  # Standalone repository: use the flat duckvep_* relations when the model
+  # carries them, otherwise project the nested model_regions/model_transcripts
+  # exactly as the DuckHTS benchmark helper does.
+  flat <- dbGetQuery(con, "SELECT table_name FROM information_schema.tables
+    WHERE table_catalog = 'duckvep_bench_model' AND table_schema = 'main'
+      AND starts_with(table_name, 'duckvep_')")$table_name
+  relation_names <- c("duckvep_sequence_regions", "duckvep_transcripts",
+    "duckvep_exons", "duckvep_mature_mirna", "duckvep_peptide_edits")
+  if (all(relation_names %in% flat)) {
+    model_relations <- as.list(setNames(
+      paste0("duckvep_bench_model.main.", relation_names), relation_names))
+  } else {
+    regions <- "duckvep_bench_model.main.model_regions"
+    transcripts <- "duckvep_bench_model.main.model_transcripts"
+    projections <- c(
+      duckvep_sequence_regions = paste("SELECT seq_region, sequence_length, seq_region_name AS name FROM", regions),
+      duckvep_transcripts = paste("SELECT * FROM", transcripts),
+      duckvep_exons = paste("SELECT transcript_index, exon.* FROM", transcripts,
+        "CROSS JOIN UNNEST(exons) AS u(exon)"),
+      duckvep_mature_mirna = paste("SELECT transcript_index, region.* FROM", transcripts,
+        "CROSS JOIN UNNEST(mature_mirna_regions) AS u(region)"),
+      duckvep_peptide_edits = paste("SELECT transcript_index, edit.* FROM", transcripts,
+        "CROSS JOIN UNNEST(peptide_edits) AS u(edit)"))
+    model_relations <- as.list(setNames(
+      paste0("(", projections, ") AS duckvep_prepared"), names(projections)))
+  }
+}
 invisible(dbExecute(
   con,
   glue("CREATE TEMP TABLE duckvep_bench_regions AS

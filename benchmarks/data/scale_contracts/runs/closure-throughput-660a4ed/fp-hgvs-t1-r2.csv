@@ -1,0 +1,2 @@
+"schema_version","workload","output_mode","transcript_distance","input_variants","output_rows","xor_hash","sum_hash","model_sha256","region_ordinal_sha256","variants_database_sha256"
+2,"ensembl116_grch38_giab_hg002_v4_2_1_full_literal_public_relation_public_relation","hgvs","5000",4095611,"47835851","12680072761941579349","441216807664288228713082623","296bc90633562da49e900a723675c7a0b4aba53b8cbdec027f107d46972aec68","e1f7d2c9a229e69df3285cd0af2c8a25e2ea76b772eff6f5057ba9201fdcafec","3cdaab642bc4ab9a882be1d518f80bfcd1352755dd1c5a4e0b356dbf8881fab4"

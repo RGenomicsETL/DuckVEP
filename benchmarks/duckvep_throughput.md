@@ -477,6 +477,42 @@ additionally retain an untimed full-row fingerprint.
 `elapsed_vs_compact` compares projections at the same thread count; it
 is not a comparison against a private kernel lane.
 
+### Closure re-measurement on the frozen candidate (660a4ed)
+
+| revision | output    | threads | input_alleles | output_rows | median_seconds | alleles_per_second | output_rows_per_second | scaling_vs_one_core | elapsed_vs_compact |
+|:---------|:----------|--------:|:--------------|:------------|---------------:|:-------------------|:-----------------------|--------------------:|-------------------:|
+| 660a4ed  | compact   |       1 | 4,095,611     | 47,835,851  |          3.958 | 1,034,768          | 12,085,864             |                1.00 |               1.00 |
+| 660a4ed  | rich      |       1 | 4,095,611     | 47,835,851  |          9.291 | 440,815            | 5,148,622              |                1.00 |               2.35 |
+| 660a4ed  | hgvs      |       1 | 4,095,611     | 47,835,851  |         19.035 | 215,162            | 2,513,047              |                1.00 |               4.81 |
+| 660a4ed  | rich_hgvs |       1 | 4,095,611     | 47,835,851  |         24.633 | 166,265            | 1,941,942              |                1.00 |               6.22 |
+| 660a4ed  | compact   |       4 | 4,095,611     | 47,835,851  |          1.167 | 3,509,521          | 40,990,446             |                3.39 |               1.00 |
+| 660a4ed  | rich      |       4 | 4,095,611     | 47,835,851  |          2.669 | 1,534,511          | 17,922,762             |                3.48 |               2.29 |
+| 660a4ed  | hgvs      |       4 | 4,095,611     | 47,835,851  |          5.658 | 723,862            | 8,454,551              |                3.36 |               4.85 |
+| 660a4ed  | rich_hgvs |       4 | 4,095,611     | 47,835,851  |          7.357 | 556,696            | 6,502,087              |                3.35 |               6.30 |
+
+These are the rows of the closure lane for the frozen candidate `660a4ed`
+(`origin/main` after the scale runner), taken with an immutable copy of the
+`make release` binary (SHA-256 `c914483a...`), DuckDB v1.5.5, the same
+model, corpus, regulation features, warmup, pass count and affinity as the
+rows above, and one-minute load averages of 1.62 to 2.91 before the runs
+(an unrelated unpinned gnomAD staging job was running). The aggregate
+checksums and the untimed full-row fingerprints equal the `cfba55c` rows in
+every mode and thread count. The one-core compact row is the median of five
+runs: the run medians are 3.935, 3.944, 3.946, 3.947 and 3.958 s, which is
+1,037,915 alleles/s at the median (1,034,768 to 1,040,816 across runs); the
+gate of 1,000,000 alleles/s on one core is met. The table shows the last run
+of each configuration as the ledger stores one row per configuration: the
+compact four-thread runs were 1.027 to 1.167 s (five runs), rich 1 thread
+9.276 to 9.335 s, hgvs 19.035 to 19.140 s and rich_hgvs 24.610 to 24.757 s
+(three runs each), with four-thread rich, hgvs and rich_hgvs at 2.669 to
+2.742 s, 5.597 to 5.663 s and 7.348 to 7.375 s. The four-thread CPU set 2,
+4, 6, 8 shares core 6 with unrelated work, as before. Receipts, logs and
+the driver script are in
+[closure-throughput-660a4ed](data/scale_contracts/runs/closure-throughput-660a4ed).
+The runner label `_public_relation` was passed twice on the command line
+and doubled in the raw `history.csv` there; the ledger rows carry the
+single suffix.
+
 ## Historical full-corpus transcript-only diagnostic
 
 | revision | corpus             | output  | input_alleles | output_rows | rows_per_allele | median_seconds | alleles_per_second | output_rows_per_second | elapsed_vs_compact | projected_700M_allele_hours |
