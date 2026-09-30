@@ -32,7 +32,7 @@ CASES = ROOT / "test/sql_v2/equality_cases.sql"
 NATIVE = ROOT / "test/sql_v2/v2_native.sql"
 GOLDEN = ROOT / "test/sql_v2/equality_golden.json"
 PIN = json.loads((ROOT / "duckvep-package.json").read_text())["v2_host"]
-MESSAGE = re.compile(r"duckvep_\w+: [^\n]*")
+MESSAGE = re.compile(r"(?:duckvep_\w+|_duckvep_\w+|DuckVEP builder): [^\n]*")
 
 
 def quote(path):
