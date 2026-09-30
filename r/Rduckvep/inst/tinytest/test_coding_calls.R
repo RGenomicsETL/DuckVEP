@@ -2,7 +2,7 @@ local({
   con <- rduckvep_connect()
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
   model <- paste0("SELECT loaded FROM duckvep_model_load('tinytest_calls', ",
-    "'SELECT 0::UINTEGER seq_region, ''chrT'' seq_region_name', ",
+    "'SELECT 0::UINTEGER seq_region, 1000::UBIGINT sequence_length, ''chrT'' seq_region_name', ",
     "'SELECT 0::UINTEGER transcript_index,0::UINTEGER seq_region,100::UBIGINT transcript_start,111::UBIGINT transcript_end,1::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,100::UBIGINT cds_start,111::UBIGINT cds_end,''ATGGCTGCTTAA''::BLOB cds_sequence,1::UTINYINT codon_table,''''::BLOB pre_cds_sequence,''''::BLOB post_cds_sequence', ",
     "'SELECT 0::UINTEGER transcript_index,100::UBIGINT exon_start,111::UBIGINT exon_end,1::UBIGINT exon_cdna_start,12::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase')")
   expect_true(DBI::dbGetQuery(con, model)$loaded)
@@ -21,11 +21,11 @@ local({
   calls <- rduckvep_coding_calls(con, "tinytest_calls", vcf)
   expect_true(is.data.frame(calls))
   expect_equal(nrow(calls), 3L)
-  expect_equal(sort(calls$event_index), c(192, 193, 256))
-  expect_equal(calls$phase_set[calls$event_index == 192], 77)
-  expect_true(is.na(calls$phase_set[calls$event_index == 256]))
-  expect_equal(unlist(calls$alleles[calls$event_index == 193]), c(1L, 2L))
-  expect_equal(unlist(calls$phase_before[calls$event_index == 256]), c(FALSE, FALSE))
+  expect_equal(sort(calls$event_index), c(128, 129, 192))
+  expect_equal(calls$phase_set[calls$event_index == 128], 77)
+  expect_true(is.na(calls$phase_set[calls$event_index == 192]))
+  expect_equal(unlist(calls$alleles[calls$event_index == 129]), c(1L, 2L))
+  expect_equal(unlist(calls$phase_before[calls$event_index == 192]), c(FALSE, FALSE))
   expect_true(rduckvep_coding_calls(con, "tinytest_calls", vcf, table_name = "tinytest_coding_calls"))
   expect_equal(DBI::dbGetQuery(con, "SELECT count(*) AS n FROM tinytest_coding_calls")$n, 3)
   expect_error(rduckvep_coding_calls(con, "tinytest_calls", vcf, table_name = "tinytest_coding_calls"), "already exists")
