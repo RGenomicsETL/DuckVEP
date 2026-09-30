@@ -108,7 +108,7 @@ WHERE a.transcript_hgvs IS NULL
 ORDER BY e.position;
 ```
 
-Phased genotypes become whole-haplotype consequences, again as a relation. Two nearby changes carried on the same haplotype are classified together, not as two independent events:
+Phased genotypes become whole-haplotype consequences, again as a relation. The changes at 124 and 125 fall in the same codon (Val2). On their own, one is missense and the other synonymous. Carried on the same haplotype, they are read together as one codon, GTA to GCG, and classified once:
 
 ```{sql haplotypes, eval=TRUE}
 CREATE TABLE demo_calls AS
@@ -117,7 +117,8 @@ SELECT event_index, seq_region, position, reference, alternate,
        [1, 0]::INTEGER[] alleles, [false, true]::BOOLEAN[] phase_before, NULL::BIGINT phase_set
 FROM demo_events WHERE position IN (124, 125);
 
-SELECT transcript_index, carrier_count, sequence_status, length(contributors) AS contributors
+SELECT carrier_count, length(contributors) AS contributors, prediction_status,
+       haplotype_consequences, haplotype_impact
 FROM duckvep_haplotypes('SELECT * FROM demo_calls', 'demo');
 ```
 
