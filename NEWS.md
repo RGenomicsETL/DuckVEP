@@ -1,5 +1,10 @@
 # DuckVEP
 
+## DuckDB C API v2 host, slice 2 (issue #8)
+
+- The host-neutral row logic of the ported functions moved to `src/core`, and both hosts call it (the v1 callbacks keep their own vector reads and writes). The v2 preview host now also serves `duckvep_repeat_alleles`, `duckvep_phase_call`, `_duckvep_revcomp`, `_duckvep_raw_gt` and `_duckvep_record_order`, identical to the v1 host on 126 test cases, including nested output beyond one vector, NULLs inside lists and structs, and errors.
+- Fixed: `_duckvep_revcomp` read an uninitialized string slot for NULL inputs (an intermittent crash) and returned `''` for them; it now returns NULL. `_duckvep_raw_gt` left the fields of NULL results valid with garbage; they are now NULL.
+
 ## DuckDB C API v2 host, slice 1 (issue #8)
 
 - A second, preview build of the extension targets DuckDB's stable C API v2 (`make release_v2`, footer `C_STRUCT`, extension API `v2.0.0`), next to the unchanged v1 build that ships. It uses only stable v2 functions against a pinned preview SDK (`duckdb_capi_v2/`, pins in `duckvep-package.json`) and runs no SQL at LOAD. This slice ports `duckvep_so_terms`, `duckvep_allele_geometry` and `duckvep_breakend_geometry`, whose results are identical to the v1 host's on 52 test cases. `docs/v2-host.md` maps all 25 public functions to the remaining slices.
