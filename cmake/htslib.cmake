@@ -5,7 +5,11 @@ find_package(Threads REQUIRED)
 find_program(MAKE_COMMAND NAMES gmake make REQUIRED)
 find_program(SH_COMMAND NAMES sh bash REQUIRED)
 
-set(HTSLIB_SRC_DIR "${CMAKE_SOURCE_DIR}/third_party/htslib")
+# A sibling project (host_v2) sets DUCKVEP_SOURCE_ROOT to the repository root.
+if(NOT DEFINED DUCKVEP_SOURCE_ROOT)
+    set(DUCKVEP_SOURCE_ROOT "${CMAKE_SOURCE_DIR}")
+endif()
+set(HTSLIB_SRC_DIR "${DUCKVEP_SOURCE_ROOT}/third_party/htslib")
 set(HTSLIB_CFLAGS "${CMAKE_C_FLAGS} -O2 -fPIC -ffunction-sections -fdata-sections")
 set(HTSLIB_CPPFLAGS "")
 set(HTSLIB_LDFLAGS "${CMAKE_EXE_LINKER_FLAGS}")
