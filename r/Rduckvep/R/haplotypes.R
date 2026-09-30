@@ -266,3 +266,53 @@ rduckvep_haplotypes <- function(con, calls_query, model_name,
   .duckvep_create_table(con, table_name, query, overwrite)
   invisible(TRUE)
 }
+
+#' Find the Transcripts Whose Coding Sequence Events Overlap
+#'
+#' The fast discovery route into [rduckvep_haplotypes()]: one native lookup in the
+#' resident transcript interval index and exon layout instead of annotating every
+#' record. Each row of `events_query` is one VCF record and one ALT allele with its
+#' shared anchor base (`reference`, `alternate`, one-based `position`); the event is
+#' normalized exactly as the annotation builder normalizes it, so the pairs returned
+#' are exactly those to which [rduckvep_annotate()] assigns the CDS region bit: an
+#' indel's anchor base alone never creates an overlap, an insertion is placed on the
+#' base the annotation builder places it on (and is not a CDS event at the outer CDS
+#' edges), and an intron of at most 13 bases inside the CDS counts as coding. Symbolic
+#' and breakend ALTs, missing ALTs and alleles identical to REF are not events. Records
+#' with no coding overlap, the large majority of a genome, produce no rows, so a VCF
+#' reduces to its coding records before any per-record work. The result is the
+#' `transcript_index` column of a calls relation for [rduckvep_haplotypes()]: join it
+#' with the records' genotypes.
+#'
+#' @param con An open DuckDB connection with DuckVEP loaded.
+#' @param events_query One nonempty SELECT query supplying `event_index`,
+#'   `seq_region`, `position`, `reference` and `alternate` (any integer types for the
+#'   first three).
+#' @param model_name Name of an already loaded DuckVEP model without wrapped
+#'   circular objects.
+#' @param table_name Optional output table name.
+#' @param overwrite Whether to replace an existing output table.
+#' @return A data frame of `event_index` and `transcript_index` (one row per pair,
+#'   ascending by transcript within an event), or invisible `TRUE` when creating
+#'   `table_name`.
+#' @export
+rduckvep_coding_transcripts <- function(con, events_query, model_name,
+                                        table_name = NULL, overwrite = FALSE) {
+  if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
+    stop("overwrite must be TRUE or FALSE", call. = FALSE)
+  }
+  .duckvep_check_table_target(con, table_name, overwrite)
+  for (name in c("events_query", "model_name")) {
+    value <- get(name)
+    if (!is.character(value) || length(value) != 1L || is.na(value) || !nzchar(value)) {
+      stop(name, " must be one nonempty string", call. = FALSE)
+    }
+  }
+  query <- paste0("SELECT event_index, unnest(duckvep_coding_transcripts(",
+                  sql_quote_string(con, model_name),
+                  ", seq_region, \"position\", reference, alternate)) AS transcript_index FROM (",
+                  events_query, ") AS events")
+  if (is.null(table_name)) return(DBI::dbGetQuery(con, query))
+  .duckvep_create_table(con, table_name, query, overwrite)
+  invisible(TRUE)
+}

@@ -2,6 +2,7 @@
 
 export(rduckvep_annotate)
 export(rduckvep_annotate_sql)
+export(rduckvep_coding_transcripts)
 export(rduckvep_connect)
 export(rduckvep_ensembl_regions_sql)
 export(rduckvep_ensembl_regulation_features_sql)
