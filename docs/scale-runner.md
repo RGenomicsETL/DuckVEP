@@ -16,22 +16,37 @@ Emit allowance: the extension default for the per-worker emitted-output allowanc
 
 Regulation: jobs load the resident RegulatoryFeature and MotifFeature intervals from the model's `duckvep_regulation_features` (the production configuration) by default and record their count in the receipt and summary. `--no-regulation` runs without them.
 
+## Certification and frozen artifacts
+
+A run certifies (exit 0) only when all of the following hold; anything else exits 3 with the reason in `summary.md` (for example `checksums disagree in complete17`, `native_hw_total missing for job 2`, `swap not disabled`, `model changed during the run`):
+
+- every job and mode is `ok`;
+- within each mode, the checksums (rows, `hash_sum`, `hash_xor`) agree across all ok jobs, whenever there are two or more;
+- every mandatory counter is present in every row: `memory.peak`, `memory.max`, `memory.swap.max` (which must be 0), `oom_kill`, native high-water total, spill peak and mode seconds;
+- the ceilings were enforced, and the model, panel and extension were unchanged from start to end.
+
+A capacity error during certification means the qualification failed; it is never retried into a pass.
+
+Frozen artifacts: at start the runner copies the extension into `OUT/artifacts/` (read-only) and loads only that copy, so rebuilding or replacing the original mid-campaign cannot crash running jobs. A path under a build directory is refused unless `--allow-live-extension` is given. The SHA-256 of the extension, model and panel are recorded in `run.tsv` at start and re-hashed once at the end (`*_sha256_end`; not per job); a difference fails the run. All three appear in `summary.md`.
+
+Disk pre-flight: jobs x spill quota, plus an output budget of jobs x (estimated output bytes per mode, summed over modes) x 2 for the `.partial` copy x 1.5 margin, plus `--min-free-gib`. The estimate is the panel row count (or `--limit-rows`) times 12 B/row (compact) and 48 B/row (complete17), rounded up from the committed smoke receipts (`runs/smoke-2x1M-regulation`: 11.2 and 46.2 B/row). Outputs are deleted after hashing without `--keep-output`, but they coexist while jobs run, so they are budgeted either way. Spill lives in a dedicated `$SPILL_PARENT/<run-id>` per campaign; only that directory is removed.
+
 ## The consumer's run (10 jobs x 5M alleles, 64 cores, 256 GB)
 
-Prerequisites: Linux with cgroup v2 mounted at `/sys/fs/cgroup`; root (or a systemd that lets you `systemd-run --scope -p MemoryMax=...`); R with the `DBI` and `duckdb` packages (DuckDB 1.5 or later); `sha256sum`, `awk`, `du`; a built extension (`make release`, giving `build/release/extension/duckvep/duckvep.duckdb_extension`) or a released one; the GRCh38 model `homo_sapiens_116_GRCh38_final.duckdb`; the 5M panel Parquet; at least 10 x 32 GiB + 10 GiB free disk on the spill filesystem; about 176 GiB of RAM for the ceilings (10 x 16 GiB) plus the OS, and 60 cores (10 x 6 threads).
+Prerequisites: Linux with cgroup v2 mounted at `/sys/fs/cgroup`; root (or a systemd that lets you `systemd-run --scope -p MemoryMax=...`); R with the `DBI` and `duckdb` packages (DuckDB 1.5 or later); `sha256sum`, `awk`, `du`; an immutable, checksummed extension (a released one, or a `make release` build copied outside the build directory; do not rebuild or replace it during the campaign); the GRCh38 model `homo_sapiens_116_GRCh38_final.duckdb`; the 5M panel Parquet; at least 10 x 32 GiB + 10 GiB free disk on the spill filesystem; about 176 GiB of RAM for the ceilings (10 x 16 GiB) plus the OS, and 60 cores (10 x 6 threads).
 
 ```sh
 scripts/duckvep_scale_run.sh --jobs 10 --panel /data/genomes-5M.parquet \
   --model /data/homo_sapiens_116_GRCh38_final.duckdb \
-  --extension build/release/extension/duckvep/duckvep.duckdb_extension \
+  --extension /data/duckvep.duckdb_extension \
   --threads-per-job 6 --out /scratch/duckvep-scale-10x5M
 ```
 
-`--panel` takes a file path or a name (`1M`, `5M`, `25M`, `100M`, `exome2M`, `structural`) that resolves through `$DUCKVEP_GNOMAD_ROOT/panels/`. The consumer has no staged gnomAD tree, so pass the path of the `panel-5000000.parquet` we send. Check its SHA-256 against `benchmarks/data/scale_contracts/panels/panel-receipts.tsv` (`genomes-5M`, `file_sha256`); the runner records the SHA-256 of the panel, model and extension it used.
+`--panel` takes a file path or a name (`1M`, `5M`, `25M`, `100M`, `exome2M`, `structural`) that resolves through `$DUCKVEP_GNOMAD_ROOT/panels/`. The consumer has no staged gnomAD tree, so pass the path of the `panel-5000000.parquet` we send. Check its SHA-256 against `benchmarks/data/scale_contracts/panels/panel-receipts.tsv` (`genomes-5M`, `file_sha256`); the runner records the SHA-256 of the panel, model and extension it used, at start and end. The model and panel paths must not be replaced or modified during a campaign either; a change fails the run.
 
-The pre-flight refuses, with the reason, when the host cannot hold the jobs: RAM below jobs x 16 GiB + 4 GiB, jobs x threads above the core count, free disk below jobs x spill quota + `--min-free-gib` (10), no cgroup v2, or no usable `systemd-run`. `--oversubscribe` overrides the capacity checks only; it never disables enforcement. `--cgroup manual` writes `cgroup.procs` directly on hosts without `systemd-run`; `--cgroup none` needs `--allow-unenforced` and the receipt and summary then say "ceilings not enforced".
+The pre-flight refuses, with the reason, when the host cannot hold the jobs: RAM below jobs x 16 GiB + 4 GiB, jobs x threads above the core count, free disk below jobs x spill quota + the output budget + `--min-free-gib` (10), no cgroup v2, or no usable `systemd-run`. `--oversubscribe` overrides the capacity checks only; it never disables enforcement. `--cgroup manual` writes `cgroup.procs` directly on hosts without `systemd-run`; `--cgroup none` needs `--allow-unenforced` and the receipt and summary then say "ceilings not enforced".
 
-To send back: the whole `--out` directory except spill leftovers, or at minimum `receipt.csv`, `summary.md` and `run.tsv`, plus `job-*/job.log` if any job is not `ok`. `run.tsv` carries the host, kernel, core and RAM counts, load average, panel/model/extension SHA-256, git revision and every ceiling that was applied.
+To send back: the whole `--out` directory except spill leftovers, or at minimum `receipt.csv`, `summary.md` and `run.tsv`, plus `job-*/job.log` if any job is not `ok`. `artifacts/` (the extension copy) need not be sent. `run.tsv` carries the host, kernel, core and RAM counts, load average, panel/model/extension SHA-256, git revision and every ceiling that was applied.
 
 ## What is recorded
 
@@ -47,7 +62,7 @@ Exit status: 0 all jobs ok with ceilings enforced; 2 usage error or pre-flight r
 scripts/duckvep_scale_run.sh --self-test --panel 1M --out /tmp/duckvep-scale-selftest
 ```
 
-Runs four small jobs and checks the classification: native budget 64 MiB gives a capacity error, publishes nothing, leaves no model or index bytes charged and the same connection annotates again after the budget is restored; DuckDB `memory_limit` 100MB with a 1 MiB spill quota gives DuckDB's explicit out-of-memory error; a cgroup `MemoryMax` of 700M (far above the bare process, below the model load) is classified `failed` with `oom_kill` counted, never `ok`.
+First runs the aggregator guards (`scripts/duckvep_scale_selftest_aggregate.sh`, also `make test_scale_aggregate`), which feed synthetic receipts to the aggregator and need no DuckVEP run: a clean set exits 0; disagreeing checksums, a missing native high-water or other counter, `memory.swap.max` not 0, `oom_kill` above 0, a changed model hash, missing end hashes and unenforced ceilings each exit 3 with their reason. Then runs four small jobs and checks the classification: native budget 64 MiB gives a capacity error, publishes nothing, leaves no model or index bytes charged and the same connection annotates again after the budget is restored; DuckDB `memory_limit` 100MB with a 1 MiB spill quota gives DuckDB's explicit out-of-memory error; a cgroup `MemoryMax` of 700M (far above the bare process, below the model load) is classified `failed` with `oom_kill` counted, never `ok`.
 
 ## Panels
 

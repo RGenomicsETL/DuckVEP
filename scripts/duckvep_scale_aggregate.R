@@ -61,7 +61,7 @@ for (j in jobs) {
     }
     if (enforced && (is.na(peak) || is.na(mmax))) checks <- unique(c(checks, "cgroup counters unavailable"))
     if (length(checks) && outcome == "ok") outcome <- "failed"
-    if (length(checks)) reason <- paste(c(if (nzchar(reason)) reason, checks), collapse = "; ")
+    if (length(checks)) reason <- paste(c(if (!is.na(reason) && nzchar(reason)) reason, checks), collapse = "; ")
     row <- data.frame(run_id = info[["run_id"]], job = j, mode = m, outcome = outcome, reason = reason,
       ceilings = if (enforced) "enforced" else "ceilings not enforced",
       ceilings_met = outcome == "ok" && enforced,
