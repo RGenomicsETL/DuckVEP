@@ -1627,4 +1627,5 @@ void duckvep_register_haplotypes(duckdb_connection connection, duckvep_registry_
     duckdb_destroy_logical_type(&string); duckdb_destroy_logical_type(&integer);
     duckdb_destroy_logical_type(&boolean);
     register_coding_transcripts(connection, registry);
+    duckvep_register_coding_calls(connection, registry);
 }

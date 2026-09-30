@@ -188,5 +188,6 @@ int duckvep_model_reference_identity_matches(
 void duckvep_register_model_functions(duckdb_connection,
 	duckvep_registry_t *);
 void duckvep_register_haplotypes(duckdb_connection, duckvep_registry_t *);
+void duckvep_register_coding_calls(duckdb_connection, duckvep_registry_t *);
 
 #endif /* DUCKVEP_MODEL_H */

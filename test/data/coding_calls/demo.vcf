@@ -1,0 +1,10 @@
+##fileformat=VCFv4.2
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=PS,Number=1,Type=String,Description="Phase set or label">
+##contig=<ID=chr1,length=300>
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	HG_DEMO
+chr1	50	.	A	G	.	.	.	GT:PS	0|1:1
+chr1	124	.	T	C	.	.	.	GT:PS	0|1:124
+chr1	125	.	A	G	.	.	.	GT:PS	0|1:124
+chr1	130	.	C	CA	.	.	.	GT:PS	1|1:PATMAT
+chr1	160	.	G	T,A	.	.	.	GT	1/2

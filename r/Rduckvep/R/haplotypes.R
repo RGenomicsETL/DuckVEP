@@ -316,3 +316,52 @@ rduckvep_coding_transcripts <- function(con, events_query, model_name,
   .duckvep_create_table(con, table_name, query, overwrite)
   invisible(TRUE)
 }
+
+#' Read the Coding Calls of a VCF or BCF File
+#'
+#' The fused native route into [rduckvep_haplotypes()]: one pass over a (bgzipped)
+#' VCF or BCF file with the bundled HTSlib. Each record is mapped to the model's
+#' `seq_region` by `seq_region_name`, each ALT allele goes through the same discovery
+#' as [rduckvep_coding_transcripts()], and only a record that touches coding sequence
+#' has its FORMAT parsed and its genotypes decoded. The other records, about 99\% of a
+#' whole genome, cost one line read and a few interval lookups.
+#'
+#' The result is the calls relation that [rduckvep_haplotypes()] consumes: one row per
+#' ALT allele, transcript and sample with `event_index` (record ordinal times 64 plus
+#' the ALT ordinal minus one, where the ordinal counts every data record of the file),
+#' `seq_region`, `position`, `reference`, `alternate`, `alt_index`, `transcript_index`,
+#' `sample_index` (the sample column, from 0), `alleles` (missing alleles are NA),
+#' `phase_before` (a leading `FALSE`, then one flag per separator, `|` being `TRUE`)
+#' and `phase_set` (the integer `PS` of the sample; labels such as `PATMAT` and a
+#' missing `PS` give NA). Records on contigs the model does not know, symbolic ALTs and
+#' records with no ALT make no rows. A file without samples, without a `FORMAT/GT`
+#' header line, a coding record without `GT`, more than 64 ALT alleles in a coding
+#' record, an invalid `POS` and a model loaded without `seq_region_name` are errors.
+#'
+#' @param con An open DuckDB connection with DuckVEP loaded.
+#' @param model_name Name of an already loaded DuckVEP model (loaded with
+#'   `seq_region_name` in its regions query) without wrapped circular objects.
+#' @param path Path of the VCF, bgzipped VCF or BCF file.
+#' @param table_name Optional output table name.
+#' @param overwrite Whether to replace an existing output table.
+#' @return A data frame of the calls, or invisible `TRUE` when creating `table_name`.
+#'   To feed [rduckvep_haplotypes()], create the table and pass
+#'   `"SELECT * FROM <table_name>"`.
+#' @export
+rduckvep_coding_calls <- function(con, model_name, path, table_name = NULL, overwrite = FALSE) {
+  if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
+    stop("overwrite must be TRUE or FALSE", call. = FALSE)
+  }
+  .duckvep_check_table_target(con, table_name, overwrite)
+  for (name in c("model_name", "path")) {
+    value <- get(name)
+    if (!is.character(value) || length(value) != 1L || is.na(value) || !nzchar(value)) {
+      stop(name, " must be one nonempty string", call. = FALSE)
+    }
+  }
+  query <- paste0("SELECT * FROM duckvep_coding_calls(", sql_quote_string(con, model_name), ", ",
+                  sql_quote_string(con, path.expand(path)), ")")
+  if (is.null(table_name)) return(DBI::dbGetQuery(con, query))
+  .duckvep_create_table(con, table_name, query, overwrite)
+  invisible(TRUE)
+}
