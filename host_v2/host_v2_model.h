@@ -13,4 +13,7 @@ duckvep_registry_t *host_v2_registry_of(void *user_data);
 bool host_v2_register_annotate(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
                                model_state *state, duckdb_v2_error_info_handle *error);
 
+bool host_v2_register_haplotypes(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
+                                 model_state *state, duckdb_v2_error_info_handle *error);
+
 #endif

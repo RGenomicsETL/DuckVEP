@@ -13,7 +13,7 @@ public functions.
 | Build | `make release` (the root `CMakeLists.txt`) | `make release_v2` (`host_v2/CMakeLists.txt`) |
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
 | Ships | yes: CRAN and the community repository | no: preview, waits for DuckDB 2.0.0 |
-| Functions | all 27 public functions | slices 1 to 4: `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the thirteen `duckvep_*_sql` builders, `duckvep_model_load` / `duckvep_model_drop` (as the COPY sink below), and the internal `_duckvep_annotate_*` natives with `__duckvep_projection_code`, and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order` |
+| Functions | all 27 public functions | slices 1 to 5 (every public function except the four budget and worker-limit functions of slice 6): `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the thirteen `duckvep_*_sql` builders, `duckvep_model_load` / `duckvep_model_drop` (as the COPY sink below), and the internal `_duckvep_annotate_*` natives with `__duckvep_projection_code`, and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order`; slice 5: `duckvep_haplotypes` (as `duckvep_haplotype_load_sql`, the COPY job sink and `duckvep_haplotype_scan`), `duckvep_coding_transcripts`, `duckvep_coding_calls` |
 
 The v2 host is a separate CMake project, so a v1 build does not compile or link
 any v2 file, and `duckdb_capi/` and MainDistributionPipeline are untouched. Since
@@ -125,7 +125,7 @@ slices are Astra's (memo section 4); slice 1 is this one.
 | 3 | SQL-builder surface | builders only: VARCHAR and STRUCT option inputs, SQL text out, no macros, no DDL at LOAD (done) | `duckvep_ensembl_regions_sql`, `duckvep_ensembl_transcripts_sql`, `duckvep_ensembl_regulation_features_sql`, `duckvep_model_receipt_sql`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql`, `duckvep_prepare_sv_geometry_sql`, `duckvep_prepare_breakend_pairs_sql`, `duckvep_prepare_breakend_fusion_sql`, `duckvep_prepare_structural_hgvs_sql`, `duckvep_prepare_expansionhunter_sql`, `duckvep_lof_sql` |
 | 4a | Model sink (COPY staging) | stable-v2 COPY callbacks take the caller's relations; exact-size native arrays; explicit publish and drop (done) | `duckvep_model_load`, `duckvep_model_drop` |
 | 4b | Annotation natives | the internal natives that read a pinned model; `duckvep_annotate_sql`, `duckvep_annotate_projected_sql` and `duckvep_transcript_projection_sql` execute on v2 with results equal to v1 (done) | internal `_duckvep_annotate_*`, `__duckvep_projection_code` |
-| 5 | Haplotype capture | caller-side normalization into spillable column collections, serial scanner, no appender | `duckvep_haplotypes`, `duckvep_coding_transcripts`, `duckvep_coding_calls` (all three share `src/duckvep_discovery.c`, which reads the model) |
+| 5 | Haplotype capture | caller-side normalization into spillable column collections, serial scanner, no appender (done) | `duckvep_haplotypes`, `duckvep_coding_transcripts`, `duckvep_coding_calls` (all three share `src/core/duckvep_core_discovery.c`, which reads the model) |
 | 6 | Bounded parallelism | partitioned workers, spill, cancellation and cleanup, quota accounting; 5M variants and a ten-job stress | `duckvep_native_budget`, `duckvep_native_budget_set`, `duckvep_native_budget_reset_high_water`, `duckvep_worker_limits_set` |
 
 That is 3 + 2 + 13 + 2 + 3 + 4 = 27. The budget and worker-limit functions are
@@ -159,7 +159,7 @@ Files not listed (`src/kernel/**`, `duckvep_reference.c`, `third_party/`,
 | `duckvep_repeat.c` | `duckvep_repeat_alleles` (done) | LIST and STRUCT input, DECIMAL/HUGEINT cells, NULL-in-child propagation, option STRUCT. Done in `host_v2_nested.c` |
 | `duckvep_phase_sql.c` | `duckvep_phase_call`, `_duckvep_raw_gt`, `_duckvep_record_order` (all done) | the same as repeat, plus LIST<STRUCT> output sized once per chunk. Done in `host_v2_nested.c` |
 | `duckvep_model.c` | `duckvep_model_load`/`_drop` and the registry with its private connection (v1 only; the model itself is `src/core`) | done for v2 in `host_v2_model.c`: COPY-to bind/init/batch/flush/finalize, ordered merge into a column-data collection, scan sources, publish/drop/fingerprint, the statement builder |
-| `duckvep_haplotype_sql.c`, `duckvep_coding_calls.c`, `duckvep_discovery.c` | `duckvep_haplotypes`, `duckvep_coding_transcripts`, `duckvep_coding_calls`: private query/fetch, statement parsing, an appender, LIST-of-STRUCT output | column-data-collection capture in place of the appender, the native scan source over the captured input, LIST-of-STRUCT output, cancellation |
+| `duckvep_haplotype_sql.c`, `duckvep_coding_calls.c`, `duckvep_discovery.c` | `duckvep_haplotypes`, `duckvep_coding_transcripts`, `duckvep_coding_calls` (done): private query/fetch, statement parsing, an appender, LIST-of-STRUCT output (v1 keeps the first three; the replay, its workspace and writers are `src/core/duckvep_core_haplotypes.c`, the reader is `src/core/duckvep_core_coding_calls.c`, discovery is `src/core/duckvep_core_discovery.c`) | column-data-collection capture in place of the appender, the native scan over the captured input, LIST-of-STRUCT output. Done in `host_v2_haplotypes.c` and `host_v2_coding_calls.c` |
 | `duckvep_budget_sql.c` | four resource-control functions, `set_max_threads` | BIGINT scalar, table function with `max_threads`, volatile stability |
 
 The shared pieces of the v2 adapter, in `host_v2/host_v2_common.h` and
@@ -258,7 +258,42 @@ Which built queries execute on v2 today (slice 3), by the natives their text cal
 | `duckvep_annotate_sql`, `duckvep_annotate_projected_sql` | `_duckvep_annotate_*` natives | yes (slice 4b): executed on the README, rich and reference-FASTA models in compact, rich, HGVS and projected modes, equal to v1 row for row |
 | `duckvep_transcript_projection_sql` | `__duckvep_projection_code` (and `duckvep_so_terms`, `_duckvep_revcomp`, `duckvep_allele_geometry`) | yes (slice 4b), equal to v1 |
 
-`duckvep_coding_transcripts` has no SQL-text part: it is a model lookup and moves with slice 4.
+`duckvep_coding_transcripts` has no SQL-text part: it is a model lookup and moved with slice 5.
+
+## Haplotypes on v2 (slice 5)
+
+v1 runs the caller's calls query on a private connection and normalizes it with temporary tables and an appender. v2
+cannot, so the same normalization is SQL the caller runs, and the captured rows are replayed by the same core:
+
+```sql
+-- 1. The statements (pure text; options are the named parameters of v1 duckvep_haplotypes).
+SELECT unnest(duckvep_haplotype_load_sql('SELECT * FROM my_calls', 'mymodel', 'job1', {'hgvs': true}));
+-- 2. Run them in order: COPY (<normalization wrapped around the caller's query>) TO ... (FORMAT duckvep_stage, JOB 'job1', MODEL 'mymodel', ...)
+-- 3. Scan it (once).
+SELECT * FROM duckvep_haplotype_scan('job1');
+SELECT duckvep_haplotype_drop('job1');   -- releases a job that will not be scanned
+```
+
+- The wrapper SQL of `input_mode = 'alt_events'` is the text v1 builds internally (phase-domain aggregation with
+  `duckvep_phase_call`, duplicate, version and ploidy facts). `source_records` needs four statements: a TEMP raw table,
+  a COPY of its record order into the `plan_input` relation (the native record plan runs in `_duckvep_haplotype_plan`,
+  fed by ordered rows, as v1's `duckvep_haplotype_record_plan_next` was), the COPY of the normalized calls, and the drop.
+- The COPY sink is the model's `duckvep_stage` format with a `JOB` option (plus `MODEL`, `STAGE`, `PHASE_POLICY`,
+  `INPUT_MODE`, `HGVS` and the seventeen limits). Rows are DuckDB-managed column collections, so they spill under the
+  memory limit; the COPY validates the options and the staged column types, and a failed COPY stages nothing.
+- A staged job is consumed by its scan (released at its end, on error and on cancellation) so a job is scanned once;
+  staging the same job again replaces it.
+- The scan emits one result row per exec call. A v2 list child is opened once, for its final size, so rows cannot share
+  a list within one chunk; the result is identical and only the chunking differs. Consequence, measured on HG002
+  (157,986 rows, one core): the scan of the captured input takes 11.5 s against v1's inline path, which is the
+  cost of one row per chunk; batching several rows per chunk is a later optimization of the writers, not of the core.
+- Equality with v1 (`test/sql_v2/equality_cases.sql`): the vertical, same-codon, frame, start/stop and NMD suites
+  (schema, full-row hash, nested columns, LIMIT), 47 policy, limit and error cases of `duckvep_haplotypes.test` on its
+  `hap` model (including `source_records`), discovery (10,500 events and the named cases), `duckvep_coding_calls` on the
+  VCF, gzip and BCF fixtures and the haplotypes over them. Error messages are identical.
+- HG002 (full GRCh38, MANE model, `hg002.ens.vcf.gz`) through `duckvep_coding_calls` into a job and the scan: 157,986
+  rows, full-output checksum `1456007180270799092358516`, equal to v1 and to slice 7's mode B. Whole process 18.8 s on
+  one core (model load 4 s of it), peak RSS 4.45 GiB (v1 fused: 8.2 s, 3.83 GiB). v2 has no native budget setter yet (slice 6).
 
 ## What the v2 SDK lacks, for later slices
 

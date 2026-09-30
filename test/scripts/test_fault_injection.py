@@ -307,7 +307,7 @@ def main():
         print("  site %s x%d" % (site, count))
     # The new lifted-execution sites must actually have been failed.
     for needed in ("duckvep_lift.c", "duckvep_scalar_lift_resolve", "duckvep_scalar_lift_reserve", "duckvep_coding_calls.c",
-                   "duckvep_discovery.c"):
+                   "duckvep_core_discovery.c"):
         if not args.limit and not any(needed in "%s %s" % (site[0], site[1]) for site in sites if site):
             failures.append("no failed allocation at %s" % needed)
     if failures:

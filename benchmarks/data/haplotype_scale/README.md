@@ -6,7 +6,7 @@ GRCh38 job on the MANE-selected model.
 
 ## 2026-09-30, issue #34 slice 1: the fused native reader (gate met)
 
-`duckvep_coding_calls(model, path)` reads the (bgzipped) VCF or BCF with the bundled zlib-only htslib, maps CHROM by name, runs the shared discovery (`duckvep_discovery.c`, the same code as `duckvep_coding_transcripts`) on every ALT allele
+`duckvep_coding_calls(model, path)` reads the (bgzipped) VCF or BCF with the bundled zlib-only htslib, maps CHROM by name, runs the shared discovery (`src/core/duckvep_core_discovery.c`, the same code as `duckvep_coding_transcripts`) on every ALT allele
 and decodes FORMAT, GT and PS only for the records that touch coding sequence (25,969 of 4,023,088). It emits the calls relation of mode B. The measurement below is the unchanged gate: fresh process, one core (`taskset -c 6`, cgroup 16 GiB, native budget 4 GiB,
 DuckDB threads 1), median of three, csq (`-p a -Ou -o /dev/null`) alternating with DuckVEP, load at most 3 at each start (waited once for one minute), sibling thread 0% busy in every run. Files: `perf34_slice1/` (receipt `process.tsv`, per-run stage output, `identity.txt`).
 The harness is `benchmarks/haplotype_scale/cli_worker.sh` (DuckDB v1.5.1 CLI, no R); the R worker has the same pipeline as `--mode F`. Extension: release build of source tree `8713686b` (sha256 `ab4dc8e7...`), copied to an immutable file first.

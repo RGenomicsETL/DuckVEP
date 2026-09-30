@@ -13,6 +13,45 @@ COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' 
 COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'temp-model', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
 SELECT CASE WHEN duckvep_model_publish('temp-model') THEN true ELSE error('publish of a TEMP-table model') END;
 SELECT CASE WHEN _duckvep_model_fingerprint('temp-model') = 16162758230738989510 THEN true ELSE error('TEMP model equals the README model fingerprint') END;
+-- Haplotype jobs (slice 5): options and the job lifecycle. The published temp-model is the model.
+-- expect error: the JOB and MODEL options are required
+COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', USE_TMP_FILE FALSE);
+-- expect error: unknown model name
+COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', MODEL 'no-such-model', USE_TMP_FILE FALSE);
+-- expect error: STAGE must be
+COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', MODEL 'temp-model', STAGE 'x', USE_TMP_FILE FALSE);
+-- expect error: invalid max_ploidy
+COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', MODEL 'temp-model', MAX_PLOIDY 0, USE_TMP_FILE FALSE);
+-- expect error: phase_policy must be
+COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', MODEL 'temp-model', PHASE_POLICY 'loose', USE_TMP_FILE FALSE);
+-- expect error: the staged query must return 15 columns
+COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', MODEL 'temp-model', USE_TMP_FILE FALSE);
+-- expect error: is not staged
+SELECT count(*) FROM duckvep_haplotype_scan('never-staged');
+-- expect error: source_records requires
+SELECT duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'input_mode': 'source_records'});
+-- expect error: invalid max_active_events
+SELECT duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'max_active_events': 0});
+-- expect error: unknown option
+SELECT duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'nope': 1});
+SELECT CASE WHEN len(duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j')) = 1 AND len(duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'input_mode': 'source_records', 'phase_policy': 'vep116_compat'})) = 4 THEN true ELSE error('statement counts of the haplotype builder') END;
+SELECT CASE WHEN contains(duckvep_haplotype_load_sql('SELECT 1 -- c', 'temp-model', 'j')[1], E'-- c\n') THEN true ELSE error('trailing comment stays inside the parentheses') END;
+
+-- A staged job is scanned once; drop releases one that will not be.
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'once', MODEL 'temp-model', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN (SELECT count(*) FROM duckvep_haplotype_scan('once')) >= 0 THEN true ELSE error('scan') END;
+-- expect error: is not staged
+SELECT count(*) FROM duckvep_haplotype_scan('once');
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'dropped', MODEL 'temp-model', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN duckvep_haplotype_drop('dropped') AND NOT duckvep_haplotype_drop('dropped') THEN true ELSE error('drop of a staged job') END;
+-- expect error: is not staged
+SELECT count(*) FROM duckvep_haplotype_scan('dropped');
+-- A failed COPY stages nothing.
+-- expect error: boom
+COPY (SELECT error('boom')::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'failed', MODEL 'temp-model', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+-- expect error: is not staged
+SELECT count(*) FROM duckvep_haplotype_scan('failed');
+
 
 -- Uncommitted rows are visible: an extra region inserted in an open transaction changes the model.
 CREATE TABLE u_regions AS SELECT * FROM m_regions;
