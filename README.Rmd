@@ -243,6 +243,7 @@ The extension uses the stable DuckDB C API (tested on DuckDB 1.5 and the 2.0 pre
 
 ## Documentation
 
+- [Function reference](docs/functions.md): every public SQL function, its signature, options, columns and a checked example
 - [Site](https://rgenomicsetl.github.io/DuckVEP/) and [R package reference](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/)
 - [Compatibility and errata](ERRATA.md): every known difference from VEP, classified, with witnesses
 - [Design and implementation contract](design/duckvep.md): model build, the sweep, NMD, phased edits, structural events, HGVS, supplementary annotation
