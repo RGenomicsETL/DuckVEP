@@ -11,6 +11,8 @@
 #   A      the preordered calls relation (--calls, written by --mode stage) staged from Parquet, then
 #          duckvep_haplotypes into Parquet. The builder's own ordering sort is included.
 #   stage  mode B's staging only, writing the ordered calls to --calls (untimed input preparation for mode A).
+#   F      the fused native reader (duckvep_coding_calls, #34 slice 1): the VCF/BCF is read, discovery runs per record and only
+#          coding records are decoded; then duckvep_haplotypes into Parquet. Same output as B (same checksum).
 # Options: --warm (a second pass in the same process after the cold pass), --native-budget BYTES (default 4 GiB),
 # --memory-limit (default 8GB), --spill DIR, --max-spill (default 32GiB), --calls-filter SQL (restrict calls in
 # mode A, for ad-hoc partitions), --passes N (one cold pass and N - 1 warm ones), --order-load.
@@ -37,7 +39,7 @@ discovery <- opt("discovery", "scalar")   # scalar: duckvep_coding_transcripts; 
 decoder <- opt("decoder", "duckdb")   # duckdb: read_csv inflates the .vcf.gz itself; bgzip: `bgzip -dc` (htslib, libdeflate) feeds it through a FIFO
 order_load <- flag("order-load")   # add ORDER BY to the model queries of the full model (the stored model is already in load order)
 alignment_cells <- opt("max-alignment-cells", "268435456"); workspace <- opt("workspace-limit", "1073741824")
-stopifnot(mode %in% c("A", "B", "stage"), model_kind %in% c("full", "mane"), decoder %in% c("duckdb", "bgzip"), discovery %in% c("scalar", "annotate"))
+stopifnot(mode %in% c("A", "B", "F", "stage"), model_kind %in% c("full", "mane"), decoder %in% c("duckdb", "bgzip"), discovery %in% c("scalar", "annotate"))
 
 con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extensions = "true", threads = "1")))
 on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
@@ -90,7 +92,8 @@ model_load <- function() {
       unnest(peptide_edits) u(x)", by("1, 2"))
   }
   sql("CREATE TABLE regions AS SELECT seq_region::BIGINT AS seq_region, seq_region_name, sequence_length FROM m.model_regions")
-  get(paste0("SELECT loaded FROM duckvep_model_load('hap', 'SELECT seq_region::UINTEGER AS seq_region, sequence_length
+  # seq_region_name in the regions query is how duckvep_coding_calls (mode F) maps CHROM; the other modes ignore it.
+  get(paste0("SELECT loaded FROM duckvep_model_load('hap', 'SELECT seq_region::UINTEGER AS seq_region, sequence_length, seq_region_name
     FROM regions ORDER BY seq_region', ", q(transcripts), ", ", q(exons), ",
     mature_mirna_query := ", q(mirna), ", peptide_edit_query := ", q(edits), ", transcript_coverage_complete := TRUE)"))
 }
@@ -159,6 +162,12 @@ stage_b <- function() {
     ORDER BY seq_region, position, event_index, transcript_index")
 }
 
+stage_f <- function() {
+  # The fused reader: one pass over the file, coding records only, in the calls relation's schema (file order; the builder sorts).
+  sql("DROP TABLE IF EXISTS calls")
+  sql(paste0("CREATE TABLE calls AS SELECT * FROM duckvep_coding_calls('hap', ", q(vcf), ")"))
+}
+
 stage_a <- function() {
   sql("DROP TABLE IF EXISTS calls")
   where <- if (nzchar(calls_filter)) paste("WHERE", calls_filter) else ""
@@ -199,7 +208,7 @@ for (pass in c("cold", rep("warm", passes - 1L))) {
     t_stage <- elapsed(stage_b()); t_predict <- NA
     elapsed(sql(sprintf("COPY (SELECT * FROM calls) TO %s (FORMAT parquet)", q(calls_path))))
   } else {
-    t_stage <- elapsed(if (mode == "B") stage_b() else stage_a())
+    t_stage <- elapsed(if (mode == "B") stage_b() else if (mode == "F") stage_f() else stage_a())
     t_predict <- elapsed(predict())
   }
   snap <- budget_snapshot("pass")
