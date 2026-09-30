@@ -5341,6 +5341,879 @@
    "{\"g\":{\"mate_chrom\":\"1\",\"mate_position\":0,\"local_join_after\":true,\"mate_extends_right\":false,\"replacement_sequence\":\"G\"}}"
   ]
  },
+ "builder annotate all options": {
+  "rows": [
+   "{\"h\":\"0b44d8f3a23b6786163e18792c7be9db\",\"n\":11160}"
+  ]
+ },
+ "builder annotate constant rows": {
+  "rows": [
+   "{\"i\":0,\"h\":\"8ead3c8c5782cce6133b8fad467e7736\"}",
+   "{\"i\":1,\"h\":\"8ead3c8c5782cce6133b8fad467e7736\"}",
+   "{\"i\":2,\"h\":\"8ead3c8c5782cce6133b8fad467e7736\"}",
+   "{\"i\":3,\"h\":\"8ead3c8c5782cce6133b8fad467e7736\"}"
+  ]
+ },
+ "builder annotate defaults": {
+  "rows": [
+   "{\"h\":\"4bc61e093d474a4d84d10955bce1ce8e\",\"n\":11175}"
+  ]
+ },
+ "builder annotate distance double type error": {
+  "error": "DuckVEP builder: expected INTEGER for option 'upstream_distance'"
+ },
+ "builder annotate distance negative": {
+  "rows": [
+   "{\"h\":\"59162908ccea7ccc93e28b47a5f24255\",\"n\":11164}"
+  ]
+ },
+ "builder annotate distance null": {
+  "rows": [
+   "{\"h\":\"9d44b714b33cfa833d20440df195169b\",\"n\":11166}"
+  ]
+ },
+ "builder annotate distance types": {
+  "rows": [
+   "{\"h\":\"d4778a6a7fd64ea7d561db7071ad4111\",\"n\":11179}"
+  ]
+ },
+ "builder annotate distance wrong type error": {
+  "error": "DuckVEP builder: expected INTEGER for option 'upstream_distance'"
+ },
+ "builder annotate distances": {
+  "rows": [
+   "{\"h\":\"d9ba0bd4e8b5f6bf5247e9cbe3408e32\",\"n\":11162}"
+  ]
+ },
+ "builder annotate embedded nul error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder annotate empty events": {
+  "rows": [
+   "{\"h\":\"335732d2f642c81ac00158e17cfd6f9e\",\"n\":11165}"
+  ]
+ },
+ "builder annotate empty model": {
+  "rows": [
+   "{\"h\":\"bdf3b5065f513b4fe4e7dfdcb3ed5133\",\"n\":11165}"
+  ]
+ },
+ "builder annotate extra dots": {
+  "rows": [
+   "{\"h\":\"e5e66e531c2e0d7fdabfb33110096408\",\"n\":11172}"
+  ]
+ },
+ "builder annotate filtered rows": {
+  "rows": [
+   "{\"i\":9,\"h\":\"c3ccfc27738c1e1624a2ddcc3cefd260\"}",
+   "{\"i\":410,\"h\":\"9b6643920d19fb0cf580269a7891e477\"}",
+   "{\"i\":811,\"h\":\"40cf5b126ed6fa268670a02c53a61eb0\"}",
+   "{\"i\":1212,\"h\":\"693fcced5d7f9608b7977a3a6e83d2e8\"}",
+   "{\"i\":1613,\"h\":\"0ff5b66b8993d73e253f331b9117c825\"}",
+   "{\"i\":2014,\"h\":\"aeb4edbecf50e388f8040d9eb5121f1c\"}",
+   "{\"i\":2415,\"h\":\"8d00a2a97c63ef166a58a5f51301be18\"}",
+   "{\"i\":2816,\"h\":\"911308500b690ada179686aa59b85121\"}",
+   "{\"i\":3217,\"h\":\"3d754a66eadc0e877c90a3275529cc83\"}",
+   "{\"i\":3618,\"h\":\"d8b41491e3bcec242c66c31ff56e3943\"}",
+   "{\"i\":4019,\"h\":\"cc1ba2e0251628ac342ca5dc3ec6115a\"}",
+   "{\"i\":4420,\"h\":\"68a9a1cd3a1fee58059fb1cfb6d17904\"}",
+   "{\"i\":4821,\"h\":\"db8f2a475d427444563e28fc522cec6c\"}"
+  ]
+ },
+ "builder annotate hgvs and rich": {
+  "rows": [
+   "{\"h\":\"4e26a85221d1b973095dbddeb0d80112\",\"n\":11154}"
+  ]
+ },
+ "builder annotate hgvs wrong type error": {
+  "error": "DuckVEP builder: expected BOOLEAN for option 'hgvs'"
+ },
+ "builder annotate long names": {
+  "rows": [
+   "{\"h\":\"49ba650c483836690daeff23d01d4c0f\",\"n\":11764}"
+  ]
+ },
+ "builder annotate many rows": {
+  "rows": [
+   "{\"n\":3000,\"d\":3000,\"h\":\"d2349386a3c29eb1c2fbd64b19c39234\"}"
+  ]
+ },
+ "builder annotate null booleans": {
+  "rows": [
+   "{\"h\":\"df90bb25cf1daffb56af350c821661b3\",\"n\":11154}"
+  ]
+ },
+ "builder annotate null events error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder annotate null events with options error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder annotate null model error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder annotate null options": {
+  "rows": [
+   "{\"h\":\"c6146bf8f599b3a41b26ac04db773829\",\"n\":11166}"
+  ]
+ },
+ "builder annotate null row among many error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder annotate options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder annotate quoting": {
+  "rows": [
+   "{\"h\":\"8a3603279fece7583b2ed7d059939c67\",\"n\":11177}"
+  ]
+ },
+ "builder annotate quoting schema": {
+  "rows": [
+   "{\"h\":\"1a0035ba7f9a0fb7c6ddfd48cae054cc\",\"n\":11176}"
+  ]
+ },
+ "builder annotate reversed keys": {
+  "rows": [
+   "{\"h\":\"0b44d8f3a23b6786163e18792c7be9db\",\"n\":11160}"
+  ]
+ },
+ "builder annotate rich wrong type error": {
+  "error": "DuckVEP builder: expected BOOLEAN for option 'rich'"
+ },
+ "builder annotate schema qualified": {
+  "rows": [
+   "{\"h\":\"281ed6c241f2365e7f33049d67d18ab2\",\"n\":11182}"
+  ]
+ },
+ "builder annotate unicode": {
+  "rows": [
+   "{\"h\":\"3789ccec6f3cc619140d0bd1ed742b23\",\"n\":11182}"
+  ]
+ },
+ "builder annotate unknown option error": {
+  "error": "DuckVEP builder: unknown option 'other'"
+ },
+ "builder breakend_fusion defaults": {
+  "rows": [
+   "{\"h\":\"a45fcfc14c0d2dc9ae99efbfbd9c028c\",\"n\":1296}"
+  ]
+ },
+ "builder breakend_fusion empty relation error": {
+  "error": "duckvep_prepare_breakend_fusion_sql: invalid relation name or allocation failure"
+ },
+ "builder breakend_fusion extra dots error": {
+  "error": "duckvep_prepare_breakend_fusion_sql: invalid relation name or allocation failure"
+ },
+ "builder breakend_fusion null options": {
+  "rows": [
+   "{\"h\":\"a45fcfc14c0d2dc9ae99efbfbd9c028c\",\"n\":1296}"
+  ]
+ },
+ "builder breakend_fusion null relation error": {
+  "error": "duckvep_prepare_breakend_fusion_sql: invalid relation name or allocation failure"
+ },
+ "builder breakend_fusion option unsupported error": {
+  "error": "DuckVEP builder: unknown option 'max_span'"
+ },
+ "builder breakend_fusion options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder breakend_fusion quoting": {
+  "rows": [
+   "{\"h\":\"7c8e368fe2b93a2d0cfa44500a0e7f0b\",\"n\":1296}"
+  ]
+ },
+ "builder breakend_fusion schema": {
+  "rows": [
+   "{\"h\":\"1f8ca377f9f8c57bbacfd05effcde662\",\"n\":1300}"
+  ]
+ },
+ "builder breakend_pairs defaults": {
+  "rows": [
+   "{\"h\":\"4232776fecdf016bee6ee73a42f22819\",\"n\":5747}"
+  ]
+ },
+ "builder breakend_pairs empty relation error": {
+  "error": "duckvep_prepare_breakend_pairs_sql: invalid relation name or allocation failure"
+ },
+ "builder breakend_pairs extra dots error": {
+  "error": "duckvep_prepare_breakend_pairs_sql: invalid relation name or allocation failure"
+ },
+ "builder breakend_pairs null options": {
+  "rows": [
+   "{\"h\":\"4232776fecdf016bee6ee73a42f22819\",\"n\":5747}"
+  ]
+ },
+ "builder breakend_pairs null relation error": {
+  "error": "duckvep_prepare_breakend_pairs_sql: invalid relation name or allocation failure"
+ },
+ "builder breakend_pairs option unsupported error": {
+  "error": "DuckVEP builder: unknown option 'max_span'"
+ },
+ "builder breakend_pairs options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder breakend_pairs quoting": {
+  "rows": [
+   "{\"h\":\"76c9731f17e5364f6a574814bf4d602b\",\"n\":5747}"
+  ]
+ },
+ "builder breakend_pairs schema": {
+  "rows": [
+   "{\"h\":\"3c40f98baf0a7a570d299d49a7260e3d\",\"n\":5749}"
+  ]
+ },
+ "builder ensembl regions bad qualified reference error": {
+  "error": "duckvep_ensembl_regions_sql: SQL construction failed"
+ },
+ "builder ensembl regions defaults": {
+  "rows": [
+   "{\"h\":\"b0bdcc0efb1d4fac37a3780ceea2d7af\",\"n\":3973}"
+  ]
+ },
+ "builder ensembl regions empty assembly error": {
+  "error": "DuckVEP builder: required table, schema, and assembly names must be nonempty"
+ },
+ "builder ensembl regions empty reference error": {
+  "error": "DuckVEP builder: required table, schema, and assembly names must be nonempty"
+ },
+ "builder ensembl regions many rows": {
+  "rows": [
+   "{\"n\":1200,\"h\":\"d024c5d8e3750caef1ab25e04177fc93\"}"
+  ]
+ },
+ "builder ensembl regions null core error": {
+  "error": "DuckVEP builder: required table, schema, and assembly names must be nonempty"
+ },
+ "builder ensembl regions null options": {
+  "rows": [
+   "{\"h\":\"d720b624a8632c51cb4f363fd6104feb\",\"n\":3957}"
+  ]
+ },
+ "builder ensembl regions options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder ensembl regions quoting": {
+  "rows": [
+   "{\"h\":\"31ec9d68c05ca58acc8d682c2710106c\",\"n\":3975}"
+  ]
+ },
+ "builder ensembl regions schema qualified": {
+  "rows": [
+   "{\"h\":\"f73594dc2d2d1cdb47d8b6143d6f9a80\",\"n\":3977}"
+  ]
+ },
+ "builder ensembl regions species 0": {
+  "rows": [
+   "{\"h\":\"02ee67e09c0f8081d03b0156e067373b\",\"n\":3957}"
+  ]
+ },
+ "builder ensembl regions species 1": {
+  "rows": [
+   "{\"h\":\"d720b624a8632c51cb4f363fd6104feb\",\"n\":3957}"
+  ]
+ },
+ "builder ensembl regions species 255UTINYINT": {
+  "rows": [
+   "{\"h\":\"d91fe5bb36ee0326bcaa6e6a74b9b95e\",\"n\":3959}"
+  ]
+ },
+ "builder ensembl regions species 7": {
+  "rows": [
+   "{\"h\":\"7511e0d61f8931bbb1e23874897bf3df\",\"n\":3957}"
+  ]
+ },
+ "builder ensembl regions species 9223372036854775807UBIGI": {
+  "rows": [
+   "{\"h\":\"a50095fd10d8f2c80ca709629ad206b0\",\"n\":3975}"
+  ]
+ },
+ "builder ensembl regions species NULL": {
+  "rows": [
+   "{\"h\":\"1cca97da0578b032dd84bc198c551fdf\",\"n\":3960}"
+  ]
+ },
+ "builder ensembl regions species NULLINTEGER": {
+  "rows": [
+   "{\"h\":\"1cca97da0578b032dd84bc198c551fdf\",\"n\":3960}"
+  ]
+ },
+ "builder ensembl regions species m2BIGINT": {
+  "rows": [
+   "{\"h\":\"52fc54127cbc31e58b5bc9da76242395\",\"n\":3958}"
+  ]
+ },
+ "builder ensembl regions species too large error": {
+  "error": "DuckVEP builder: species_id exceeds BIGINT range"
+ },
+ "builder ensembl regions species wrong type error": {
+  "error": "DuckVEP builder: expected INTEGER for option 'species_id'"
+ },
+ "builder ensembl regions trailing dot reference error": {
+  "error": "duckvep_ensembl_regions_sql: SQL construction failed"
+ },
+ "builder ensembl regions unknown option error": {
+  "error": "DuckVEP builder: unknown option 'species'"
+ },
+ "builder ensembl regulation defaults": {
+  "rows": [
+   "{\"h\":\"ca92e900f2a7e90b53b6c8cdb257a3f1\",\"n\":3608}"
+  ]
+ },
+ "builder ensembl regulation empty regions error": {
+  "error": "DuckVEP builder: required table, schema, and assembly names must be nonempty"
+ },
+ "builder ensembl regulation many rows": {
+  "rows": [
+   "{\"n\":1200,\"h\":\"d0ac3682b6cc30f8f00451eecd3a2c75\"}"
+  ]
+ },
+ "builder ensembl regulation null options unsupported error": {
+  "error": "duckvep_ensembl_regulation_features_sql: no options are supported"
+ },
+ "builder ensembl regulation null schema error": {
+  "error": "DuckVEP builder: required table, schema, and assembly names must be nonempty"
+ },
+ "builder ensembl regulation options unsupported error": {
+  "error": "duckvep_ensembl_regulation_features_sql: no options are supported"
+ },
+ "builder ensembl regulation quoting": {
+  "rows": [
+   "{\"h\":\"1a7828489b777e9058bf4cce160a19b7\",\"n\":3603}"
+  ]
+ },
+ "builder ensembl regulation schema regions": {
+  "rows": [
+   "{\"h\":\"12c796c70f6f009d940e01fc99e596bc\",\"n\":3620}"
+  ]
+ },
+ "builder ensembl transcripts bad qualified reference error": {
+  "error": "duckvep_ensembl_transcripts_sql: SQL construction failed"
+ },
+ "builder ensembl transcripts defaults": {
+  "rows": [
+   "{\"h\":\"5e84d7b2efb31141531e559c97263157\",\"n\":29927}"
+  ]
+ },
+ "builder ensembl transcripts empty assembly error": {
+  "error": "DuckVEP builder: required table, schema, and assembly names must be nonempty"
+ },
+ "builder ensembl transcripts empty reference error": {
+  "error": "DuckVEP builder: required table, schema, and assembly names must be nonempty"
+ },
+ "builder ensembl transcripts many rows": {
+  "rows": [
+   "{\"n\":1200,\"h\":\"143650326525a3955b27abfe960a2763\"}"
+  ]
+ },
+ "builder ensembl transcripts null core error": {
+  "error": "DuckVEP builder: required table, schema, and assembly names must be nonempty"
+ },
+ "builder ensembl transcripts null options": {
+  "rows": [
+   "{\"h\":\"4f8075d046e19a8cf2cc268f3c588787\",\"n\":29898}"
+  ]
+ },
+ "builder ensembl transcripts options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder ensembl transcripts quoting": {
+  "rows": [
+   "{\"h\":\"172e490dbe7b9f5581a10709457d4035\",\"n\":29953}"
+  ]
+ },
+ "builder ensembl transcripts schema qualified": {
+  "rows": [
+   "{\"h\":\"a2e2a194923aef67ef0dc785ed55db53\",\"n\":29959}"
+  ]
+ },
+ "builder ensembl transcripts species 0": {
+  "rows": [
+   "{\"h\":\"2176f237bbb2ec0b69718573b290053e\",\"n\":29898}"
+  ]
+ },
+ "builder ensembl transcripts species 1": {
+  "rows": [
+   "{\"h\":\"4f8075d046e19a8cf2cc268f3c588787\",\"n\":29898}"
+  ]
+ },
+ "builder ensembl transcripts species 255UTINYINT": {
+  "rows": [
+   "{\"h\":\"f8e31c3fc56c41138b49411132b5c032\",\"n\":29900}"
+  ]
+ },
+ "builder ensembl transcripts species 7": {
+  "rows": [
+   "{\"h\":\"d43da987244d9ab1aa154844a4b77527\",\"n\":29898}"
+  ]
+ },
+ "builder ensembl transcripts species 9223372036854775807UBIGI": {
+  "rows": [
+   "{\"h\":\"a6b620a9c74b7bc37ca769ea252b57e2\",\"n\":29916}"
+  ]
+ },
+ "builder ensembl transcripts species NULL": {
+  "rows": [
+   "{\"h\":\"0d15196e27738318e2f4e816a8461770\",\"n\":29901}"
+  ]
+ },
+ "builder ensembl transcripts species NULLINTEGER": {
+  "rows": [
+   "{\"h\":\"0d15196e27738318e2f4e816a8461770\",\"n\":29901}"
+  ]
+ },
+ "builder ensembl transcripts species m2BIGINT": {
+  "rows": [
+   "{\"h\":\"54f807508fb9ee2d8c01e2b056d5e6dc\",\"n\":29899}"
+  ]
+ },
+ "builder ensembl transcripts species too large error": {
+  "error": "DuckVEP builder: species_id exceeds BIGINT range"
+ },
+ "builder ensembl transcripts species wrong type error": {
+  "error": "DuckVEP builder: expected INTEGER for option 'species_id'"
+ },
+ "builder ensembl transcripts trailing dot reference error": {
+  "error": "duckvep_ensembl_transcripts_sql: SQL construction failed"
+ },
+ "builder ensembl transcripts unknown option error": {
+  "error": "DuckVEP builder: unknown option 'species'"
+ },
+ "builder executes breakend fusion": {
+  "rows": [
+   "{\"event_index\":0,\"mate_event_index\":1,\"pair_key\":\"0|1\",\"status\":\"candidate_partner_genes\",\"reason\":null,\"endpoint_genes\":[\"G1\"],\"mate_endpoint_genes\":[\"G2\"],\"fusion_asserted\":false,\"phase_status\":\"unproven\"}",
+   "{\"event_index\":1,\"mate_event_index\":0,\"pair_key\":\"0|1\",\"status\":\"candidate_partner_genes\",\"reason\":null,\"endpoint_genes\":[\"G2\"],\"mate_endpoint_genes\":[\"G1\"],\"fusion_asserted\":false,\"phase_status\":\"unproven\"}",
+   "{\"event_index\":2,\"mate_event_index\":null,\"pair_key\":null,\"status\":\"identity_unproven\",\"reason\":\"single_breakend\",\"endpoint_genes\":[\"G1\"],\"mate_endpoint_genes\":[],\"fusion_asserted\":false,\"phase_status\":\"unproven\"}",
+   "{\"event_index\":3,\"mate_event_index\":null,\"pair_key\":null,\"status\":\"identity_unproven\",\"reason\":\"malformed_alt\",\"endpoint_genes\":[],\"mate_endpoint_genes\":[],\"fusion_asserted\":false,\"phase_status\":\"unproven\"}",
+   "{\"event_index\":4,\"mate_event_index\":null,\"pair_key\":null,\"status\":\"identity_unproven\",\"reason\":\"not_breakend\",\"endpoint_genes\":[],\"mate_endpoint_genes\":[],\"fusion_asserted\":false,\"phase_status\":\"unproven\"}"
+  ]
+ },
+ "builder executes breakend pairs": {
+  "rows": [
+   "{\"event_index\":0,\"id\":\"a1\",\"chrom\":\"1\",\"pos\":100,\"record_kind\":\"paired_breakend\",\"status\":\"reciprocal\",\"reason\":\"reciprocal\",\"mate_id\":\"a2\",\"event_id\":\"e1\",\"mate_event_index\":1,\"declared_mate_chrom\":\"2\",\"declared_mate_position\":200,\"id_reciprocal\":true,\"coordinate_reciprocal\":true,\"orientation_reciprocal\":true,\"insert_agree\":true,\"event_agree\":true,\"event_record_count\":2,\"inserted_length\":2,\"inserted_sequence\":\"TT\",\"pair_key\":\"0|1\",\"phase_status\":\"not_evaluated\",\"fusion_status\":\"not_asserted\"}",
+   "{\"event_index\":1,\"id\":\"a2\",\"chrom\":\"2\",\"pos\":200,\"record_kind\":\"paired_breakend\",\"status\":\"reciprocal\",\"reason\":\"reciprocal\",\"mate_id\":\"a1\",\"event_id\":\"e1\",\"mate_event_index\":0,\"declared_mate_chrom\":\"1\",\"declared_mate_position\":100,\"id_reciprocal\":true,\"coordinate_reciprocal\":true,\"orientation_reciprocal\":true,\"insert_agree\":true,\"event_agree\":true,\"event_record_count\":2,\"inserted_length\":2,\"inserted_sequence\":\"AA\",\"pair_key\":\"0|1\",\"phase_status\":\"not_evaluated\",\"fusion_status\":\"not_asserted\"}",
+   "{\"event_index\":2,\"id\":\"s1\",\"chrom\":\"3\",\"pos\":10,\"record_kind\":\"single_breakend\",\"status\":\"not_applicable\",\"reason\":\"single_breakend\",\"mate_id\":null,\"event_id\":null,\"mate_event_index\":null,\"declared_mate_chrom\":null,\"declared_mate_position\":null,\"id_reciprocal\":null,\"coordinate_reciprocal\":null,\"orientation_reciprocal\":null,\"insert_agree\":null,\"event_agree\":null,\"event_record_count\":null,\"inserted_length\":0,\"inserted_sequence\":null,\"pair_key\":null,\"phase_status\":\"not_evaluated\",\"fusion_status\":\"not_asserted\"}",
+   "{\"event_index\":3,\"id\":\"x1\",\"chrom\":\"4\",\"pos\":5,\"record_kind\":\"malformed_alt\",\"status\":\"invalid\",\"reason\":\"malformed_alt\",\"mate_id\":\"zz\",\"event_id\":null,\"mate_event_index\":null,\"declared_mate_chrom\":null,\"declared_mate_position\":null,\"id_reciprocal\":null,\"coordinate_reciprocal\":null,\"orientation_reciprocal\":null,\"insert_agree\":null,\"event_agree\":null,\"event_record_count\":null,\"inserted_length\":null,\"inserted_sequence\":null,\"pair_key\":null,\"phase_status\":\"not_evaluated\",\"fusion_status\":\"not_asserted\"}",
+   "{\"event_index\":4,\"id\":\"n1\",\"chrom\":\"5\",\"pos\":7,\"record_kind\":\"not_breakend\",\"status\":\"not_applicable\",\"reason\":\"not_breakend\",\"mate_id\":null,\"event_id\":null,\"mate_event_index\":null,\"declared_mate_chrom\":null,\"declared_mate_position\":null,\"id_reciprocal\":null,\"coordinate_reciprocal\":null,\"orientation_reciprocal\":null,\"insert_agree\":null,\"event_agree\":null,\"event_record_count\":null,\"inserted_length\":null,\"inserted_sequence\":null,\"pair_key\":null,\"phase_status\":\"not_evaluated\",\"fusion_status\":\"not_asserted\"}"
+  ]
+ },
+ "builder executes expansionhunter": {
+  "rows": [
+   "{\"event_index\":0,\"status\":\"ok\",\"reason\":\"exact\",\"source\":{\"info\":\"END=2008;REF=1;RL=3;RU=CAG\",\"format\":\"GT:SO:REPCN:REPCI\",\"sample\":\"1/2:SPANNING/SPANNING:2/10:2-2/10-10\",\"ref\":\"C\",\"alt\":\"<STR2>,<STR10>\",\"reference_sequence\":\"CAG\",\"alt_index\":1.0},\"reference_components\":{\"unit\":\"CAG\",\"count\":1.0},\"alternate_components\":{\"unit\":\"CAG\",\"count\":2.0},\"sequence_exact\":true}",
+   "{\"event_index\":1,\"status\":\"ok\",\"reason\":\"exact\",\"source\":{\"info\":\"END=2008;REF=1;RL=3;RU=CAG\",\"format\":\"GT:SO:REPCN:REPCI\",\"sample\":\"1/2:SPANNING/SPANNING:2/10:2-2/10-10\",\"ref\":\"C\",\"alt\":\"<STR2>,<STR10>\",\"reference_sequence\":\"CAG\",\"alt_index\":2.0},\"reference_components\":{\"unit\":\"CAG\",\"count\":1.0},\"alternate_components\":{\"unit\":\"CAG\",\"count\":10.0},\"sequence_exact\":true}",
+   "{\"event_index\":2,\"status\":\"ok\",\"reason\":\"exact\",\"source\":{\"info\":\"END=2008;REF=1;RL=3;RU=CAG\",\"format\":\"GT:SO:REPCN:REPCI\",\"sample\":\"1/1:SPANNING/SPANNING:2/2:2-2/2-2\",\"ref\":\"C\",\"alt\":\"<STR2>\",\"reference_sequence\":\"CAG\",\"alt_index\":1.0},\"reference_components\":{\"unit\":\"CAG\",\"count\":1.0},\"alternate_components\":{\"unit\":\"CAG\",\"count\":2.0},\"sequence_exact\":true}",
+   "{\"event_index\":3,\"status\":\"incomplete\",\"reason\":\"missing_field\",\"source\":{\"info\":null,\"format\":\"GT\",\"sample\":\"1\",\"ref\":\"C\",\"alt\":\"<STR2>\",\"reference_sequence\":\"CAG\",\"alt_index\":1.0},\"reference_components\":null,\"alternate_components\":null,\"sequence_exact\":false}"
+  ]
+ },
+ "builder executes expansionhunter into repeat alleles": {
+  "rows": [
+   "{\"event_index\":0,\"status\":\"ok\",\"r\":{\"reference\":\"CAG\",\"alternate\":\"CAGCAG\",\"reference_length\":3,\"alternate_length\":6,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"event_index\":1,\"status\":\"ok\",\"r\":{\"reference\":\"CAG\",\"alternate\":\"CAGCAGCAGCAGCAGCAGCAGCAGCAGCAG\",\"reference_length\":3,\"alternate_length\":30,\"length_change\":27,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"event_index\":2,\"status\":\"ok\",\"r\":{\"reference\":\"CAG\",\"alternate\":\"CAGCAG\",\"reference_length\":3,\"alternate_length\":6,\"length_change\":3,\"length_direction\":\"GAIN\",\"status\":\"ok\"}}",
+   "{\"event_index\":3,\"status\":\"incomplete\",\"r\":{\"reference\":null,\"alternate\":null,\"reference_length\":null,\"alternate_length\":null,\"length_change\":null,\"length_direction\":null,\"status\":\"summary_only\"}}"
+  ]
+ },
+ "builder executes prepare sv geometry": {
+  "rows": [
+   "{\"event_index\":0,\"status\":\"ok\",\"mode\":\"structural\",\"nominal_start\":13546124,\"nominal_end\":13546123,\"outer_start\":13546122,\"inner_start\":13546124,\"inner_end\":13546123,\"outer_end\":13546125,\"inserted_sequence\":null,\"source_sequence\":\"ATG\"}",
+   "{\"event_index\":1,\"status\":\"ok\",\"mode\":\"structural\",\"nominal_start\":101,\"nominal_end\":220,\"outer_start\":96,\"inner_start\":106,\"inner_end\":null,\"outer_end\":null,\"inserted_sequence\":null,\"source_sequence\":null}",
+   "{\"event_index\":2,\"status\":\"ok\",\"mode\":\"literal_insertion\",\"nominal_start\":501,\"nominal_end\":500,\"outer_start\":null,\"inner_start\":null,\"inner_end\":null,\"outer_end\":null,\"inserted_sequence\":\"ATG\",\"source_sequence\":null}",
+   "{\"event_index\":3,\"status\":\"unsupported_geometry\",\"mode\":\"structural\",\"nominal_start\":10,\"nominal_end\":null,\"outer_start\":null,\"inner_start\":null,\"inner_end\":null,\"outer_end\":null,\"inserted_sequence\":null,\"source_sequence\":null}"
+  ]
+ },
+ "builder executes prepare sv geometry qualified": {
+  "rows": [
+   "{\"event_index\":0,\"status\":\"ok\",\"mode\":\"structural\",\"nominal_start\":13546124,\"nominal_end\":13546123,\"outer_start\":13546122,\"inner_start\":13546124,\"inner_end\":13546123,\"outer_end\":13546125,\"inserted_sequence\":null,\"source_sequence\":\"ATG\"}",
+   "{\"event_index\":1,\"status\":\"ok\",\"mode\":\"structural\",\"nominal_start\":101,\"nominal_end\":220,\"outer_start\":96,\"inner_start\":106,\"inner_end\":null,\"outer_end\":null,\"inserted_sequence\":null,\"source_sequence\":null}",
+   "{\"event_index\":2,\"status\":\"ok\",\"mode\":\"literal_insertion\",\"nominal_start\":501,\"nominal_end\":500,\"outer_start\":null,\"inner_start\":null,\"inner_end\":null,\"outer_end\":null,\"inserted_sequence\":\"ATG\",\"source_sequence\":null}",
+   "{\"event_index\":3,\"status\":\"unsupported_geometry\",\"mode\":\"structural\",\"nominal_start\":10,\"nominal_end\":null,\"outer_start\":null,\"inner_start\":null,\"inner_end\":null,\"outer_end\":null,\"inserted_sequence\":null,\"source_sequence\":null}"
+  ]
+ },
+ "builder executes structural hgvs": {
+  "rows": [
+   "{\"event_index\":0,\"hgvs_status\":\"supported\",\"hgvs_reason\":null,\"edit\":\"deletion\",\"hgvs_g\":\"21:g.7467463_7467465del\",\"normalization\":\"none\",\"transcript_hgvs_route\":\"literal_equivalent\",\"literal_position\":7467462,\"literal_reference\":\"TCAG\",\"literal_alternate\":\"T\"}",
+   "{\"event_index\":1,\"hgvs_status\":\"unsupported\",\"hgvs_reason\":\"breakend\",\"edit\":null,\"hgvs_g\":null,\"normalization\":null,\"transcript_hgvs_route\":\"unsupported\",\"literal_position\":null,\"literal_reference\":null,\"literal_alternate\":null}",
+   "{\"event_index\":2,\"hgvs_status\":\"unavailable\",\"hgvs_reason\":\"missing_flank_sequence\",\"edit\":null,\"hgvs_g\":null,\"normalization\":null,\"transcript_hgvs_route\":\"unavailable\",\"literal_position\":null,\"literal_reference\":null,\"literal_alternate\":null}",
+   "{\"event_index\":3,\"hgvs_status\":\"supported\",\"hgvs_reason\":null,\"edit\":\"inversion\",\"hgvs_g\":\"21:g.201_203inv\",\"normalization\":\"none\",\"transcript_hgvs_route\":\"literal_equivalent\",\"literal_position\":201,\"literal_reference\":\"GTA\",\"literal_alternate\":\"TAC\"}"
+  ]
+ },
+ "builder executes structural hgvs with max_span": {
+  "rows": [
+   "{\"event_index\":0,\"hgvs_status\":\"supported\",\"hgvs_reason\":null}",
+   "{\"event_index\":1,\"hgvs_status\":\"unsupported\",\"hgvs_reason\":\"breakend\"}",
+   "{\"event_index\":2,\"hgvs_status\":\"unsupported\",\"hgvs_reason\":\"span_capacity\"}",
+   "{\"event_index\":3,\"hgvs_status\":\"supported\",\"hgvs_reason\":null}"
+  ]
+ },
+ "builder prepare expansionhunter defaults": {
+  "rows": [
+   "{\"h\":\"3f2e01a45473784e12ba1ee3834a1a05\",\"n\":5368}"
+  ]
+ },
+ "builder prepare expansionhunter empty events error": {
+  "error": "duckvep_prepare_expansionhunter_sql: invalid relation name or allocation failure"
+ },
+ "builder prepare expansionhunter extra dots error": {
+  "error": "duckvep_prepare_expansionhunter_sql: invalid relation name or allocation failure"
+ },
+ "builder prepare expansionhunter many rows": {
+  "rows": [
+   "{\"n\":2500,\"h\":\"7b77a04b94d65eaf9f8760354b6ce289\"}"
+  ]
+ },
+ "builder prepare expansionhunter null options": {
+  "rows": [
+   "{\"h\":\"ea45383653b6568d9685461befdaaebb\",\"n\":5355}"
+  ]
+ },
+ "builder prepare expansionhunter null reference error": {
+  "error": "duckvep_prepare_expansionhunter_sql: invalid relation name or allocation failure"
+ },
+ "builder prepare expansionhunter option unsupported error": {
+  "error": "DuckVEP builder: unknown option 'x'"
+ },
+ "builder prepare expansionhunter schemas": {
+  "rows": [
+   "{\"h\":\"bf89d5f4beea5d2c050ab4473767b89e\",\"n\":5376}"
+  ]
+ },
+ "builder prepare sv defaults": {
+  "rows": [
+   "{\"h\":\"c8aa25f1523203d291f6ed2268a3e2ab\",\"n\":2857}"
+  ]
+ },
+ "builder prepare sv empty relation error": {
+  "error": "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure"
+ },
+ "builder prepare sv extra dots error": {
+  "error": "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure"
+ },
+ "builder prepare sv leading dot error": {
+  "error": "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure"
+ },
+ "builder prepare sv many rows": {
+  "rows": [
+   "{\"n\":2500,\"h\":\"275354cba86be16649a6c98c065f2050\"}"
+  ]
+ },
+ "builder prepare sv null options": {
+  "rows": [
+   "{\"h\":\"c8aa25f1523203d291f6ed2268a3e2ab\",\"n\":2857}"
+  ]
+ },
+ "builder prepare sv null relation error": {
+  "error": "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure"
+ },
+ "builder prepare sv option unsupported error": {
+  "error": "DuckVEP builder: unknown option 'x'"
+ },
+ "builder prepare sv options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder prepare sv quoting": {
+  "rows": [
+   "{\"h\":\"e2f9b19dea4b25e039adde4830a64f56\",\"n\":2855}"
+  ]
+ },
+ "builder prepare sv schema": {
+  "rows": [
+   "{\"h\":\"80f56960029172e6c5934f622be8c029\",\"n\":2864}"
+  ]
+ },
+ "builder prepare sv trailing dot error": {
+  "error": "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure"
+ },
+ "builder projected defaults": {
+  "rows": [
+   "{\"h\":\"e5426936b3258ca561b74648f6ded56b\",\"n\":707}"
+  ]
+ },
+ "builder projected distance double type error": {
+  "error": "DuckVEP builder: expected INTEGER for option 'upstream_distance'"
+ },
+ "builder projected distance negative": {
+  "rows": [
+   "{\"h\":\"d5adaa51f0985bc5337a3c4c1ac54d47\",\"n\":696}"
+  ]
+ },
+ "builder projected distance null": {
+  "rows": [
+   "{\"h\":\"6d9e8d644e9bf84bc25088e9dd7fa6a1\",\"n\":698}"
+  ]
+ },
+ "builder projected distance types": {
+  "rows": [
+   "{\"h\":\"ab613109776a88c5d2733ac68d72bab5\",\"n\":711}"
+  ]
+ },
+ "builder projected distance wrong type error": {
+  "error": "DuckVEP builder: expected INTEGER for option 'upstream_distance'"
+ },
+ "builder projected distances": {
+  "rows": [
+   "{\"h\":\"f891a2270971a68e1301db45fd1cb33f\",\"n\":694}"
+  ]
+ },
+ "builder projected embedded nul error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder projected empty events": {
+  "rows": [
+   "{\"h\":\"e5e458013843c174003ba935c9eb44c3\",\"n\":697}"
+  ]
+ },
+ "builder projected empty model error": {
+  "error": "duckvep_annotate_projected: model_name must be non-empty"
+ },
+ "builder projected extra dots": {
+  "rows": [
+   "{\"h\":\"34629b3466d11220290e3d4a789e0777\",\"n\":704}"
+  ]
+ },
+ "builder projected hgvs unsupported error": {
+  "error": "DuckVEP builder: unknown option 'hgvs'"
+ },
+ "builder projected long names": {
+  "rows": [
+   "{\"h\":\"70d9adb54435bb628b5f81619337b959\",\"n\":1296}"
+  ]
+ },
+ "builder projected many rows": {
+  "rows": [
+   "{\"n\":3000,\"d\":2405,\"h\":\"93e9bee0de61c23aac020c92e72d4719\"}"
+  ]
+ },
+ "builder projected null events error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder projected null events with options error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder projected null model error": {
+  "error": "duckvep_annotate_sql: invalid input or allocation failure"
+ },
+ "builder projected null options": {
+  "rows": [
+   "{\"h\":\"bd613df76517dc9f13607625bcceea19\",\"n\":698}"
+  ]
+ },
+ "builder projected options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder projected quoting": {
+  "rows": [
+   "{\"h\":\"b29e4d5a029675b24eaad28ac41a6e7e\",\"n\":709}"
+  ]
+ },
+ "builder projected quoting schema": {
+  "rows": [
+   "{\"h\":\"1b8a3c2f1b087b1264b946cea346ce29\",\"n\":708}"
+  ]
+ },
+ "builder projected reversed keys": {
+  "rows": [
+   "{\"h\":\"85ae836ffa9e1b3371c46537fc1972a9\",\"n\":692}"
+  ]
+ },
+ "builder projected schema qualified": {
+  "rows": [
+   "{\"h\":\"50705e78b179395a9bc606d220eed9d8\",\"n\":714}"
+  ]
+ },
+ "builder projected unicode": {
+  "rows": [
+   "{\"h\":\"dec4c2f22a88169eaf4fa320423b0652\",\"n\":714}"
+  ]
+ },
+ "builder projected unknown option error": {
+  "error": "DuckVEP builder: unknown option 'other'"
+ },
+ "builder projection defaults": {
+  "rows": [
+   "{\"h\":\"87f2a5de04455d4cf163e6487dae5e7f\",\"n\":21005}"
+  ]
+ },
+ "builder projection empty events error": {
+  "error": "duckvep_transcript_projection_sql: invalid table name, options, or allocation failure"
+ },
+ "builder projection empty transcripts error": {
+  "error": "duckvep_transcript_projection_sql: invalid table name, options, or allocation failure"
+ },
+ "builder projection extra dots": {
+  "rows": [
+   "{\"h\":\"7db5d2e0b737a8cc912373841ee6a934\",\"n\":20986}"
+  ]
+ },
+ "builder projection many rows": {
+  "rows": [
+   "{\"n\":2500,\"h\":\"3967d37c0694c7ef48abe8f6712e875c\"}"
+  ]
+ },
+ "builder projection null annotations error": {
+  "error": "duckvep_transcript_projection_sql: invalid table name, options, or allocation failure"
+ },
+ "builder projection null options": {
+  "rows": [
+   "{\"h\":\"0b69ade6456bedd2903f3622ed34b20b\",\"n\":20980}"
+  ]
+ },
+ "builder projection option not supported error": {
+  "error": "DuckVEP builder: unknown option 'x'"
+ },
+ "builder projection options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder projection quoting": {
+  "rows": [
+   "{\"h\":\"96424530926c3bcaef196f59cc609bcf\",\"n\":20989}"
+  ]
+ },
+ "builder projection schema qualified": {
+  "rows": [
+   "{\"h\":\"015592cbab13b865ccc200624fa8410e\",\"n\":21017}"
+  ]
+ },
+ "builder receipt defaults": {
+  "rows": [
+   "{\"h\":\"5c40b7adfe9c7c43b44bc422660479e7\",\"n\":9513}"
+  ]
+ },
+ "builder receipt many rows": {
+  "rows": [
+   "{\"n\":1500,\"h\":\"522c17c2b50d89f44f5c22e5a5eb467b\"}"
+  ]
+ },
+ "builder receipt nul in parameter error": {
+  "error": "duckvep_model_receipt_sql: invalid argument string or allocation failure"
+ },
+ "builder receipt null model error": {
+  "error": "duckvep_model_receipt_sql: region and transcript table names are required"
+ },
+ "builder receipt null options": {
+  "rows": [
+   "{\"h\":\"5c40b7adfe9c7c43b44bc422660479e7\",\"n\":9513}"
+  ]
+ },
+ "builder receipt null parameters": {
+  "rows": [
+   "{\"h\":\"fa2e5de8187e25b51d688492d0064304\",\"n\":9500}"
+  ]
+ },
+ "builder receipt null regions error": {
+  "error": "duckvep_model_receipt_sql: region and transcript table names are required"
+ },
+ "builder receipt option wrong type error": {
+  "error": "DuckVEP builder: expected VARCHAR for option 'regulation_features_table'"
+ },
+ "builder receipt options not a struct error": {
+  "error": "DuckVEP builder: options must be a STRUCT"
+ },
+ "builder receipt quoting": {
+  "rows": [
+   "{\"h\":\"283cd3bfccea93b7215e4e69cf2ad0df\",\"n\":9502}"
+  ]
+ },
+ "builder receipt regulation null": {
+  "rows": [
+   "{\"h\":\"5c40b7adfe9c7c43b44bc422660479e7\",\"n\":9513}"
+  ]
+ },
+ "builder receipt regulation qualified": {
+  "rows": [
+   "{\"h\":\"cd7bf5ae3dc221f6a57e01ce816476b1\",\"n\":9334}"
+  ]
+ },
+ "builder receipt regulation table": {
+  "rows": [
+   "{\"h\":\"275af7945f5ed4d12401c117f8f1965b\",\"n\":9329}"
+  ]
+ },
+ "builder receipt schema tables": {
+  "rows": [
+   "{\"h\":\"1adf24c746f96e5024305b26ab002dcc\",\"n\":9503}"
+  ]
+ },
+ "builder receipt unknown option error": {
+  "error": "DuckVEP builder: unknown option 'other'"
+ },
+ "builder structural many rows": {
+  "rows": [
+   "{\"n\":2600,\"h\":\"28b808138d46336cd2f947c7ef2a74fd\"}"
+  ]
+ },
+ "builder structural_hgvs defaults": {
+  "rows": [
+   "{\"h\":\"b90daa8ceb1c4ab504db1d0a04c0c80a\",\"n\":6041}"
+  ]
+ },
+ "builder structural_hgvs empty relation error": {
+  "error": "duckvep_prepare_structural_hgvs_sql: invalid relation name or allocation failure"
+ },
+ "builder structural_hgvs extra dots error": {
+  "error": "duckvep_prepare_structural_hgvs_sql: invalid relation name or allocation failure"
+ },
+ "builder structural_hgvs max_span 1": {
+  "rows": [
+   "{\"h\":\"f5bc4eaf12eb2adb8c1ead7ae2e1586f\",\"n\":6032}"
+  ]
+ },
+ "builder structural_hgvs max_span 5000": {
+  "rows": [
+   "{\"h\":\"956367bf0ca97eddfe069830ee924343\",\"n\":6035}"
+  ]
+ },
+ "builder structural_hgvs max_span 60000": {
+  "rows": [
+   "{\"h\":\"71e75dbe6c133dacfeaf4e7b3cde9dec\",\"n\":6036}"
+  ]
+ },
+ "builder structural_hgvs max_span huge unsigned error": {
+  "error": "DuckVEP builder: option 'max_span' must be between 1 and 60000"
+ },
+ "builder structural_hgvs max_span negative error": {
+  "error": "DuckVEP builder: option 'max_span' must be between 1 and 60000"
+ },
+ "builder structural_hgvs max_span null": {
+  "rows": [
+   "{\"h\":\"956367bf0ca97eddfe069830ee924343\",\"n\":6035}"
+  ]
+ },
+ "builder structural_hgvs max_span too large error": {
+  "error": "DuckVEP builder: option 'max_span' must be between 1 and 60000"
+ },
+ "builder structural_hgvs max_span types": {
+  "rows": [
+   "{\"h\":\"868ae5a51deddf1a496f0079d9044eaa\",\"n\":6033}"
+  ]
+ },
+ "builder structural_hgvs max_span wrong type error": {
+  "error": "DuckVEP builder: expected INTEGER for option 'max_span'"
+ },
+ "builder structural_hgvs max_span zero error": {
+  "error": "DuckVEP builder: option 'max_span' must be between 1 and 60000"
+ },
+ "builder structural_hgvs null options": {
+  "rows": [
+   "{\"h\":\"b90daa8ceb1c4ab504db1d0a04c0c80a\",\"n\":6041}"
+  ]
+ },
+ "builder structural_hgvs null relation error": {
+  "error": "duckvep_prepare_structural_hgvs_sql: invalid relation name or allocation failure"
+ },
+ "builder structural_hgvs quoting": {
+  "rows": [
+   "{\"h\":\"20dad4d2b4249d84909f8c17cc4f573a\",\"n\":6041}"
+  ]
+ },
+ "builder structural_hgvs schema": {
+  "rows": [
+   "{\"h\":\"ea965e6bbefcd58978d42a2aeb971c97\",\"n\":6045}"
+  ]
+ },
+ "builder structural_hgvs unknown option error": {
+  "error": "DuckVEP builder: unknown option 'other'"
+ },
  "geometry functions combined": {
   "rows": [
    "{\"k\":0,\"p\":5,\"n\":41}"

@@ -11,6 +11,8 @@
 
 #include "core/duckvep_core_geometry.h"
 
+bool host_v2_register_builders(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
+                               duckdb_v2_error_info_handle *error);
 bool host_v2_register_nested(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
                              duckdb_v2_error_info_handle *error);
 
@@ -310,6 +312,9 @@ DUCKDB_EXTENSION_ENTRYPOINT(duckdb_v2_extension_handle extension, duckdb_v2_cont
         return;
     }
     if (!host_v2_register_nested(extension, context, error)) {
+        return;
+    }
+    if (!host_v2_register_builders(extension, context, error)) {
         return;
     }
 }
