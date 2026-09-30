@@ -6,7 +6,7 @@ GRCh38 job on the MANE-selected model.
 
 ## Verdict
 
-**The gate is not met.** Judged on mode B (identical unsorted VCF, decode through Parquet), cold process, model load included, whole-process wall clock
+**The gate is not met.** The maintainer closed #2 on its correctness contract, and the gate moved unchanged to #34. Judged on mode B (identical unsorted VCF, decode through Parquet), cold process, model load included, whole-process wall clock
 (R and DuckDB start-up included), one core, three fresh processes each:
 
 | | wall s (median of 3) |
