@@ -1,0 +1,28 @@
+{
+  "name": "duckvep",
+  "native_extension": "duckvep.duckdb_extension",
+  "v1_host": {
+    "extension_api_version": "v1.2.0",
+    "headers": "duckdb_capi",
+    "note": "Distributed host (CRAN, community repository); pinned by TARGET_DUCKDB_VERSION and DUCKDB_HEADER_VERSION in the Makefile"
+  },
+  "v2_host": {
+    "status": "preview",
+    "duckdb_c_api_major": 2,
+    "extension_api_version": "v2.0.0",
+    "abi_type": "C_STRUCT",
+    "allow_unstable_symbols": false,
+    "allow_deprecated": false,
+    "headers": "duckdb_capi_v2",
+    "duckdb_sdk_revision": "fece4143738e2b1d05a851d5c5dc036838aff8ec",
+    "duckdb_sdk_sha256": {
+      "duckdb_v2.h": "0f134bd33f1ee1a511f21d5ad122213d5897320c301d5dca9d5fb24a658acd73",
+      "duckdb_extension_v2.h": "0f69df71d9de3d1d707a95ff8403a6aebbde2e29077a035d201affe73b91cc2f"
+    },
+    "validation_host": {
+      "note": "Headers and a DuckDB CLI built at the same revision; the PyPI preview wheel is a different snapshot and is a secondary check",
+      "engine_revision": "fece4143738e2b1d05a851d5c5dc036838aff8ec",
+      "pypi_preview": "duckdb>=2.0.0.dev0 (pip install --pre)"
+    }
+  }
+}
