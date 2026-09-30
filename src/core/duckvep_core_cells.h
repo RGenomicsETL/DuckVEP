@@ -22,6 +22,7 @@ typedef enum {
 typedef struct {
     duckvep_cell_kind_t kind;
     uint8_t scale;
+    bool decimal; /* a DECIMAL (kind is its storage kind); callers that accept only plain numbers refuse it */
     bool valid;
     int64_t i;
     uint64_t u;

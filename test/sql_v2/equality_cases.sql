@@ -1373,3 +1373,162 @@ SELECT __duckvep_projection_code(NULL::UTINYINT) IS NULL AS n
 
 -- case: projection code unsupported error
 SELECT __duckvep_projection_code(200::UTINYINT) AS c
+
+-- fixture: lof README annotations
+CREATE TABLE lof_ann_readme AS SELECT * FROM query(duckvep_annotate_projected_sql('ann_lit', 'readme'))
+
+-- fixture: lof README transcripts
+CREATE TABLE lof_tx_readme AS SELECT t.transcript_index, '1' AS seq_region_name, t.strand, t.cds_start, t.cds_end, 'protein_coding' AS transcript_biotype, 'ENST_README' AS transcript_stable_id, (SELECT list(struct_pack(exon_start := e.exon_start, exon_end := e.exon_end) ORDER BY e.exon_start) FROM readme_exons e WHERE e.transcript_index = t.transcript_index) AS exons FROM readme_transcripts t
+
+-- fixture: lof README reference
+CREATE TABLE lof_ref_readme AS SELECT '1' AS chrom, 0 AS "start", 300 AS "end", repeat('A', 150) || 'GT' || repeat('T', 45) || 'AG' || repeat('A', 101) AS seq
+
+-- fixture: lof gerp
+CREATE TABLE lof_gerp AS SELECT '1' AS chrom, i * 10 AS "start", i * 10 + 10 AS "end", (i % 7) - 3.5 AS score FROM range(30) t(i)
+
+-- fixture: lof ancestor
+CREATE TABLE lof_anc AS SELECT '1' AS chrom, 0 AS "start", 300 AS "end", repeat('ACGT', 75) AS seq
+
+-- fixture: lof phylocsf
+CREATE TABLE lof_pcsf AS SELECT * FROM (VALUES ('ENST_README', 1, -1.5, 2.0), ('ENST_README', 2, 3.0, 4.0)) t(transcript, exon, corresponding_orf_score, max_score)
+
+-- fixture: lof rich annotations
+CREATE TABLE lof_ann_rich AS SELECT * FROM query(duckvep_annotate_projected_sql('ann_rich', 'rich'))
+
+-- fixture: lof rich transcripts
+CREATE TABLE lof_tx_rich AS SELECT t.transcript_index, 'chr' || t.seq_region AS seq_region_name, t.strand, t.cds_start, t.cds_end, CASE WHEN t.transcript_index = 3 THEN 'miRNA' ELSE 'protein_coding' END AS transcript_biotype, 'ENST_RICH' || t.transcript_index AS transcript_stable_id, (SELECT list(struct_pack(exon_start := e.exon_start, exon_end := e.exon_end) ORDER BY e.exon_start) FROM rich_exons e WHERE e.transcript_index = t.transcript_index) AS exons FROM rich_transcripts t
+
+-- fixture: lof rich reference
+CREATE TABLE lof_ref_rich AS SELECT * FROM (SELECT 'chr0' AS chrom, 0 AS "start", 300 AS "end", repeat('ACGTTGCA', 37) || 'GTAG' AS seq UNION ALL SELECT 'chr1', 0, 700, repeat('GATTACA', 100))
+
+-- case: builder lof defaults
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a', 't', 'r') AS x)
+
+-- case: builder lof schema qualified
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('s.a', 's.t', 's.r') AS x)
+
+-- case: builder lof quoting
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a"1', 't"2', 'r"3') AS x)
+
+-- case: builder lof gerp
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'gerp': 'g'}) AS x)
+
+-- case: builder lof ancestor
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'ancestor': 's.anc'}) AS x)
+
+-- case: builder lof phylocsf
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'phylocsf': 'p'}) AS x)
+
+-- case: builder lof all relations
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'gerp': 'g', 'ancestor': 'n', 'phylocsf': 'p'}) AS x)
+
+-- case: builder lof min intron
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'min_intron_size': 30}) AS x)
+
+-- case: builder lof min intron types
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'min_intron_size': 7::UTINYINT}) AS x)
+
+-- case: builder lof min intron bounds
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'min_intron_size': 1000000000}) AS x)
+
+-- case: builder lof cutoff double
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'gerp_end_trunc_cutoff': -12.25::DOUBLE}) AS x)
+
+-- case: builder lof cutoff integer
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'gerp_end_trunc_cutoff': 4}) AS x)
+
+-- case: builder lof cutoff float
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'gerp_end_trunc_cutoff': 1.5::FLOAT}) AS x)
+
+-- case: builder lof cutoff decimal error
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'gerp_end_trunc_cutoff': 1.5::DECIMAL(4,1)}) AS x)
+
+-- case: builder lof check cds
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'check_complete_cds': true}) AS x)
+
+-- case: builder lof all options
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'gerp': 'g', 'ancestor': 'n', 'phylocsf': 'p', 'min_intron_size': 20, 'gerp_end_trunc_cutoff': -40.5::DOUBLE, 'check_complete_cds': true}) AS x)
+
+-- case: builder lof null options
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',NULL) AS x)
+
+-- case: builder lof null option values
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_lof_sql('a','t','r',{'gerp': NULL::VARCHAR, 'min_intron_size': NULL::INTEGER, 'gerp_end_trunc_cutoff': NULL, 'check_complete_cds': NULL::BOOLEAN}) AS x)
+
+-- case: builder lof unknown option error
+SELECT duckvep_lof_sql('a','t','r',{'other': 1}) AS x
+
+-- case: builder lof options not a struct error
+SELECT duckvep_lof_sql('a','t','r',5) AS x
+
+-- case: builder lof min intron wrong type error
+SELECT duckvep_lof_sql('a','t','r',{'min_intron_size': 'x'}) AS x
+
+-- case: builder lof min intron too large error
+SELECT duckvep_lof_sql('a','t','r',{'min_intron_size': 1000000001}) AS x
+
+-- case: builder lof min intron negative error
+SELECT duckvep_lof_sql('a','t','r',{'min_intron_size': -1}) AS x
+
+-- case: builder lof min intron huge unsigned error
+SELECT duckvep_lof_sql('a','t','r',{'min_intron_size': 18446744073709551615::UBIGINT}) AS x
+
+-- case: builder lof cutoff wrong type error
+SELECT duckvep_lof_sql('a','t','r',{'gerp_end_trunc_cutoff': 'x'}) AS x
+
+-- case: builder lof cutoff not finite error
+SELECT duckvep_lof_sql('a','t','r',{'gerp_end_trunc_cutoff': 'Infinity'::DOUBLE}) AS x
+
+-- case: builder lof cutoff nan error
+SELECT duckvep_lof_sql('a','t','r',{'gerp_end_trunc_cutoff': 'NaN'::DOUBLE}) AS x
+
+-- case: builder lof check cds wrong type error
+SELECT duckvep_lof_sql('a','t','r',{'check_complete_cds': 1}) AS x
+
+-- case: builder lof gerp wrong type error
+SELECT duckvep_lof_sql('a','t','r',{'gerp': 5}) AS x
+
+-- case: builder lof null annotations error
+SELECT duckvep_lof_sql(NULL,'t','r') AS x
+
+-- case: builder lof null reference error
+SELECT duckvep_lof_sql('a','t',NULL) AS x
+
+-- case: builder lof extra dots error
+SELECT duckvep_lof_sql('a.b.c','t','r') AS x
+
+-- case: builder lof empty transcripts error
+SELECT duckvep_lof_sql('a','','r') AS x
+
+-- case: builder lof many rows
+SELECT count(*) AS n, md5(string_agg(x, '' ORDER BY i)) AS h FROM (SELECT i, duckvep_lof_sql('a' || (i % 5), 't' || (i % 3), 'r', {'min_intron_size': i % 50, 'gerp': CASE WHEN i % 2 = 0 THEN 'g' ELSE NULL END}) AS x FROM range(1200) t(i))
+
+-- case: lof executes README defaults
+SELECT * FROM query(duckvep_lof_sql('lof_ann_readme', 'lof_tx_readme', 'lof_ref_readme')) ORDER BY ALL
+
+-- case: lof executes README defaults hashes
+SELECT count(*) AS n, count(lof) AS calls, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h, t.lof FROM query(duckvep_lof_sql('lof_ann_readme', 'lof_tx_readme', 'lof_ref_readme')) t)
+
+-- case: lof executes README all options
+SELECT * FROM query(duckvep_lof_sql('lof_ann_readme', 'lof_tx_readme', 'lof_ref_readme', {'gerp': 'lof_gerp', 'ancestor': 'lof_anc', 'phylocsf': 'lof_pcsf', 'min_intron_size': 40, 'check_complete_cds': true})) ORDER BY ALL
+
+-- case: lof executes README all options hashes
+SELECT count(*) AS n, count(lof) AS calls, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h, t.lof FROM query(duckvep_lof_sql('lof_ann_readme', 'lof_tx_readme', 'lof_ref_readme', {'gerp': 'lof_gerp', 'ancestor': 'lof_anc', 'phylocsf': 'lof_pcsf', 'min_intron_size': 40, 'check_complete_cds': true})) t)
+
+-- case: lof executes README gerp cutoff
+SELECT * FROM query(duckvep_lof_sql('lof_ann_readme', 'lof_tx_readme', 'lof_ref_readme', {'gerp': 'lof_gerp', 'gerp_end_trunc_cutoff': -2.5::DOUBLE})) ORDER BY ALL
+
+-- case: lof executes README gerp cutoff hashes
+SELECT count(*) AS n, count(lof) AS calls, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h, t.lof FROM query(duckvep_lof_sql('lof_ann_readme', 'lof_tx_readme', 'lof_ref_readme', {'gerp': 'lof_gerp', 'gerp_end_trunc_cutoff': -2.5::DOUBLE})) t)
+
+-- case: lof executes rich model defaults
+SELECT * FROM query(duckvep_lof_sql('lof_ann_rich', 'lof_tx_rich', 'lof_ref_rich')) ORDER BY ALL
+
+-- case: lof executes rich model defaults hashes
+SELECT count(*) AS n, count(lof) AS calls, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h, t.lof FROM query(duckvep_lof_sql('lof_ann_rich', 'lof_tx_rich', 'lof_ref_rich')) t)
+
+-- case: lof executes rich model check cds
+SELECT * FROM query(duckvep_lof_sql('lof_ann_rich', 'lof_tx_rich', 'lof_ref_rich', {'check_complete_cds': true, 'min_intron_size': 100})) ORDER BY ALL
+
+-- case: lof executes rich model check cds hashes
+SELECT count(*) AS n, count(lof) AS calls, sum(h::HUGEINT) AS s, bit_xor(h) AS x FROM (SELECT hash(t) AS h, t.lof FROM query(duckvep_lof_sql('lof_ann_rich', 'lof_tx_rich', 'lof_ref_rich', {'check_complete_cds': true, 'min_intron_size': 100})) t)
