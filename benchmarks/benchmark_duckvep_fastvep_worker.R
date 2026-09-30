@@ -126,8 +126,8 @@ if (nzchar(opt$duckhts_extension)) {
     # attributes_map on every wanted line).
     gff_keys <- "'ID', 'Name', 'tag', 'transcript_support_level', 'ccdsid'"
     invisible(dbExecute(reader, glue("COPY (SELECT feature, map_from_entries(list_transform(
-        list_filter(string_split(attributes, ';'), x -> split_part(x, '=', 1) IN ({gff_keys})),
-        x -> {{'k': split_part(x, '=', 1), 'v': url_decode(substr(x, strpos(x, '=') + 1))}}))
+        list_filter(string_split(attributes, ';'), lambda x: split_part(x, '=', 1) IN ({gff_keys})),
+        lambda x: {{'k': split_part(x, '=', 1), 'v': url_decode(substr(x, strpos(x, '=') + 1))}}))
         AS attributes_map
       FROM read_gff({reader_q(normalizePath(opt$gff3))}, scan_mode := 'sequential')
       WHERE feature NOT IN ('exon', 'CDS', 'chromosome', 'biological_region',
