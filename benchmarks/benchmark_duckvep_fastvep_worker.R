@@ -111,13 +111,27 @@ if (nzchar(opt$duckhts_extension)) {
   invisible(dbExecute(reader, glue("PRAGMA threads={opt$threads}")))
   invisible(dbExecute(reader, glue("SET memory_limit = {reader_q(opt$memory_limit)}")))
   invisible(dbExecute(reader, "SET preserve_insertion_order = true"))
+  # Records stay in file order (the unindexed VCF has no contig-parallel scan);
+  # with more than one thread, htslib decompression uses worker threads.
+  decode_threads <- if (opt$threads > 1L) opt$threads else 0L
   invisible(dbExecute(reader, glue("COPY (SELECT CHROM, POS, ID, REF, ALT
-    FROM read_bcf({reader_q(input)}, scan_mode := 'sequential', decompression_threads := 0))
+    FROM read_bcf({reader_q(input)}, scan_mode := 'sequential',
+      decompression_threads := {decode_threads}))
     TO {reader_q(staged_vcf)} (FORMAT PARQUET)")))
   if (nzchar(opt$gff3)) {
-    invisible(dbExecute(reader, glue("COPY (SELECT feature, attributes_map
-      FROM read_gff({reader_q(normalizePath(opt$gff3))}, attributes_map := TRUE,
-        scan_mode := 'sequential')) TO {reader_q(staged_gff)} (FORMAT PARQUET)")))
+    # The field builders read only these attribute keys from gene and transcript
+    # lines. read_gff's attributes_map builds a map for all 10.7M lines before
+    # any filter applies, so read the raw attribute string of the 0.7M wanted
+    # lines and split out just these keys (URL-decoded values; checked equal to
+    # attributes_map on every wanted line).
+    gff_keys <- "'ID', 'Name', 'tag', 'transcript_support_level', 'ccdsid'"
+    invisible(dbExecute(reader, glue("COPY (SELECT feature, map_from_entries(list_transform(
+        list_filter(string_split(attributes, ';'), x -> split_part(x, '=', 1) IN ({gff_keys})),
+        x -> {{'k': split_part(x, '=', 1), 'v': url_decode(substr(x, strpos(x, '=') + 1))}}))
+        AS attributes_map
+      FROM read_gff({reader_q(normalizePath(opt$gff3))}, scan_mode := 'sequential')
+      WHERE feature NOT IN ('exon', 'CDS', 'chromosome', 'biological_region',
+        'five_prime_UTR', 'three_prime_UTR')) TO {reader_q(staged_gff)} (FORMAT PARQUET)")))
   }
   dbDisconnect(reader, shutdown = TRUE)
   invisible(dbExecute(con, glue("CREATE TEMP MACRO read_bcf(path, scan_mode := 'sequential',
