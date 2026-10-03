@@ -210,7 +210,9 @@ SELECT row_number() OVER (ORDER BY r.seq_region, v.POS, alt_allele)::UBIGINT AS 
        NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region,
        NULL::UBIGINT AS mate_position
 FROM read_bcf('cohort.vcf.gz') v CROSS JOIN unnest(v.ALT) AS t(alt_allele)
-JOIN grch38_regions r ON r.seq_region_name = v.CHROM;
+JOIN grch38_regions r   -- Ensembl names contigs 1..22, X, Y, MT; UCSC-style VCFs say chr1, chrM
+  ON r.seq_region_name = CASE WHEN v.CHROM IN ('chrM', 'M') THEN 'MT'
+                              ELSE regexp_replace(v.CHROM, '^chr', '') END;
 
 -- High-impact consequences next to their arbitrated ClinVar decision
 SELECT r.seq_region_name AS contig, e.position, e.reference, e.alternate,

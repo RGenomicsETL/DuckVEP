@@ -174,14 +174,15 @@ facts as consequence prediction; it must not reconstruct biology from rendered S
 
 ## Code map
 
-- `functions.yaml` is the public SQL contract.
-- `src/duckvep/duckvep_ensembl.c` registers the relation-to-model SQL described below.
-- `src/duckvep/duckvep_sql.c` registers the public event-relation dispatcher and generated
+- `docs/functions.md` is the public SQL contract.
+- `src/duckvep_ensembl.c` registers the relation-to-model SQL described below.
+- `src/duckvep_sql.c` registers the public event-relation dispatcher and generated
   SO metadata relation.
-- `src/duckvep/duckvep_model.c` validates, owns, publishes, pins, and drops named models.
-- `src/duckvep/duckvep_annotate.c` adapts DuckDB vectors to the pure C batch interface
+- `src/duckvep_model.c` validates, owns, publishes, pins, and drops named models.
+- `src/duckvep_annotate.c` adapts DuckDB vectors to the pure C batch interface
   and materializes results.
-- `src/duckvep/kernel/include/duckvep_kernel.h` is the host-neutral kernel ABI; the sibling
+- `src/core/` holds the row logic both hosts share; `host_v2/` is the C API v2 host.
+- `src/kernel/include/duckvep_kernel.h` is the host-neutral kernel ABI; the sibling
   kernel sources own traversal, topology, projection, coding edits, phased edits,
   structural geometry, and fact-to-SO evaluation.
 - `test/sql/duckvep_ensembl.test` exercises model preparation and publication;

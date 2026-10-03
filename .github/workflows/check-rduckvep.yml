@@ -51,4 +51,6 @@ jobs:
       - name: Build webR binary in Emscripten toolchain
         run: |
           docker run --rm -v "$PWD:/project:ro" -w /tmp ghcr.io/r-wasm/webr:latest \
-            sh -c 'mkdir -p /tmp/output && Rscript -e '\''rwasm::build("/project/r/Rduckvep", out_dir="/tmp/output", dependencies=FALSE)'\'' && test -f /tmp/output/Rduckvep_*.tgz'
+            sh -c 'mkdir -p /tmp/output && Rscript -e '\''rwasm::build("/project/r/Rduckvep", out_dir="/tmp/output", dependencies=FALSE)'\'' && test -f /tmp/output/Rduckvep_*.tgz &&
+              mkdir /tmp/unpacked && tar -xzf /tmp/output/Rduckvep_*.tgz -C /tmp/unpacked &&
+              python3 /project/test/scripts/check_wasm_exports.py "$(find /tmp/unpacked -name duckvep.duckdb_extension | head -n 1)"'
