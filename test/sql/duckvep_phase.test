@@ -92,6 +92,20 @@ ORDER BY a.input_slot
 2	2	NULL	allele_slot	called
 3	NULL	NULL	allele_slot	missing
 
+# 'vep_compat' names the pinned executable VEP release; 'vep116_compat' is its older spelling.
+query II
+SELECT duckvep_phase_call([NULL,1,NULL,2], NULL, {phase_policy: 'vep_compat'}) =
+       duckvep_phase_call([NULL,1,NULL,2], NULL, {phase_policy: 'vep116_compat'}),
+       duckvep_phase_call([NULL,1,NULL,2], NULL, {phase_policy: 'vep_compat'}) =
+       duckvep_phase_call([NULL,1,NULL,2], NULL, {phase_policy: 'strict'})
+----
+true	false
+
+statement error
+SELECT duckvep_phase_call([0,1], NULL, {phase_policy: 'vep117_compat'})
+----
+phase_policy must be 'strict' or 'vep_compat'
+
 # VEP's parser compacts called alleles before container lane assignment.
 query IIT
 SELECT a.input_slot, a.haplotype_lane, a.status

@@ -8,6 +8,7 @@ DUCKDB_EXTENSION_EXTERN
 
 #include "duckvep_model.h"
 #include "core/duckvep_core_haplotypes.h"
+#include "core/duckvep_core_phase.h"
 #include "core/duckvep_core_discovery.h"
 
 #include <stdbool.h>
@@ -102,11 +103,12 @@ static void haplotype_bind(duckdb_bind_info info) {
     }
     value = duckdb_bind_get_named_parameter(info, "phase_policy");
     name = value && !duckdb_is_null_value(value) ? duckdb_get_varchar(value) : NULL;
-    int valid = !value || (name && (!strcmp(name, "strict") || !strcmp(name, "vep116_compat")));
-    b->cfg.policy = name && !strcmp(name, "vep116_compat") ? DUCKVEP_PHASE_VEP116_COMPAT : DUCKVEP_PHASE_STRICT;
+    int valid;
+    b->cfg.policy = DUCKVEP_PHASE_STRICT;
+    valid = !value || (name && duckvep_core_phase_policy(name, strlen(name), &b->cfg.policy));
     duckdb_free(name); duckdb_destroy_value(&value);
     if (!valid) {
-        duckdb_bind_set_error(info, "duckvep_haplotypes: phase_policy must be 'strict' or 'vep116_compat'");
+        duckdb_bind_set_error(info, "duckvep_haplotypes: phase_policy must be 'strict' or 'vep_compat'");
         haplotype_bind_destroy(b); return;
     }
     value = duckdb_bind_get_named_parameter(info, "input_mode");
@@ -115,7 +117,7 @@ static void haplotype_bind(duckdb_bind_info info) {
     b->cfg.source_records = name && !strcmp(name, "source_records");
     duckdb_free(name); duckdb_destroy_value(&value);
     if (!valid || (b->cfg.source_records && b->cfg.policy != DUCKVEP_PHASE_VEP116_COMPAT)) {
-        duckdb_bind_set_error(info, "duckvep_haplotypes: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep116_compat'");
+        duckdb_bind_set_error(info, "duckvep_haplotypes: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep_compat'");
         haplotype_bind_destroy(b); return;
     }
     value = duckdb_bind_get_named_parameter(info, "hgvs");

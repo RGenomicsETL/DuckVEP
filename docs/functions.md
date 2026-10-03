@@ -700,7 +700,7 @@ duckvep_phase_call(alleles, phase_before, options STRUCT) -> STRUCT[]
 
 Parameters: `alleles` is a list of integer allele indices (NULL for a missing call) and `phase_before` a list of booleans of the same length: a slot is true when it is phased to the slot before it. Either argument may be NULL: a NULL `alleles` gives a NULL result, and under the strict policy a NULL `phase_before` leaves every slot unphased. Lists of different lengths, an empty genotype or a ploidy above 65,535 are errors.
 
-Options: `phase_set` (INTEGER, the record's phase-set label; without it phased slots carry no label) and `phase_policy` (VARCHAR, `'strict'` by default, or `'vep116_compat'` for VEP 116's called-slot order).
+Options: `phase_set` (INTEGER, the record's phase-set label; without it phased slots carry no label) and `phase_policy` (VARCHAR, `'strict'` by default, or `'vep_compat'` for the called-slot order of the pinned executable VEP release, today 116; `'vep116_compat'` is accepted as its older spelling).
 
 Returns: one element per genotype slot, `STRUCT(input_slot USMALLINT, allele_index INTEGER, haplotype_lane USMALLINT, ploidy USMALLINT, phase_set BIGINT, phase_scope VARCHAR, status VARCHAR)[]`. `status` is `called`, `unphased` or `missing`; `phase_scope` is `phase_set`, `all_phase_sets`, `allele_slot` or `unresolved`. A slot with no lane has a NULL `haplotype_lane`.
 
@@ -799,8 +799,8 @@ Named parameters:
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `phase_policy` | VARCHAR | `'strict'` | `'strict'` interprets GT and PS strictly; `'vep116_compat'` follows VEP 116 called-slot order. |
-| `input_mode` | VARCHAR | `'alt_events'` | `'alt_events'` for decoded per-ALT calls, or `'source_records'` for raw GT text, which requires `phase_policy := 'vep116_compat'`. |
+| `phase_policy` | VARCHAR | `'strict'` | `'strict'` interprets GT and PS strictly; `'vep_compat'` follows the called-slot order of the pinned executable VEP release (today 116); `'vep116_compat'` is accepted as its older spelling. |
+| `input_mode` | VARCHAR | `'alt_events'` | `'alt_events'` for decoded per-ALT calls, or `'source_records'` for raw GT text, which requires `phase_policy := 'vep_compat'`. |
 | `hgvs` | BOOLEAN | false | Request bounded protein HGVS for supported completed paths (`hgvsp`, `hgvsp_status`). |
 
 Capacity limits are positive integers. A path that would exceed one is an error, never a truncated result. Defaults: `max_active_events` 16384, `max_active_transcripts` 4096, `max_active_carriers` 65536, `max_active_prefixes` 262144, `max_active_projections` 262144, `max_allele_bytes` 8388608, `max_leaf_events` 4096, `max_leaf_edits` 65536, `max_sequence_bases` 1048576, `max_ploidy` 64 (at most 65535), `max_phase_sets` 1024, `max_alignment_cells` 16777216, `max_leaf_differences` 65536, `max_hgvs_operations` 65536, `max_hgvs_bytes` 1048576, `max_hgvs_reference_bytes` 262144 and `workspace_limit` 268435456 bytes.

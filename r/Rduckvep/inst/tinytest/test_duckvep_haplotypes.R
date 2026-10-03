@@ -1040,7 +1040,7 @@ local({
       if (raw && policy == "strict") {
         expect_error(rduckvep_haplotypes(con, n_indel_query, "n_indel_witnesses", hgvs = TRUE,
           phase_policy = policy, input_mode = "source_records"),
-          "source_records requires phase_policy='vep116_compat'")
+          "source_records requires phase_policy='vep_compat'")
         next
       }
       singletons <- rduckvep_haplotypes(con, n_indel_query, "n_indel_witnesses", hgvs = TRUE,

@@ -1,5 +1,7 @@
 # Rduckvep
 
+- `rduckvep_haplotypes()` takes `phase_policy = "vep_compat"` for the pinned executable VEP release; `"vep116_compat"` is still accepted.
+
 - The webR build keeps its bundled HTSlib, zlib and cgranges private: the side module exports only the DuckDB entry point, so it can be
   loaded next to Rduckhts, which carries its own HTSlib.
 

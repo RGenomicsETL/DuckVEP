@@ -1,4 +1,5 @@
 #include "duckvep_core_haplotype_script.h"
+#include "duckvep_core_phase.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -91,20 +92,22 @@ int duckvep_core_haplotype_script(const char *query, const char *model, const ch
     const duckvep_haplotype_script_options_t *o, duckvep_sql_text out[DUCKVEP_HAPLOTYPE_SCRIPT_MAX],
     size_t *count, char *error, size_t error_size) {
     int source_records = o->input_mode && !strcmp(o->input_mode, "source_records");
-    int compat = o->phase_policy && !strcmp(o->phase_policy, "vep116_compat");
+    duckvep_phase_policy_t policy = DUCKVEP_PHASE_STRICT;
+    int policy_valid = !o->phase_policy || duckvep_core_phase_policy(o->phase_policy, strlen(o->phase_policy), &policy);
+    int compat = policy == DUCKVEP_PHASE_VEP116_COMPAT;
     bool ok = true;
     size_t n = 0u;
     *count = 0u;
-    if ((o->phase_policy && strcmp(o->phase_policy, "strict") && !compat) ||
+    if (!policy_valid ||
         (o->input_mode && strcmp(o->input_mode, "alt_events") && !source_records)) {
-        snprintf(error, error_size, "%s", o->phase_policy && strcmp(o->phase_policy, "strict") && !compat
-            ? "duckvep_haplotype_load_sql: phase_policy must be 'strict' or 'vep116_compat'"
-            : "duckvep_haplotype_load_sql: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep116_compat'");
+        snprintf(error, error_size, "%s", !policy_valid
+            ? "duckvep_haplotype_load_sql: phase_policy must be 'strict' or 'vep_compat'"
+            : "duckvep_haplotype_load_sql: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep_compat'");
         return 2;
     }
     if (source_records && !compat) {
         snprintf(error, error_size,
-            "duckvep_haplotype_load_sql: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep116_compat'");
+            "duckvep_haplotype_load_sql: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep_compat'");
         return 2;
     }
     for (unsigned i = 0u; i < DUCKVEP_HAP_LIMIT_COUNT; i++) {

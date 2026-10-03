@@ -69,7 +69,7 @@ int duckvep_hap_config_check(const duckvep_hap_config_t *config, char *error, si
     }
     if (config->source_records && config->policy != DUCKVEP_PHASE_VEP116_COMPAT) {
         duckvep_sql_set_error(error, error_size,
-            "duckvep_haplotypes: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep116_compat'");
+            "duckvep_haplotypes: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep_compat'");
         return 0;
     }
     for (unsigned i = 0u; i < DUCKVEP_HAP_LIMIT_COUNT; i++) {

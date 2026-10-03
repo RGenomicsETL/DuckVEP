@@ -15,6 +15,7 @@
 #include "core/duckvep_core_discovery.h"
 #include "core/duckvep_core_haplotype_script.h"
 #include "core/duckvep_core_haplotypes.h"
+#include "core/duckvep_core_phase.h"
 #include "kernel/src/duckvep_budget.h"
 #include "kernel/src/duckvep_haplotype_stream.h"
 
@@ -236,7 +237,7 @@ bool host_v2_hap_bind_finish(hap_bind *bind, model_state *state, duckdb_v2_conte
     char message[DUCKVEP_SQL_ERROR_SIZE + 128];
     duckvep_model_entry_t *entry = NULL;
     duckvep_hap_config_t config;
-    bool plan = false, ok = false;
+    bool plan = false, ok = false, policy_valid = true;
     if (!*bind->job || !model || !*model) {
         set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID,
                   "duckvep_haplotypes: the JOB and MODEL options are required and must be non-empty");
@@ -253,17 +254,16 @@ bool host_v2_hap_bind_finish(hap_bind *bind, model_state *state, duckdb_v2_conte
         return false;
     }
     duckvep_hap_config_defaults(&config, &entry->model);
-    config.policy = bind->policy && strcmp(bind->policy, "vep116_compat") == 0 ? DUCKVEP_PHASE_VEP116_COMPAT
-                                                                                 : DUCKVEP_PHASE_STRICT;
+    config.policy = DUCKVEP_PHASE_STRICT;
+    policy_valid = !bind->policy || duckvep_core_phase_policy(bind->policy, strlen(bind->policy), &config.policy);
     config.source_records = bind->mode && strcmp(bind->mode, "source_records") == 0;
     config.hgvs = bind->has_hgvs && bind->hgvs;
-    if ((bind->policy && strcmp(bind->policy, "strict") && strcmp(bind->policy, "vep116_compat")) ||
+    if (!policy_valid ||
         (bind->mode && strcmp(bind->mode, "alt_events") && strcmp(bind->mode, "source_records"))) {
         set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID,
-                  bind->policy && strcmp(bind->policy, "strict") && strcmp(bind->policy, "vep116_compat")
-                      ? "duckvep_haplotypes: phase_policy must be 'strict' or 'vep116_compat'"
+                  !policy_valid ? "duckvep_haplotypes: phase_policy must be 'strict' or 'vep_compat'"
                       : "duckvep_haplotypes: input_mode must be 'alt_events' or 'source_records'; source_records "
-                        "requires phase_policy='vep116_compat'");
+                        "requires phase_policy='vep_compat'");
         goto cleanup;
     }
     for (unsigned i = 0; i < DUCKVEP_HAP_LIMIT_COUNT; ++i) {

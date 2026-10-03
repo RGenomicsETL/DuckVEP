@@ -6,7 +6,7 @@
 #include <string.h>
 
 const char duckvep_core_phase_policy_error[] =
-    "duckvep_phase_call: phase_policy must be 'strict' or 'vep116_compat'";
+    "duckvep_phase_call: phase_policy must be 'strict' or 'vep_compat'";
 const char duckvep_core_phase_set_error[] = "duckvep_phase_call: phase_set exceeds BIGINT range";
 const char duckvep_core_record_order_error[] = "duckvep_haplotypes: invalid source-buffer ordinal";
 
@@ -30,7 +30,9 @@ const char *duckvep_core_phase_check_row(bool have_gt, bool have_phase, size_t g
 bool duckvep_core_phase_policy(const char *name, size_t length, duckvep_phase_policy_t *policy)
 {
     *policy = DUCKVEP_PHASE_STRICT;
-    if (length == 13u && !memcmp(name, "vep116_compat", 13u)) {
+    /* "vep_compat" names the pinned executable VEP release; "vep116_compat" is its older spelling. */
+    if ((length == 10u && !memcmp(name, "vep_compat", 10u)) ||
+        (length == 13u && !memcmp(name, "vep116_compat", 13u))) {
         *policy = DUCKVEP_PHASE_VEP116_COMPAT;
         return true;
     }

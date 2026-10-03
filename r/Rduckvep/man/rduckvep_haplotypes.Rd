@@ -8,7 +8,7 @@ rduckvep_haplotypes(
   con,
   calls_query,
   model_name,
-  phase_policy = c("strict", "vep116_compat"),
+  phase_policy = c("strict", "vep_compat", "vep116_compat"),
   ...,
   input_mode = c("alt_events", "source_records"),
   hgvs = FALSE,
@@ -32,7 +32,7 @@ pinned raw parser and explicitly conditional missing-slot interpretation.}
 `max_sequence_bases`, `max_ploidy`, `max_phase_sets`, and `workspace_limit`.}
 
 \item{input_mode}{`alt_events` for decoded per-ALT calls, or `source_records`
-for raw GT and complete source ALT lists under `vep116_compat`.}
+for raw GT and complete source ALT lists under `vep_compat`.}
 
 \item{hgvs}{Whether to request bounded protein HGVS for supported completed paths.}
 
@@ -239,7 +239,7 @@ With `input_mode = "source_records"`, the required columns are `event_index`,
 `seq_region`, `position`, `reference`, `alternates` (a character list),
 `transcript_index`, `sample_index`, and `gt` (original VCF text).
 Here `event_index` identifies the whole source record. This mode requires
-`vep116_compat`: the pinned file profile consumes two slots and ignores PS.
+`vep_compat`: the pinned file profile consumes two slots and ignores PS.
 Missing calls and undefined slots can yield `conditional` sequence with
 evidence bit 8; this is not known phase or biological rescue. Contributor
 `alt_index` is 0 for REF, a positive source ALT ordinal, or NA for an undefined

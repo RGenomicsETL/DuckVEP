@@ -194,7 +194,7 @@
 #' `seq_region`, `position`, `reference`, `alternates` (a character list),
 #' `transcript_index`, `sample_index`, and `gt` (original VCF text).
 #' Here `event_index` identifies the whole source record. This mode requires
-#' `vep116_compat`: the pinned file profile consumes two slots and ignores PS.
+#' `vep_compat`: the pinned file profile consumes two slots and ignores PS.
 #' Missing calls and undefined slots can yield `conditional` sequence with
 #' evidence bit 8; this is not known phase or biological rescue. Contributor
 #' `alt_index` is 0 for REF, a positive source ALT ordinal, or NA for an undefined
@@ -212,11 +212,13 @@
 #' @param overwrite Whether to replace an existing output table.
 #' @param calls_query One nonempty SELECT query supplying the call relation.
 #' @param model_name Name of an already loaded DuckVEP model.
-#' @param phase_policy Strict GT/PS interpretation or VEP-116 called-slot order.
+#' @param phase_policy Strict GT/PS interpretation, or `vep_compat` for the
+#'   called-slot order of the pinned executable VEP release (`vep116_compat`
+#'   is accepted as its older spelling).
 #'   Decoded missing calls remain incomplete; source-record input uses the
 #'   pinned raw parser and explicitly conditional missing-slot interpretation.
 #' @param input_mode `alt_events` for decoded per-ALT calls, or `source_records`
-#'   for raw GT and complete source ALT lists under `vep116_compat`.
+#'   for raw GT and complete source ALT lists under `vep_compat`.
 #' @param hgvs Whether to request bounded protein HGVS for supported completed paths.
 #' @param ... Named positive integer workspace capacities accepted by
 #'   `duckvep_haplotypes`, such as `max_active_events`, `max_active_carriers`,
@@ -224,7 +226,7 @@
 #' @return A data frame, or invisible `TRUE` when creating `table_name`.
 #' @export
 rduckvep_haplotypes <- function(con, calls_query, model_name,
-                               phase_policy = c("strict", "vep116_compat"),
+                               phase_policy = c("strict", "vep_compat", "vep116_compat"),
                                ..., input_mode = c("alt_events", "source_records"),
                                hgvs = FALSE, table_name = NULL, overwrite = FALSE) {
   if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
@@ -239,8 +241,8 @@ rduckvep_haplotypes <- function(con, calls_query, model_name,
   }
   phase_policy <- match.arg(phase_policy)
   input_mode <- match.arg(input_mode)
-  if (input_mode == "source_records" && phase_policy != "vep116_compat") {
-    stop("source_records requires phase_policy='vep116_compat'", call. = FALSE)
+  if (input_mode == "source_records" && !phase_policy %in% c("vep_compat", "vep116_compat")) {
+    stop("source_records requires phase_policy='vep_compat'", call. = FALSE)
   }
   if (!is.logical(hgvs) || length(hgvs) != 1L || is.na(hgvs)) {
     stop("hgvs must be TRUE or FALSE", call. = FALSE)

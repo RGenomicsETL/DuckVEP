@@ -1,5 +1,9 @@
 # DuckVEP
 
+## Release-neutral phase policy
+
+- `phase_policy` takes `'vep_compat'`, the called-slot order of the pinned executable VEP release (today 116). `'vep116_compat'` is still accepted as its older spelling and selects the same profile. Both hosts and `duckvep_haplotype_load_sql` parse the option through one function, and error messages name `'vep_compat'`.
+
 ## Coexistence with DuckHTS
 
 - The webR side module exports only `duckvep_init_c_api` and binds its bundled HTSlib, zlib and cgranges locally (`SIDE_MODULE=2`, an explicit export list and `-Bsymbolic`). It used to export 1,445 bundled symbols and import 127 of them through the GOT, where Rduckhts's own HTSlib could replace them. Native builds already exported one symbol. `test/scripts/check_wasm_exports.py` checks the webR CI build.

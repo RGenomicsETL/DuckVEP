@@ -11,7 +11,7 @@
 #define DUCKVEP_HAPLOTYPE_SCRIPT_MAX 6
 
 typedef struct {
-    const char *phase_policy;   /* "strict" (default) or "vep116_compat" */
+    const char *phase_policy;   /* "strict" (default) or "vep_compat" */
     const char *input_mode;     /* "alt_events" (default) or "source_records" */
     int hgvs;                   /* -1 absent, 0 false, 1 true */
     int has_limit[DUCKVEP_HAP_LIMIT_COUNT];

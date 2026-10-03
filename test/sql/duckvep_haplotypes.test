@@ -220,6 +220,22 @@ JOIN hap_phase_expected e USING(transcript_index);
 ----
 6	6	6
 
+# The release-neutral spelling selects the same profile, and source_records still needs it.
+query I
+SELECT count(*) FROM duckvep_haplotypes('SELECT *,[alternate] alternates,event_index-1 transcript_index,
+ 0 sample_index,''1|1'' gt FROM hap_phase_events','hap_phase',hgvs:=true,
+ input_mode:='source_records',phase_policy:='vep_compat') h
+JOIN hap_phase_expected e USING(transcript_index)
+WHERE regexp_replace(h.hgvsp,'[()]','','g') IS NOT DISTINCT FROM e.protein_hgvs AND h.carrier_count=2;
+----
+6
+
+statement error
+SELECT count(*) FROM duckvep_haplotypes('SELECT *,[alternate] alternates,event_index-1 transcript_index,
+ 0 sample_index,''1|1'' gt FROM hap_phase_events','hap_phase',input_mode:='source_records');
+----
+source_records requires phase_policy='vep_compat'
+
 statement ok
 DROP TABLE hap_phase_expected;
 
