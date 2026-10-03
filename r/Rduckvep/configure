@@ -57,6 +57,9 @@ if [ "$(uname -s)" = Darwin ]; then
     "-DCMAKE_EXE_LINKER_FLAGS=$ldflags" \
     "-DCMAKE_SHARED_LINKER_FLAGS=$ldflags"
 elif [ "$wasm" = yes ]; then
+  # rwasm links packages with SIDE_MODULE=1, which exports every symbol. The
+  # extension chooses SIDE_MODULE=2 and its own export list (CMakeLists.txt).
+  LDFLAGS=$(printf '%s' "${LDFLAGS:-}" | sed 's/-s *SIDE_MODULE=1//g')
   set -- "-DCMAKE_TOOLCHAIN_FILE=${EMSCRIPTEN}/cmake/Modules/Platform/Emscripten.cmake" \
     "-DCMAKE_C_COMPILER=${CC:-emcc}" \
     -DDUCKDB_WASM_EXTENSION=ON -DDUCKVEP_WEBR_EXTENSION=ON \
