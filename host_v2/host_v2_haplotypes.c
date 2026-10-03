@@ -5,7 +5,7 @@
  * v1 runs the caller's calls query on a private connection and normalizes it with temporary tables. v2 cannot, so the
  * normalization is SQL the caller runs (duckvep_haplotype_load_sql wraps the caller's query), and the normalized rows are
  * captured by COPY into spillable column collections. The scan replays them through src/core/duckvep_core_haplotypes.c,
- * the same code the v1 host runs, emitting one result row per exec call. A job is scanned once and is released when the
+ * the same code the v1 host runs, a full chunk of rows per exec call. A job is scanned once and is released when the
  * scan ends or fails. */
 #include "duckvep_host.h"
 
@@ -690,6 +690,7 @@ static void scan_exec(duckdb_v2_table_function_exec_info_handle info, duckdb_v2_
     v2_call *call = calloc(1, sizeof(*call));
     duckvep_hap_input_t input;
     char message[DUCKVEP_SQL_ERROR_SIZE + 256];
+    const size_t capacity = duckvep_h_vector_size();
     size_t rows = 0;
     if (!call) {
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_haplotype_scan: out of memory");
@@ -698,19 +699,19 @@ static void scan_exec(duckdb_v2_table_function_exec_info_handle info, duckdb_v2_
     DUCKDB_CALL(duckdb_v2_table_function_exec_get_global_state(info, (void **)&s, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_exec_get_output_chunk(info, &chunk, &detail));
     call->error = error;
-    call->rows = 1;
+    call->rows = capacity;
     call->argc = DUCKVEP_HAP_OUTPUT_COLUMNS;
     for (unsigned i = 0; i < DUCKVEP_HAP_OUTPUT_COLUMNS; ++i) {
         duckdb_v2_vector_handle vector = NULL;
         DUCKDB_CALL(duckdb_v2_data_chunk_get_vector(chunk, i, &vector, &detail));
-        if (!v2_open_writable(call, &call->inputs[i], vector, 1, true)) {
+        if (!v2_open_writable(call, &call->inputs[i], vector, capacity, true)) {
             goto cleanup;
         }
     }
     input.context = s;
     input.next = scan_input_next;
-    /* One row per chunk: a v2 list child is opened once, for its final size, so rows cannot share a list. */
-    if (!duckvep_hap_scan(s->core, &input, call, 1, &rows, message, sizeof message)) {
+    /* A full chunk of rows, as on v1: list children grow as rows are appended (duckvep_host.h). */
+    if (!duckvep_hap_scan(s->core, &input, call, capacity, &rows, message, sizeof message)) {
         if (!call->failed) {
             report(*error, message);
         }
@@ -720,10 +721,10 @@ static void scan_exec(duckdb_v2_table_function_exec_info_handle info, duckdb_v2_
     if (call->failed) {
         goto cleanup;
     }
-    if (rows == 0) {
-        /* An empty batch ends the scan. */
+    if (rows != capacity) {
+        /* The rows written; an empty batch ends the scan. */
         for (unsigned i = 0; i < DUCKVEP_HAP_OUTPUT_COLUMNS; ++i) {
-            DUCKDB_CALL(duckdb_v2_vector_set_size(call->inputs[i].handle, 0, &detail));
+            DUCKDB_CALL(duckdb_v2_vector_set_size(call->inputs[i].handle, rows, &detail));
         }
     }
 cleanup:

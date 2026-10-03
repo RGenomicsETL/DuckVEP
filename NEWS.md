@@ -1,5 +1,9 @@
 # DuckVEP
 
+## v2 host: full-chunk writers (issue #48)
+
+- `duckvep_haplotype_scan` and `duckvep_coding_calls` emit full chunks on the v2 host instead of one row per chunk. The host layer opens each list child once per call and grows it as later rows extend the list; the shared core is unchanged. HG002 (157,986 rows, one core): the scan takes 2.3 s instead of 12.2 to 12.8 s, and the stages total 8.0 s against v1's 7.95 s, with the same rows and checksum.
+
 ## Release-neutral phase policy
 
 - `phase_policy` takes `'vep_compat'`, the called-slot order of the pinned executable VEP release (today 116). `'vep116_compat'` is still accepted as its older spelling and selects the same profile. Both hosts and `duckvep_haplotype_load_sql` parse the option through one function, and error messages name `'vep_compat'`.

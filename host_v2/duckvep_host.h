@@ -8,6 +8,8 @@
 #include "host_v2_common.h"
 #include "core/duckvep_core_model.h"
 
+#define V2_VEC_KIDS 16
+
 typedef struct v2_vec {
     duckdb_v2_vector_handle handle;
     void *data;
@@ -18,6 +20,8 @@ typedef struct v2_vec {
     size_t child_capacity; /* a list's reserved element count */
     duckdb_v2_arena_handle arena;
     struct v2_call *call;
+    bool leaf;                        /* has a data pointer */
+    struct v2_vec *kids[V2_VEC_KIDS]; /* the children already opened, by child index */
 } v2_vec;
 
 #define V2_CALL_INPUTS 32
@@ -61,6 +65,7 @@ static inline bool v2_open_writable(v2_call *call, v2_vec *v, duckdb_v2_vector_h
     v->size = size;
     v->final_size = size;
     v->call = call;
+    v->leaf = leaf;
     status = duckdb_v2_vector_set_size(handle, size, &detail);
     if (status == DUCKDB_V2_ERROR_NONE && leaf) {
         status = duckdb_v2_vector_get_data_mutable(handle, &v->data, &detail);
@@ -79,12 +84,44 @@ static inline bool v2_open_writable(v2_call *call, v2_vec *v, duckdb_v2_vector_h
     return !call->failed;
 }
 
+/* Grows an opened vector to `size` elements. The elements already written stay; the data and mask
+ * pointers are fetched again, and the new mask words start all valid. */
+static inline void v2_grow(v2_call *call, v2_vec *v, size_t size) {
+    duckdb_v2_error_info_handle detail = NULL;
+    size_t old_words = (v->size + 63) / 64;
+    DUCKDB_V2_ERROR status = duckdb_v2_vector_set_size(v->handle, size, &detail);
+    if (status == DUCKDB_V2_ERROR_NONE && v->leaf) {
+        status = duckdb_v2_vector_get_data_mutable(v->handle, &v->data, &detail);
+    }
+    if (status == DUCKDB_V2_ERROR_NONE) {
+        status = duckdb_v2_vector_flat_get_validity_mutable(v->handle, &v->validity, &detail);
+    }
+    if (status != DUCKDB_V2_ERROR_NONE) {
+        v2_fail(call, status, detail);
+    } else {
+        for (size_t word = old_words; word < (size + 63) / 64; ++word) {
+            v->validity[word] = ~UINT64_C(0);
+        }
+        v->size = size;
+    }
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+/* The child `index` of `parent`, opened for at least `size` elements. A child is opened once per call and
+ * grown when a later row needs more room, so several rows of one chunk can share a list. */
 static inline v2_vec *v2_child_of(v2_vec *parent, size_t index, size_t size, bool leaf) {
     v2_call *call = parent->call;
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_vector_handle handle = NULL;
     v2_vec *child;
     DUCKDB_V2_ERROR status;
+    if (index < V2_VEC_KIDS && parent->kids[index]) {
+        child = parent->kids[index];
+        if (size > child->size && !call->failed) {
+            v2_grow(call, child, size);
+        }
+        return child;
+    }
     if (call->pool_used >= V2_CALL_POOL) {
         v2_fail(call, DUCKDB_V2_ERROR_INPUT_INVALID, NULL);
         return &call->pool[0];
@@ -97,9 +134,22 @@ static inline v2_vec *v2_child_of(v2_vec *parent, size_t index, size_t size, boo
         (void)duckdb_v2_error_info_destroy(&detail);
         return child;
     }
-    (void)v2_open_writable(call, child, handle, size, leaf);
+    if (v2_open_writable(call, child, handle, size, leaf) && index < V2_VEC_KIDS) {
+        parent->kids[index] = child;
+    }
     (void)duckdb_v2_error_info_destroy(&detail);
     return child;
+}
+
+/* The element capacity to open a list's child for: the reserved or extended count, doubled when an
+ * opened child has to grow so that a chunk of rows costs a logarithmic number of resizes. */
+static inline size_t v2_list_capacity(const v2_vec *list) {
+    size_t capacity = list->child_capacity > list->child_size ? list->child_capacity : list->child_size;
+    const v2_vec *child = list->kids[0];
+    if (child && capacity > child->size && capacity < 2 * child->size) {
+        capacity = 2 * child->size;
+    }
+    return capacity;
 }
 
 #define duckvep_h_data(v) ((v)->data)
@@ -118,16 +168,14 @@ static inline v2_vec *v2_child_of(v2_vec *parent, size_t index, size_t size, boo
  * opened for its reserved capacity (writers size masks by an upper bound) and shrunk to its final
  * element count when the call ends (v2_finish). */
 static inline v2_vec *duckvep_h_list_child(v2_vec *list) {
-    size_t capacity = list->child_capacity > list->child_size ? list->child_capacity : list->child_size;
-    v2_vec *child = v2_child_of(list, 0, capacity, false);
+    v2_vec *child = v2_child_of(list, 0, v2_list_capacity(list), false);
     child->final_size = list->child_size;
     return child;
 }
 
 /* The element vector of a list of primitives or text: a leaf, so it has data. */
 static inline v2_vec *duckvep_h_list_values(v2_vec *list) {
-    size_t capacity = list->child_capacity > list->child_size ? list->child_capacity : list->child_size;
-    v2_vec *child = v2_child_of(list, 0, capacity, true);
+    v2_vec *child = v2_child_of(list, 0, v2_list_capacity(list), true);
     child->final_size = list->child_size;
     return child;
 }
@@ -164,9 +212,8 @@ static inline int duckvep_h_list_set_size(v2_vec *list, size_t count) {
     return 1;
 }
 
-/* Appends `count` elements to a result list and returns where they start. A v2 list's child is opened once,
- * for its final size, after every extension: a chunk that extends one list more than once (several rows
- * sharing a list) must be written one row at a time. */
+/* Appends `count` elements to a result list and returns where they start. The child is opened, or grown,
+ * by the next duckvep_h_list_child / duckvep_h_list_values call. */
 static inline int duckvep_h_list_extend(v2_vec *list, size_t count, duckdb_v2_list_entry *entry) {
     if (count > SIZE_MAX - list->child_size) return 0;
     entry->offset = list->child_size;

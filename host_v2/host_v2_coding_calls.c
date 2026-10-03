@@ -1,6 +1,6 @@
 /* duckvep_coding_calls(model, path) on the v2 host: a table function over the host-neutral fused VCF/BCF reader of
- * src/core/duckvep_core_coding_calls.c. It needs no caller relation, so it binds and scans directly. A v2 list child is
- * opened once, for its final size, so each exec call emits one row. */
+ * src/core/duckvep_core_coding_calls.c. It needs no caller relation, so it binds and scans directly. Each exec call
+ * emits a full chunk of rows; the list children grow as rows are appended (duckvep_host.h). */
 #include "duckvep_host.h"
 
 #include "host_v2_columns.h"
@@ -156,70 +156,80 @@ static void cc_exec(duckdb_v2_table_function_exec_info_handle info, duckdb_v2_co
     v2_call *call = calloc(1, sizeof(*call));
     duckvep_cc_row_t row;
     char message[DUCKVEP_SQL_ERROR_SIZE];
-    int fetched;
+    const size_t capacity = duckvep_h_vector_size();
+    size_t rows = 0;
+    v2_vec *v;
     if (!call) {
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, CC "out of memory");
         return;
     }
     DUCKDB_CALL(duckdb_v2_table_function_exec_get_global_state(info, (void **)&s, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_exec_get_output_chunk(info, &chunk, &detail));
-    message[0] = '\0';
-    fetched = duckvep_cc_next(s->reader, &row, message, sizeof message);
-    if (fetched < 0) {
-        report(*error, message);
-        goto cleanup;
-    }
-    if (fetched == 0) {
-        duckdb_v2_vector_handle vector = NULL;
-        /* An empty batch ends the scan. */
-        DUCKDB_CALL(duckdb_v2_data_chunk_get_vector(chunk, 0, &vector, &detail));
-        DUCKDB_CALL(duckdb_v2_vector_set_size(vector, 0, &detail));
-        goto cleanup;
-    }
     call->error = error;
-    call->rows = 1;
+    call->rows = capacity;
     for (unsigned i = 0; i < DUCKVEP_CC_COLUMNS; ++i) {
         duckdb_v2_vector_handle vector = NULL;
         DUCKDB_CALL(duckdb_v2_data_chunk_get_vector(chunk, i, &vector, &detail));
-        if (!v2_open_writable(call, &call->inputs[i], vector, 1, true)) {
+        if (!v2_open_writable(call, &call->inputs[i], vector, capacity, true)) {
             goto cleanup;
         }
     }
-    {
-        v2_vec *v = call->inputs;
+    v = call->inputs;
+    /* A full chunk of rows, as on v1: the two list children grow as rows are appended (duckvep_host.h). */
+    while (rows < capacity) {
         duckdb_v2_list_entry alleles_entry, phase_entry;
-        ((int64_t *)v[0].data)[0] = row.event_index;
-        ((int32_t *)v[1].data)[0] = row.region;
-        ((int64_t *)v[2].data)[0] = row.position;
-        duckvep_h_assign_string(&v[3], 0, row.ref, row.ref_length);
-        duckvep_h_assign_string(&v[4], 0, row.alt, row.alt_length);
-        ((int32_t *)v[5].data)[0] = row.alt_index;
-        ((int32_t *)v[6].data)[0] = row.transcript;
-        ((int32_t *)v[7].data)[0] = row.sample;
+        int fetched;
+        message[0] = '\0';
+        fetched = duckvep_cc_next(s->reader, &row, message, sizeof message);
+        if (fetched < 0) {
+            report(*error, message);
+            goto cleanup;
+        }
+        if (fetched == 0) {
+            break;
+        }
+        ((int64_t *)v[0].data)[rows] = row.event_index;
+        ((int32_t *)v[1].data)[rows] = row.region;
+        ((int64_t *)v[2].data)[rows] = row.position;
+        duckvep_h_assign_string(&v[3], rows, row.ref, row.ref_length);
+        duckvep_h_assign_string(&v[4], rows, row.alt, row.alt_length);
+        ((int32_t *)v[5].data)[rows] = row.alt_index;
+        ((int32_t *)v[6].data)[rows] = row.transcript;
+        ((int32_t *)v[7].data)[rows] = row.sample;
         if (!duckvep_h_list_extend(&v[8], row.lanes, &alleles_entry) ||
             !duckvep_h_list_extend(&v[9], row.lanes, &phase_entry)) {
             INPUT_ERROR(CC "output list allocation failed");
         }
-        ((duckdb_v2_list_entry *)v[8].data)[0] = alleles_entry;
-        ((duckdb_v2_list_entry *)v[9].data)[0] = phase_entry;
+        ((duckdb_v2_list_entry *)v[8].data)[rows] = alleles_entry;
+        ((duckdb_v2_list_entry *)v[9].data)[rows] = phase_entry;
         if (row.lanes) {
             v2_vec *allele_child = duckvep_h_list_values(&v[8]), *phase_child = duckvep_h_list_values(&v[9]);
+            if (call->failed) {
+                goto cleanup;
+            }
             for (uint32_t k = 0; k < row.lanes; ++k) {
                 int32_t a = row.alleles[k];
-                ((int32_t *)allele_child->data)[k] = a < 0 ? 0 : a;
+                ((int32_t *)allele_child->data)[alleles_entry.offset + k] = a < 0 ? 0 : a;
                 if (a < 0) {
-                    mark_null(allele_child->validity, k);
+                    mark_null(allele_child->validity, alleles_entry.offset + k);
                 }
-                ((bool *)phase_child->data)[k] = row.phase[k] != 0u;
+                ((bool *)phase_child->data)[phase_entry.offset + k] = row.phase[k] != 0u;
             }
         }
         if (row.phase_set_present) {
-            ((int64_t *)v[10].data)[0] = row.phase_set;
+            ((int64_t *)v[10].data)[rows] = row.phase_set;
         } else {
-            mark_null(v[10].validity, 0);
+            mark_null(v[10].validity, rows);
         }
+        ++rows;
     }
     v2_finish(call);
+    if (!call->failed && rows != capacity) {
+        /* The rows written; an empty batch ends the scan. */
+        for (unsigned i = 0; i < DUCKVEP_CC_COLUMNS; ++i) {
+            DUCKDB_CALL(duckdb_v2_vector_set_size(call->inputs[i].handle, rows, &detail));
+        }
+    }
 cleanup:
     free(call);
     (void)duckdb_v2_error_info_destroy(&detail);

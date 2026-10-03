@@ -283,21 +283,20 @@ SELECT duckvep_haplotype_drop('job1');   -- releases a job that will not be scan
   memory limit; the COPY validates the options and the staged column types, and a failed COPY stages nothing.
 - A staged job is consumed by its scan (released at its end, on error and on cancellation) so a job is scanned once;
   staging the same job again replaces it.
-- The scan emits one result row per exec call. A v2 list child is opened once, for its final size, so rows cannot share
-  a list within one chunk; the result is identical and only the chunking differs. Consequence, measured on HG002
-  (157,986 rows, one core): the scan of the captured input takes 11.5 s against v1's inline path, which is the
-  cost of one row per chunk; batching several rows per chunk is a later optimization of the writers, not of the core.
-  **Known performance gap** (HG002, `taskset` one core, same machine, release builds): v2 18.8 s whole process and
-  4.45 GiB peak RSS (model load about 4 s, capture 4.5 s, scan 11.5 s) against v1's fused 8.2 s and 3.83 GiB. The
-  `duckvep_coding_calls` table function has the same one-row-per-chunk writer, and the capture COPY adds a second pass
-  over the rows. Correctness is unaffected (identical checksum).
+- The scan emits full chunks, as v1 does. A v2 list child is sized by `vector_set_size`, so the host layer
+  (`host_v2/duckvep_host.h`) opens each child once per call and grows it, doubling, as later rows of the chunk extend
+  the list; the shared core is unchanged. `duckvep_coding_calls` writes full chunks the same way. Measured on HG002
+  (157,986 rows, `taskset` one core, same machine, release builds, stage timers): v2 load 2.3 s, capture 3.4 s, scan
+  2.3 s, 8.0 s in total, against v1's 7.95 s (load 2.35 s, fused prediction 5.6 s). With one row per chunk the scan
+  took 12.2 to 12.8 s and the whole process 19.6 to 20.8 s. Peak RSS is 4.45 GiB on v2 against 3.96 GiB on v1: the
+  capture COPY stages the calls, which v1's inline path does not.
 - Equality with v1 (`test/sql_v2/equality_cases.sql`): the vertical, same-codon, frame, start/stop and NMD suites
   (schema, full-row hash, nested columns, LIMIT), 47 policy, limit and error cases of `duckvep_haplotypes.test` on its
   `hap` model (including `source_records`), discovery (10,500 events and the named cases), `duckvep_coding_calls` on the
   VCF, gzip and BCF fixtures and the haplotypes over them. Error messages are identical.
 - HG002 (full GRCh38, MANE model, `hg002.ens.vcf.gz`) through `duckvep_coding_calls` into a job and the scan: 157,986
-  rows, full-output checksum `1456007180270799092358516`, equal to v1 and to slice 7's mode B. Whole process 18.8 s on
-  one core (model load 4 s of it), peak RSS 4.45 GiB (v1 fused: 8.2 s, 3.83 GiB). Its v2 memory comparison is unbudgeted (same default 4 GiB budget, see slice 6).
+  rows, full-output checksum `1456007180270799092358516`, equal to v1 and to slice 7's mode B. Whole process 8.5 s on
+  one core (model load 2.3 s of it), peak RSS 4.45 GiB (v1 fused: 7.95 s of stages, 3.96 GiB). Its v2 memory comparison is unbudgeted (same default 4 GiB budget, see slice 6).
 
 ## What the v2 SDK lacks, for later slices
 
@@ -373,6 +372,5 @@ Every one of the 27 public v1 functions runs on v2; equality with v1 is recorded
 
 Still v1-only or different by design: the query-string forms of `duckvep_model_load` and `duckvep_haplotypes` (v2 has no
 private connection, so the caller runs the statements of the `*_load_sql` builders); the fault-injection functions
-(test builds); the R package, which ships v1. A v2 job is scanned once. Known gaps: the one-row-per-chunk writers
-(performance numbers above) and no partitioned parallel workers (the haplotype scan and `duckvep_coding_calls` run on
+(test builds); the R package, which ships v1. A v2 job is scanned once. Known gap: no partitioned parallel workers (the haplotype scan and `duckvep_coding_calls` run on
 one thread, as on v1).
