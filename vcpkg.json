@@ -3,7 +3,7 @@
   "version-string": "1.5.2.9002",
   "description": "Ensembl VEP consequence annotation in DuckDB",
   "dependencies": ["zlib"],
-  "default-features": ["compression", "net"],
+  "default-features": [],
   "features": {
     "compression": {
       "description": "htslib compression",

@@ -236,6 +236,8 @@ make configure release test_release
 duckdb -unsigned -c "LOAD 'build/release/duckvep.duckdb_extension'"
 ```
 
+DuckHTS 1.5.2 and earlier still ship the DuckVEP functions they once bundled, under the same SQL names. With such a DuckHTS loaded in the same database, models load into one extension and annotation looks in the other, and queries fail with `unknown model name`. Use a DuckHTS release newer than 1.5.2 next to DuckVEP.
+
 The extension uses the stable DuckDB C API (tested on DuckDB 1.5 and the 2.0 pre-release) and links its own htslib (for indexed reference FASTA) and cgranges. From R, [Rduckvep](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/) builds the same sources offline and adds connection, model and haplotype helpers.
 
 ## Documentation

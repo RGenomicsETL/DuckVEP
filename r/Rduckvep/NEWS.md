@@ -1,5 +1,8 @@
 # Rduckvep
 
+- The webR build keeps its bundled HTSlib, zlib and cgranges private: the side module exports only the DuckDB entry point, so it can be
+  loaded next to Rduckhts, which carries its own HTSlib.
+
 - `rduckvep_lof_sql()` wraps the native `duckvep_lof_sql()` builder, LOFTEE's HC/LC loss-of-function call with its filters, flags and info as a relation
   over `duckvep_annotate_projected_sql` rows. No rules live in R; options (`gerp`, `ancestor`, `phylocsf`, `min_intron_size`,
   `gerp_end_trunc_cutoff`, `check_complete_cds`) are forwarded as the builder's STRUCT.
