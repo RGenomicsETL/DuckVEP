@@ -29,11 +29,26 @@ reported. vep-rs has no hand-written SIMD; its AVX2 use comes from the compiler 
 | 16 | DuckVEP | 6.84 | 71 | 4.9 | 47,278,065 rows, 142 MB Parquet |
 | 16 | vep-rs | 9.39 | 105 | 3.5 | 36,258,238 rows, 4.17 GB text |
 | 1 | DuckVEP | 33.5 | 33.5 | 2.6 | |
-| 1 | vep-rs | 30.0 | 53.3 | 3.1 | |
+| 1 | vep-rs, `--fork 1` | 30.0 | 53.3 | 3.1 | |
+| 1 | vep-rs, `--fork 1` pinned to one core | 34.4 | 34.4 | | |
 
 At 16 threads DuckVEP finishes 1.37× sooner on two thirds of the CPU time, while annotating 30% more rows (see
-below). With one thread vep-rs finishes 1.12× sooner; `--fork 1` still uses more than one core (53 CPU-seconds in
-30 s). DuckVEP's resident memory includes the 1.3 GiB model, which is a file mapping shared between processes.
+below). `--fork 1` is not one core: vep-rs used 53 CPU-seconds in 30 s. Pinned to a single core it takes 34.4 s
+against DuckVEP's 33.5 s, so on one core the two are level. DuckVEP's resident memory includes the 1.3 GiB model,
+which is a file mapping shared between processes.
+
+Most of DuckVEP's one-core time is output encoding, not annotation (one core, same input):
+
+| Stage | Time (s) |
+|---|---:|
+| Annotation, compact output, rows counted | 3.4 |
+| Annotation, rich output, rows counted | 8.0 |
+| Rich output, every column read | 11.4 |
+| The benchmark query: rich output, two identifier joins, Parquet write | 30.3 |
+| Compact output written to Parquet | 15.5 |
+
+Writing 47 million rows to Parquet and attaching the VCF and transcript identifiers take about 19 s of the 30 s;
+both parallelize, which is why DuckVEP pulls ahead at 16 threads.
 
 The two outputs are not the same artifact. vep-rs writes VEP's own text format, which is what a drop-in
 replacement must do; DuckVEP writes typed columns. vep-rs 0.3.1 did not accept `--parquet`, so a like-for-like

@@ -2,7 +2,7 @@
 
 ## vep-rs replaces FastVEP as the comparison
 
-- New benchmark against vep-rs 0.3.1 with executable VEP 116 adjudicating every disagreement (`benchmarks/benchmark_duckvep_vep_rs.sh`, report in `benchmarks/benchmark_duckvep_vep_rs.md`). On GIAB HG002 (4,070,522 alleles, Ensembl 116, 16 threads) DuckVEP takes 6.8 s against 9.4 s; on one thread vep-rs is 1.12× faster. The tools agree on 34,146,531 of 34,148,222 tuples on shared transcripts, and VEP sides with DuckVEP on 1,689 of the 1,691 that differ.
+- New benchmark against vep-rs 0.3.1 with executable VEP 116 adjudicating every disagreement (`benchmarks/benchmark_duckvep_vep_rs.sh`, report in `benchmarks/benchmark_duckvep_vep_rs.md`). On GIAB HG002 (4,070,522 alleles, Ensembl 116, 16 threads) DuckVEP takes 6.8 s against 9.4 s; on a single core the two are level (33.5 s against 34.4 s with vep-rs pinned; its `--fork 1` uses more than one core). The tools agree on 34,146,531 of 34,148,222 tuples on shared transcripts, and VEP sides with DuckVEP on 1,689 of the 1,691 that differ.
 - The FastVEP benchmark, its scripts, tests and recorded data are removed. The field projection and the replay input that the scale runner also uses stay, as `benchmarks/duckvep_field_projection.R` and `benchmarks/data/scale_contracts/field_replay_9bf888e`.
 
 ## Wider haplotype domain (issue #12)
