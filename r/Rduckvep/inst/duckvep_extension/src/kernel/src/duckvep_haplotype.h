@@ -37,7 +37,10 @@ enum {
     DUCKVEP_HAPLOTYPE_FLAG_INDEL               = 1u << 0,
     DUCKVEP_HAPLOTYPE_FLAG_FRAMESHIFT          = 1u << 1,
     DUCKVEP_HAPLOTYPE_FLAG_RESOLVED_FRAMESHIFT = 1u << 2,
-    DUCKVEP_HAPLOTYPE_FLAG_STOP_TRUNCATED      = 1u << 3
+    DUCKVEP_HAPLOTYPE_FLAG_STOP_TRUNCATED      = 1u << 3,
+    /* The stop was lost and the protein continues through the transcript's 3' flank: to the next stop
+     * (the protein then ends in '*') or to the end of the stored flank. */
+    DUCKVEP_HAPLOTYPE_FLAG_EXTENDED            = 1u << 4
 };
 
 typedef struct duckvep_haplotype_edit {

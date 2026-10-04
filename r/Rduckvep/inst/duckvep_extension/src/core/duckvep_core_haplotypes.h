@@ -23,7 +23,7 @@ extern const uint64_t duckvep_hap_limit_defaults[DUCKVEP_HAP_LIMIT_COUNT];
 /* Whether `value` is an acceptable setting of limit `index` (a named option of the function). */
 int duckvep_hap_limit_valid(unsigned index, uint64_t value);
 
-#define DUCKVEP_HAP_OUTPUT_COLUMNS 31u
+#define DUCKVEP_HAP_OUTPUT_COLUMNS 32u
 /* The output column `index` (0..30): its name and its type as SQL text; `source_records` selects the eight-field
  * contributors record. */
 const char *duckvep_hap_column_name(unsigned index);

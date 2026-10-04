@@ -125,7 +125,9 @@ through the model transcript ordinal; the suffix contains no accession.
 `prediction_policy` names the versioned contract (`duckvep-coding`).
 `prediction_status` and `prediction_reason` state eligibility for its supported
 domain and whether the classifiers decided it (see below), and `nmd_prediction` gives
-the rule `ejc50` NMD prediction. The domain is strict complete phased calls of
+the rule `ejc50` NMD prediction; `nmd_exceptions` lists the exceptions to that rule that apply to a
+premature stop (`start_proximal`, `long_exon`) without changing the prediction. When the stop is lost,
+`protein` continues through the stored 3' flank to the next stop. The domain is strict complete phased calls of
 any ploidy (a haploid call has one lane), one unambiguous heterozygous phase
 domain per transcript and sample, literal ACGT SNVs, MNVs and indels of any
 length, non-overlapping and inside coding exons of CDSs in a supported genetic

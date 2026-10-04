@@ -271,7 +271,9 @@ local({
     rownames(result) <- NULL
     expect_identical(result$hgvsp, expected)
     expect_true(all(result$hgvsp_status == "ok"))
-    expect_true(all(result$cds == "ATGGGTCCTTTAA" & result$protein == "MGPL"))
+    # A predicted path reads the lost stop through into the 3' flank; a path that is only replayed does not.
+    protein <- ifelse(result$prediction_status == "predicted", "MGPLKRTIITS*", "MGPL")
+    expect_true(all(result$cds == "ATGGGTCCTTTAA" & result$protein == protein))
     expect_true(all(result$carrier_count == 2L))
     for (i in 1:4) {
       expect_equal(nrow(result$contributors[[i]]), 1L)

@@ -1,0 +1,43 @@
+# name: test/sql/duckvep_haplotype_extension.test
+# description: A lost stop is read through into the transcript's 3' flank
+# group: [duckvep]
+#
+# Transcript 0 is ATG GCT GCT GAA GGT TAA followed by the 3' flank GGATAGCCTGA; transcript 1 is the same
+# CDS with no stored flank. Expected, by hand:
+#   TAA>CAA with the flank    Gln, then GGA (Gly), then TAG: the protein gains QG and ends in a stop
+#   1-base deletion           ATG GCG CTG AAG GTT AA|G GAT AGC CTG A: no stop in the flank, the protein runs
+#                             to its last complete codon and does not end in '*'
+#   a missense edit           the stop is kept, nothing is read through
+#   TAA>CAA without a flank   the protein ends where the CDS ends
+# sequence_flags bit 16 marks a protein that continues past the CDS (1 and 2 are the indel and frameshift bits).
+
+require duckvep
+
+query I
+SELECT loaded FROM duckvep_model_load('ext',
+ 'SELECT i::UINTEGER seq_region FROM range(2) t(i)',
+ 'SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,100::UBIGINT transcript_start,
+  CASE i WHEN 0 THEN 128 ELSE 117 END::UBIGINT transcript_end,1::TINYINT strand,i::UINTEGER gene_index,3::UBIGINT transcript_flags,
+  100::UBIGINT cds_start,117::UBIGINT cds_end,''ATGGCTGCTGAAGGTTAA''::BLOB cds_sequence,1::UTINYINT codon_table,
+  ''''::BLOB pre_cds_sequence,CASE i WHEN 0 THEN ''GGATAGCCTGA'' ELSE '''' END::BLOB post_cds_sequence FROM range(2) t(i)',
+ 'SELECT i::UINTEGER transcript_index,100::UBIGINT exon_start,CASE i WHEN 0 THEN 128 ELSE 117 END::UBIGINT exon_end,
+  1::UBIGINT exon_cdna_start,CASE i WHEN 0 THEN 29 ELSE 18 END::UBIGINT exon_cdna_end,0::TINYINT phase,
+  CASE i WHEN 0 THEN -1 ELSE 0 END::TINYINT end_phase FROM range(2) t(i)')
+----
+true
+
+statement ok
+CREATE TABLE ev AS SELECT * FROM (VALUES
+ (1,0,115,'T','C','flank: TAA>CAA reads GGA TAG'),(2,0,104,'CT','C','flank: 1-base deletion runs off the flank'),
+ (3,0,103,'G','A','flank: missense is not extended'),(4,1,115,'T','C','no flank: TAA>CAA')) t(e,tx,p,r,a,note)
+
+query TTTITT
+SELECT e.note, array_to_string(c.haplotype_consequences,',') so, h.protein, h.sequence_flags, h.cds, c.nmd_prediction nmd
+FROM (SELECT *, unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT e::BIGINT event_index, tx seq_region, p::BIGINT AS position, r reference, a alternate, 1 alt_index, tx transcript_index, e sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set FROM ev', 'ext')) h
+JOIN ev e ON e.e = c.sample_index ORDER BY e.e
+----
+flank: TAA>CAA reads GGA TAG	stop_lost	MAAEGQG*	16	ATGGCTGCTGAAGGTCAA	unknown
+flank: 1-base deletion runs off the flank	frameshift_variant,stop_lost	MALKVKDSL	19	ATGGCGCTGAAGGTTAA	unknown
+flank: missense is not extended	missense_variant	MTAEG*	0	ATGACTGCTGAAGGTTAA	not_applicable
+no flank: TAA>CAA	stop_lost	MAAEGQ	0	ATGGCTGCTGAAGGTCAA	unknown

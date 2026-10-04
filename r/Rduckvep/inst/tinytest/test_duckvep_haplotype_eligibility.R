@@ -59,7 +59,7 @@ local({
     "prediction_reason", "contributor_provenance", "normalized_edits", "carrier_predictions",
     "haplotype_consequences", "haplotype_impact", "nmd_rule", "nmd_prediction", "nmd_stop_position",
     "nmd_junction_position"))
-  expect_identical(names(result)[30:31], c("nmd_contributors", "nominal_length_diff"))
+  expect_identical(names(result)[30:32], c("nmd_contributors", "nmd_exceptions", "nominal_length_diff"))
   expect_true(all(result$prediction_policy == "duckvep-coding"))
 
   keyed <- do.call(rbind, lapply(result$carrier_predictions, function(x) x))

@@ -276,10 +276,10 @@ SELECT contributors[1].event_index,cds,protein,hgvsp,hgvsp_status,carrier_count,
  duckvep_haplotypes('SELECT * FROM hap_anchor_calls','hap_anchor',hgvs:=true)
  ORDER BY contributors[1].event_index;
 ----
-1	ATGGGTCCTTTAA	MGPL	p.(Ter4LeufsTer9)	ok	2	1	19
-2	ATGGGTCCTTTAA	MGPL	p.(Ter4delinsLeuTer)	ok	2	1	20
-3	ATGGGTCCTTTAA	MGPL	p.(Ter4delinsLeuTer)	ok	2	1	20
-4	ATGGGTCCTTTAA	MGPL	p.(Ter4delinsLeuTer)	ok	2	1	21
+1	ATGGGTCCTTTAA	MGPLKRTIITS*	p.(Ter4LeufsTer9)	ok	2	1	19
+2	ATGGGTCCTTTAA	MGPLKRTIITS*	p.(Ter4delinsLeuTer)	ok	2	1	20
+3	ATGGGTCCTTTAA	MGPLKRTIITS*	p.(Ter4delinsLeuTer)	ok	2	1	20
+4	ATGGGTCCTTTAA	MGPLKRTIITS*	p.(Ter4delinsLeuTer)	ok	2	1	21
 
 # Simultaneous duplicate records follow Haplosaurus last-source retention.
 # The shadowed source remains an output contributor, with reference replay.

@@ -849,8 +849,8 @@ Returns:
 | Column | Type | Description |
 | --- | --- | --- |
 | `transcript_index` | UINTEGER | Model transcript ordinal. |
-| `cds`, `protein` | VARCHAR | The edited coding sequence and its translation. |
-| `sequence_flags`, `evidence_flags` | UINTEGER, UTINYINT | Sequence and evidence bit flags. |
+| `cds`, `protein` | VARCHAR | The edited coding sequence and its translation. When the stop is lost, the protein continues through the transcript's stored 3' flank to the next stop (it then ends in `*`) or to the end of the flank. |
+| `sequence_flags`, `evidence_flags` | UINTEGER, UTINYINT | Sequence and evidence bit flags. In `sequence_flags`: 1 indel, 2 frameshift, 4 resolved frameshift, 8 truncated at a stop, 16 protein continued past the CDS after a lost stop. |
 | `projection_status`, `sequence_status` | VARCHAR | Whether the edits projected and whether the sequence was rebuilt (`ok`, or an explicit reason). |
 | `edit_count`, `carrier_count` | UBIGINT, UINTEGER | Edits in the path and carriers of it. |
 | `carriers` | STRUCT[] | `sample_index`, `phase_set`, `haplotype_lane`, `ploidy`. |
@@ -863,6 +863,7 @@ Returns:
 | `carrier_predictions` | STRUCT[] | The per-carrier keyed result, with impact, consequences and NMD. |
 | `haplotype_consequences`, `haplotype_impact` | VARCHAR[], VARCHAR | The whole-protein Sequence Ontology set and IMPACT of the edited sequence, NULL unless `prediction_status` is `predicted`. |
 | `nmd_rule`, `nmd_prediction`, `nmd_stop_position`, `nmd_junction_position`, `nmd_contributors` | VARCHAR, VARCHAR, UBIGINT, UBIGINT, UBIGINT[] | The whole-haplotype NMD prediction under rule `ejc50` and its evidence. |
+| `nmd_exceptions` | VARCHAR | Exceptions to the junction rule that apply to a premature stop, reported beside the prediction without changing it: `start_proximal` (the stop codon lies within the first 100 coding bases) and `long_exon` (the stop lies in an exon of the edited transcript longer than 407 bases), comma-separated; NULL when none applies. |
 | `nominal_length_diff` | BIGINT | Signed sum of projected replacement ALT-minus-REF lengths. |
 
 `nmd_prediction` is an EJC-distance heuristic on the whole haplotype, not a union of single-allele results and not the VEP NMD plugin.

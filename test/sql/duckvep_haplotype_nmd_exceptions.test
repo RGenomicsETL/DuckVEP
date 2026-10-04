@@ -1,0 +1,57 @@
+# name: test/sql/duckvep_haplotype_nmd_exceptions.test
+# description: Exceptions to the junction rule reported beside the ejc50 NMD prediction
+# group: [duckvep]
+#
+# Two three-exon transcripts, ATG then GAA codons then TAA; a G>T at the first base of a GAA makes a stop.
+# Transcript 0 has exons of 450, 60 and 60 bases; transcript 1 has 150, 60 and 60. nmd_prediction stays the
+# junction rule (trigger when the last junction is more than 50 bases after the stop). nmd_exceptions adds:
+#   start_proximal  the stop codon lies within the first 100 coding bases (codon 33 ends at base 99 and is
+#                   inside; codon 34 ends at base 102 and is not)
+#   long_exon       the stop lies in an exon longer than 407 bases
+# A stop in the last exon escapes by the junction rule and has no exception.
+
+require duckvep
+
+query I
+SELECT loaded FROM duckvep_model_load('nx',
+ 'SELECT i::UINTEGER seq_region FROM range(2) t(i)',
+ 'SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,1001::UBIGINT transcript_start,3060::UBIGINT transcript_end,1::TINYINT strand,
+  i::UINTEGER gene_index,3::UBIGINT transcript_flags,1001::UBIGINT cds_start,3060::UBIGINT cds_end,
+  (''ATG''||repeat(''GAA'',CASE i WHEN 0 THEN 188 ELSE 88 END)||''TAA'')::BLOB cds_sequence,1::UTINYINT codon_table,
+  ''''::BLOB pre_cds_sequence,''''::BLOB post_cds_sequence FROM range(2) t(i)',
+ 'SELECT * FROM (SELECT i::UINTEGER transcript_index,e.s::UBIGINT exon_start,e.z::UBIGINT exon_end,e.a::UBIGINT exon_cdna_start,e.b::UBIGINT exon_cdna_end,
+   0::TINYINT phase,0::TINYINT end_phase
+  FROM range(2) t(i), LATERAL (SELECT * FROM (VALUES
+    (0,1001,1450,1,450),(0,2001,2060,451,510),(0,3001,3060,511,570),
+    (1,1001,1150,1,150),(1,2001,2060,151,210),(1,3001,3060,211,270)) v(tx,s,z,a,b) WHERE v.tx = i) e) ORDER BY transcript_index, exon_start')
+----
+true
+
+statement ok
+CREATE TABLE ev AS SELECT * FROM (VALUES
+ (1,0,1028,'long first exon (450): stop at codon 10'),(2,0,1148,'long first exon (450): stop at codon 50'),
+ (3,1,1058,'short first exon (150): stop at codon 20'),(4,1,1118,'short first exon (150): stop at codon 40'),
+ (5,1,3013,'last exon: stop at codon 75'),
+ (6,1,1097,'boundary: stop codon ends at base 99'),(7,1,1100,'boundary: stop codon ends at base 102')) t(e,tx,p,note)
+
+query TTTIITI
+SELECT e.note, array_to_string(c.haplotype_consequences,',') so, h.nmd_prediction, h.nmd_stop_position stop, h.nmd_junction_position junction, coalesce(h.nmd_exceptions,'-') exceptions, length(h.protein) plen
+FROM (SELECT *, unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT e::BIGINT event_index, tx seq_region, p::BIGINT AS position, ''G'' reference, ''T'' alternate, 1 alt_index, tx transcript_index, e sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set FROM ev', 'nx')) h
+JOIN ev e ON e.e = c.sample_index ORDER BY e.e
+----
+long first exon (450): stop at codon 10	stop_gained	trigger	30	510	start_proximal,long_exon	10
+long first exon (450): stop at codon 50	stop_gained	trigger	150	510	long_exon	50
+short first exon (150): stop at codon 20	stop_gained	trigger	60	210	start_proximal	20
+short first exon (150): stop at codon 40	stop_gained	trigger	120	210	-	40
+last exon: stop at codon 75	stop_gained	escape	225	210	-	75
+boundary: stop codon ends at base 99	stop_gained	trigger	99	210	start_proximal	33
+boundary: stop codon ends at base 102	stop_gained	trigger	102	210	-	34
+
+# Paths without a newly premature stop carry no exception.
+query I
+SELECT count(*) FROM duckvep_haplotypes(
+ 'SELECT 9::BIGINT event_index, 1 seq_region, 1004::BIGINT AS position, ''G'' reference, ''C'' alternate, 1 alt_index, 1 transcript_index, 9 sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set', 'nx')
+WHERE nmd_exceptions IS NULL AND nmd_prediction = 'not_applicable';
+----
+1

@@ -825,6 +825,28 @@ static void nmd_ejc50(const duckvep_haplotype_stream_t *s, duckvep_haplotype_lea
         origin + ref_length - 1u > last_end) { leaf->nmd_stop_valid = 0u; return; }
     leaf->nmd_stop_position1 = stop;
     leaf->nmd_stop_valid = 1u;
+    const duckvep_haplotype_stream_buffers_t *eb = &s->buffers;
+    if ((uint64_t)first_stop * 3u - padding <= DUCKVEP_HAPLOTYPE_NMD_START_PROXIMAL_BASES)
+        leaf->nmd_exceptions |= DUCKVEP_HAPLOTYPE_NMD_EXCEPTION_START_PROXIMAL;
+    /* The exon of the edited transcript that holds the stop. Exons are stored in cDNA order. */
+    uint64_t edited_end = 0u, previous_end = 0u;
+    for (size_t i = first; i < first + n; i++) {
+        uint64_t a = x->cdna_start1[i], z = x->cdna_end1[i];
+        if (a != previous_end + 1u) break;                           /* not in cDNA order: no statement */
+        previous_end = z;
+        int64_t size = (int64_t)(z - a + 1u);
+        for (size_t j = 0u; j < leaf->edit_count; j++) {
+            uint64_t q0 = origin + (uint64_t)eb->edits[j].cds_start - 1u - padding;
+            if (q0 >= a && q0 <= z) size += (int64_t)eb->edits[j].alt_len - (int64_t)eb->edits[j].ref_len;
+        }
+        if (size <= 0) break;
+        if (stop <= edited_end + (uint64_t)size) {
+            if (size > DUCKVEP_HAPLOTYPE_NMD_LONG_EXON_BASES)
+                leaf->nmd_exceptions |= DUCKVEP_HAPLOTYPE_NMD_EXCEPTION_LONG_EXON;
+            break;
+        }
+        edited_end += (uint64_t)size;
+    }
     if (n == 1u) {                                                  /* intronless: no junction, always escapes */
         leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_ESCAPE;
         return;
@@ -853,6 +875,37 @@ static void nmd_ejc50(const duckvep_haplotype_stream_t *s, duckvep_haplotype_lea
     leaf->nmd_junction_valid = 1u;
     leaf->nmd = junction - (int64_t)stop > DUCKVEP_HAPLOTYPE_NMD_THRESHOLD ? DUCKVEP_HAPLOTYPE_NMD_TRIGGER
                                                                             : DUCKVEP_HAPLOTYPE_NMD_ESCAPE;
+}
+
+/* Reading through a lost stop: translation continues from the last bases of the edited CDS into the
+ * transcript's stored 3' flank, to the first stop or the end of the flank. The residues are appended to
+ * the path's protein. Nothing is appended when the model has no flank for the transcript or the protein
+ * buffer cannot hold the whole possible extension, so a protein is never cut short silently. */
+static void extend_past_cds(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf,
+                            duckvep_codon_table_t table) {
+    const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
+    const duckvep_sequence_pool_t *seq = s->sequences;
+    uint32_t tx = leaf->carriers.transcript_index;
+    if (leaf->protein != b->protein || !seq->flank_bytes || !seq->post_cds_offset || !seq->post_cds_length) return;
+    uint64_t offset = seq->post_cds_offset[tx];
+    size_t flank = seq->post_cds_length[tx], tail = leaf->cds_length % 3u, at = leaf->translation.length;
+    if (!flank || offset > seq->flank_bytes_len || flank > seq->flank_bytes_len - offset ||
+        at >= b->protein_capacity || (tail + flank) / 3u + 1u > b->protein_capacity - at) return;
+    const uint8_t *bases = seq->flank_bytes + (size_t)offset;
+    char codon[3];
+    size_t filled = 0u;
+    for (size_t i = 0u; i < tail; i++) codon[filled++] = (char)leaf->cds[leaf->cds_length - tail + i];
+    for (size_t i = 0u; i < flank; i++) {
+        codon[filled++] = (char)bases[i];
+        if (filled < 3u) continue;
+        filled = 0u;
+        char residue = duckvep_translate_codon(codon, table);
+        b->protein[at++] = (uint8_t)residue;
+        if (residue == '*') break;
+    }
+    b->protein[at] = 0u;
+    leaf->protein_length = at;
+    leaf->flags |= DUCKVEP_HAPLOTYPE_FLAG_EXTENDED;
 }
 
 static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf) {
@@ -971,6 +1024,7 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
     }
     leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
     leaf->haplotype_so_mask = mask;
+    if ((mask & DUCKVEP_SO(DUCKVEP_SO_STOP_LOST)) && !first_stop) extend_past_cds(s, leaf, table);
     nmd_ejc50(s, leaf, mask, first_stop);
 }
 

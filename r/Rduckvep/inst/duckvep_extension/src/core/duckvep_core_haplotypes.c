@@ -29,7 +29,8 @@ enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
     HAPLOTYPE_IMPACT_COLUMN = 24,
     HAPLOTYPE_NMD_RULE_COLUMN = 25, HAPLOTYPE_NMD_COLUMN = 26, HAPLOTYPE_NMD_STOP_COLUMN = 27,
     HAPLOTYPE_NMD_JUNCTION_COLUMN = 28, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN = 29,
-    HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 30, HAPLOTYPE_OUTPUT_COLUMNS = 31 };
+    HAPLOTYPE_NMD_EXCEPTIONS_COLUMN = 30,
+    HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 31, HAPLOTYPE_OUTPUT_COLUMNS = 32 };
 enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 10 };
 #define HAPLOTYPE_POLICY_VERSION "duckvep-coding"
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10 };
@@ -95,7 +96,7 @@ static const char *const column_names[HAPLOTYPE_OUTPUT_COLUMNS] = {"transcript_i
     "stop_in_displaced_frame", "hgvsp", "hgvsp_status", "prediction_policy", "prediction_status",
     "prediction_reason", "contributor_provenance", "normalized_edits", "carrier_predictions",
     "haplotype_consequences", "haplotype_impact", "nmd_rule", "nmd_prediction", "nmd_stop_position",
-    "nmd_junction_position", "nmd_contributors", "nominal_length_diff"};
+    "nmd_junction_position", "nmd_contributors", "nmd_exceptions", "nominal_length_diff"};
 static const char *const column_types[HAPLOTYPE_OUTPUT_COLUMNS] = {"UINTEGER", "VARCHAR", "VARCHAR",
     "UINTEGER", "UTINYINT", "VARCHAR", "VARCHAR", "UBIGINT", "UINTEGER",
     HAP_CARRIER, NULL,
@@ -111,7 +112,7 @@ static const char *const column_types[HAPLOTYPE_OUTPUT_COLUMNS] = {"UINTEGER", "
     "STRUCT(sample_index UINTEGER, phase_set BIGINT, haplotype_lane USMALLINT, prediction_status VARCHAR, "
     "prediction_reason VARCHAR, haplotype_impact VARCHAR, haplotype_consequences VARCHAR[], nmd_prediction VARCHAR, "
     "nmd_stop_position UBIGINT, nmd_junction_position UBIGINT)[]",
-    "VARCHAR[]", "VARCHAR", "VARCHAR", "VARCHAR", "UBIGINT", "UBIGINT", "UBIGINT[]", "BIGINT"};
+    "VARCHAR[]", "VARCHAR", "VARCHAR", "VARCHAR", "UBIGINT", "UBIGINT", "UBIGINT[]", "VARCHAR", "BIGINT"};
 
 const char *duckvep_hap_column_name(unsigned index) {
     return index < HAPLOTYPE_OUTPUT_COLUMNS ? column_names[index] : NULL;
@@ -801,6 +802,12 @@ static int append_prediction(duckvep_h_chunk output, size_t row, duckvep_hap_sta
             ((uint64_t *)duckvep_h_data(values))[attribution_entry.offset + at++] = leaf->contributors[i].source.event_id;
         }
     }
+    /* Exceptions to the junction rule that apply to this premature stop; NULL when there is none. */
+    duckvep_h_vector exceptions = duckvep_h_chunk_vector(output, HAPLOTYPE_NMD_EXCEPTIONS_COLUMN);
+    static const char *const exception_names[4] = {NULL, "start_proximal", "long_exon", "start_proximal,long_exon"};
+    const char *listed = decided && leaf->nmd_stop_valid ? exception_names[leaf->nmd_exceptions & 3u] : NULL;
+    if (listed) assign_text(exceptions, row, listed);
+    else null_cell(exceptions, row);
     return 1;
 }
 

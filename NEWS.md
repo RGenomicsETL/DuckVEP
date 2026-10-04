@@ -1,5 +1,10 @@
 # DuckVEP
 
+## Read-through of a lost stop, and NMD exceptions (issue #13)
+
+- When the stop is lost, `protein` continues through the transcript's stored 3' flank to the next stop, or to the end of the flank; `sequence_flags` bit 16 marks it. On HG002 every one of the 363 single-edit paths with a numbered new stop in the per-variant protein HGVS has exactly that length.
+- New column `nmd_exceptions` (before `nominal_length_diff`): `start_proximal` when the premature stop lies within the first 100 coding bases, `long_exon` when it lies in an exon longer than 407 bases. The `ejc50` prediction is unchanged; on HG002, 234 of the 795 stop-gained paths it calls `trigger` carry an exception.
+
 ## Haplotypes on transcripts with an unannotated CDS start or end (issue #12)
 
 - Whole-haplotype prediction now covers `cds_start_NF` and `cds_end_NF` transcripts, including those that begin inside a codon. On HG002 predicted paths rise from 149,897 to 156,413 of 157,986, and no previously decided path changes.

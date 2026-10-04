@@ -1,5 +1,8 @@
 # Rduckvep
 
+- `rduckvep_haplotypes()` returns the new `nmd_exceptions` column, reads a lost stop through into the 3' flank in `protein`, and
+  predicts transcripts whose CDS start or end is not annotated.
+
 - `rduckvep_haplotypes()` covers complete phased calls of any ploidy, alleles of any length and transcripts in any supported
   genetic code. The policy is reported as `duckvep-coding`, the NMD rule as `ejc50`, and the VEP-compatible phase policy is
   `phase_policy = "vep_compat"`.

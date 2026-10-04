@@ -25,7 +25,7 @@ DUCKDB_EXTENSION_EXTERN
 enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
     HAPLOTYPE_PROVENANCE_COLUMN = 20, HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 22,
     HAPLOTYPE_CONSEQUENCES_COLUMN = 23, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN = 29,
-    HAPLOTYPE_OUTPUT_COLUMNS = 31 };
+    HAPLOTYPE_OUTPUT_COLUMNS = 32 };
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10, HAPLOTYPE_PROVENANCE_FIELDS = 10,
     HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 10 };
 
@@ -222,6 +222,9 @@ static void haplotype_bind(duckdb_bind_info info) {
     duckdb_bind_add_result_column(info, "nmd_contributors", index_list);
     duckdb_destroy_logical_type(&index_list);
     duckdb_destroy_logical_type(&length_type);
+    string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
+    duckdb_bind_add_result_column(info, "nmd_exceptions", string_type);
+    duckdb_destroy_logical_type(&string_type);
     length_type = duckdb_create_logical_type(DUCKDB_TYPE_BIGINT);
     duckdb_bind_add_result_column(info, "nominal_length_diff", length_type);
     duckdb_destroy_logical_type(&length_type);

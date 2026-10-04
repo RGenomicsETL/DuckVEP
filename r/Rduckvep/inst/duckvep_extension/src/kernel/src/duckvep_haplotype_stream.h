@@ -126,6 +126,15 @@ typedef enum {
  * NOT_APPLICABLE is a reference lane and known termination without a newly premature stop. */
 #define DUCKVEP_HAPLOTYPE_NMD_RULE "ejc50"
 #define DUCKVEP_HAPLOTYPE_NMD_THRESHOLD 50
+/* Exceptions to the junction rule that the literature describes for a premature stop. They are reported
+ * beside the ejc50 prediction and do not change it; a consumer decides whether they are escapes.
+ *   start-proximal: the stop codon lies within the first 100 coding bases, where translation can
+ *                   reinitiate downstream (the distance Ensembl's NMD plugin uses);
+ *   long exon:      the stop lies in an exon of the edited transcript longer than 407 bases
+ *                   (Lindeboom, Supek and Lehner, Nature Genetics 2016). */
+#define DUCKVEP_HAPLOTYPE_NMD_START_PROXIMAL_BASES 100
+#define DUCKVEP_HAPLOTYPE_NMD_LONG_EXON_BASES 407
+enum { DUCKVEP_HAPLOTYPE_NMD_EXCEPTION_START_PROXIMAL = 1u << 0, DUCKVEP_HAPLOTYPE_NMD_EXCEPTION_LONG_EXON = 1u << 1 };
 typedef enum {
     DUCKVEP_HAPLOTYPE_NMD_UNKNOWN = 0,
     DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE,
@@ -265,6 +274,7 @@ typedef struct {
      * transcript. The contributors that put the stop there are those with role APPLIED. */
     duckvep_haplotype_nmd_t nmd;
     uint8_t nmd_stop_valid, nmd_junction_valid;
+    uint8_t nmd_exceptions; /* DUCKVEP_HAPLOTYPE_NMD_EXCEPTION_* bits; meaningful when nmd_stop_valid */
     uint64_t nmd_stop_position1, nmd_junction_position1;
     /* Ascending-CDS edit islands with source IDs, in stream buffers edits/edit_event_ids.
      * Listed for known sequences and for failed decoded-call leaves, so conflicts and
