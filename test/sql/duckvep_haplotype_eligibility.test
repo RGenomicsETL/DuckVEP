@@ -77,7 +77,7 @@ CREATE TABLE hap_elig_calls AS SELECT e.event_index,e.seq_region,e.position,e.re
  FROM hap_elig_events e JOIN hap_elig_gt g USING(event_index)
 
 # Keyed eligibility per sample/phase/lane. Samples: 1 cis pair, 2 trans control, 3 missing allele,
-# 4 unphased heterozygous, 5 heterozygous in PS 10 and PS 20 (cross-PS), 6 hom-alt plus one het PS, 7 SNV inside a
+# 4 unphased heterozygous at its only heterozygous site (needs no phase), 5 heterozygous in PS 10 and PS 20 (cross-PS), 6 hom-alt plus one het PS, 7 SNV inside a
 # deletion, 8 contradictory SNVs, 9 two insertions in one gap, 10 duplicated record, 11 REF mismatch,
 # 12 intronic plus exonic, 13 deletion across an exon boundary, 14 a 51-base in-frame and 15 a 50-base frameshifting insertion,
 # 16 stop-creating MNV with a later SNV, 17 haploid call, 18 N allele, 30 MNV, 40 multiallelic ALT 2,
@@ -93,8 +93,7 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 2	NULL	2	predicted	supported_domain
 3	NULL	1	predicted	supported_domain
 3	NULL	2	incomplete_input	missing_call
-4	NULL	1	incomplete_input	unphased_heterozygous
-4	NULL	2	incomplete_input	unphased_heterozygous
+4	NULL	2	predicted	supported_domain
 5	10	1	incomplete_input	unresolved_cross_ps_phase
 5	20	1	incomplete_input	unresolved_cross_ps_phase
 6	10	1	predicted	supported_domain
@@ -138,8 +137,7 @@ FROM (SELECT haplotype_consequences,unnest(carrier_predictions) c FROM duckvep_h
 2	2	predicted	supported_domain	missense_variant	MODERATE	missense_variant
 3	1	predicted	supported_domain	missense_variant	MODERATE	row NULL
 3	2	incomplete_input	missing_call	NULL	NULL	row NULL
-4	1	incomplete_input	unphased_heterozygous	NULL	NULL	row NULL
-4	2	incomplete_input	unphased_heterozygous	NULL	NULL	row NULL
+4	2	predicted	supported_domain	missense_variant	MODERATE	row NULL
 5	1	incomplete_input	unresolved_cross_ps_phase	NULL	NULL	row NULL
 5	1	incomplete_input	unresolved_cross_ps_phase	NULL	NULL	row NULL
 17	1	predicted	supported_domain	missense_variant	MODERATE	row NULL
@@ -211,6 +209,30 @@ FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes(
 73	7	predicted	start_lost	HIGH	IAAEG*
 74	7	predicted	stop_lost	HIGH	MAAEGR
 
+# An unphased heterozygous call needs no phase when it is the sample's only heterozygous or missing call on the
+# transcript: the haplotypes are the one with the allele and the one without. Sample 70 has one unphased site and a
+# homozygous one (resolved, and equal to its phased twin, sample 71); sample 72 has two unphased heterozygous sites
+# and sample 73 an unphased site beside a phased one (both unresolved).
+query ITTTT
+SELECT c.sample_index,c.haplotype_lane::VARCHAR,c.prediction_status,c.prediction_reason,coalesce(h.protein,'-')
+FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT e.event_index,e.seq_region,e.position,e.reference,e.alternate,e.alt_index,e.transcript_index,g.s sample_index,
+   g.a::INTEGER[] alleles,g.p phase_before,NULL::BIGINT phase_set
+  FROM hap_elig_events e JOIN (VALUES (1,70,[0,1],[false,false]),(2,70,[1,1],[false,false]),
+    (1,71,[0,1],[false,true]),(2,71,[1,1],[false,true]),
+    (1,72,[0,1],[false,false]),(2,72,[0,1],[false,false]),
+    (1,73,[0,1],[false,false]),(2,73,[0,1],[false,true])) g(e,s,a,p) ON g.e=e.event_index','hap_elig')) h
+ORDER BY 1,2,5;
+----
+70	1	predicted	supported_domain	MVAEG*
+70	2	predicted	supported_domain	MIAEG*
+71	1	predicted	supported_domain	MVAEG*
+71	2	predicted	supported_domain	MIAEG*
+72	1	incomplete_input	unphased_heterozygous	-
+72	2	incomplete_input	unphased_heterozygous	-
+73	1	incomplete_input	unphased_heterozygous	-
+73	2	incomplete_input	unphased_heterozygous	-
+
 # carrier_predictions is parallel to carriers, and the policy version is constant.
 
 query IIIT
@@ -220,7 +242,7 @@ SELECT count(*),count(*) FILTER (WHERE len(carriers)<>len(carrier_predictions) O
  count(DISTINCT prediction_policy),min(prediction_policy)
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
 ----
-27	0	1	duckvep-coding
+26	0	1	duckvep-coding
 
 # The row summary is eligible_classifier_pending or predicted only when every carrier is eligible or predicted;
 # otherwise it is the first ineligible carrier's keyed result.
@@ -243,8 +265,7 @@ FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index NOT IN 
 GROUP BY ALL ORDER BY ALL
 ----
 edit_conflict	contradictory_edits	edit_conflict	1
-incomplete_input	unphased_heterozygous	incomplete_input	1
-predicted	supported_domain	ok	9
+predicted	supported_domain	ok	10
 unsupported_context	curated_transcript	ok	1
 unsupported_context	internal_stop	ok	1
 unsupported_context	invalid_allele	unavailable_projection	1
@@ -267,6 +288,7 @@ FROM (SELECT *,unnest(contributor_provenance) x FROM duckvep_haplotypes(
 GROUP BY ALL ORDER BY ALL
 ----
 1	1	NULL	predicted	1/1:applied 2/1:applied
+4	2	NULL	predicted	1/1:applied
 7	1	NULL	unsupported_overlap	1/1:unapplied 5/1:unapplied
 8	1	NULL	edit_conflict	1/1:unapplied 6/1:unapplied
 9	1	NULL	unsupported_overlap	71/1:unapplied 72/1:unapplied
@@ -303,7 +325,7 @@ SELECT count(*),count(*) FILTER (WHERE
  count(*) FILTER (WHERE len(normalized_edits)<>edit_count)
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
 ----
-27	0	0	0	0
+26	0	0	0	0
 
 # Normalized edits: ascending CDS order with their source event and block. Failed leaves keep them too,
 # without a block: sample 8 conflicts, sample 7 overlaps, sample 16 has an MNV plus a post-stop SNV.

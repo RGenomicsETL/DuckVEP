@@ -296,7 +296,8 @@ up_del3_d50	46;65	46;65	-	escape
 up_ins3_d51	46;65	46;65	-	trigger
 
 # Failed and ineligible paths are unknown, with NULL S, J and attribution (and NULL SO/IMPACT as before): an unphased
-# heterozygous call (sample 1), a missing allele's other lane (sample 3), and a contradictory pair of SNVs. A phased
+# heterozygous call beside a second heterozygous site, a missing allele's other lane (sample 3), and a contradictory pair of SNVs.
+# Sample 1's unphased heterozygous call is its only heterozygous call on the transcript, so it needs no phase. A phased
 # triploid call (sample 2) is a complete call: its lane gets the prediction of the same edits on a
 # diploid lane (sample 0). Samples 0, 2 and 3 share one edit path whose carriers are all predicted, so the row summary
 # is predicted too. The non-strict phase policy is unknown.
@@ -319,8 +320,7 @@ SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason,c
  FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes('SELECT * FROM nm_mix','nm')) h ORDER BY 1,2;
 ----
 0	1	predicted	supported_domain	trigger	51/102	predicted/trigger/51/102	1/HIGH
-1	1	incomplete_input	unphased_heterozygous	unknown	-/-	incomplete_input/unknown/-/-	-/-
-1	2	incomplete_input	unphased_heterozygous	unknown	-/-	incomplete_input/unknown/-/-	-/-
+1	1	predicted	supported_domain	trigger	51/102	predicted/trigger/51/102	1/HIGH
 2	1	predicted	supported_domain	trigger	51/102	predicted/trigger/51/102	1/HIGH
 3	1	predicted	supported_domain	trigger	51/102	predicted/trigger/51/102	1/HIGH
 3	2	incomplete_input	missing_call	unknown	-/-	incomplete_input/unknown/-/-	-/-

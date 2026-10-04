@@ -83,7 +83,8 @@
 #' premature stop (`start_proximal`, `long_exon`) without changing the prediction. When the stop is lost,
 #' `protein` continues through the stored 3' flank to the next stop. The domain is strict complete phased calls of
 #' any ploidy (a haploid call has one lane), one unambiguous heterozygous phase
-#' domain per transcript and sample, literal ACGT SNVs, MNVs and indels of any
+#' domain per transcript and sample (an unphased heterozygous call that is the
+#' sample's only heterozygous call on the transcript needs no phase), literal ACGT SNVs, MNVs and indels of any
 #' length, non-overlapping and inside coding exons of CDSs in a supported genetic
 #' code with no curated RNA or peptide edits. A complete CDS needs a start codon
 #' (ATG in the standard code) and a terminal stop; a CDS whose start or end is not

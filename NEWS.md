@@ -1,5 +1,9 @@
 # DuckVEP
 
+## A single heterozygous site needs no phase (issue #12)
+
+- Under the strict policy, an unphased heterozygous call that is the sample's only heterozygous or missing call on a transcript is read in slot order: the two haplotypes are the one with the allele and the one without. Two or more such sites, or an unphased site beside a phased one, stay `incomplete_input`. On HG002 this resolves 782 of 1,110 unphased-heterozygous paths; 157,343 of 158,137 paths are now predicted.
+
 ## Read-through of a lost stop, and NMD exceptions (issue #13)
 
 - When the stop is lost, `protein` continues through the transcript's stored 3' flank to the next stop, or to the end of the flank; `sequence_flags` bit 16 marks it. On HG002 every one of the 363 single-edit paths with a numbered new stop in the per-variant protein HGVS has exactly that length.

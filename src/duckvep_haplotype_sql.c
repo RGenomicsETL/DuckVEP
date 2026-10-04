@@ -8,6 +8,7 @@ DUCKDB_EXTENSION_EXTERN
 
 #include "duckvep_model.h"
 #include "core/duckvep_core_haplotypes.h"
+#include "core/duckvep_core_haplotype_script.h"
 #include "core/duckvep_core_phase.h"
 #include "core/duckvep_core_discovery.h"
 
@@ -383,10 +384,8 @@ static int input_open(haplotype_state_t *s, const haplotype_bind_t *b, char *err
         "position::UBIGINT AS position, reference::VARCHAR AS reference, alternate::VARCHAR AS alternate, "
         "alt_index::UINTEGER alt_index, transcript_index::UINTEGER transcript_index, sample_index::UINTEGER sample_index, "
         "alleles::INTEGER[] alleles, phase_before::BOOLEAN[] phase_before, phase_set::BIGINT phase_set FROM (";
-    const char *middle =
-        ") source), calls AS MATERIALIZED (SELECT *, "
-        "list_contains(list_transform(duckvep_phase_call(alleles,phase_before,{phase_set: phase_set}), "
-        "lambda a: a.phase_scope), 'phase_set') scoped FROM raw), domains AS (SELECT transcript_index, sample_index, ";
+    const char *middle = b->cfg.policy == DUCKVEP_PHASE_STRICT ? DUCKVEP_HAP_ALT_MIDDLE_STRICT
+                                                                 : DUCKVEP_HAP_ALT_MIDDLE_COMPAT;
     const char *domain = b->cfg.policy == DUCKVEP_PHASE_STRICT ?
         "coalesce(list(DISTINCT phase_set ORDER BY phase_set NULLS FIRST) FILTER(WHERE scoped), [NULL]::BIGINT[]) AS domain_sets " :
         "[NULL]::BIGINT[] AS domain_sets ";

@@ -12,10 +12,8 @@ static const char alt_prefix[] =
     "position::UBIGINT AS position, reference::VARCHAR AS reference, alternate::VARCHAR AS alternate, "
     "alt_index::UINTEGER alt_index, transcript_index::UINTEGER transcript_index, sample_index::UINTEGER sample_index, "
     "alleles::INTEGER[] alleles, phase_before::BOOLEAN[] phase_before, phase_set::BIGINT phase_set FROM (";
-static const char alt_middle[] =
-    ") source), calls AS MATERIALIZED (SELECT *, "
-    "list_contains(list_transform(duckvep_phase_call(alleles,phase_before,{phase_set: phase_set}), "
-    "lambda a: a.phase_scope), 'phase_set') scoped FROM raw), domains AS (SELECT transcript_index, sample_index, ";
+static const char alt_middle_strict[] = DUCKVEP_HAP_ALT_MIDDLE_STRICT;
+static const char alt_middle_compat[] = DUCKVEP_HAP_ALT_MIDDLE_COMPAT;
 static const char alt_domain_strict[] =
     "coalesce(list(DISTINCT phase_set ORDER BY phase_set NULLS FIRST) FILTER(WHERE scoped), [NULL]::BIGINT[]) AS domain_sets ";
 static const char alt_domain_compat[] = "[NULL]::BIGINT[] AS domain_sets ";
@@ -120,7 +118,7 @@ int duckvep_core_haplotype_script(const char *query, const char *model, const ch
         duckvep_sql_text *sql = &out[n++];
         /* The newlines keep a trailing line comment in a query from swallowing the parenthesis. */
         ok = duckvep_sql_append(sql, "COPY (\n") && duckvep_sql_append(sql, alt_prefix) && duckvep_sql_append(sql, "\n") &&
-            duckvep_sql_append(sql, query) && duckvep_sql_append(sql, "\n") && duckvep_sql_append(sql, alt_middle) &&
+            duckvep_sql_append(sql, query) && duckvep_sql_append(sql, "\n") && duckvep_sql_append(sql, compat ? alt_middle_compat : alt_middle_strict) &&
             duckvep_sql_append(sql, compat ? alt_domain_compat : alt_domain_strict) && duckvep_sql_append(sql, alt_suffix) &&
             append_copy_options(sql, model, job, NULL, o);
     } else {
