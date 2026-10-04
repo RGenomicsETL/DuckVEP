@@ -1,5 +1,11 @@
 # DuckVEP
 
+## Haplotype policy `duckvep-coding-v2`: a wider domain (issue #12)
+
+- Whole-haplotype prediction now covers complete phased calls of any ploidy (haploid chrX, chrY and MT calls included), literal alleles longer than 50 bases, and transcripts in any supported genetic code. v1 refused these with `non_diploid_call`, `allele_over_50_bases` and `non_standard_codon_table`. The classifier is unchanged: every path v1 predicted has the same output, apart from `prediction_policy`, which now reads `duckvep-coding-v2`.
+- Start and stop tests follow the transcript's genetic code. The standard code keeps the ATG start rule; another code accepts any of its start codons, and a change between two start codons is not a peptide change.
+- Checked by a metamorphic test (each lane of haploid, triploid and tetraploid calls equals the diploid lane with the same edits), a hand-derived 51-base insertion, and four edits read under NCBI table 2 against a standard-code control. The contract's section 2a records the rules and what #12 still leaves out.
+
 ## Model snapshots
 
 - `duckvep_model_save(name, path)` writes a loaded model's native arrays to one file, and `duckvep_model_restore(name, path)` loads a model by mapping that file read-only. A relation load copies the model through the table scan, the sort, the materialized result and the native arrays; a restore copies nothing. Ensembl 116 GRCh38 (644,427 transcripts, one thread): 0.54 s and 1.3 GiB peak RSS, against 3.0 s and 3.4 to 5.2 GiB from relations, and the mapped pages are shared between processes that restore the same file.

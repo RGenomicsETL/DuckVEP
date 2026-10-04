@@ -615,7 +615,23 @@ static int stop_codon(const uint8_t *c) {
     return a == 'T' && ((b == 'A' && (d == 'A' || d == 'G')) || (b == 'G' && d == 'A'));
 }
 
-/* Complete table-1 CDS with phase-zero start, canonical ATG start and terminal stop,
+/* Start and stop codons under the transcript's genetic code. The standard code keeps coding-v1's
+ * canonical ATG start; another code has no single canonical start, so any start codon of that code
+ * counts (vertebrate mitochondrial transcripts begin with ATA, ATT or GTG as well as ATG). */
+static int start_codon_of(const uint8_t *c, duckvep_codon_table_t table) {
+    if (table == DUCKVEP_CODON_TABLE_STANDARD)
+        return (c[0] & 0xDFu) == 'A' && (c[1] & 0xDFu) == 'T' && (c[2] & 0xDFu) == 'G';
+    return duckvep_codon_is_start(c, table);
+}
+
+static int stop_codon_of(const uint8_t *c, duckvep_codon_table_t table) {
+    char codon[3];
+    if (table == DUCKVEP_CODON_TABLE_STANDARD) return stop_codon(c);
+    for (unsigned i = 0u; i < 3u; i++) codon[i] = (char)(c[i] & 0xDFu);
+    return duckvep_translate_codon(codon, table) == '*';
+}
+
+/* Complete CDS in a supported genetic code with phase-zero start, a start codon and a terminal stop,
  * no internal stop, and no curated RNA/peptide edit or recoding. Cached per transcript. */
 static duckvep_prediction_reason_t transcript_domain(duckvep_haplotype_stream_t *s, uint32_t tx) {
     if (s->have_domain && s->domain_transcript == tx) return s->domain_reason;
@@ -630,7 +646,7 @@ static duckvep_prediction_reason_t transcript_domain(duckvep_haplotype_stream_t 
     uint64_t flags = m->flags ? m->flags[tx] : 0u;
     if (!length || !m->cds_start1 || !m->cds_start1[tx] || offset > seq->cds_bytes_len ||
         length > seq->cds_bytes_len - offset) r = DUCKVEP_REASON_TRANSCRIPT_NOT_CODING;
-    else if (seq->codon_table && seq->codon_table[tx] != DUCKVEP_CODON_TABLE_STANDARD)
+    else if (seq->codon_table && !duckvep_codon_table_supported((duckvep_codon_table_t)seq->codon_table[tx]))
         r = DUCKVEP_REASON_NON_STANDARD_CODON_TABLE;
     else if ((flags & curated) || (seq->peptide_edit_offset &&
              seq->peptide_edit_offset[tx + 1u] != seq->peptide_edit_offset[tx]))
@@ -640,11 +656,12 @@ static duckvep_prediction_reason_t transcript_domain(duckvep_haplotype_stream_t 
         r = DUCKVEP_REASON_INCOMPLETE_CDS;
     else {
         const uint8_t *c = seq->cds_bytes + (size_t)offset;
-        if ((c[0] & 0xDFu) != 'A' || (c[1] & 0xDFu) != 'T' || (c[2] & 0xDFu) != 'G')
-            r = DUCKVEP_REASON_NONCANONICAL_START;
-        else if (!stop_codon(c + length - 3u)) r = DUCKVEP_REASON_NONCANONICAL_STOP;
+        duckvep_codon_table_t table = seq->codon_table
+            ? (duckvep_codon_table_t)seq->codon_table[tx] : DUCKVEP_CODON_TABLE_STANDARD;
+        if (!start_codon_of(c, table)) r = DUCKVEP_REASON_NONCANONICAL_START;
+        else if (!stop_codon_of(c + length - 3u, table)) r = DUCKVEP_REASON_NONCANONICAL_STOP;
         else for (size_t i = 3u; i + 3u < length; i += 3u)
-            if (stop_codon(c + i)) { r = DUCKVEP_REASON_INTERNAL_STOP; break; }
+            if (stop_codon_of(c + i, table)) { r = DUCKVEP_REASON_INTERNAL_STOP; break; }
     }
     s->have_domain = 1u;
     s->domain_transcript = tx;
@@ -683,7 +700,8 @@ static duckvep_prediction_reason_t edit_relation(const duckvep_haplotype_edit_t 
  * domain. It classifies the whole edited peptide against the uncurated reference peptide, never an edit
  * alone. The decision follows the translated sequence of the edited CDS, not the nominal net frame offset
  * of its edits, in this order:
- *   edited CDS does not begin with ATG                       -> start_lost (alone: initiation is unknown, so
+ *   edited CDS does not begin with a start codon (ATG in the
+ *     standard code, any start codon of another code)        -> start_lost (alone: initiation is unknown, so
  *                                                               start loss suppresses every other prediction)
  *   no stop in the edited CDS                                -> stop_lost, plus frameshift_variant when the
  *                                                               frame is still displaced when the CDS runs out;
@@ -711,13 +729,14 @@ static duckvep_prediction_reason_t edit_relation(const duckvep_haplotype_edit_t 
  * Purity is a property of the normalized edit path (differing islands), as the contract pins for frame SO.
  * No eligible path is left pending: the reference is a complete table-1 CDS with its first stop at the
  * terminator (domain check), so the remaining guards are defensive and report unsupported_context. */
-static int base_matches(uint8_t c, char upper) { return (c & 0xDFu) == (uint8_t)upper; }
-
-/* The edited peptide before its first stop equals the reference peptide before the terminator. */
+/* The edited peptide before its first stop equals the reference peptide before the terminator. The first
+ * residue is the initiator: the caller has established that both first codons are start codons, so it is
+ * the same residue even where a genetic code translates two of its start codons differently internally. */
 static int same_peptide(const duckvep_haplotype_stream_t *s, const duckvep_haplotype_leaf_t *leaf,
                         size_t first_stop) {
     size_t ref_n = s->sequences->cds_length[leaf->carriers.transcript_index] / 3u - 1u;
-    return ref_n == first_stop - 1u && !memcmp(leaf->reference_coding_protein, s->buffers.protein, ref_n);
+    return ref_n == first_stop - 1u && ref_n != 0u &&
+        !memcmp(leaf->reference_coding_protein + 1, s->buffers.protein + 1, ref_n - 1u);
 }
 
 /* ejc50-v1 (coding-v1 slice 6), decided on the edited spliced transcript of the shared path and never per
@@ -846,8 +865,9 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
     const size_t window_end = (size_t)((int64_t)alt_length - after_change);
     const size_t first_stop = leaf->translation.first_stop_position1;
     uint64_t mask;
-    if (alt_length < 3u || !base_matches(leaf->cds[0], 'A') || !base_matches(leaf->cds[1], 'T') ||
-        !base_matches(leaf->cds[2], 'G')) {
+    const duckvep_codon_table_t table = s->sequences->codon_table
+        ? (duckvep_codon_table_t)s->sequences->codon_table[tx] : DUCKVEP_CODON_TABLE_STANDARD;
+    if (alt_length < 3u || !start_codon_of(leaf->cds, table)) {
         mask = DUCKVEP_SO(DUCKVEP_SO_START_LOST);
     } else if (!first_stop) {
         mask = DUCKVEP_SO(DUCKVEP_SO_STOP_LOST);
@@ -977,8 +997,6 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
                 if (!literal_acgt(c->source.ref, c->source.ref_len) ||
                     !literal_acgt(c->source.alt, c->source.alt_len))
                     reason = DUCKVEP_REASON_NON_LITERAL_ALLELE;
-                else if (c->prepared && (c->prepared->ref_diff_length > 50u || c->prepared->alt_diff_length > 50u))
-                    reason = DUCKVEP_REASON_ALLELE_OVER_50;
             }
             if (reason == DUCKVEP_REASON_SUPPORTED_DOMAIN) status = DUCKVEP_PREDICTION_ELIGIBLE;
         }
@@ -1013,11 +1031,10 @@ void duckvep_haplotype_carrier_prediction(const duckvep_haplotype_leaf_t *leaf,
     if (call->key.domain_split) {
         *status = DUCKVEP_PREDICTION_INCOMPLETE_INPUT;
         *reason = DUCKVEP_REASON_CROSS_PS_UNRESOLVED;
-    } else if ((leaf->path_status == DUCKVEP_PREDICTION_ELIGIBLE ||
-                leaf->path_status == DUCKVEP_PREDICTION_PREDICTED) && call->key.ploidy != 2u) {
-        *status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
-        *reason = DUCKVEP_REASON_NON_DIPLOID_CALL;
     }
+    /* coding-v2: a lane of a complete, phased call is one haplotype whatever the call's ploidy (a haploid
+     * call has one lane and nothing to phase), so its prediction is the path's. coding-v1 refused every
+     * call that was not diploid. */
 }
 
 duckvep_haplotype_stream_status_t duckvep_haplotype_stream_next(

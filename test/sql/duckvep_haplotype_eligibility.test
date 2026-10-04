@@ -106,17 +106,17 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 11	NULL	1	unsupported_context	reference_mismatch
 12	NULL	1	unsupported_context	outside_cds
 13	NULL	1	unsupported_context	outside_cds
-14	NULL	1	unsupported_context	allele_over_50_bases
+14	NULL	1	predicted	supported_domain
 15	NULL	1	predicted	supported_domain
 16	NULL	1	predicted	supported_domain
-17	NULL	1	unsupported_context	non_diploid_call
+17	NULL	1	predicted	supported_domain
 18	NULL	1	unsupported_context	invalid_allele
 21	NULL	1	unsupported_context	noncanonical_start
 22	NULL	1	unsupported_context	internal_stop
 23	NULL	1	unsupported_context	noncanonical_stop
 24	NULL	1	unsupported_context	curated_transcript
 25	NULL	1	unsupported_context	incomplete_cds
-26	NULL	1	unsupported_context	non_standard_codon_table
+26	NULL	1	predicted	supported_domain
 30	NULL	1	predicted	supported_domain
 40	NULL	1	predicted	supported_domain
 40	NULL	2	predicted	supported_domain
@@ -124,7 +124,8 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 # Per-carrier consequences (slice 4): the edited sequence is shared by the carriers of a row, so its SO set and IMPACT
 # are decided per carrier from the carrier's own keyed status. A row with one ineligible carrier keeps NULL row-level
 # haplotype_consequences/haplotype_impact but does not hide the eligible carriers' set. The path of event 1 alone
-# (a missense SNV) is shared by samples 2 and 3 (eligible), 4 (unphased), 5 (cross-PS) and the haploid sample 17.
+# (a missense SNV) is shared by samples 2 and 3 (eligible), 4 (unphased), 5 (cross-PS) and the haploid sample 17,
+# whose single lane is predicted like the diploid lanes that carry the same edit (coding-v2).
 
 query IITTTTT
 SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason,
@@ -141,9 +142,10 @@ FROM (SELECT haplotype_consequences,unnest(carrier_predictions) c FROM duckvep_h
 4	2	incomplete_input	unphased_heterozygous	NULL	NULL	row NULL
 5	1	incomplete_input	unresolved_cross_ps_phase	NULL	NULL	row NULL
 5	1	incomplete_input	unresolved_cross_ps_phase	NULL	NULL	row NULL
-17	1	unsupported_context	non_diploid_call	NULL	NULL	row NULL
+17	1	predicted	supported_domain	missense_variant	MODERATE	row NULL
 
-# The same with a triploid call (ploidy 3): non_diploid_call for that carrier only, the diploid carrier keeps its set.
+# A phased triploid call (ploidy 3) is predicted lane by lane, identically to the diploid carrier of the same path;
+# with every carrier predicted the row carries the set too. One unphased slot leaves the call incomplete.
 
 query IITTTT
 SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason,
@@ -152,8 +154,62 @@ FROM (SELECT haplotype_consequences,unnest(carrier_predictions) c FROM duckvep_h
  'SELECT * FROM hap_elig_calls WHERE sample_index=2 AND event_index=1 UNION ALL SELECT 1,0,103,''G'',''A'',1,0,50,[1,0,0]::INTEGER[],[false,true,true],NULL::BIGINT',
  'hap_elig')) ORDER BY 1,2;
 ----
-2	1	predicted	supported_domain	missense_variant	row NULL
-50	1	unsupported_context	non_diploid_call	NULL	row NULL
+2	1	predicted	supported_domain	missense_variant	row set
+50	1	predicted	supported_domain	missense_variant	row set
+
+query IITT
+SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason
+FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT 1::BIGINT event_index,0 seq_region,103::BIGINT AS position,''G'' reference,''A'' alternate,1 alt_index,0 transcript_index,51 sample_index,[1,0,0]::INTEGER[] alleles,[false,true,false] phase_before,NULL::BIGINT phase_set',
+ 'hap_elig')) ORDER BY 1,2;
+----
+51	1	incomplete_input	unphased_heterozygous
+51	3	incomplete_input	unphased_heterozygous
+
+# Metamorphic check of the extended domain: a lane's protein, consequences, impact and NMD depend on its edits only.
+# The haploid lane (17) and every lane of a phased tetraploid call (60) equal the diploid lanes with the same edits
+# (sample 2: event 1 on lane 1, event 2 on lane 2; sample 1: both in cis). Reference-only lanes have no row.
+query ITTTTI
+WITH rows AS (SELECT h.protein,c.sample_index,c.haplotype_lane lane,array_to_string(c.haplotype_consequences,',') so,
+  c.haplotype_impact impact,c.nmd_prediction nmd,c.prediction_status status
+ FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes(
+  'SELECT * FROM hap_elig_calls WHERE sample_index IN (1,2,17)
+   UNION ALL SELECT event_index,seq_region,position,reference,alternate,alt_index,transcript_index,60,
+    CASE event_index WHEN 1 THEN [1,0,1,0] ELSE [0,1,1,0] END::INTEGER[],[false,true,true,true],NULL::BIGINT
+    FROM hap_elig_events WHERE event_index IN (1,2)','hap_elig')) h)
+SELECT protein,min(so),min(impact),min(nmd),string_agg(sample_index||':'||lane,',' ORDER BY sample_index,lane),
+ count(DISTINCT (so,impact,nmd,status))
+FROM rows WHERE status='predicted' GROUP BY protein ORDER BY protein;
+----
+MIAEG*	missense_variant	MODERATE	not_applicable	1:1,60:3	1
+MTAEG*	missense_variant	MODERATE	not_applicable	2:1,17:1,60:1	1
+MVAEG*	missense_variant	MODERATE	not_applicable	2:2,60:2	1
+
+# Genetic codes other than the standard one (coding-v2). Transcript 6 carries the vertebrate mitochondrial code
+# (NCBI table 2: TGA is Trp, AGA and AGG are stops, ATA is Met and a start); transcript 7 is the same CDS
+# (ATG GCT GCT GAA GGT TAA) under the standard code. The same four edits, read under each code:
+#   GAA>TGA  table 2: Glu>Trp, missense                 standard: stop_gained
+#   GAA>AGA  table 2: stop_gained                       standard: Glu>Arg, missense
+#   ATG>ATA  table 2: ATA still starts, Met kept        standard: start_lost
+#   TAA>AGA  table 2: still a stop, stop_retained       standard: stop_lost
+query ITTTTT
+SELECT c.sample_index,h.transcript_index::VARCHAR,c.prediction_status,array_to_string(c.haplotype_consequences,','),
+ c.haplotype_impact,h.protein
+FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT e::BIGINT event_index,t seq_region,p::BIGINT AS position,r reference,a alternate,1 alt_index,t transcript_index,
+   s sample_index,[1,0]::INTEGER[] alleles,[false,true] phase_before,NULL::BIGINT phase_set
+  FROM (VALUES (201,6,109,''GA'',''TG'',61),(202,6,109,''GA'',''AG'',62),(203,6,102,''G'',''A'',63),(204,6,115,''TA'',''AG'',64),
+               (211,7,109,''GA'',''TG'',71),(212,7,109,''GA'',''AG'',72),(213,7,102,''G'',''A'',73),(214,7,115,''TA'',''AG'',74))
+   v(e,t,p,r,a,s)','hap_elig')) h ORDER BY 1;
+----
+61	6	predicted	missense_variant	MODERATE	MAAWG*
+62	6	predicted	stop_gained	HIGH	MAA*
+63	6	predicted	synonymous_variant	LOW	MAAEG*
+64	6	predicted	stop_retained_variant	LOW	MAAEG*
+71	7	predicted	stop_gained	HIGH	MAA*
+72	7	predicted	missense_variant	MODERATE	MAARG*
+73	7	predicted	start_lost	HIGH	IAAEG*
+74	7	predicted	stop_lost	HIGH	MAAEGR
 
 # carrier_predictions is parallel to carriers, and the policy version is constant.
 
@@ -164,7 +220,7 @@ SELECT count(*),count(*) FILTER (WHERE len(carriers)<>len(carrier_predictions) O
  count(DISTINCT prediction_policy),min(prediction_policy)
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
 ----
-27	0	1	duckvep-coding-v1
+27	0	1	duckvep-coding-v2
 
 # The row summary is eligible_classifier_pending or predicted only when every carrier is eligible or predicted;
 # otherwise it is the first ineligible carrier's keyed result.
@@ -188,13 +244,11 @@ GROUP BY ALL ORDER BY ALL
 ----
 edit_conflict	contradictory_edits	edit_conflict	1
 incomplete_input	unphased_heterozygous	incomplete_input	1
-predicted	supported_domain	ok	6
-unsupported_context	allele_over_50_bases	ok	1
+predicted	supported_domain	ok	8
 unsupported_context	curated_transcript	ok	1
 unsupported_context	incomplete_cds	ok	1
 unsupported_context	internal_stop	ok	1
 unsupported_context	invalid_allele	unavailable_projection	1
-unsupported_context	non_standard_codon_table	ok	1
 unsupported_context	noncanonical_start	ok	1
 unsupported_context	noncanonical_stop	ok	1
 unsupported_context	outside_cds	unavailable_projection	2
@@ -221,7 +275,7 @@ GROUP BY ALL ORDER BY ALL
 11	1	NULL	unsupported_context	9/1:omitted
 12	1	NULL	unsupported_context	3/1:unapplied 11/1:omitted
 13	1	NULL	unsupported_context	12/1:omitted
-14	1	NULL	unsupported_context	13/1:applied
+14	1	NULL	predicted	13/1:applied
 15	1	NULL	predicted	14/1:applied
 16	1	NULL	predicted	3/1:post_stop 10/1:applied
 18	1	NULL	unsupported_context	15/1:omitted
@@ -230,7 +284,7 @@ GROUP BY ALL ORDER BY ALL
 23	1	NULL	unsupported_context	103/1:applied
 24	1	NULL	unsupported_context	104/1:applied
 25	1	NULL	unsupported_context	105/1:applied
-26	1	NULL	unsupported_context	106/1:applied
+26	1	NULL	predicted	106/1:applied
 30	1	NULL	predicted	16/1:applied
 40	1	NULL	predicted	20/2:applied
 40	2	NULL	predicted	21/1:applied

@@ -2190,19 +2190,22 @@ TEST haplotype_same_codon_classifier_is_keyed_per_carrier(void) {
     struct haplotype_stream_scene f;
     duckvep_haplotype_leaf_t leaf;
     struct haplo_class_edit edit = {5u, "C", "G"};
-    /* A triploid call: the shared path is decided, the carrier is outside the diploid domain and the
-     * row must not claim a classification. */
-    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, haplo_class_run(&f, 0, &edit, 1u, 3u, &leaf));
-    ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.path_status);
-    ASSERT_EQ((int)DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, (int)leaf.prediction_status);
-    ASSERT_EQ((int)DUCKVEP_REASON_NON_DIPLOID_CALL, (int)leaf.prediction_reason);
-    const duckvep_carrier_call_t *c = duckvep_carriers_call(&f.stream.carriers, leaf.carriers.first_call);
-    ASSERT(c != NULL);
-    duckvep_prediction_status_t status;
-    duckvep_prediction_reason_t reason;
-    duckvep_haplotype_carrier_prediction(&leaf, c, &status, &reason);
-    ASSERT_EQ((int)DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, (int)status);
-    ASSERT_EQ((int)DUCKVEP_REASON_NON_DIPLOID_CALL, (int)reason);
+    /* coding-v2: a lane of a complete phased call is one haplotype at any ploidy, so the carrier of a haploid,
+     * triploid or tetraploid call takes the path's prediction, exactly as a diploid carrier does. */
+    for (uint16_t ploidy = 1u; ploidy <= 4u; ploidy++) {
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, haplo_class_run(&f, 0, &edit, 1u, ploidy, &leaf));
+        ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.path_status);
+        ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.prediction_status);
+        ASSERT_EQ((int)DUCKVEP_REASON_SUPPORTED_DOMAIN, (int)leaf.prediction_reason);
+        const duckvep_carrier_call_t *c = duckvep_carriers_call(&f.stream.carriers, leaf.carriers.first_call);
+        ASSERT(c != NULL);
+        ASSERT_EQ(ploidy, c->key.ploidy);
+        duckvep_prediction_status_t status;
+        duckvep_prediction_reason_t reason;
+        duckvep_haplotype_carrier_prediction(&leaf, c, &status, &reason);
+        ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)status);
+        ASSERT_EQ((int)DUCKVEP_REASON_SUPPORTED_DOMAIN, (int)reason);
+    }
     PASS();
 }
 

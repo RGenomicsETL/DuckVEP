@@ -295,7 +295,7 @@ SELECT duckvep_haplotype_drop('job1');   -- releases a job that will not be scan
   `hap` model (including `source_records`), discovery (10,500 events and the named cases), `duckvep_coding_calls` on the
   VCF, gzip and BCF fixtures and the haplotypes over them. Error messages are identical.
 - HG002 (full GRCh38, MANE model, `hg002.ens.vcf.gz`) through `duckvep_coding_calls` into a job and the scan: 157,986
-  rows, full-output checksum `1456007180270799092358516`, equal to v1 and to slice 7's mode B. Whole process 8.5 s on
+  rows, full-output checksum `1456549220664673069753112` under `duckvep-coding-v2`, equal to v1 (under `duckvep-coding-v1` it was `1456007180270799092358516`, equal to slice 7's mode B; the two outputs differ in the policy name and in one path, a 94-base insertion that v1 refused). Whole process 8.5 s on
   one core (model load 2.3 s of it), peak RSS 4.45 GiB (v1 fused: 7.95 s of stages, 3.96 GiB). Its v2 memory comparison is unbudgeted (same default 4 GiB budget, see slice 6).
 
 ## What the v2 SDK lacks, for later slices

@@ -76,19 +76,20 @@
 #' and returns `not_requested`. Identifiers are joined
 #' through the model transcript ordinal; the suffix contains no accession.
 #'
-#' `prediction_policy` names the versioned contract (`duckvep-coding-v1`).
+#' `prediction_policy` names the versioned contract (`duckvep-coding-v2`).
 #' `prediction_status` and `prediction_reason` state eligibility for its supported
 #' domain and whether the classifiers decided it (see below), and `nmd_prediction` gives
-#' the rule `ejc50-v1` NMD prediction. The domain is strict complete diploid calls, one
-#' unambiguous heterozygous phase domain per transcript and sample, literal ACGT
-#' SNVs, MNVs and indels of at most 50 normalized bases, non-overlapping and
-#' inside coding exons of complete table-1 CDSs with a canonical start and stop
+#' the rule `ejc50-v1` NMD prediction. The domain is strict complete phased calls of
+#' any ploidy (a haploid call has one lane), one unambiguous heterozygous phase
+#' domain per transcript and sample, literal ACGT SNVs, MNVs and indels of any
+#' length, non-overlapping and inside coding exons of complete CDSs in a supported
+#' genetic code, with a start codon (ATG in the standard code) and a terminal stop
 #' and no curated RNA or peptide edits. Statuses: `incomplete_input` (reasons
 #' `missing_call`, `unphased_heterozygous`, `unresolved_cross_ps_phase`),
 #' `edit_conflict` (`contradictory_edits`), `unsupported_overlap`
 #' (`overlapping_edits`, `duplicate_edits`, `ambiguous_same_gap_insertions`) and
-#' `unsupported_context` (`non_strict_phase_policy`, `non_diploid_call`,
-#' `non_literal_allele`, `allele_over_50_bases`, the transcript reasons
+#' `unsupported_context` (`non_strict_phase_policy`,
+#' `non_literal_allele`, the transcript reasons
 #' `transcript_not_coding`, `non_standard_codon_table`, `curated_transcript`,
 #' `incomplete_cds`, `noncanonical_start`, `noncanonical_stop`, `internal_stop`,
 #' and preserved projection or sequence reasons such as `reference_mismatch`,

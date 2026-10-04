@@ -1,5 +1,8 @@
 # Rduckvep
 
+- `rduckvep_haplotypes()` predicts under `duckvep-coding-v2`: complete phased calls of any ploidy, alleles of any length and
+  transcripts in any supported genetic code are in the domain; `prediction_policy` reports the new name.
+
 - `rduckvep_save_model()` and `rduckvep_restore_model()` wrap the native model snapshots: a restored model is mapped from its file, loads
   several times faster than from relations, and is shared in memory between R sessions that restore the same file.
 

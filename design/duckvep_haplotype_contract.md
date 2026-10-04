@@ -38,6 +38,23 @@ Reference-only lanes have an empty SO set and NULL IMPACT. Other mixed frame-pre
 
 **Failure contract:** missing alleles, unphased heterozygosity or unresolved cross-PS phase → `incomplete_input`; contradictory edits → `edit_conflict`; other overlaps/ambiguous same-gap insertions → `unsupported_overlap`. Preserve reference-mismatch/projection reasons; excluded contexts → `unsupported_context`. Whole SO/IMPACT are NULL and NMD unknown on these paths; any compatibility replay stays explicitly conditional. Retain every contributor, including omitted, shadowed and post-stop sources. Malformed identities/budget overflow fail explicitly rather than truncate.
 
+## 2a. `duckvep-coding-v2`: a wider domain, the same classifier (2026-10-04, #12)
+
+v2 changes which paths are eligible, not how an eligible path is classified. Every path that v1 predicted has the same output under v2 except for the `prediction_policy` name. Three refusals of v1 are lifted:
+
+| v1 refusal | v2 rule | Why the v1 classifier applies unchanged |
+|---|---|---|
+| `non_diploid_call` | A lane of a complete, phased call is predicted at any ploidy. A haploid call has one lane and nothing to phase. An unphased slot still makes the call `incomplete_input`. | A lane is one chromosome copy; its prediction depends on its edits only. |
+| `allele_over_50_bases` | Literal alleles of any length, bounded by the workspace limits (`max_allele_bytes`, `max_sequence_bases`), which fail explicitly. | The classifier reads the edited CDS; the cap was the csq comparison domain, not a property of the method. |
+| `non_standard_codon_table` | Any genetic code the kernel supports. The start rule is ATG for the standard code (as in v1) and any start codon of the transcript's code otherwise; stops and translation follow the code. The first residue is the initiator, so a change between two start codons is not a peptide change. | Translation was already table-aware; only the start and stop tests were written for the standard code. |
+
+**Oracles.** csq remains the authority on its comparable domain (diploid, standard code), where v2 equals v1. Outside it:
+- ploidy: a metamorphic test, each lane of haploid, triploid and tetraploid calls equals the diploid lane carrying the same edits (`duckvep_haplotype_eligibility.test`, and the property suite for ploidies 1 to 4);
+- allele length: a 51-base insertion with a hand-derived protein;
+- genetic code: four edits read under NCBI table 2 and under the standard code on the same CDS, with outcomes derived by hand from the published tables (TGA Trp, AGA stop, ATA Met and start).
+
+Still refused, and still #12: curated, incomplete or internally stopped transcripts, non-strict phase policy and raw source records, uncertain-phase enumeration and general overlaps.
+
 ## 3. Named follow-ups, not closure blockers
 
 - **#11, “Compound haplotype HGVS and overlap nomenclature”**: move checklist item 3 and its compound shifted-HGVS work from item 6 here. Sequence equality cannot validate nomenclature. Existing supported protein HGVS remains a regression gate.
