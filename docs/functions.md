@@ -859,7 +859,7 @@ Returns:
 | `cds_differences`, `protein_differences` | STRUCT[] | Aligned differing runs (`ref_start0`, `alt_start0`, `reference`, `alternate`, `alignment_start0`). |
 | `stop_in_displaced_frame` | BOOLEAN | Whether the first stop codon overlaps a frame-displaced span. |
 | `hgvsp`, `hgvsp_status` | VARCHAR | Protein HGVS and its status (`not_requested` when `hgvs` is false). |
-| `prediction_policy`, `prediction_status`, `prediction_reason` | VARCHAR | The versioned contract (`duckvep-coding`) and whether a path is in its supported domain: complete phased calls of any ploidy, literal alleles of any length, and complete CDSs in any supported genetic code. |
+| `prediction_policy`, `prediction_status`, `prediction_reason` | VARCHAR | The versioned contract (`duckvep-coding`) and whether a path is in its supported domain: complete phased calls of any ploidy, literal alleles of any length, and CDSs in any supported genetic code, including those whose start or end is not annotated. |
 | `carrier_predictions` | STRUCT[] | The per-carrier keyed result, with impact, consequences and NMD. |
 | `haplotype_consequences`, `haplotype_impact` | VARCHAR[], VARCHAR | The whole-protein Sequence Ontology set and IMPACT of the edited sequence, NULL unless `prediction_status` is `predicted`. |
 | `nmd_rule`, `nmd_prediction`, `nmd_stop_position`, `nmd_junction_position`, `nmd_contributors` | VARCHAR, VARCHAR, UBIGINT, UBIGINT, UBIGINT[] | The whole-haplotype NMD prediction under rule `ejc50` and its evidence. |

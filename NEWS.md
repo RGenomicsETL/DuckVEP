@@ -1,5 +1,11 @@
 # DuckVEP
 
+## Haplotypes on transcripts with an unannotated CDS start or end (issue #12)
+
+- Whole-haplotype prediction now covers `cds_start_NF` and `cds_end_NF` transcripts, including those that begin inside a codon. On HG002 predicted paths rise from 149,897 to 156,413 of 157,986, and no previously decided path changes.
+- With no annotated end, a stop is `stop_gained`, a frame still displaced at the end of the annotation is a frameshift, and an edit confined to the trailing partial codon is an `incomplete_terminal_codon_variant`. With no annotated start there is no start test.
+- Checked by hand-derived cases and, on HG002, by comparing single-edit haplotypes with the per-variant annotation: 91,212 of 91,708 are identical and the rest fall in named policy differences.
+
 ## vep-rs replaces FastVEP as the comparison
 
 - New benchmark against vep-rs 0.3.1 with executable VEP 116 adjudicating every disagreement (`benchmarks/benchmark_duckvep_vep_rs.sh`, report in `benchmarks/benchmark_duckvep_vep_rs.md`). On GIAB HG002 (4,070,522 alleles, Ensembl 116, 16 threads) DuckVEP takes 6.8 s against 9.4 s; on a single core the two are level (33.5 s against 34.4 s with vep-rs pinned; its `--fork 1` uses more than one core). The tools agree on 34,146,531 of 34,148,222 tuples on shared transcripts, and VEP sides with DuckVEP on 1,689 of the 1,691 that differ.

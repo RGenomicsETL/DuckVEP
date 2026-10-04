@@ -74,13 +74,13 @@ local({
     haplotype_lane = c(1, 1, 2, 1, 2, 1, 2, 1, 1, rep(1, 14)),
     prediction_status = unname(status[c("predicted", "predicted", "predicted", "predicted", "incomplete",
       "incomplete", "incomplete", "incomplete", "incomplete", "overlap", "conflict", "context",
-      "predicted", "predicted", rep("context", 5), "predicted", "predicted", "predicted", "predicted")]),
+      "predicted", "predicted", rep("context", 4), "predicted", "predicted", "predicted", "predicted", "predicted")]),
     prediction_reason = c("supported_domain", "supported_domain", "supported_domain",
       "supported_domain", "missing_call", "unphased_heterozygous", "unphased_heterozygous",
       "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "overlapping_edits",
       "contradictory_edits", "outside_cds", "supported_domain", "supported_domain",
       "noncanonical_start", "internal_stop", "noncanonical_stop", "curated_transcript",
-      "incomplete_cds", "supported_domain", "supported_domain", "supported_domain",
+      "supported_domain", "supported_domain", "supported_domain", "supported_domain",
       "supported_domain"),
     stringsAsFactors = FALSE)
   # Sample 40 carries ALT ordinal 2 on lane 1 only.

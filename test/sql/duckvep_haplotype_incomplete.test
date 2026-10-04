@@ -1,0 +1,58 @@
+# name: test/sql/duckvep_haplotype_incomplete.test
+# description: Whole-haplotype prediction on transcripts whose CDS start or end is not annotated
+# group: [duckvep]
+#
+# Three transcripts carry the same coding bases. Transcript 0 is complete (ATG GCT GCT GAA GGT TAA).
+# Transcript 1 has no annotated end (cds_end_NF): ATG GCT GCT GAA GGT T, five codons and one base of a
+# sixth, and no stop. Transcript 2 has no annotated start (cds_start_NF) and begins in phase 1, so it is
+# stored as Ensembl translates it, padded with one N: NTG GCT GCT GAA GGT TAA, first residue unknown.
+# The expected outcomes are derived by hand from those sequences:
+#   end open    a stop is new (stop_gained); nothing can be lost or retained; a frame still displaced where
+#               the annotation ends is a frameshift; an edit confined to the partial codon is an
+#               incomplete_terminal_codon_variant; NMD is unknown for a new stop (the last junction is not
+#               annotated) and not applicable otherwise
+#   start open  no start test; an edit in the unknown first codon with an unchanged peptide is a
+#               coding_sequence_variant; the stop rules are those of a complete CDS
+
+require duckvep
+
+query I
+SELECT loaded FROM duckvep_model_load('inc',
+ 'SELECT i::UINTEGER seq_region FROM range(3) t(i)',
+ 'SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,100::UBIGINT transcript_start,
+  CASE i WHEN 0 THEN 117 WHEN 1 THEN 115 ELSE 116 END::UBIGINT transcript_end,1::TINYINT strand,i::UINTEGER gene_index,
+  CASE i WHEN 0 THEN 3 WHEN 1 THEN 35 ELSE 19 END::UBIGINT transcript_flags,100::UBIGINT cds_start,
+  CASE i WHEN 0 THEN 117 WHEN 1 THEN 115 ELSE 116 END::UBIGINT cds_end,
+  CASE i WHEN 0 THEN ''ATGGCTGCTGAAGGTTAA'' WHEN 1 THEN ''ATGGCTGCTGAAGGTT'' ELSE ''NTGGCTGCTGAAGGTTAA'' END::BLOB cds_sequence,
+  1::UTINYINT codon_table,''''::BLOB pre_cds_sequence,''''::BLOB post_cds_sequence FROM range(3) t(i)',
+ 'SELECT i::UINTEGER transcript_index,100::UBIGINT exon_start,
+  CASE i WHEN 0 THEN 117 WHEN 1 THEN 115 ELSE 116 END::UBIGINT exon_end,1::UBIGINT exon_cdna_start,
+  CASE i WHEN 0 THEN 18 WHEN 1 THEN 16 ELSE 17 END::UBIGINT exon_cdna_end,
+  CASE i WHEN 2 THEN 1 ELSE 0 END::TINYINT phase,CASE i WHEN 1 THEN 1 ELSE 0 END::TINYINT end_phase FROM range(3) t(i)')
+----
+true
+
+statement ok
+CREATE TABLE ev AS SELECT * FROM (VALUES
+ (1,1,103,'G','A','end open: GCT>ACT'),(2,1,105,'T','C','end open: GCT>GCC'),(3,1,109,'G','T','end open: GAA>TAA'),
+ (4,1,115,'T','A','end open: partial codon'),(5,1,104,'CT','C','end open: 1-base deletion'),
+ (6,2,100,'T','C','start open: unknown first codon'),(7,2,102,'G','A','start open: GCT>ACT'),
+ (8,2,108,'G','T','start open: GAA>TAA'),(9,2,114,'T','C','start open: TAA>CAA'),
+ (10,0,103,'G','A','complete control: GCT>ACT')) t(e,tx,p,r,a,note)
+
+query TTTTTTT
+SELECT e.note, c.prediction_status st, c.prediction_reason reason, array_to_string(c.haplotype_consequences,',') so, c.haplotype_impact impact, h.protein, c.nmd_prediction nmd
+FROM (SELECT *, unnest(carrier_predictions) c FROM duckvep_haplotypes(
+ 'SELECT e::BIGINT event_index, tx seq_region, p::BIGINT AS position, r reference, a alternate, 1 alt_index, tx transcript_index, e sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set FROM ev', 'inc')) h
+JOIN ev e ON e.e = c.sample_index ORDER BY e.e
+----
+end open: GCT>ACT	predicted	supported_domain	missense_variant	MODERATE	MTAEG	not_applicable
+end open: GCT>GCC	predicted	supported_domain	synonymous_variant	LOW	MAAEG	not_applicable
+end open: GAA>TAA	predicted	supported_domain	stop_gained	HIGH	MAA*	unknown
+end open: partial codon	predicted	supported_domain	incomplete_terminal_codon_variant	LOW	MAAEG	not_applicable
+end open: 1-base deletion	predicted	supported_domain	frameshift_variant	HIGH	MALKV	unknown
+start open: unknown first codon	predicted	supported_domain	coding_sequence_variant	MODIFIER	XAAEG*	not_applicable
+start open: GCT>ACT	predicted	supported_domain	missense_variant	MODERATE	XTAEG*	not_applicable
+start open: GAA>TAA	predicted	supported_domain	stop_gained	HIGH	XAA*	escape
+start open: TAA>CAA	predicted	supported_domain	stop_lost	HIGH	XAAEGQ	unknown
+complete control: GCT>ACT	predicted	supported_domain	missense_variant	MODERATE	MTAEG*	not_applicable

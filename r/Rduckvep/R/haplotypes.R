@@ -82,9 +82,10 @@
 #' the rule `ejc50` NMD prediction. The domain is strict complete phased calls of
 #' any ploidy (a haploid call has one lane), one unambiguous heterozygous phase
 #' domain per transcript and sample, literal ACGT SNVs, MNVs and indels of any
-#' length, non-overlapping and inside coding exons of complete CDSs in a supported
-#' genetic code, with a start codon (ATG in the standard code) and a terminal stop
-#' and no curated RNA or peptide edits. Statuses: `incomplete_input` (reasons
+#' length, non-overlapping and inside coding exons of CDSs in a supported genetic
+#' code with no curated RNA or peptide edits. A complete CDS needs a start codon
+#' (ATG in the standard code) and a terminal stop; a CDS whose start or end is not
+#' annotated is predicted without the test for the missing end. Statuses: `incomplete_input` (reasons
 #' `missing_call`, `unphased_heterozygous`, `unresolved_cross_ps_phase`),
 #' `edit_conflict` (`contradictory_edits`), `unsupported_overlap`
 #' (`overlapping_edits`, `duplicate_edits`, `ambiguous_same_gap_insertions`) and
