@@ -110,7 +110,7 @@ main <- function() {
   message("Public SQL artifacts: ", out)
   summaries <- list()
   controls <- list()
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     DBI::dbExecute(con, paste0("CREATE OR REPLACE TABLE hap_output AS SELECT * FROM duckvep_haplotypes(",
       DBI::dbQuoteString(con, calls_query), ",'public_hap',phase_policy:=", DBI::dbQuoteString(con, policy), ")"))
     leaves <- DBI::dbGetQuery(con, "SELECT * FROM hap_output")
@@ -198,7 +198,7 @@ main <- function() {
   write.csv(summary, file.path(out, "summary.csv"), row.names = FALSE)
   write.csv(do.call(rbind, controls), file.path(out, "controls.csv"), row.names = FALSE)
   identities <- c(files, file.path(artifact,"receipt.json"), extension,
-    "test/duckvep/conformance/haplotype_sql_differential.R", file.path(out,c("strict.rds","vep116_compat.rds","summary.csv","controls.csv")))
+    "test/duckvep/conformance/haplotype_sql_differential.R", file.path(out,c("strict.rds","vep_compat.rds","summary.csv","controls.csv")))
   jsonlite::write_json(list(source_revision = revision, extension_build_binding = binding,
     scope = "public_literal_sequence_replay_not_combined_consequence_hgvs_or_broad_phase_compatibility",
     source_receipt = file.path(artifact,"receipt.json"), oracle_revisions = original$oracle_revisions,
@@ -279,7 +279,7 @@ main <- function() {
       if (nzchar(expected$events[i])) strsplit(expected$events[i], ",", fixed = TRUE)[[1L]],
       intron_ids[expected$transcript_index[i] + 1L])), collapse = ","), "")
     augmented_summary <- list()
-    for (policy in c("strict", "vep116_compat")) {
+    for (policy in c("strict", "vep_compat")) {
       DBI::dbExecute(con, paste0("CREATE OR REPLACE TABLE hap_noncoding_output AS SELECT * FROM duckvep_haplotypes(",
         DBI::dbQuoteString(con, augmented_query), ",'public_hap',phase_policy:=", DBI::dbQuoteString(con, policy), ")"))
       actual <- DBI::dbGetQuery(con, paste("SELECT transcript_index,cds,protein,sequence_flags,projection_status,sequence_status,",
@@ -318,7 +318,7 @@ main <- function() {
     augmented_summary <- do.call(rbind, augmented_summary)
     write.csv(augmented_summary, file.path(out, "noncoding_summary.csv"), row.names = FALSE)
     augmented_files <- c(source_paths, augmented_vcf, oracle_path,
-      file.path(out, c("noncoding_environment.txt", "noncoding_strict.rds", "noncoding_vep116_compat.rds", "noncoding_summary.csv")))
+      file.path(out, c("noncoding_environment.txt", "noncoding_strict.rds", "noncoding_vep_compat.rds", "noncoding_summary.csv")))
     jsonlite::write_json(list(source_revision = revision, extension_build_binding = binding,
       extension_sha256 = duckvep_evidence_sha256(extension), source_receipt = file.path(artifact, "receipt.json"),
       scope = "literal_cds_with_complete_noncoding_provenance_not_splice_prediction_or_compound_so",

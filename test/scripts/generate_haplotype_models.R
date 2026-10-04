@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Derive the DuckVEP model tables (transcripts and exons, TSV) for a coding-v1 fixture straight from its
+# Derive the DuckVEP model tables (transcripts and exons, TSV) for a duckvep-coding fixture straight from its
 # FASTA and GFF3, the same files bcftools csq reads. Base R only. Usage: generate_haplotype_models.R prefix...
 # where prefix is 'vertical', 'same_codon', 'frame', 'startstop' or 'nmd' under test/data/haplotype. Every transcript is a
 # single-CDS protein_coding mRNA with a table-1 CDS. Exons come from the GFF3 exon rows, so a UTR (exon rows wider than the

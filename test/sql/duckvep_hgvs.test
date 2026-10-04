@@ -86,7 +86,7 @@ SELECT contributors[1].event_index,cds,protein,projection_status,sequence_status
 FROM duckvep_haplotypes(
   'SELECT event_index,seq_region,position,reference,[alternate] alternates,
    seq_region transcript_index,0 sample_index,''1|1'' gt FROM hgvs_table_events WHERE event_index=5400',
-  'hgvs-alternate-table',input_mode:='source_records',phase_policy:='vep116_compat');
+  'hgvs-alternate-table',input_mode:='source_records',phase_policy:='vep_compat');
 ----
 5400	ATGNAAGCCTAA	MXA*	ok	conditional	0	2	1	0	source_allele_skipped
 
@@ -172,7 +172,7 @@ FROM duckvep_haplotypes(
   'SELECT event_index, seq_region, position, reference, [alternate] alternates,
    seq_region transcript_index, 0 sample_index, ''1|1'' gt FROM hgvs_padding_events
    WHERE event_index IN (1, 8)',
-  'hgvs-padding', hgvs := true, input_mode := 'source_records', phase_policy := 'vep116_compat')
+  'hgvs-padding', hgvs := true, input_mode := 'source_records', phase_policy := 'vep_compat')
 ORDER BY transcript_index;
 ----
 1	ATGACNGCCTAA	MTA*	NULL	ok	conditional	source_allele_skipped	0	0	2
@@ -239,7 +239,7 @@ SELECT contributors[1].event_index, cds, protein, contributors[1].position,
 FROM duckvep_haplotypes(
   'SELECT event_index, seq_region, position, reference, [alternate] alternates,
    seq_region transcript_index, 0 sample_index, ''1|1'' gt FROM hgvs_removed_ref_events',
-  'hgvs-removed-ref', input_mode := 'source_records', phase_policy := 'vep116_compat')
+  'hgvs-removed-ref', input_mode := 'source_records', phase_policy := 'vep_compat')
 ORDER BY transcript_index;
 ----
 110244	ATGGCGCCTAA	MAP	15	CT	C	1
@@ -325,13 +325,13 @@ CREATE TABLE hgvs_residual_decoded AS SELECT * FROM duckvep_haplotypes(
   'SELECT event_index, seq_region, position, reference, alternate, 1 alt_index,
    seq_region transcript_index, 0 sample_index, [1]::INTEGER[] alleles,
    [true]::BOOLEAN[] phase_before, NULL::BIGINT phase_set FROM hgvs_residual_events',
-  'hgvs-residual', hgvs := true, phase_policy := 'vep116_compat');
+  'hgvs-residual', hgvs := true, phase_policy := 'vep_compat');
 
 statement ok
 CREATE TABLE hgvs_residual_raw AS SELECT * FROM duckvep_haplotypes(
   'SELECT event_index, seq_region, position, reference, [alternate] alternates,
    seq_region transcript_index, 0 sample_index, ''1|1'' gt FROM hgvs_residual_events',
-  'hgvs-residual', hgvs := true, input_mode := 'source_records', phase_policy := 'vep116_compat');
+  'hgvs-residual', hgvs := true, input_mode := 'source_records', phase_policy := 'vep_compat');
 
 # Source-record replay skips N-bearing ALTs while retaining conditional evidence.
 # It does not acquire independent TVA eligibility by erasing their shared anchor.

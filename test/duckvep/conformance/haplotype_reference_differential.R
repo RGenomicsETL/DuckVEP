@@ -192,7 +192,7 @@ main <- function() {
   calls <- 'SELECT event_index,r.seq_region,position,reference,[alt] alternates,m.transcript_index,s.i sample_index,
     CASE s.i WHEN 0 THEN s0 WHEN 1 THEN s1 ELSE s2 END gt FROM records r JOIN models m USING(seq_region),range(3) s(i)'
   actual <- DBI::dbGetQuery(con, paste0('SELECT * FROM duckvep_haplotypes(', q(calls),
-    ",'reference_route',input_mode:='source_records',phase_policy:='vep116_compat')"))
+    ",'reference_route',input_mode:='source_records',phase_policy:='vep_compat')"))
   saveRDS(actual, file.path(out, 'actual.rds'))
   oracle_lines <- readLines(file.path(out, 'oracle.stdout'))
   oracle <- lapply(oracle_lines, jsonlite::fromJSON, simplifyVector = FALSE)

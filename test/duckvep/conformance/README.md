@@ -94,7 +94,7 @@ The validation gates have independent jobs:
   `DUCKVEP_STATE_MAX_LENGTH` controls the generated non-anchor allele length and the target
   passes that value plus the retained VCF anchor to the differential eligibility cap. A
   long-allele campaign therefore fails rather than quietly reverting to the runner's
-  50-base default subset.
+  100-base default subset.
   `data/property_coverage_requirements.tsv` makes the rare-state denominator executable:
   a statistically required state must receive at least one observation, while an allowed
   zero count must name a fixed C witness. An undeclared zero counter, a missing required
@@ -177,7 +177,7 @@ The state exploration defaults are reproducible and can be widened without chang
 ```sh
 DUCKVEP_STATE_CASES=100000 \
 DUCKVEP_STATE_SEED=29 \
-DUCKVEP_STATE_MAX_LENGTH=49 \
+DUCKVEP_STATE_MAX_LENGTH=99 \
 DUCKVEP_PROP_TRIALS=1000000 \
   make test-duckvep-state-exploration
 ```

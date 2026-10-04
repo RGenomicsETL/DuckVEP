@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# NMD attribution (coding-v1 slice 6, rule ejc50-v1) fixtures and goldens. Base R only: no DuckVEP code and no
+# NMD attribution (rule ejc50) fixtures and goldens. Base R only: no DuckVEP code and no
 # csq (csq reports NMD_transcript only as a biotype marker and predicts no NMD). Each scenario edits the spliced
 # mRNA (5' UTR + CDS + 3' UTR), translates the edited CDS with the standard code, follows every base's exon through
 # the edits, and applies the rule to the edited transcript:

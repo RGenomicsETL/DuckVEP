@@ -303,11 +303,11 @@ codon_native_partition <- function(con, events, expected, partition, indel, fast
       'FROM', label, 'a LEFT JOIN inputs i USING(event_index)'))
     comparisons[[label]] <- codon_equal(actual, expected)
     DBI::dbRemoveTable(con, label)
-    for (route in c('strict', 'vep116_compat', 'source_records')) {
+    for (route in c('strict', 'vep_compat', 'source_records')) {
       label <- paste0(route, '_', threads)
       message('Native partition ', partition$model_partition, ' route: ', label)
       raw <- route == 'source_records'
-      policy <- if (raw) 'vep116_compat' else route
+      policy <- if (raw) 'vep_compat' else route
       calls <- paste('SELECT event_index,seq_region,position,reference,alternate,transcript_index,',
         '1 alt_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set FROM inputs')
       if (raw) calls <- paste('SELECT event_index,seq_region,position,reference,transcript_index,',

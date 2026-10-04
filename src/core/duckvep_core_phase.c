@@ -30,10 +30,9 @@ const char *duckvep_core_phase_check_row(bool have_gt, bool have_phase, size_t g
 bool duckvep_core_phase_policy(const char *name, size_t length, duckvep_phase_policy_t *policy)
 {
     *policy = DUCKVEP_PHASE_STRICT;
-    /* "vep_compat" names the pinned executable VEP release; "vep116_compat" is its older spelling. */
-    if ((length == 10u && !memcmp(name, "vep_compat", 10u)) ||
-        (length == 13u && !memcmp(name, "vep116_compat", 13u))) {
-        *policy = DUCKVEP_PHASE_VEP116_COMPAT;
+    /* "vep_compat" is the behaviour of the pinned executable VEP release. */
+    if (length == 10u && !memcmp(name, "vep_compat", 10u)) {
+        *policy = DUCKVEP_PHASE_VEP_COMPAT;
         return true;
     }
     return length == 6u && !memcmp(name, "strict", 6u);
@@ -145,7 +144,7 @@ void duckvep_core_revcomp(const char *sequence, size_t length, char *reversed)
 void duckvep_core_raw_gt(const char *gt, size_t length, uint32_t source_alt_count, uint32_t fields[7])
 {
     duckvep_raw_gt_t call = {0};
-    duckvep_raw_gt_status_t status = duckvep_phase_parse_vep116_raw(
+    duckvep_raw_gt_status_t status = duckvep_phase_parse_vep_raw(
         (const uint8_t *)gt, length, source_alt_count, &call);
     fields[0] = (uint32_t)status;
     fields[1] = call.allele_index[0]; fields[2] = call.allele_index[1];

@@ -312,7 +312,7 @@ main <- function() {
   stopifnot(DBI::dbGetQuery(con,paste0("SELECT loaded FROM duckvep_model_load('records',",
     paste(q(queries),collapse=','),')'))$loaded)
   actual <- DBI::dbGetQuery(con,"SELECT * FROM duckvep_haplotypes(
-    'SELECT *,[alternate] alternates FROM records','records',input_mode:='source_records',phase_policy:='vep116_compat')")
+    'SELECT *,[alternate] alternates FROM records','records',input_mode:='source_records',phase_policy:='vep_compat')")
   saveRDS(actual,file.path(out,'actual.rds'))
   rows_by_tx <- native_haplotype_rows(actual,cases$transcript_index)
   record_index <- match(seq_len(nrow(records)),records$event_index)

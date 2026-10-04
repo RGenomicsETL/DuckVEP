@@ -977,7 +977,7 @@ remain invalid rather than being stripped or coerced. Intronic/UTR reference
 sequence is not available from a CDS-only pool. Invalid layout, CDS storage,
 unsupported alleles or coding REF still make sequence unavailable.
 SQL/R selects this raw-record interface with `input_mode := 'source_records'` and
-`phase_policy := 'vep116_compat'`. The default `alt_events` input is the decoded-call
+`phase_policy := 'vep_compat'`. The default `alt_events` input is the decoded-call
 contract; it cannot emulate lexical distinctions absent from those arrays.
 
 `duckvep_haplotypes` consumes flat event/transcript/sample calls. DuckDB derives phase

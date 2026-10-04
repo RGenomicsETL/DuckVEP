@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Start and stop (coding-v1 slice 5) contract check, offline by default.
+# Start and stop contract check, offline by default.
 #  1. regenerate the base-R fixtures/goldens (fails if a committed fixture differs);
 #  2. verify the pinned csq output against its receipt hashes, and re-run csq only when the pinned
 #     bcftools is installed;

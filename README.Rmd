@@ -174,7 +174,7 @@ The main cases:
   - VEP models origin-crossing transcripts as reversed intervals, so it can't be the oracle for them. Those are checked instead by rotation equivariance and against a linear model ([design](design/duckvep.md), [survey and differential](benchmarks/data/circular_source_survey.md)).
 - **Unknown is a value.** When a result can't be computed, the row carries `duckvep_status` and a reason instead of a guess. Examples are a missing reference sequence, a reference mismatch, or an unsupported symbolic allele.
 - **Whole-haplotype consequences are checked against `bcftools csq`, not VEP.**
-  - VEP 116 does not define them. The coding-only contract is [`duckvep-coding-v1`](design/duckvep_haplotype_contract.md), with independent base-R goldens and a declared list of every divergence from csq.
+  - VEP 116 does not define them. The coding-only contract is [`duckvep-coding`](design/duckvep_haplotype_contract.md), with independent base-R goldens and a declared list of every divergence from csq.
   - DuckVEP is 1.56× faster than csq end to end on HG002 (the 2× goal is tracked in [#34](https://github.com/RGenomicsETL/DuckVEP/issues/34)).
 - **Outside the claim:**
   - species and releases that haven't been tested;
@@ -252,7 +252,7 @@ The extension uses the stable DuckDB C API (tested on DuckDB 1.5 and the 2.0 pre
 - [Site](https://rgenomicsetl.github.io/DuckVEP/) and [R package reference](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/)
 - [Compatibility and errata](ERRATA.md): every known difference from VEP, classified, with witnesses
 - [Design and implementation contract](design/duckvep.md): model build, the sweep, NMD, phased edits, structural events, HGVS, supplementary annotation
-- [Haplotype contract `duckvep-coding-v1`](design/duckvep_haplotype_contract.md) and its [scale qualification](benchmarks/data/haplotype_scale/README.md)
+- [Haplotype contract `duckvep-coding`](design/duckvep_haplotype_contract.md) and its [scale qualification](benchmarks/data/haplotype_scale/README.md)
 - Reports: [conformance](benchmarks/duckvep_conformance.md), [throughput](benchmarks/duckvep_throughput.md), [FastVEP comparison](benchmarks/benchmark_duckvep_fastvep.md), [haplotypes](benchmarks/duckvep_haplotypes.md), [scale runner](docs/scale-runner.md)
 - [Corpus workflow](design/duckvep_corpus_workflow.md) and [conformance harness](test/duckvep/conformance/README.md)
 

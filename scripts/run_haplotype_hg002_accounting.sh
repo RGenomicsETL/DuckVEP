@@ -30,7 +30,7 @@ done
 Rscript scripts/account_haplotype_csq.R "$prefix.strict.tsv" "$prefix.domain.tsv" \
     "$prefix.parity.tsv" "$prefix.counts.tsv"
 {
-    printf 'field\tvalue\ncomparison_scope\tcoding-v1\n'
+    printf 'field\tvalue\ncomparison_scope\tduckvep-coding\n'
     printf 'domain_annotated_records\t%s\n' "$(awk -F '\t' '$5!="."{n++} END{print n+0}' "$prefix.domain.tsv")"
     printf 'domain_unannotated_records\t%s\n' "$(awk -F '\t' '$5=="."{n++} END{print n+0}' "$prefix.domain.tsv")"
     printf 'model_sha256\t%s\n' "$(sha256sum "$model" | cut -d' ' -f1)"

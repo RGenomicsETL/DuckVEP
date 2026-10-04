@@ -95,7 +95,7 @@ op <- add_option(
   "--max-random-length",
   dest = "max_random_length",
   type = "integer",
-  default = 10L,
+  default = 100L,
   help = "maximum differing REF or ALT length in a random allele [%default]"
 )
 opt <- parse_args(op)

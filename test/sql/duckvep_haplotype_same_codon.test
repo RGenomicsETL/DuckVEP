@@ -67,7 +67,7 @@ CREATE TABLE sc_out AS SELECT h.transcript_index,c.haplotype_lane-1 AS lane,h.pr
 # Lanes carrying at least one ALT: 138 transcripts; the trans and hom-alt scenarios put both lanes in play.
 
 query IIII
-SELECT count(*),count(DISTINCT transcript_index),count(DISTINCT prediction_policy),min(prediction_policy)='duckvep-coding-v2'
+SELECT count(*),count(DISTINCT transcript_index),count(DISTINCT prediction_policy),min(prediction_policy)='duckvep-coding'
 FROM sc_out;
 ----
 150	138	1	1

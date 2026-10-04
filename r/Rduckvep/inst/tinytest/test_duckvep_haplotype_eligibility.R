@@ -60,7 +60,7 @@ local({
     "haplotype_consequences", "haplotype_impact", "nmd_rule", "nmd_prediction", "nmd_stop_position",
     "nmd_junction_position"))
   expect_identical(names(result)[30:31], c("nmd_contributors", "nominal_length_diff"))
-  expect_true(all(result$prediction_policy == "duckvep-coding-v2"))
+  expect_true(all(result$prediction_policy == "duckvep-coding"))
 
   keyed <- do.call(rbind, lapply(result$carrier_predictions, function(x) x))
   keyed <- keyed[order(keyed$sample_index, keyed$phase_set, keyed$haplotype_lane), ]
@@ -117,10 +117,10 @@ local({
   expect_equal(nrow(result$contributor_provenance[[stopped]]), 2L)
   expect_equal(sum(result$prediction_status == "eligible_classifier_pending"), 0L)
 
-  # NMD (slice 6, rule ejc50-v1). Transcript 0's exons are cDNA 1-9 and 10-18, so J = 9. The created stop TAG is
+  # NMD (slice 6, rule ejc50). Transcript 0's exons are cDNA 1-9 and 10-18, so J = 9. The created stop TAG is
   # codon 2 (S = 6): J - S = 3, escape, with the stop's own edit attributed. unknown is a row that is not predicted or
   # a start loss; every decided row without a premature stop is not_applicable and has no positions or attribution.
-  expect_true(all(result$nmd_rule == "ejc50-v1"))
+  expect_true(all(result$nmd_rule == "ejc50"))
   expect_identical(result$nmd_prediction[stopped], "escape")
   expect_equal(c(result$nmd_stop_position[stopped], result$nmd_junction_position[stopped]), c(6, 9))
   expect_equal(length(result$nmd_contributors[[stopped]]), 1L)
@@ -191,15 +191,15 @@ local({
   same <- which(result$cds == "ATGATTGCTGAAGGTTAA")
   expect_equal(sort(vapply(same, function(i) nrow(result$contributor_provenance[[i]]), 0L)), c(1L, 2L))
 
-  # vep116_compat is a compatibility interpretation, outside the strict v1 domain.
+  # vep_compat is a compatibility interpretation, outside the strict v1 domain.
   compat <- rduckvep_haplotypes(con, "SELECT * FROM elig_calls WHERE sample_index IN (1,2,3,4)",
-    "elig", phase_policy = "vep116_compat")
+    "elig", phase_policy = "vep_compat")
   ck <- do.call(rbind, compat$carrier_predictions)
   expect_true(all(ck$prediction_reason[ck$sample_index %in% c(1, 2, 4)] == "non_strict_phase_policy"))
   expect_true(all(ck$prediction_reason[ck$sample_index == 3] == "missing_call"))
   dbExecute(con, "CREATE TABLE elig_raw AS SELECT 1::UBIGINT event_index,0::UINTEGER seq_region,103::UBIGINT AS position,'G' AS reference,['A'] AS alternates,0::UINTEGER transcript_index,0::UINTEGER sample_index,'1|0' AS gt")
   rawres <- rduckvep_haplotypes(con, "SELECT * FROM elig_raw", "elig",
-    phase_policy = "vep116_compat", input_mode = "source_records")
+    phase_policy = "vep_compat", input_mode = "source_records")
   expect_true(all(rawres$prediction_status == "unsupported_context"))
   expect_true(all(rawres$prediction_reason == "non_strict_phase_policy"))
   expect_true(all(mapply(function(a, b) nrow(a) == nrow(b), rawres$contributors,

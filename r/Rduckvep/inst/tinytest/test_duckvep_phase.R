@@ -59,12 +59,12 @@ test_phase_preparation <- function() {
   expect_equal(ambiguous$lane, c(1L, NA_integer_, NA_integer_))
   expect_equal(ambiguous$status, c("called", "unphased", "missing"))
   expect_equal(ambiguous$ps, c("10", NA, NA))
-  compatible <- prepared("[0,1,NULL]", "[false,false,false]", "vep116_compat", "42")
+  compatible <- prepared("[0,1,NULL]", "[false,false,false]", "vep_compat", "42")
   expect_equal(compatible$lane, c(1L, 2L, NA_integer_))
   expect_equal(compatible$phase_scope, rep("allele_slot", 3))
   expect_equal(compatible$status, c("called", "called", "missing"))
   expect_true(all(is.na(compatible$ps)))
-  expect_equal(prepared("[NULL,1,NULL,2]", "NULL", "vep116_compat")$lane,
+  expect_equal(prepared("[NULL,1,NULL,2]", "NULL", "vep_compat")$lane,
                c(NA_integer_, 1L, NA_integer_, 2L))
   expect_equal(prepared("[2,2,2]", "NULL", ps = "99")$phase_scope, rep("all_phase_sets", 3))
   expect_equal(prepared("[2,1,1]", "[true,false,false]", ps = "-1")$ps, rep("-1", 3))
@@ -90,7 +90,7 @@ test_phase_preparation <- function() {
     "FROM (SELECT i, unnest(duckvep_phase_call(",
     "CASE WHEN i%3=2 THEN [NULL,2,0] ELSE [0,1] END,",
     "CASE WHEN i%3=2 THEN NULL WHEN i%3=0 THEN [true,true] ELSE [false,false] END,",
-    "{phase_set: i, phase_policy: CASE WHEN i%3=2 THEN 'vep116_compat' ELSE 'strict' END})) a",
+    "{phase_set: i, phase_policy: CASE WHEN i%3=2 THEN 'vep_compat' ELSE 'strict' END})) a",
     "FROM range(5000) r(i)) ORDER BY i,slot"))
   expected_many <- do.call(rbind, lapply(0:4999, function(i) {
     if (i %% 3L == 0L) {

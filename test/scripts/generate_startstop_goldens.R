@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Start and stop (coding-v1 slice 5) fixtures and goldens. Base R only: no DuckVEP code, no csq. The
+# Start and stop fixtures and goldens. Base R only: no DuckVEP code, no csq. The
 # 36-codon coding transcript of the frame fixture (its +1 and -2 displaced frames read stops at cDNA 27 and
 # 102, its -1 and +2 frames read none before the CDS runs out) is laid out on both strands in one-, two- and
 # three-exon arrangements (introns inside codons 12 and 18 and at the codon 25 boundary). Every scenario is

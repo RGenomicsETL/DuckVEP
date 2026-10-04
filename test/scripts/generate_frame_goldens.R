@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Frame opening/restoration and stop-gain (coding-v1 slice 4) fixtures and goldens. Base R only: no
+# Frame opening/restoration and stop-gain fixtures and goldens. Base R only: no
 # DuckVEP code, no csq. One 36-codon coding transcript is laid out on both strands and in one-, two- and
 # three-exon genomic arrangements (introns inside codons 12 and 18, and at the codon 25 boundary). Every
 # scenario is written in transcript (cDNA) coordinates, mapped to genome VCF records, and its expected

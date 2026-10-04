@@ -178,10 +178,10 @@ SELECT duckvep_phase_call([NULL, NULL], [true, false]) AS a, duckvep_phase_call(
 SELECT duckvep_phase_call([0::TINYINT, 1::TINYINT], [0, 1]) AS a, duckvep_phase_call([0::UBIGINT, 1::UBIGINT], ['true', 'FALSE']) AS b, duckvep_phase_call(['0', '1'], ['1', '0']) AS c, duckvep_phase_call([0.0::DOUBLE, 1.0::DOUBLE], [1::BIGINT, 0::BIGINT]) AS d, duckvep_phase_call([0.5::DECIMAL(4,1), 1.0::DECIMAL(4,1)], [true, true]) AS e, duckvep_phase_call([0::HUGEINT, 1::HUGEINT], [true, false]) AS f
 
 -- case: phase options phase_set and policy
-SELECT duckvep_phase_call([0, 1], [false, true], {'phase_set': 5}) AS a, duckvep_phase_call([0, 1], [false, true], {'phase_set': 9::UBIGINT, 'phase_policy': 'strict'}) AS b, duckvep_phase_call([0, 1], [false, true], {'phase_policy': 'vep116_compat'}) AS c, duckvep_phase_call([0, 1], [true, true], {'phase_set': NULL::INTEGER, 'phase_policy': NULL::VARCHAR}) AS d, duckvep_phase_call([0, 1], [false, true], NULL) AS e
+SELECT duckvep_phase_call([0, 1], [false, true], {'phase_set': 5}) AS a, duckvep_phase_call([0, 1], [false, true], {'phase_set': 9::UBIGINT, 'phase_policy': 'strict'}) AS b, duckvep_phase_call([0, 1], [false, true], {'phase_policy': 'vep_compat'}) AS c, duckvep_phase_call([0, 1], [true, true], {'phase_set': NULL::INTEGER, 'phase_policy': NULL::VARCHAR}) AS d, duckvep_phase_call([0, 1], [false, true], NULL) AS e
 
 -- case: phase options with NULL struct rows
-SELECT i, duckvep_phase_call([0, 1], [false, true], CASE WHEN i % 2 = 0 THEN NULL ELSE {'phase_set': i, 'phase_policy': 'vep116_compat'} END) AS g FROM range(6) t(i)
+SELECT i, duckvep_phase_call([0, 1], [false, true], CASE WHEN i % 2 = 0 THEN NULL ELSE {'phase_set': i, 'phase_policy': 'vep_compat'} END) AS g FROM range(6) t(i)
 
 -- case: phase option phase_set too large error
 SELECT duckvep_phase_call([0, 1], [false, true], {'phase_set': 18446744073709551615::UBIGINT}) AS g
@@ -1903,7 +1903,7 @@ SELECT event_index,0 seq_region,position,reference,alternate,
  FROM (VALUES (1,101,'A','AA'),(2,108,'AA','A'))
  v(event_index,position,reference,alternate)
 
--- job: hap_p07 hap phase_policy='vep116_compat'
+-- job: hap_p07 hap phase_policy='vep_compat'
 SELECT * FROM hap_calls
 
 -- job: hap_p08 hap
@@ -1921,7 +1921,7 @@ SELECT * REPLACE([0,0] AS alleles) FROM hap_calls UNION ALL SELECT * REPLACE([0,
 -- job: hap_p12 hap
 SELECT * FROM hap_calls UNION ALL SELECT * REPLACE(1 AS sample_index,position+1 AS position) FROM hap_calls
 
--- job: hap_p13 hap phase_policy='vep116_compat'
+-- job: hap_p13 hap phase_policy='vep_compat'
 SELECT * FROM hap_calls UNION ALL SELECT * REPLACE(1 AS sample_index,2 AS alt_index) FROM hap_calls
 
 -- job: hap_p14 hap
@@ -1945,80 +1945,80 @@ SELECT * FROM hap_calls
 -- job: hap_p20 hap
 SELECT * FROM hap_calls WHERE false
 
--- job: hap_p21 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p21 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * FROM hap_raw_overlap ORDER BY event_index DESC
 
--- job: hap_p22 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p22 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * FROM hap_raw_overlap
 
--- job: hap_p23 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p23 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(CASE event_index WHEN 1 THEN '.|.' ELSE gt END AS gt)
  FROM hap_raw_overlap
 
--- job: hap_p24 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p24 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(100 AS position,'A' AS reference,'1|1' AS gt,
  CASE event_index WHEN 1 THEN ['C'] ELSE ['G'] END AS alternates) FROM hap_raw_overlap
 
--- job: hap_p25 hap input_mode='source_records' phase_policy='vep116_compat' max_leaf_edits=1
+-- job: hap_p25 hap input_mode='source_records' phase_policy='vep_compat' max_leaf_edits=1
 SELECT * FROM hap_raw_overlap
 
--- job: hap_p26 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p26 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT event_index,0 seq_region,position,reference,alternates,0 transcript_index,0 sample_index,gt
  FROM (VALUES (1,100,'A',['C'],'1|1'),(2,100,'A',['G'],'1|1'),
  (3,109,'A',['T'],'0|0')) r(event_index,position,reference,alternates,gt) ORDER BY event_index DESC
 
--- job: hap_p27 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p27 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT event_index,0 seq_region,100 AS position,'A' AS reference,['C'] alternates,
  0 transcript_index,0 sample_index,gt FROM (VALUES (1,'1|0'),(2,'0|1')) r(event_index,gt)
 
--- job: hap_p28 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p28 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT event_index,0 seq_region,100 AS position,'A' AS reference,alternates,
  0 transcript_index,0 sample_index,'1|1' gt
  FROM (VALUES (1,['C','G']),(2,['C','T'])) r(event_index,alternates)
 
--- job: hap_p29 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p29 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * FROM hap_raw ORDER BY event_index DESC
 
--- job: hap_p30 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p30 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * FROM hap_raw
 
--- job: hap_p31 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p31 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(CASE event_index WHEN 1 THEN '|0|1' ELSE gt END AS gt) FROM hap_raw
 
--- job: hap_p32 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p32 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(CASE event_index WHEN 1 THEN '0|1' ELSE gt END AS gt) FROM hap_raw
 
--- job: hap_p33 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p33 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(CASE event_index WHEN 1 THEN '.' ELSE gt END AS gt) FROM hap_raw
 
--- job: hap_p34 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p34 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE('T' AS reference,'.' AS gt) FROM hap_raw WHERE event_index=1
 
--- job: hap_p35 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p35 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * FROM hap_raw UNION ALL SELECT * FROM hap_raw
 
--- job: hap_p36 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p36 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(['C',NULL] AS alternates) FROM hap_raw
 
--- job: hap_p37 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p37 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(NULL AS alternates) FROM hap_raw
 
--- job: hap_p38 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p38 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE('3|1' AS gt) FROM hap_raw
 
--- job: hap_p39 hap max_ploidy=1 input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p39 hap max_ploidy=1 input_mode='source_records' phase_policy='vep_compat'
 SELECT * FROM hap_raw
 
--- job: hap_p40 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p40 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * EXCLUDE(i) REPLACE(s.i AS sample_index) FROM hap_raw CROSS JOIN range(4097) s(i)
 
--- job: hap_p41 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p41 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(NULL AS event_index) FROM hap_raw
 
--- job: hap_p42 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p42 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(NULL AS sample_index) FROM hap_raw
 
--- job: hap_p43 hap input_mode='source_records' phase_policy='vep116_compat'
+-- job: hap_p43 hap input_mode='source_records' phase_policy='vep_compat'
 SELECT * REPLACE(NULL AS transcript_index) FROM hap_raw
 
 -- job: hap_p44 hap max_active_events=1
@@ -2178,7 +2178,7 @@ SELECT * FROM hap_p46()
 -- case: haplotypes policy 47
 SELECT * FROM hap_p47()
 
--- job: hap_vt_compat vt phase_policy='vep116_compat'
+-- job: hap_vt_compat vt phase_policy='vep_compat'
 SELECT * FROM vt_calls
 
 -- job: hap_vt_hgvs vt hgvs=true
@@ -2214,7 +2214,7 @@ SELECT * FROM vt_calls ORDER BY hash(event_index)
 -- job: hap_nm_hgvs nm hgvs=true
 SELECT * FROM nm_calls
 
--- job: hap_nm_compat nm phase_policy='vep116_compat'
+-- job: hap_nm_compat nm phase_policy='vep_compat'
 SELECT * FROM nm_calls
 
 -- job: hap_nm_events nm max_leaf_events=1

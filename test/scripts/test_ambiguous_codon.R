@@ -292,7 +292,7 @@ check_codon_bundle <- function(directory, hgvsp_failures, so_failures,
   pairs <- DBI::dbGetQuery(con, paste('SELECT * FROM read_parquet(',
     DBI::dbQuoteString(con, file.path(directory, 'pairs.parquet')), ')'))
   stopifnot(nrow(pairs) == 230400L, all(pairs$actual_present), all(pairs$expected_present),
-    setequal(unique(pairs$route), paste0(rep(c('independent', 'strict', 'vep116_compat', 'source_records'),
+    setequal(unique(pairs$route), paste0(rep(c('independent', 'strict', 'vep_compat', 'source_records'),
       each = 2L), '_', c(1L, 4L))),
     all(pairs$seq_region == pairs$event_index - 1L),
     all(pairs$transcript_index == pairs$event_index - 1L))

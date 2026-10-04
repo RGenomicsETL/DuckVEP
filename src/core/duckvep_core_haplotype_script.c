@@ -94,7 +94,7 @@ int duckvep_core_haplotype_script(const char *query, const char *model, const ch
     int source_records = o->input_mode && !strcmp(o->input_mode, "source_records");
     duckvep_phase_policy_t policy = DUCKVEP_PHASE_STRICT;
     int policy_valid = !o->phase_policy || duckvep_core_phase_policy(o->phase_policy, strlen(o->phase_policy), &policy);
-    int compat = policy == DUCKVEP_PHASE_VEP116_COMPAT;
+    int compat = policy == DUCKVEP_PHASE_VEP_COMPAT;
     bool ok = true;
     size_t n = 0u;
     *count = 0u;

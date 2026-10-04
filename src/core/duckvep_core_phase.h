@@ -41,8 +41,7 @@ extern const char duckvep_core_phase_set_error[];
 const char *duckvep_core_phase_check_row(bool have_gt, bool have_phase, size_t gt_length,
     size_t phase_length, size_t *total);
 
-/* 'strict', or 'vep_compat' for the pinned executable VEP release ('vep116_compat' is accepted as
- * its older spelling). False for any other name. */
+/* 'strict', or 'vep_compat' for the pinned executable VEP release. False for any other name. */
 bool duckvep_core_phase_policy(const char *name, size_t length, duckvep_phase_policy_t *policy);
 
 /* The phase_set option as a BIGINT; false when an unsigned value does not fit. */

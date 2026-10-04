@@ -645,25 +645,25 @@ current-revision evidence.
 | source_revision |     seed | policy        | input_records | input_calls | input_allele_slots | observed_carriers | provenance_memberships |
 |:----------------|---------:|:--------------|--------------:|------------:|-------------------:|------------------:|-----------------------:|
 | eb83f6ff        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| eb83f6ff        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| eb83f6ff        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | eb83f6ff        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| eb83f6ff        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| eb83f6ff        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 | d1c591b7        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| d1c591b7        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| d1c591b7        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | d1c591b7        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| d1c591b7        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| d1c591b7        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 | 8f9987e3        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| 8f9987e3        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| 8f9987e3        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | 8f9987e3        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| 8f9987e3        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| 8f9987e3        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 | 7f4a4e28        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| 7f4a4e28        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| 7f4a4e28        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | 7f4a4e28        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| 7f4a4e28        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| 7f4a4e28        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 | 9b1b8a0d        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| 9b1b8a0d        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| 9b1b8a0d        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | 9b1b8a0d        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| 9b1b8a0d        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| 9b1b8a0d        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 
 Sources eb83f6ff1d03d05a3c9f8135c8ef355b7f431ee7,
 d1c591b76f8a9a07036736ac0666a004eb58e0eb,
@@ -731,7 +731,7 @@ homozygous second site in a different phase set, using the registered
 Every REF is checked before execution. These are correctness
 denominators, not timing measurements.
 
-The pinned, unmodified Haplosaurus runner and decoded `vep116_compat`
+The pinned, unmodified Haplosaurus runner and decoded `vep_compat`
 executor consume the same VCF/GFF/FASTA. Comparisons retain complete
 CDS/protein multisets, source-record contributors and carrier counts.
 Eighteen ordinary called diploid profiles agree. The audit rejects 12
@@ -791,7 +791,7 @@ preceding audit exactly. The passing native lane does not waive those
 failures or make conditional sequence biologically known.
 
 Public `input_mode := 'source_records'` with
-`phase_policy := 'vep116_compat'` records **0 disagreements across 7020
+`phase_policy := 'vep_compat'` records **0 disagreements across 7020
 complete CDS/protein multiset, carrier-count and physical-edit
 provenance comparisons**, plus **0 disagreements across 28080 per-lane
 record observations**. It consumes original GT text and complete ALT
@@ -820,7 +820,7 @@ biological certainty for conditional sequence.
 | 20260906 | rare             |    36096 |             0 |                              0 |                                  0 |                      0 |
 
 Source 4119d55c43fe0649ffe8325135bbdf26c1f37e94 runs the public
-`source_records`/`vep116_compat` path against pinned, unmodified
+`source_records`/`vep_compat` path against pinned, unmodified
 Haplosaurus. Across the two seeds there are **73,504 profiles**, 220,512
 source records and 147,008 oracle file lanes; DuckHTS returns 147,008
 carrier memberships. The full comparison retains CDS/protein multisets,

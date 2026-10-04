@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Frame opening/restoration and stop-gain (coding-v1 slice 4) contract check, offline by default.
+# Frame opening/restoration and stop-gain contract check, offline by default.
 #  1. regenerate the base-R fixtures/goldens (fails if a committed fixture differs);
 #  2. verify the pinned csq output against its receipt hashes, and re-run csq only when the pinned
 #     bcftools is installed;

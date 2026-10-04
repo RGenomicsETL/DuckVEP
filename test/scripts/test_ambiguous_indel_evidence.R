@@ -115,7 +115,7 @@ indel_audit_source_controls <- function(cases) {
 }
 
 indel_audit_pairs <- function(pairs, events, expected) {
-  routes <- paste0(rep(c('independent', 'strict', 'vep116_compat', 'source_records'), each = 2L),
+  routes <- paste0(rep(c('independent', 'strict', 'vep_compat', 'source_records'), each = 2L),
     '_', c(1L, 4L))
   numeric_fields <- c('event_index', 'seq_region', 'transcript_index', 'position', 'table',
     'model_partition', 'event_offset')
@@ -428,7 +428,7 @@ indel_audit_self_test <- function() {
     table = 1, codon = c('NAA', 'AAA', 'AAA'), case_id = c('a', 'b', 'c'))
   expected <- data.frame(event_index = events$event_index, allele = events$alternate,
     hgvsp = c('p.Test1', NA_character_, 'p.Test3'), so = c('test_a', 'test_b', 'test_c'))
-  routes <- paste0(rep(c('independent', 'strict', 'vep116_compat', 'source_records'), each = 2L),
+  routes <- paste0(rep(c('independent', 'strict', 'vep_compat', 'source_records'), each = 2L),
     '_', c(1L, 4L))
   pairs <- do.call(rbind, lapply(routes, function(route) {
     phased <- !startsWith(route, 'independent_')

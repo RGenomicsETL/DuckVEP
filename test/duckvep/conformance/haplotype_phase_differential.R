@@ -665,7 +665,7 @@ main <- function() {
   stopifnot(nrow(records) == 2L * nrow(cases), nrow(calls) == 3L * nrow(cases),
     all(lengths(calls$alleles) == cases$ploidy[calls$transcript_index + 1L]))
   actual <- DBI::dbGetQuery(con, "SELECT * FROM duckvep_haplotypes('SELECT * FROM calls',
-    'phase',phase_policy:='vep116_compat')")
+    'phase',phase_policy:='vep_compat')")
   stopifnot(all(actual$carrier_count == vapply(actual$carriers, nrow, 1L)),
     all(vapply(actual$carriers, function(c) all(c$sample_index == 0L), TRUE)))
   saveRDS(list(records = records, calls = calls, actual = actual), file.path(out, "native.rds"))
@@ -680,7 +680,7 @@ main <- function() {
     unnest(r.calls) u(c)")
   stopifnot(DBI::dbGetQuery(con, "SELECT count(*) n FROM source_calls")$n == nrow(records))
   public_raw <- DBI::dbGetQuery(con, "SELECT * FROM duckvep_haplotypes('SELECT * FROM source_calls',
-    'phase',phase_policy:='vep116_compat',input_mode:='source_records')")
+    'phase',phase_policy:='vep_compat',input_mode:='source_records')")
   saveRDS(public_raw, file.path(out, "public_raw_output.rds"))
   public_raw_comparisons <- phase_public_comparisons(cases, oracle, public_raw, records, phase)
   public_semantics <- phase_public_semantics(cases, public_raw, records)

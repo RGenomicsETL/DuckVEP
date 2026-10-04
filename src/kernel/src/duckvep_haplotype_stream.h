@@ -78,7 +78,7 @@ typedef struct {
     uint32_t alt_ordinal;
 } duckvep_haplotype_source_t;
 
-/* Versioned coding-v1 status of one completed leaf. ELIGIBLE means the leaf is inside
+/* Status of one completed leaf. ELIGIBLE means the leaf is inside
  * the supported domain but its whole-haplotype consequence needs a classifier that has
  * not landed (no path is left in this state since the start/stop classifier); PREDICTED means the
  * same-codon, frame/stop-gain or start/stop classifier decided it and leaf.haplotype_so_mask is authoritative.
@@ -119,12 +119,12 @@ typedef enum {
     DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING
 } duckvep_prediction_reason_t;
 
-/* Whole-haplotype NMD prediction under rule ejc50-v1 (coding-v1 slice 6). An EJC-distance heuristic on the
+/* Whole-haplotype NMD prediction under rule ejc50. An EJC-distance heuristic on the
  * edited spliced transcript only: no reinitiation, no long-exon exception, no NMD_transcript_variant biotype
  * term, and not the single-allele VEP NMD plugin. UNKNOWN (zero) is every path that is not PREDICTED, a
  * lost start, an edited CDS with no stop (termination unavailable) and incomplete exon topology;
  * NOT_APPLICABLE is a reference lane and known termination without a newly premature stop. */
-#define DUCKVEP_HAPLOTYPE_NMD_RULE "ejc50-v1"
+#define DUCKVEP_HAPLOTYPE_NMD_RULE "ejc50"
 #define DUCKVEP_HAPLOTYPE_NMD_THRESHOLD 50
 typedef enum {
     DUCKVEP_HAPLOTYPE_NMD_UNKNOWN = 0,
@@ -172,7 +172,7 @@ typedef struct {
     uint8_t role;            /* duckvep_haplotype_role_t. */
     uint32_t edit_count;     /* Differing edit islands contributed by this source. */
     uint32_t post_stop_edits; /* Of those, islands after the first stop of the rebuilt protein. */
-    /* ejc50-v1: one of its edits changes length at or before the penultimate exon's last base, so it moved J. */
+    /* ejc50: one of its edits changes length at or before the penultimate exon's last base, so it moved J. */
     uint8_t nmd_moved_junction;
 } duckvep_haplotype_contributor_t;
 
@@ -255,11 +255,11 @@ typedef struct {
     duckvep_prediction_status_t prediction_status, path_status;
     duckvep_prediction_reason_t prediction_reason, path_reason;
     duckvep_cds_edit_status_t prediction_projection; /* Valid for DUCKVEP_REASON_PROJECTION. */
-    /* Same-codon and frame/stop-gain classifier (coding-v1 slices 3 and 4). Set only when path_status is PREDICTED;
+    /* Same-codon and frame/stop-gain classifier. Set only when path_status is PREDICTED;
      * the reduced whole-protein SO set as DUCKVEP_SO() bits, empty for a lane equal to the
      * reference (which has no IMPACT). */
     uint64_t haplotype_so_mask;
-    /* Slice 6: ejc50-v1. S is the final nucleotide of the first stop codon and J the final nucleotide of the
+    /* Slice 6: ejc50. S is the final nucleotide of the first stop codon and J the final nucleotide of the
      * penultimate exon, both 1-based in edited spliced-transcript (cDNA, 5' UTR included) coordinates. Each is
      * valid only when its flag is set: S for a newly premature stop, J additionally for a multi-exon
      * transcript. The contributors that put the stop there are those with role APPLIED. */
@@ -272,7 +272,7 @@ typedef struct {
     size_t listed_edit_count;
 } duckvep_haplotype_leaf_t;
 
-/* Keyed coding-v1 result of one carrier of a completed leaf: unresolved cross-PS phase
+/* Keyed result of one carrier of a completed leaf: unresolved cross-PS phase
  * and non-diploid calls are properties of the sample/phase/lane, not of the shared path. */
 void duckvep_haplotype_carrier_prediction(const duckvep_haplotype_leaf_t *leaf,
     const duckvep_carrier_call_t *call, duckvep_prediction_status_t *status,

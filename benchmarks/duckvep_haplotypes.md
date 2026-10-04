@@ -220,7 +220,7 @@ baseline.
 ### Raw source-record SQL lane
 
 `--modes sql_records` measures the public
-`input_mode := 'source_records'` path under `vep116_compat`; the default
+`input_mode := 'source_records'` path under `vep_compat`; the default
 `--modes native,sql` selects the decoded lanes reported above. All modes
 use the same registered reference and four biallelic events. Source rows
 carry the ordered ALT list and literal diploid GT text. The timed query

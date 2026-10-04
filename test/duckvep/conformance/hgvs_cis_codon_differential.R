@@ -315,7 +315,7 @@ cis_codon_main <- function() {
           "[alternate] alternates,'1|1' gt", 'FROM', representation)
       dbExecute(con, paste0('CREATE TABLE ', table, ' AS SELECT * FROM duckvep_haplotypes(',
         q(calls), ",'cis',hgvs:=true,input_mode:=", q(mode), ',phase_policy:=',
-        q(if (mode == 'alt_events') 'strict' else 'vep116_compat'), ')'))
+        q(if (mode == 'alt_events') 'strict' else 'vep_compat'), ')'))
       actual <- dbGetQuery(con, paste('SELECT * FROM', table, 'ORDER BY transcript_index'))
       saveRDS(actual, file.path(out, paste0(table, '.rds')))
       cis_codon_check_native(actual, inputs[[representation]], models,

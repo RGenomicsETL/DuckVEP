@@ -8,7 +8,7 @@ rduckvep_haplotypes(
   con,
   calls_query,
   model_name,
-  phase_policy = c("strict", "vep_compat", "vep116_compat"),
+  phase_policy = c("strict", "vep_compat"),
   ...,
   input_mode = c("alt_events", "source_records"),
   hgvs = FALSE,
@@ -24,8 +24,7 @@ rduckvep_haplotypes(
 \item{model_name}{Name of an already loaded DuckVEP model.}
 
 \item{phase_policy}{Strict GT/PS interpretation, or `vep_compat` for the
-called-slot order of the pinned executable VEP release (`vep116_compat`
-is accepted as its older spelling).
+called-slot order of the pinned executable VEP release.
 Decoded missing calls remain incomplete; source-record input uses the
 pinned raw parser and explicitly conditional missing-slot interpretation.}
 
@@ -123,10 +122,10 @@ truncating text. Disabled HGVS allocates no HGVS buffers or reference handle
 and returns `not_requested`. Identifiers are joined
 through the model transcript ordinal; the suffix contains no accession.
 
-`prediction_policy` names the versioned contract (`duckvep-coding-v2`).
+`prediction_policy` names the versioned contract (`duckvep-coding`).
 `prediction_status` and `prediction_reason` state eligibility for its supported
 domain and whether the classifiers decided it (see below), and `nmd_prediction` gives
-the rule `ejc50-v1` NMD prediction. The domain is strict complete phased calls of
+the rule `ejc50` NMD prediction. The domain is strict complete phased calls of
 any ploidy (a haploid call has one lane), one unambiguous heterozygous phase
 domain per transcript and sample, literal ACGT SNVs, MNVs and indels of any
 length, non-overlapping and inside coding exons of complete CDSs in a supported
@@ -189,7 +188,7 @@ ascending order with their source `event_index` and `coding_blocks` index
 drops contributors. Malformed identities and exhausted budgets error.
 
 `nmd_prediction` is the versioned NMD prediction of the edited transcript under rule
-`nmd_rule` (`ejc50-v1`), an EJC-distance heuristic on the whole haplotype, never per
+`nmd_rule` (`ejc50`), an EJC-distance heuristic on the whole haplotype, never per
 allele, never a union of single-allele results and not the VEP NMD plugin. For a newly
 premature stop (`stop_gained` in `haplotype_consequences`, with or without
 `frameshift_variant`) it is `trigger` when J - S > 50 and `escape` otherwise. S

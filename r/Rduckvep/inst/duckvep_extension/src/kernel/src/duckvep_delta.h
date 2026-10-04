@@ -494,7 +494,7 @@ duckvep_cds_edit_build_prepared_allele(
  * not manufacture an edit or bypass a failed whole-span mapping. Both source
  * omission statuses return a zeroed edit. Noncoding-only spans retain OUT_OF_CDS. */
 DUCKVEP_INTERNAL_API duckvep_cds_edit_status_t
-duckvep_compat_vep116_source_cds_edit_build(
+duckvep_compat_vep_source_cds_edit_build(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t *exons,
     const duckvep_sequence_pool_t *seq, size_t tx_idx,
@@ -508,7 +508,7 @@ duckvep_compat_vep116_source_cds_edit_build(
  * the phased edit-set projector: a phased caller must preserve every exon and
  * intron segment instead of collapsing the feature to one CDS edit. */
 DUCKVEP_INTERNAL_API duckvep_cds_edit_status_t
-duckvep_compat_vep116_outer_cds_edit_build(
+duckvep_compat_vep_outer_cds_edit_build(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t       *exons,
     const duckvep_sequence_pool_t    *seq,
@@ -716,7 +716,7 @@ typedef enum duckvep_feature_substitution_result {
  * feature ALT for this display.  All returned sequence views borrow `scratch`.
  * NOT_APPLICABLE leaves the caller free to use the ordinary projection path. */
 DUCKVEP_INTERNAL_API duckvep_feature_substitution_result_t
-duckvep_compat_vep116_internal_gap_context_fill(
+duckvep_compat_vep_internal_gap_context_fill(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t       *exons,
     const duckvep_sequence_pool_t    *seq,

@@ -129,7 +129,7 @@ op <- add_option(
   "--max-allele-length",
   dest = "max_allele_length",
   type = "integer",
-  default = 50L,
+  default = 101L,
   help = paste(
     "maximum literal REF or ALT length in the small-event lane;",
     "the compact kernel limit is 65535 [%default]"
@@ -813,6 +813,14 @@ invisible(dbExecute(
 invisible(dbExecute(con, glue("SET threads = {opt$duckdb_threads}")))
 invisible(dbExecute(con, "SET preserve_insertion_order = false"))
 invisible(dbExecute(con, glue("LOAD {sql_q(normalizePath(opt$extension))}")))
+# The runner reads VCF, GFF and FASTA with DuckHTS table functions. DuckVEP no longer ships inside DuckHTS,
+# so a DuckHTS build is loaded next to it (DUCKVEP_READER_EXT, or an installed duckhts).
+reader_extension <- Sys.getenv("DUCKVEP_READER_EXT", "")
+if (nzchar(reader_extension)) {
+  invisible(dbExecute(con, glue("LOAD {sql_q(normalizePath(reader_extension))}")))
+} else if (nrow(dbGetQuery(con, "SELECT 1 FROM duckdb_functions() WHERE function_name = 'read_bcf' LIMIT 1")) == 0L) {
+  invisible(dbExecute(con, "LOAD duckhts"))
+}
 invisible(tryCatch(
   dbExecute(con, "LOAD json"),
   error = function(e) {

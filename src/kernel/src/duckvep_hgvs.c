@@ -1428,7 +1428,7 @@ duckvep_hgvs_status_t duckvep_hgvs_shifted_cds_edit_build(
          * path. Reuse that compatibility helper so HGVSp does not invent a
          * second mapper-gap interpretation.
          */
-        edit_status = duckvep_compat_vep116_outer_cds_edit_build(
+        edit_status = duckvep_compat_vep_outer_cds_edit_build(
             transcripts, exons, seq, edit->tx_idx,
             edit->transcript_strand, &event, NULL, 0u,
             edit->transcript_strand, &result_edit);

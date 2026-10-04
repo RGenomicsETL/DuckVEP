@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <string.h>
 
-duckvep_raw_gt_status_t duckvep_phase_parse_vep116_raw(
+duckvep_raw_gt_status_t duckvep_phase_parse_vep_raw(
     const uint8_t *gt, size_t length, uint32_t source_alt_count, duckvep_raw_gt_t *out) {
     if (!out) return DUCKVEP_RAW_GT_INVALID_ARG;
     memset(out, 0, sizeof(*out));
@@ -103,11 +103,11 @@ duckvep_phase_status_t duckvep_phase_assign(
     memset(out, 0, sizeof(*out));
     if (!s || !s->ploidy || !slot1 || slot1 > s->ploidy || called_before >= slot1 ||
         allele < -1 || phase_before > 1u ||
-        (policy != DUCKVEP_PHASE_STRICT && policy != DUCKVEP_PHASE_VEP116_COMPAT))
+        (policy != DUCKVEP_PHASE_STRICT && policy != DUCKVEP_PHASE_VEP_COMPAT))
         return DUCKVEP_PHASE_INVALID_ARG;
     out->lane = slot1;
     out->status = allele < 0 ? DUCKVEP_PHASE_MISSING : DUCKVEP_PHASE_CALLED;
-    if (policy == DUCKVEP_PHASE_VEP116_COMPAT) {
+    if (policy == DUCKVEP_PHASE_VEP_COMPAT) {
         /* BaseVCF4::get_samples_genotypes omits missing entries before
          * Transcript::get_genotypes assigns allele slots and phased=1. */
         out->lane = allele < 0 ? 0u : (uint16_t)(called_before + 1u);

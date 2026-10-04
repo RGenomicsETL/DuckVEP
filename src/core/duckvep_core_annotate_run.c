@@ -1614,7 +1614,7 @@ duckvep_scalar_projection_store(duckvep_scalar_hgvs_observer_t *observer,
 		scratch = duckvep_workspace_delta_scratch(
 		    observer->state->workspace);
 		if (scratch != NULL &&
-		    duckvep_compat_vep116_internal_gap_context_fill(
+		    duckvep_compat_vep_internal_gap_context_fill(
 		        &model->transcripts, &model->exons, &model->sequences,
 		        batch, consequence->variant_idx, consequence->tx_idx,
 		        model->transcripts.strand[consequence->tx_idx], scratch,

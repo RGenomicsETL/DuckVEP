@@ -46,13 +46,13 @@ typedef struct {
  * the latter can cause an upstream conditional deletion. This routine only
  * resolves source ordinals; it does not project or apply that interpretation.
  * Constant native space, no allocation. Errors leave the output zeroed. */
-duckvep_raw_gt_status_t duckvep_phase_parse_vep116_raw(
+duckvep_raw_gt_status_t duckvep_phase_parse_vep_raw(
     const uint8_t *gt, size_t length, uint32_t source_alt_count, duckvep_raw_gt_t *out);
 
 typedef enum {
     DUCKVEP_PHASE_STRICT,
-    DUCKVEP_PHASE_VEP116_COMPAT,
-    DUCKVEP_PHASE_VEP116_RAW
+    DUCKVEP_PHASE_VEP_COMPAT,
+    DUCKVEP_PHASE_VEP_RAW
 } duckvep_phase_policy_t;
 
 typedef enum {

@@ -4666,7 +4666,7 @@ TEST vep116_outer_cds_edit_spans_internal_intron_both_strands(void) {
         event.feature_start1 = 105u;
         event.feature_end1 = 203u;
         ASSERT_EQ(DUCKVEP_CDS_EDIT_OK,
-                  duckvep_compat_vep116_outer_cds_edit_build(
+                  duckvep_compat_vep_outer_cds_edit_build(
                       &s.tx, &s.ex, &seq, 0u, (int8_t)1, &event,
                       alternate, (uint32_t)sizeof alternate, (int8_t)1,
                       &edit));
@@ -4680,14 +4680,14 @@ TEST vep116_outer_cds_edit_spans_internal_intron_both_strands(void) {
         event.feature_start1 = 105u;
         event.feature_end1 = 108u;
         ASSERT_EQ(DUCKVEP_CDS_EDIT_NON_CONTIGUOUS,
-                  duckvep_compat_vep116_outer_cds_edit_build(
+                  duckvep_compat_vep_outer_cds_edit_build(
                       &s.tx, &s.ex, &seq, 0u, (int8_t)1, &event,
                       alternate, (uint32_t)sizeof alternate, (int8_t)1,
                       &edit));
         event.feature_start1 = 150u;
         event.feature_end1 = 203u;
         ASSERT_EQ(DUCKVEP_CDS_EDIT_OUT_OF_CDS,
-                  duckvep_compat_vep116_outer_cds_edit_build(
+                  duckvep_compat_vep_outer_cds_edit_build(
                       &s.tx, &s.ex, &seq, 0u, (int8_t)1, &event,
                       alternate, (uint32_t)sizeof alternate, (int8_t)1,
                       &edit));
@@ -4719,7 +4719,7 @@ TEST vep116_outer_cds_edit_spans_internal_intron_both_strands(void) {
         event.feature_start1 = 106u;
         event.feature_end1 = 203u;
         ASSERT_EQ(DUCKVEP_CDS_EDIT_OK,
-                  duckvep_compat_vep116_outer_cds_edit_build(
+                  duckvep_compat_vep_outer_cds_edit_build(
                       &s.tx, &s.ex, &seq, 0u, (int8_t)-1, &event,
                       alternate, (uint32_t)sizeof alternate, (int8_t)-1,
                       &edit));

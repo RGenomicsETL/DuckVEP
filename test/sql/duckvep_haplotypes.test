@@ -150,7 +150,7 @@ SELECT count(*),sum(carrier_count),count(DISTINCT contributors[1].event_index),
  AND contributors[1].alternate=CASE WHEN transcript_index%2=0 THEN 'C' ELSE 'CAA' END)
 FROM duckvep_haplotypes('SELECT event_index,seq_region,position,reference,
  [alternate] alternates,transcript_index,sample_index,''1|1'' gt FROM hap_borrowed_calls',
- 'hap_borrowed',hgvs:=true,input_mode:='source_records',phase_policy:='vep116_compat',
+ 'hap_borrowed',hgvs:=true,input_mode:='source_records',phase_policy:='vep_compat',
  max_active_events:=3,max_active_transcripts:=1,max_active_projections:=3,max_allele_bytes:=24);
 ----
 2051	12306	2051	2051
@@ -215,7 +215,7 @@ SELECT count(*),count(*) FILTER (WHERE regexp_replace(h.hgvsp,'[()]','','g')
  AND len(h.contributors)=1 AND h.contributors[1].event_index=e.event_index)
 FROM duckvep_haplotypes('SELECT *,[alternate] alternates,event_index-1 transcript_index,
  0 sample_index,''1|1'' gt FROM hap_phase_events','hap_phase',hgvs:=true,
- input_mode:='source_records',phase_policy:='vep116_compat') h
+ input_mode:='source_records',phase_policy:='vep_compat') h
 JOIN hap_phase_expected e USING(transcript_index);
 ----
 6	6	6
@@ -288,7 +288,7 @@ SELECT contributors[1].event_index,cds,protein,hgvsp,hgvsp_status,carrier_count,
  len(contributors),contributors[1].position,contributors[1].projection_status FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''1|1'' gt FROM hap_anchor_calls','hap_anchor',
- phase_policy:='vep116_compat',input_mode:='source_records',hgvs:=true)
+ phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
  ORDER BY contributors[1].event_index;
 ----
 1	ATGGGTCCTTTAA	MGPL	p.(Ter4LeufsTer9)	ok	2	1	19	ok
@@ -302,19 +302,19 @@ SELECT contributors[1].event_index,hgvsp FROM (
  SELECT * FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''1|1'' gt FROM hap_anchor_calls WHERE event_index=1',
- 'hap_anchor',phase_policy:='vep116_compat',input_mode:='source_records',hgvs:=true)
+ 'hap_anchor',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
  UNION ALL SELECT * FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''1|1'' gt FROM hap_anchor_calls WHERE event_index=2',
- 'hap_anchor',phase_policy:='vep116_compat',input_mode:='source_records',hgvs:=true)
+ 'hap_anchor',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
  UNION ALL SELECT * FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''1|1'' gt FROM hap_anchor_calls WHERE event_index=3',
- 'hap_anchor',phase_policy:='vep116_compat',input_mode:='source_records',hgvs:=true)
+ 'hap_anchor',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
  UNION ALL SELECT * FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''1|1'' gt FROM hap_anchor_calls WHERE event_index=4',
- 'hap_anchor',phase_policy:='vep116_compat',input_mode:='source_records',hgvs:=true))
+ 'hap_anchor',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true))
  ORDER BY contributors[1].event_index;
 ----
 1	p.(Ter4LeufsTer9)
@@ -411,7 +411,7 @@ CREATE TABLE hap_reference_views_calls AS SELECT transcript_index+1 event_index,
 
 # Pinned VEP 116 translates GCN and GCC to Ala, and ACN and ACC to Thr.
 # Each closing transcript supplies its own raw and curated reference views.
-foreach policy strict vep116_compat
+foreach policy strict vep_compat
 
 foreach workers 1 4
 
@@ -489,7 +489,7 @@ FROM query(duckvep_annotate_sql('hap_n_codon_events',
 9	start_lost	p.Ala1?
 10	start_lost	p.Ter1?
 
-foreach policy strict vep116_compat
+foreach policy strict vep_compat
 
 query IT
 SELECT transcript_index,hgvsp FROM duckvep_haplotypes('SELECT * FROM hap_n_codon_calls',
@@ -565,7 +565,7 @@ FROM query(duckvep_annotate_sql('hap_n_indel_events','hap_n_indels', struct_pack
 6	coding_sequence_variant&inframe_insertion	p.Ter2_Ala3insPro
 7	frameshift_variant	NULL
 
-foreach policy strict vep116_compat
+foreach policy strict vep_compat
 
 query IT
 SELECT transcript_index,hgvsp FROM duckvep_haplotypes('SELECT * FROM hap_n_indel_calls',
@@ -588,7 +588,7 @@ statement ok
 CREATE TABLE hap_n_indel_raw AS SELECT * FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,0 sample_index,''1|1'' gt FROM hap_n_indel_calls',
- 'hap_n_indels',hgvs:=true,phase_policy:='vep116_compat',input_mode:='source_records');
+ 'hap_n_indels',hgvs:=true,phase_policy:='vep_compat',input_mode:='source_records');
 
 query ITTT
 SELECT transcript_index,hgvsp,projection_status,sequence_status
@@ -641,7 +641,7 @@ query ITTTTIII
 SELECT transcript_index,cds,protein,sequence_status,hgvsp,carrier_count,
  edit_count,len(contributors) FROM duckvep_haplotypes(
  'SELECT * EXCLUDE(alternate),[${selected_alt}] alternates,''|0|0'' gt FROM hap_ref_slot_source',
- 'hap_n_indels',phase_policy:='vep116_compat',input_mode:='source_records',hgvs:=true)
+ 'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
 ORDER BY transcript_index;
 ----
 4	ATGGCNGCCTAA	MAA*	ok	p.(=)	2	0	0
@@ -651,7 +651,7 @@ query IITIIIT
 SELECT transcript_index,carriers[1].haplotype_lane,sequence_status,edit_count,
  len(contributors),contributors[1].alt_index,hgvsp FROM duckvep_haplotypes(
  'SELECT * EXCLUDE(alternate),[${selected_alt}] alternates,''0|1'' gt FROM hap_ref_slot_source',
- 'hap_n_indels',phase_policy:='vep116_compat',input_mode:='source_records',hgvs:=true)
+ 'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
 ORDER BY transcript_index,carriers[1].haplotype_lane;
 ----
 4	1	ok	0	0	NULL	p.(=)
@@ -664,7 +664,7 @@ SELECT count(*),sum(carrier_count),count(*) FILTER(WHERE sequence_status='condit
  count(*) FILTER(WHERE contributors[1].alt_index=1 AND edit_count=0)
 FROM duckvep_haplotypes(
  'SELECT * EXCLUDE(alternate),[${selected_alt}] alternates,''1|1'' gt FROM hap_ref_slot_source',
- 'hap_n_indels',phase_policy:='vep116_compat',input_mode:='source_records');
+ 'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records');
 ----
 2	4	2	2
 
@@ -672,7 +672,7 @@ FROM duckvep_haplotypes(
 query I
 SELECT count(*) FROM duckvep_haplotypes(
  'SELECT * EXCLUDE(alternate),[${selected_alt}] alternates,''0|0'' gt FROM hap_ref_slot_source',
- 'hap_n_indels',phase_policy:='vep116_compat',input_mode:='source_records');
+ 'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records');
 ----
 0
 
@@ -686,7 +686,7 @@ SELECT carriers[1].haplotype_lane,carriers[1].ploidy,cds,protein,carrier_count,
 FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,0 sample_index,''1'' gt FROM hap_n_indel_calls WHERE event_index=4',
- 'hap_n_indels',phase_policy:='vep116_compat',input_mode:='source_records')
+ 'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records')
 ORDER BY carriers[1].haplotype_lane;
 ----
 1	2	ATGGCNGCCTAA	MAA*	1	0	1	NGCC	conditional
@@ -698,7 +698,7 @@ SELECT projection_status,cds IS NULL,protein IS NULL,contributors[1].projection_
 FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,''G'' reference,[alternate] alternates,
   transcript_index,0 sample_index,''1|1'' gt FROM hap_n_indel_calls WHERE event_index=4',
- 'hap_n_indels',phase_policy:='vep116_compat',input_mode:='source_records');
+ 'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records');
 ----
 reference_mismatch	1	1	reference_mismatch
 
@@ -713,7 +713,7 @@ FROM (VALUES (1,'mixed_n_anchor',16,'N','NGCC'),(2,'mixed_snv',18,'C','A'))
 statement ok
 CREATE TABLE hap_n_skipped_result AS SELECT * FROM duckvep_haplotypes(
  'SELECT * FROM hap_n_skipped_mixed','hap_n_indels',hgvs:=true,max_leaf_edits:=1,
- phase_policy:='vep116_compat',input_mode:='source_records');
+ phase_policy:='vep_compat',input_mode:='source_records');
 
 query TTTTIIIIT
 SELECT cds,protein,projection_status,sequence_status,carrier_count,edit_count,
@@ -806,7 +806,7 @@ SELECT transcript_index,protein,sequence_flags,edit_count,carrier_count,
  len(protein_differences),sequence_status FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''.'' gt FROM hap_protein_calls',
- 'hap_proteins',input_mode:='source_records',phase_policy:='vep116_compat')
+ 'hap_proteins',input_mode:='source_records',phase_policy:='vep_compat')
  ORDER BY transcript_index;
 ----
 0	MA*	0	0	2	0	conditional
@@ -820,7 +820,7 @@ query ITI
 SELECT transcript_index,protein,edit_count FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''0|1'' gt FROM hap_protein_calls',
- 'hap_proteins',input_mode:='source_records',phase_policy:='vep116_compat'),
+ 'hap_proteins',input_mode:='source_records',phase_policy:='vep_compat'),
  unnest(carriers) c(carrier) WHERE carrier.haplotype_lane=1 ORDER BY transcript_index;
 ----
 0	LA*	0
@@ -857,7 +857,7 @@ CREATE TABLE hap_route_result AS SELECT * FROM duckvep_haplotypes(
   CASE WHEN s.i=0 THEN CASE e.i WHEN 1 THEN ''.'' ELSE ''0|1'' END
        WHEN s.i=1 THEN ''0|0'' ELSE CASE e.i WHEN 1 THEN ''1|1'' ELSE ''0|0'' END END gt
   FROM hap_route_tx,range(1,3) e(i),range(3) s(i)',
- 'hap_routes',input_mode:='source_records',phase_policy:='vep116_compat');
+ 'hap_routes',input_mode:='source_records',phase_policy:='vep_compat');
 
 query ITIIIII
 SELECT transcript_index,protein,count(*),sum(edit_count),sum(sequence_flags),
@@ -1011,7 +1011,7 @@ query ITTTI
 SELECT transcript_index,protein,hgvsp,hgvsp_status,carrier_count FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''1|1'' gt FROM hap_hgvs_calls','hap_hgvs',
- input_mode:='source_records',phase_policy:='vep116_compat',hgvs:=true)
+ input_mode:='source_records',phase_policy:='vep_compat',hgvs:=true)
  ORDER BY transcript_index;
 ----
 0	MAAADAAE*	p.(Ala4_Ala5insAsp)	ok	2
@@ -1090,7 +1090,7 @@ query TTII
 SELECT hgvsp,hgvsp_status,edit_count,len(coding_blocks) FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''0|1'' gt FROM hap_protein_calls WHERE transcript_index=0',
- 'hap_proteins',input_mode:='source_records',phase_policy:='vep116_compat',hgvs:=true)
+ 'hap_proteins',input_mode:='source_records',phase_policy:='vep_compat',hgvs:=true)
  WHERE edit_count=0;
 ----
 p.(Met1Leu)	ok	0	0
@@ -1142,7 +1142,7 @@ SELECT cds,protein,sequence_status,sequence_flags,len(contributors),len(cds_diff
 ATAGCNTGNGCC	IAXA	ok	0	1	1
 
 query T
-SELECT protein FROM duckvep_haplotypes('SELECT * FROM hap_n_calls','hap_n',phase_policy := 'vep116_compat');
+SELECT protein FROM duckvep_haplotypes('SELECT * FROM hap_n_calls','hap_n',phase_policy := 'vep_compat');
 ----
 IAXA
 
@@ -1226,7 +1226,7 @@ ORDER BY b.alternate;
 
 query TTII
 SELECT cds, protein, carrier_count, carriers[1].phase_set IS NULL
-FROM duckvep_haplotypes('SELECT * FROM hap_calls', 'hap', phase_policy := 'vep116_compat') ORDER BY cds;
+FROM duckvep_haplotypes('SELECT * FROM hap_calls', 'hap', phase_policy := 'vep_compat') ORDER BY cds;
 ----
 CACAAAAAAAAA	HKKK	1	true
 CGAAAAAAAAAA	RKKK	1	true
@@ -1401,7 +1401,7 @@ SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_calls UNION ALL SELECT * REP
 inconsistent event identity
 
 statement error
-SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_calls UNION ALL SELECT * REPLACE(1 AS sample_index,2 AS alt_index) FROM hap_calls', 'hap', phase_policy := 'vep116_compat');
+SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_calls UNION ALL SELECT * REPLACE(1 AS sample_index,2 AS alt_index) FROM hap_calls', 'hap', phase_policy := 'vep_compat');
 ----
 inconsistent event identity
 
@@ -1615,7 +1615,7 @@ SELECT v.event_index,h.protein,h.hgvsp,h.carrier_count
  FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
   transcript_index,sample_index,''1|1'' gt FROM hap_repeat_calls',
- 'hap_repeat',input_mode:='source_records',phase_policy:='vep116_compat',hgvs:=true) h,
+ 'hap_repeat',input_mode:='source_records',phase_policy:='vep_compat',hgvs:=true) h,
  unnest(h.contributors) u(v) ORDER BY v.event_index;
 ----
 1	MQQQQQQQQQQQ*	p.(Gln11dup)	2
@@ -1638,7 +1638,7 @@ query TTIIITT
 SELECT cds,protein,edit_count,len(contributors),stop_in_displaced_frame,
  coding_blocks[1].coding_status,coding_blocks[1].event_indices
 FROM duckvep_haplotypes('SELECT * FROM hap_raw_overlap ORDER BY event_index DESC','hap',
- input_mode:='source_records',phase_policy:='vep116_compat') ORDER BY cds;
+ input_mode:='source_records',phase_policy:='vep_compat') ORDER BY cds;
 ----
 AAAAAAAAAAAA	KKKK	2	2	NULL	unsupported_ordered_replacements	[1, 2]
 CAAAAAAAAAAA	QKKK	2	2	NULL	unsupported_ordered_replacements	[1, 2]
@@ -1647,7 +1647,7 @@ query TTII
 SELECT coding_blocks[1].reference,coding_blocks[1].alternate,
  coding_blocks[1].local_consequence_mask,contributors[1].alt_index
 FROM duckvep_haplotypes('SELECT * FROM hap_raw_overlap','hap',
- input_mode:='source_records',phase_policy:='vep116_compat') ORDER BY cds;
+ input_mode:='source_records',phase_policy:='vep_compat') ORDER BY cds;
 ----
 AAA	AAA	NULL	0
 AAA	CAA	NULL	1
@@ -1655,14 +1655,14 @@ AAA	CAA	NULL	1
 query TTIII
 SELECT cds,sequence_status,edit_count,carrier_count,evidence_flags
 FROM duckvep_haplotypes('SELECT * REPLACE(CASE event_index WHEN 1 THEN ''.|.'' ELSE gt END AS gt)
- FROM hap_raw_overlap','hap',input_mode:='source_records',phase_policy:='vep116_compat');
+ FROM hap_raw_overlap','hap',input_mode:='source_records',phase_policy:='vep_compat');
 ----
 AGAAAAAAAAAA	conditional	1	2	11
 
 query III
 SELECT count(*),min(nominal_length_diff),max(nominal_length_diff)
 FROM duckvep_haplotypes('SELECT * FROM hap_raw_overlap','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 2	0	0
 
@@ -1703,7 +1703,7 @@ SELECT transcript_index,c.haplotype_lane,nominal_length_diff,len(cds)-12,
  sequence_flags,len(contributors),sequence_status
 FROM (SELECT *,unnest(carriers) c FROM duckvep_haplotypes(
  'SELECT * FROM hap_nominal_calls ORDER BY event_index DESC','hap_nominal',
- input_mode:='source_records',phase_policy:='vep116_compat'))
+ input_mode:='source_records',phase_policy:='vep_compat'))
 ORDER BY transcript_index,c.haplotype_lane;
 ----
 0	1	2	2	3	2	conditional
@@ -1727,7 +1727,7 @@ query III
 SELECT count(*),sum(carrier_count),count(*) FILTER(WHERE nominal_length_diff<>
  list_sum(list_transform(coding_blocks,lambda b: b.length_change)))
 FROM duckvep_haplotypes('SELECT * FROM hap_nominal_calls','hap_nominal',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 10	16	4
 
@@ -1746,13 +1746,13 @@ query TI
 SELECT cds,edit_count FROM duckvep_haplotypes(
  'SELECT * REPLACE(100 AS position,''A'' AS reference,''1|1'' AS gt,
  CASE event_index WHEN 1 THEN [''C''] ELSE [''G''] END AS alternates) FROM hap_raw_overlap',
- 'hap',input_mode:='source_records',phase_policy:='vep116_compat');
+ 'hap',input_mode:='source_records',phase_policy:='vep_compat');
 ----
 GAAAAAAAAAAA	2
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_raw_overlap','hap',
- input_mode:='source_records',phase_policy:='vep116_compat',max_leaf_edits:=1);
+ input_mode:='source_records',phase_policy:='vep_compat',max_leaf_edits:=1);
 ----
 max_leaf_edits=1
 
@@ -1763,7 +1763,7 @@ SELECT cds,edit_count FROM duckvep_haplotypes(
  'SELECT event_index,0 seq_region,position,reference,alternates,0 transcript_index,0 sample_index,gt
  FROM (VALUES (1,100,''A'',[''C''],''1|1''),(2,100,''A'',[''G''],''1|1''),
  (3,109,''A'',[''T''],''0|0'')) r(event_index,position,reference,alternates,gt) ORDER BY event_index DESC',
- 'hap',input_mode:='source_records',phase_policy:='vep116_compat');
+ 'hap',input_mode:='source_records',phase_policy:='vep_compat');
 ----
 CAAAAAAAAAAA	2
 
@@ -1774,7 +1774,7 @@ SELECT cds,list_transform(contributors,lambda c: c.projection_status),
  coding_blocks[1].event_indices FROM duckvep_haplotypes(
  'SELECT event_index,0 seq_region,100 AS position,''A'' AS reference,[''C''] alternates,
  0 transcript_index,0 sample_index,gt FROM (VALUES (1,''1|0''),(2,''0|1'')) r(event_index,gt)',
- 'hap',input_mode:='source_records',phase_policy:='vep116_compat') ORDER BY cds;
+ 'hap',input_mode:='source_records',phase_policy:='vep_compat') ORDER BY cds;
 ----
 AAAAAAAAAAAA	[shadowed_duplicate]	NULL
 CAAAAAAAAAAA	[ok]	[2]
@@ -1785,7 +1785,7 @@ SELECT cds,list_count(list_filter(contributors,lambda c: c.projection_status='sh
  'SELECT event_index,0 seq_region,100 AS position,''A'' AS reference,alternates,
  0 transcript_index,0 sample_index,''1|1'' gt
  FROM (VALUES (1,[''C'',''G'']),(2,[''C'',''T''])) r(event_index,alternates)',
- 'hap',input_mode:='source_records',phase_policy:='vep116_compat');
+ 'hap',input_mode:='source_records',phase_policy:='vep_compat');
 ----
 CAAAAAAAAAAA	0
 
@@ -1797,7 +1797,7 @@ CREATE TABLE hap_raw AS SELECT i event_index,0 seq_region,99+i AS position,'A' A
 query TTIII
 SELECT cds,sequence_status,evidence_flags,edit_count,carrier_count
 FROM duckvep_haplotypes('SELECT * FROM hap_raw ORDER BY event_index DESC','hap',
- input_mode:='source_records',phase_policy:='vep116_compat') ORDER BY cds;
+ input_mode:='source_records',phase_policy:='vep_compat') ORDER BY cds;
 ----
 CGAAAAAAAAAA	conditional	11	2	1
 GAAAAAAAAAA	conditional	11	2	1
@@ -1805,7 +1805,7 @@ GAAAAAAAAAA	conditional	11	2	1
 query IIITII
 SELECT c.haplotype_lane,c.ploidy,c.phase_set,e.alternate,e.alt_index,e.evidence_flags FROM (
  SELECT unnest(carriers) c,contributors[1] e FROM duckvep_haplotypes('SELECT * FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat')) ORDER BY c.haplotype_lane;
+ input_mode:='source_records',phase_policy:='vep_compat')) ORDER BY c.haplotype_lane;
 ----
 1	2	NULL	C	1	11
 2	2	NULL	(empty)	NULL	10
@@ -1813,14 +1813,14 @@ SELECT c.haplotype_lane,c.ploidy,c.phase_set,e.alternate,e.alt_index,e.evidence_
 query III
 SELECT count(*),sum(carrier_count),sum(edit_count) FROM duckvep_haplotypes(
  'SELECT * REPLACE(CASE event_index WHEN 1 THEN ''|0|1'' ELSE gt END AS gt) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 1	2	1
 
 query III
 SELECT count(*),sum(carrier_count),sum(edit_count) FROM duckvep_haplotypes(
  'SELECT * REPLACE(CASE event_index WHEN 1 THEN ''0|1'' ELSE gt END AS gt) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 2	2	3
 
@@ -1828,14 +1828,14 @@ query TIIIII
 SELECT sequence_status,edit_count,carrier_count,len(contributors),contributors[1].alt_index,
  len(cds_differences) FROM duckvep_haplotypes(
  'SELECT * REPLACE(CASE event_index WHEN 1 THEN ''.'' ELSE gt END AS gt) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 conditional	1	2	2	0	1
 
 query IT
 SELECT cds IS NULL,projection_status FROM duckvep_haplotypes(
  'SELECT * REPLACE(''T'' AS reference,''.'' AS gt) FROM hap_raw WHERE event_index=1','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 1	reference_mismatch
 
@@ -1851,31 +1851,31 @@ input_mode must be
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_raw UNION ALL SELECT * FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 duplicate call
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * REPLACE([''C'',NULL] AS alternates) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 invalid source ALT list
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * REPLACE(NULL AS alternates) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 invalid source ALT list
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * REPLACE(''3|1'' AS gt) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 raw GT status 3
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_raw','hap',max_ploidy:=1,
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 max_ploidy=1
 
@@ -1884,25 +1884,25 @@ max_ploidy=1
 query III
 SELECT count(*),sum(carrier_count),sum(len(carriers)) FROM duckvep_haplotypes(
  'SELECT * EXCLUDE(i) REPLACE(s.i AS sample_index) FROM hap_raw CROSS JOIN range(4097) s(i)','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 2	8194	8194
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * REPLACE(NULL AS event_index) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 required input
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * REPLACE(NULL AS sample_index) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 required input
 
 statement error
 SELECT * FROM duckvep_haplotypes('SELECT * REPLACE(NULL AS transcript_index) FROM hap_raw','hap',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 required input
 
@@ -2004,7 +2004,7 @@ SELECT transcript_index,cds,projection_status,sequence_status,edit_count,len(con
 query III
 SELECT count(*),count(*) FILTER(WHERE c.projection_status='outside_cds'),
  count(*) FILTER(WHERE c.projection_status='ok')
- FROM duckvep_haplotypes('SELECT * FROM hap_mixed_calls','hap_mixed',phase_policy:='vep116_compat'),
+ FROM duckvep_haplotypes('SELECT * FROM hap_mixed_calls','hap_mixed',phase_policy:='vep_compat'),
  unnest(contributors) u(c);
 ----
 14	12	2
@@ -2057,7 +2057,7 @@ CREATE TABLE hap_unmapped_raw AS SELECT event_index,0 seq_region,position,refere
 query ITTTIII
 SELECT transcript_index,cds,protein,sequence_status,sum(carrier_count),min(edit_count),max(edit_count)
  FROM duckvep_haplotypes('SELECT * FROM hap_unmapped_raw','hap_mixed',
- input_mode:='source_records',phase_policy:='vep116_compat',max_leaf_edits:=1)
+ input_mode:='source_records',phase_policy:='vep_compat',max_leaf_edits:=1)
  GROUP BY ALL ORDER BY transcript_index,sequence_status;
 ----
 0	AAAAAAAAAAGA	KKKR	conditional	8	1	1
@@ -2069,7 +2069,7 @@ query III
 SELECT count(*),count(*) FILTER(WHERE c.projection_status='source_unmapped' AND c.evidence_flags & 8 = 8),
  count(*) FILTER(WHERE c.alt_index IS NULL AND c.alternate='')
  FROM duckvep_haplotypes('SELECT * FROM hap_unmapped_raw','hap_mixed',
- input_mode:='source_records',phase_policy:='vep116_compat'),unnest(contributors) u(c)
+ input_mode:='source_records',phase_policy:='vep_compat'),unnest(contributors) u(c)
  WHERE c.event_index=1;
 ----
 10	10	2
@@ -2077,7 +2077,7 @@ SELECT count(*),count(*) FILTER(WHERE c.projection_status='source_unmapped' AND 
 query III
 SELECT count(*),count(*) FILTER(WHERE block.event_indices=[2]),sum(len(block.event_indices))
  FROM duckvep_haplotypes('SELECT * FROM hap_unmapped_raw','hap_mixed',
- input_mode:='source_records',phase_policy:='vep116_compat'),unnest(coding_blocks) u(block);
+ input_mode:='source_records',phase_policy:='vep_compat'),unnest(coding_blocks) u(block);
 ----
 12	12	12
 
@@ -2087,7 +2087,7 @@ SELECT sum(carrier_count),sum(carrier_count) FILTER(WHERE cds IS NULL),
  sum(carrier_count) FILTER(WHERE projection_status='reference_mismatch')
  FROM duckvep_haplotypes('SELECT * REPLACE(CASE WHEN event_index=1 THEN ''C''||repeat(''A'',37)
  ELSE reference END AS reference) FROM hap_unmapped_raw','hap_mixed',
- input_mode:='source_records',phase_policy:='vep116_compat');
+ input_mode:='source_records',phase_policy:='vep_compat');
 ----
 20	16	16
 
@@ -2237,7 +2237,7 @@ SELECT transcript_index,protein,len(cds),sequence_flags,len(coding_blocks),
 query ITII
 SELECT transcript_index,protein,len(cds),sum(len(b.event_indices))
  FROM (SELECT transcript_index,protein,cds,unnest(coding_blocks) b FROM
- duckvep_haplotypes('SELECT * FROM hap_early_stop_calls','hap_early_stop',phase_policy := 'vep116_compat'))
+ duckvep_haplotypes('SELECT * FROM hap_early_stop_calls','hap_early_stop',phase_policy := 'vep_compat'))
  GROUP BY ALL ORDER BY transcript_index;
 ----
 0	MGLS*	180	2
@@ -2252,7 +2252,7 @@ SELECT transcript_index,stop_in_displaced_frame,coding_blocks[1].sequence_flags 
 
 query I
 SELECT bool_and(stop_in_displaced_frame) FROM
- duckvep_haplotypes('SELECT * FROM hap_early_stop_calls','hap_early_stop',phase_policy := 'vep116_compat');
+ duckvep_haplotypes('SELECT * FROM hap_early_stop_calls','hap_early_stop',phase_policy := 'vep_compat');
 ----
 true
 

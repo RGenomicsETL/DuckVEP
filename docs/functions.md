@@ -739,7 +739,7 @@ duckvep_phase_call(alleles, phase_before, options STRUCT) -> STRUCT[]
 
 Parameters: `alleles` is a list of integer allele indices (NULL for a missing call) and `phase_before` a list of booleans of the same length: a slot is true when it is phased to the slot before it. Either argument may be NULL: a NULL `alleles` gives a NULL result, and under the strict policy a NULL `phase_before` leaves every slot unphased. Lists of different lengths, an empty genotype or a ploidy above 65,535 are errors.
 
-Options: `phase_set` (INTEGER, the record's phase-set label; without it phased slots carry no label) and `phase_policy` (VARCHAR, `'strict'` by default, or `'vep_compat'` for the called-slot order of the pinned executable VEP release, today 116; `'vep116_compat'` is accepted as its older spelling).
+Options: `phase_set` (INTEGER, the record's phase-set label; without it phased slots carry no label) and `phase_policy` (VARCHAR, `'strict'` by default, or `'vep_compat'` for the called-slot order of the pinned executable VEP release, today 116).
 
 Returns: one element per genotype slot, `STRUCT(input_slot USMALLINT, allele_index INTEGER, haplotype_lane USMALLINT, ploidy USMALLINT, phase_set BIGINT, phase_scope VARCHAR, status VARCHAR)[]`. `status` is `called`, `unphased` or `missing`; `phase_scope` is `phase_set`, `all_phase_sets`, `allele_slot` or `unresolved`. A slot with no lane has a NULL `haplotype_lane`.
 
@@ -838,7 +838,7 @@ Named parameters:
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `phase_policy` | VARCHAR | `'strict'` | `'strict'` interprets GT and PS strictly; `'vep_compat'` follows the called-slot order of the pinned executable VEP release (today 116); `'vep116_compat'` is accepted as its older spelling. |
+| `phase_policy` | VARCHAR | `'strict'` | `'strict'` interprets GT and PS strictly; `'vep_compat'` follows the called-slot order of the pinned executable VEP release (today 116). |
 | `input_mode` | VARCHAR | `'alt_events'` | `'alt_events'` for decoded per-ALT calls, or `'source_records'` for raw GT text, which requires `phase_policy := 'vep_compat'`. |
 | `hgvs` | BOOLEAN | false | Request bounded protein HGVS for supported completed paths (`hgvsp`, `hgvsp_status`). |
 
@@ -859,10 +859,10 @@ Returns:
 | `cds_differences`, `protein_differences` | STRUCT[] | Aligned differing runs (`ref_start0`, `alt_start0`, `reference`, `alternate`, `alignment_start0`). |
 | `stop_in_displaced_frame` | BOOLEAN | Whether the first stop codon overlaps a frame-displaced span. |
 | `hgvsp`, `hgvsp_status` | VARCHAR | Protein HGVS and its status (`not_requested` when `hgvs` is false). |
-| `prediction_policy`, `prediction_status`, `prediction_reason` | VARCHAR | The versioned contract (`duckvep-coding-v2`) and whether a path is in its supported domain: complete phased calls of any ploidy, literal alleles of any length, and complete CDSs in any supported genetic code. |
+| `prediction_policy`, `prediction_status`, `prediction_reason` | VARCHAR | The versioned contract (`duckvep-coding`) and whether a path is in its supported domain: complete phased calls of any ploidy, literal alleles of any length, and complete CDSs in any supported genetic code. |
 | `carrier_predictions` | STRUCT[] | The per-carrier keyed result, with impact, consequences and NMD. |
 | `haplotype_consequences`, `haplotype_impact` | VARCHAR[], VARCHAR | The whole-protein Sequence Ontology set and IMPACT of the edited sequence, NULL unless `prediction_status` is `predicted`. |
-| `nmd_rule`, `nmd_prediction`, `nmd_stop_position`, `nmd_junction_position`, `nmd_contributors` | VARCHAR, VARCHAR, UBIGINT, UBIGINT, UBIGINT[] | The whole-haplotype NMD prediction under rule `ejc50-v1` and its evidence. |
+| `nmd_rule`, `nmd_prediction`, `nmd_stop_position`, `nmd_junction_position`, `nmd_contributors` | VARCHAR, VARCHAR, UBIGINT, UBIGINT, UBIGINT[] | The whole-haplotype NMD prediction under rule `ejc50` and its evidence. |
 | `nominal_length_diff` | BIGINT | Signed sum of projected replacement ALT-minus-REF lengths. |
 
 `nmd_prediction` is an EJC-distance heuristic on the whole haplotype, not a union of single-allele results and not the VEP NMD plugin.

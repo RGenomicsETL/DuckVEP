@@ -125,7 +125,7 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 # are decided per carrier from the carrier's own keyed status. A row with one ineligible carrier keeps NULL row-level
 # haplotype_consequences/haplotype_impact but does not hide the eligible carriers' set. The path of event 1 alone
 # (a missense SNV) is shared by samples 2 and 3 (eligible), 4 (unphased), 5 (cross-PS) and the haploid sample 17,
-# whose single lane is predicted like the diploid lanes that carry the same edit (coding-v2).
+# whose single lane is predicted like the diploid lanes that carry the same edit.
 
 query IITTTTT
 SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason,
@@ -185,7 +185,7 @@ MIAEG*	missense_variant	MODERATE	not_applicable	1:1,60:3	1
 MTAEG*	missense_variant	MODERATE	not_applicable	2:1,17:1,60:1	1
 MVAEG*	missense_variant	MODERATE	not_applicable	2:2,60:2	1
 
-# Genetic codes other than the standard one (coding-v2). Transcript 6 carries the vertebrate mitochondrial code
+# Genetic codes other than the standard one. Transcript 6 carries the vertebrate mitochondrial code
 # (NCBI table 2: TGA is Trp, AGA and AGG are stops, ATA is Met and a start); transcript 7 is the same CDS
 # (ATG GCT GCT GAA GGT TAA) under the standard code. The same four edits, read under each code:
 #   GAA>TGA  table 2: Glu>Trp, missense                 standard: stop_gained
@@ -220,7 +220,7 @@ SELECT count(*),count(*) FILTER (WHERE len(carriers)<>len(carrier_predictions) O
  count(DISTINCT prediction_policy),min(prediction_policy)
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
 ----
-27	0	1	duckvep-coding-v2
+27	0	1	duckvep-coding
 
 # The row summary is eligible_classifier_pending or predicted only when every carrier is eligible or predicted;
 # otherwise it is the first ineligible carrier's keyed result.
@@ -357,7 +357,7 @@ FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index IN (1,1
 ----
 1	1	3
 
-# Source-record replay (vep116_compat) is a compatibility interpretation, outside the strict v1 domain:
+# Source-record replay (vep_compat) is a compatibility interpretation, outside the strict v1 domain:
 # reference-only lanes (the 0|0 record, whose nonmutating REF contributor is not emitted) and shadowed/duplicate
 # sources keep provenance but get non_strict_phase_policy.
 
@@ -375,14 +375,14 @@ SELECT prediction_status,prediction_reason,count(*),sum(len(contributors)),sum(l
  count(*) FILTER (WHERE list_bool_or(list_transform(carrier_predictions,lambda c: c.prediction_status<>prediction_status))),
  count(*) FILTER (WHERE edit_count=0 AND len(contributor_provenance)=0)
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_raw','hap_elig',input_mode:='source_records',
- phase_policy:='vep116_compat') GROUP BY ALL ORDER BY ALL
+ phase_policy:='vep_compat') GROUP BY ALL ORDER BY ALL
 ----
 unsupported_context	non_strict_phase_policy	6	5	5	0	3
 
 query IITTI
 SELECT x.event_index,x.alt_index,x.role,x.projection_status,x.evidence_flags
 FROM (SELECT unnest(contributor_provenance) x FROM duckvep_haplotypes('SELECT * FROM hap_elig_raw',
- 'hap_elig',input_mode:='source_records',phase_policy:='vep116_compat')) ORDER BY ALL
+ 'hap_elig',input_mode:='source_records',phase_policy:='vep_compat')) ORDER BY ALL
 ----
 1	1	shadowed	shadowed_duplicate	1
 2	1	applied	ok	1
@@ -393,13 +393,13 @@ FROM (SELECT unnest(contributor_provenance) x FROM duckvep_haplotypes('SELECT * 
 statement ok
 DROP TABLE hap_elig_raw
 
-# The vep116_compat policy on decoded calls is likewise outside the strict domain, but missing calls stay
+# The vep_compat policy on decoded calls is likewise outside the strict domain, but missing calls stay
 # incomplete_input.
 
 query IITT
 SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason
 FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
- 'SELECT * FROM hap_elig_calls WHERE sample_index IN (1,2,3,4)','hap_elig',phase_policy:='vep116_compat'))
+ 'SELECT * FROM hap_elig_calls WHERE sample_index IN (1,2,3,4)','hap_elig',phase_policy:='vep_compat'))
 ORDER BY 1,2,3
 ----
 1	1	unsupported_context	non_strict_phase_policy

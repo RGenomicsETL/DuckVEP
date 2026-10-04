@@ -17,7 +17,7 @@ main <- function() {
   public_receipt <- jsonlite::read_json(file.path(public, "receipt.json"), simplifyVector = TRUE)
   stopifnot(identical(public_receipt$source_receipt, file.path(artifact, "receipt.json")))
   original_paths <- file.path(artifact, c("inputs.rds", "native.rds", "summary.csv"))
-  public_paths <- file.path(public, c("strict.rds", "vep116_compat.rds", "summary.csv"))
+  public_paths <- file.path(public, c("strict.rds", "vep_compat.rds", "summary.csv"))
   for (p in original_paths) stopifnot(identical(duckvep_evidence_sha256(p), original$sha256[[p]]))
   for (p in public_paths) stopifnot(identical(duckvep_evidence_sha256(p), public_receipt$sha256[[p]]))
   stopifnot(read.csv(original_paths[3L])$failures == 0L,
@@ -119,7 +119,7 @@ main <- function() {
   changed <- actual; changed[[first]] <- rbind(changed[[first]], changed[[first]][1L, ])
   controls["extra_run"] <- !equal(changed)
   public_checks <- list()
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     leaves <- readRDS(file.path(public, paste0(policy, ".rds")))$leaves
     for (axis in c("cds", "protein")) {
       checks <- vapply(seq_len(nrow(leaves)), function(i) {

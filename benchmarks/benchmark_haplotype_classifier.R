@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Synthetic classifier workload for duckvep_haplotypes() on immutable extension builds (coding-v1, #2).
+# Synthetic classifier workload for duckvep_haplotypes() on immutable extension builds (#2).
 #
 #   Rscript benchmarks/benchmark_haplotype_classifier.R [--copies N] [--runs R] [--threads T] EXT [EXT ...]
 #

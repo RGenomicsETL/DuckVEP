@@ -1058,7 +1058,7 @@ calls, 21,060 source ALT events/candidate calls, and 54,168 input allele slots.
 Every REF is checked before execution. These are correctness denominators, not
 timing measurements.
 
-The pinned, unmodified Haplosaurus runner and decoded `vep116_compat` executor consume
+The pinned, unmodified Haplosaurus runner and decoded `vep_compat` executor consume
 the same VCF/GFF/FASTA. Comparisons retain complete CDS/protein multisets, source-record
 contributors and carrier counts. Eighteen ordinary called diploid profiles agree.
 The audit rejects `r phase_controls` deliberate corruptions: four check
@@ -1135,7 +1135,7 @@ public_raw_record_failures <- sum(phase_current$public_raw_record_disagreements)
 stopifnot(public_raw_cases == raw_cases, public_raw_records == raw_records)
 ```
 
-Public `input_mode := 'source_records'` with `phase_policy := 'vep116_compat'`
+Public `input_mode := 'source_records'` with `phase_policy := 'vep_compat'`
 records **`r public_raw_failures` disagreements across `r public_raw_cases` complete
 CDS/protein multiset, carrier-count and physical-edit provenance comparisons**,
 plus **`r public_raw_record_failures` disagreements across `r public_raw_records`
@@ -1176,7 +1176,7 @@ names(record_summary) <- c("seed", "cohort", "profiles", "full failures",
 knitr::kable(record_summary, row.names = FALSE)
 ```
 
-Source `r record_revision` runs the public `source_records`/`vep116_compat` path
+Source `r record_revision` runs the public `source_records`/`vep_compat` path
 against pinned, unmodified Haplosaurus. Across the two seeds there are
 **`r format(sum(record_current$profiles), big.mark = ",")` profiles**,
 `r format(sum(record_current$input_records), big.mark = ",")` source records and

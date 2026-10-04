@@ -46,7 +46,7 @@ SELECT duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'input_mode': 
 SELECT duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'max_active_events': 0});
 -- expect error: unknown option
 SELECT duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'nope': 1});
-SELECT CASE WHEN len(duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j')) = 1 AND len(duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'input_mode': 'source_records', 'phase_policy': 'vep116_compat'})) = 4 THEN true ELSE error('statement counts of the haplotype builder') END;
+SELECT CASE WHEN len(duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j')) = 1 AND len(duckvep_haplotype_load_sql('SELECT 1', 'temp-model', 'j', {'input_mode': 'source_records', 'phase_policy': 'vep_compat'})) = 4 THEN true ELSE error('statement counts of the haplotype builder') END;
 SELECT CASE WHEN contains(duckvep_haplotype_load_sql('SELECT 1 -- c', 'temp-model', 'j')[1], E'-- c\n') THEN true ELSE error('trailing comment stays inside the parentheses') END;
 
 -- A staged job is scanned once; drop releases one that will not be.

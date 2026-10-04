@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# NMD attribution (coding-v1 slice 6, rule ejc50-v1) contract check, offline, base R, no DuckVEP code and no csq.
+# NMD attribution (rule ejc50) contract check, offline, base R, no DuckVEP code and no csq.
 #  1. regenerate the fixtures and goldens (fails if a committed file differs) and the model tables;
 #  2. re-derive every lane golden a second, structurally different way from the committed FASTA, GFF3 and VCF alone:
 #     apply the lane's VCF records to the genome base by base, keep each base's exon, CDS membership and reference-CDS origin,

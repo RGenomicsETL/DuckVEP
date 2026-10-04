@@ -297,7 +297,7 @@ model_native_query <- function(max_alignment_cells) {
     s.i sample_index,CASE s.i WHEN 0 THEN s0 WHEN 1 THEN s1 ELSE s2 END gt
     FROM records r JOIN models m USING(seq_region),range(3) s(i)"
   paste0("SELECT * FROM duckvep_haplotypes('", gsub("'", "''", calls, fixed = TRUE),
-    "','probe',input_mode:='source_records',phase_policy:='vep116_compat',max_alignment_cells:=",
+    "','probe',input_mode:='source_records',phase_policy:='vep_compat',max_alignment_cells:=",
     max_alignment_cells, ')')
 }
 

@@ -31,7 +31,7 @@ enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
     HAPLOTYPE_NMD_JUNCTION_COLUMN = 28, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN = 29,
     HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 30, HAPLOTYPE_OUTPUT_COLUMNS = 31 };
 enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 10 };
-#define HAPLOTYPE_POLICY_VERSION "duckvep-coding-v2"
+#define HAPLOTYPE_POLICY_VERSION "duckvep-coding"
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10 };
 
 const char *const duckvep_hap_limit_names[DUCKVEP_HAP_LIMIT_COUNT] = {"max_active_events", "max_active_transcripts",
@@ -67,7 +67,7 @@ int duckvep_hap_config_check(const duckvep_hap_config_t *config, char *error, si
             "duckvep_haplotypes: phased edit sets are not supported for models with wrapped circular objects");
         return 0;
     }
-    if (config->source_records && config->policy != DUCKVEP_PHASE_VEP116_COMPAT) {
+    if (config->source_records && config->policy != DUCKVEP_PHASE_VEP_COMPAT) {
         duckvep_sql_set_error(error, error_size,
             "duckvep_haplotypes: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep_compat'");
         return 0;
@@ -628,7 +628,7 @@ static const char *nmd_name(duckvep_haplotype_nmd_t nmd) {
     }
 }
 
-/* Versioned coding-v1 status/reason plus complete contributor and normalized-edit
+/* Status/reason plus complete contributor and normalized-edit
  * provenance. Every contributor of the leaf is listed, whatever its role. */
 static int append_prediction(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *s,
     const duckvep_hap_config_t *bind, const duckvep_haplotype_leaf_t *leaf) {
@@ -770,7 +770,7 @@ static int append_prediction(duckvep_h_chunk output, size_t row, duckvep_hap_sta
         duckvep_h_set_valid(impact, row);
         assign_text(impact, row, duckvep_impact_name(duckvep_so_impact(leaf->haplotype_so_mask)));
     } else null_cell(impact, row);
-    /* ejc50-v1 row summary, gated like the consequences: unknown unless every carrier is decided.
+    /* ejc50 row summary, gated like the consequences: unknown unless every carrier is decided.
      * The contributors that put the stop there are the APPLIED ones (the edits up to and including the stop),
      * by event_index; post_stop, shadowed and omitted sources are not listed. */
     assign_text(duckvep_h_chunk_vector(output, HAPLOTYPE_NMD_RULE_COLUMN), row,

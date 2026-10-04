@@ -1466,7 +1466,7 @@ local({
   raw_naa <- rduckvep_haplotypes(con, paste(
     "SELECT event_index,seq_region,position,reference,[alternate] alternates,",
     "seq_region transcript_index,0 sample_index,'1|1' gt FROM hgvs_table_events WHERE event_index=5400"
-  ), "r-hgvs-alternate-table", "vep116_compat", input_mode = "source_records", hgvs = TRUE)
+  ), "r-hgvs-alternate-table", "vep_compat", input_mode = "source_records", hgvs = TRUE)
   expect_identical(raw_naa$cds, "ATGNAAGCCTAA")
   expect_identical(raw_naa$protein, "MXA*")
   expect_identical(raw_naa$projection_status, "ok")
@@ -1547,7 +1547,7 @@ local({
     "SELECT event_index, seq_region, position, reference, [alternate] alternates,",
     "seq_region transcript_index, 0 sample_index, '1|1' gt FROM hgvs_padding_events",
     "WHERE event_index IN (1, 8)"
-  ), "r-hgvs-padding", hgvs = TRUE, input_mode = "source_records", phase_policy = "vep116_compat")
+  ), "r-hgvs-padding", hgvs = TRUE, input_mode = "source_records", phase_policy = "vep_compat")
   padding_replay <- padding_replay[order(padding_replay$transcript_index), ]
   expect_identical(padding_replay$hgvsp, rep(NA_character_, 2L))
   expect_identical(padding_replay$hgvsp_status, rep("incomplete_input", 2L))
@@ -1620,7 +1620,7 @@ local({
   removed_ref_replay <- rduckvep_haplotypes(con, paste(
     "SELECT event_index, seq_region, position, reference, [alternate] alternates,",
     "seq_region transcript_index, 0 sample_index, '1|1' gt FROM hgvs_removed_ref_events"
-  ), "r-hgvs-removed-ref", input_mode = "source_records", phase_policy = "vep116_compat")
+  ), "r-hgvs-removed-ref", input_mode = "source_records", phase_policy = "vep_compat")
   removed_ref_replay <- removed_ref_replay[order(removed_ref_replay$transcript_index), ]
   expect_equal(removed_ref_replay$transcript_index, hgvs_removed_ref_sources$i)
   expect_identical(removed_ref_replay$cds, rep("ATGGCGCCTAA", 2L))
@@ -1704,7 +1704,7 @@ local({
       "[true]::BOOLEAN[] phase_before, NULL::BIGINT phase_set FROM hgvs_residual_events"
     )
     replay <- rduckvep_haplotypes(con, input, "r-hgvs-residual", hgvs = TRUE,
-      phase_policy = "vep116_compat", input_mode = if (raw) "source_records" else "alt_events")
+      phase_policy = "vep_compat", input_mode = if (raw) "source_records" else "alt_events")
     replay <- replay[order(replay$transcript_index), ]
     expect_equal(replay$transcript_index, hgvs_residual_sources$i)
     # Raw ALT N is skipped even when TVA can erase its shared anchor.

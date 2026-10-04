@@ -1,6 +1,6 @@
 require duckvep
 
-# NMD attribution (slice 6 of #2, contract design/duckvep_haplotype_contract.md, rule ejc50-v1). The model, calls and
+# NMD attribution (slice 6 of #2, contract design/duckvep_haplotype_contract.md, rule ejc50). The model, calls and
 # expectations are the committed fixtures of test/scripts/generate_nmd_goldens.R: base R with no DuckVEP code and no
 # csq (csq predicts no NMD). 61 scenarios laid out on both strands, with and without a UTR (u1: 13-nt 5' UTR and 17-nt
 # 3' UTR, so S and J are mRNA coordinates), 1 to 4 exons: 238 transcripts, 342 VCF records, 476 lane goldens.
@@ -88,7 +88,7 @@ SELECT count(*),
  count(*) FILTER (WHERE carrier_stop IS NOT DISTINCT FROM stop_end AND nmd_stop_position IS NOT DISTINCT FROM stop_end),
  count(*) FILTER (WHERE carrier_junction IS NOT DISTINCT FROM junction AND nmd_junction_position IS NOT DISTINCT FROM junction),
  count(*) FILTER (WHERE distance IS NOT DISTINCT FROM (carrier_junction::BIGINT-carrier_stop::BIGINT)),
- count(*) FILTER (WHERE nmd_rule='ejc50-v1'),
+ count(*) FILTER (WHERE nmd_rule='ejc50'),
  count(*) FILTER (WHERE list_contains(haplotype_consequences,'stop_gained')=premature)
 FROM nm_named;
 ----
@@ -297,7 +297,7 @@ up_ins3_d51	46;65	46;65	-	trigger
 
 # Failed and ineligible paths are unknown, with NULL S, J and attribution (and NULL SO/IMPACT as before): an unphased
 # heterozygous call (sample 1), a missing allele's other lane (sample 3), and a contradictory pair of SNVs. A phased
-# triploid call (sample 2) is a complete call: under coding-v2 its lane gets the prediction of the same edits on a
+# triploid call (sample 2) is a complete call: its lane gets the prediction of the same edits on a
 # diploid lane (sample 0). Samples 0, 2 and 3 share one edit path whose carriers are all predicted, so the row summary
 # is predicted too. The non-strict phase policy is unknown.
 
@@ -339,9 +339,9 @@ edit_conflict	contradictory_edits	unknown	-	unknown	-	-
 query TTTTT
 SELECT c.prediction_status,c.prediction_reason,c.nmd_prediction,h.nmd_prediction,h.nmd_rule
  FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes(
-  'SELECT * FROM nm_calls WHERE transcript_index=(SELECT transcript_index FROM nm_ix)','nm',phase_policy:='vep116_compat')) h;
+  'SELECT * FROM nm_calls WHERE transcript_index=(SELECT transcript_index FROM nm_ix)','nm',phase_policy:='vep_compat')) h;
 ----
-unsupported_context	non_strict_phase_policy	unknown	unknown	ejc50-v1
+unsupported_context	non_strict_phase_policy	unknown	unknown	ejc50
 
 # Reference lanes: an ALT-free lane carries no carrier in strict decoded output, so it has no row to label (222 golden lanes
 # above); the goldens record it as not_applicable, and a lane whose path has no edits gets not_applicable in the kernel

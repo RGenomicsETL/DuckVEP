@@ -33,7 +33,7 @@ local({
     flags = c(rep(3L, 4L), rep(1L, 8L), rep(3L, 4L)))
   for (threads in c(1L, 4L)) {
     dbExecute(con, paste("SET threads =", threads))
-    result <- rduckvep_haplotypes(con, calls, "nominal", phase_policy = "vep116_compat",
+    result <- rduckvep_haplotypes(con, calls, "nominal", phase_policy = "vep_compat",
       input_mode = "source_records")
     expect_identical(tail(names(result), 1L), "nominal_length_diff")
     expect_equal(nrow(result), 10L)
@@ -160,7 +160,7 @@ local({
     # Raw input retains REF and undefined-slot descriptors as well as ALT.
     raw <- mode == "source_records"
     result <- rduckvep_haplotypes(con, query, "borrowed", hgvs = TRUE, input_mode = mode,
-      phase_policy = if (raw) "vep116_compat" else "strict",
+      phase_policy = if (raw) "vep_compat" else "strict",
       max_active_events = if (raw) 3 else 2, max_active_transcripts = 1,
       max_active_projections = if (raw) 3 else 2, max_allele_bytes = if (raw) 24 else 8)
     expect_equal(nrow(result), 2051L)
@@ -218,7 +218,7 @@ local({
       "NULL::BIGINT phase_set FROM phase_events") else paste("SELECT *,[alternate] alternates,",
       "event_index-1 transcript_index,0 sample_index,'1|1' gt FROM phase_events")
     result <- rduckvep_haplotypes(con, calls, "phase", hgvs = TRUE, input_mode = mode,
-      phase_policy = if (mode == "source_records") "vep116_compat" else "strict")
+      phase_policy = if (mode == "source_records") "vep_compat" else "strict")
     result <- result[order(result$transcript_index), ]
     expect_equal(nrow(result), 6L)
     expect_equal(result$transcript_index, 0:5)
@@ -254,7 +254,7 @@ local({
   # These are per-record executable VEP-116 suffixes, not HGVS-rule corrections.
   expected <- c("p.(Ter4LeufsTer9)", rep("p.(Ter4delinsLeuTer)", 3L))
   baseline <- list()
-  for (threads in c(1L, 4L)) for (route in c("strict", "vep116_compat", "source_records")) {
+  for (threads in c(1L, 4L)) for (route in c("strict", "vep_compat", "source_records")) {
     dbExecute(con, paste("SET threads =", threads))
     raw <- route == "source_records"
     query <- if (raw) paste("SELECT event_index,seq_region,position,reference,",
@@ -262,7 +262,7 @@ local({
     # Independent record comparisons must not trigger raw-file duplicate retention.
     queries <- if (raw) paste("SELECT * FROM (", query, ") WHERE event_index=", 1:4) else query
     result <- do.call(rbind, lapply(queries, function(sql) rduckvep_haplotypes(con, sql, "anchor",
-      phase_policy = if (raw) "vep116_compat" else route,
+      phase_policy = if (raw) "vep_compat" else route,
       input_mode = if (raw) "source_records" else "alt_events", hgvs = TRUE)))
     expect_equal(nrow(result), 4L)
     ids <- vapply(result$contributors, function(x) x$event_index, 0)
@@ -341,7 +341,7 @@ local({
       "SELECT event_index,seq_region,position,reference,[alternate] alternates,",
       "transcript_index,sample_index,'1|1' gt FROM (", calls, ")")
     result <- rduckvep_haplotypes(con, query, "repeat",
-      phase_policy = if (mode == "alt_events") "strict" else "vep116_compat",
+      phase_policy = if (mode == "alt_events") "strict" else "vep_compat",
       input_mode = mode, hgvs = TRUE)
     expect_equal(nrow(result), 2L)
     result <- result[order(vapply(result$contributors, function(x) x$event_index, 0)), ]
@@ -349,7 +349,7 @@ local({
       "SELECT event_index,seq_region,position,reference,[alternate] alternates,",
       "transcript_index,sample_index,'1|1' gt FROM (", prepared, ")")
     expanded <- rduckvep_haplotypes(con, prepared_query, "repeat",
-      phase_policy = if (mode == "alt_events") "strict" else "vep116_compat",
+      phase_policy = if (mode == "alt_events") "strict" else "vep_compat",
       input_mode = mode, hgvs = TRUE)
     expanded <- expanded[order(vapply(expanded$contributors, function(x) x$event_index, 0)), ]
     rownames(expanded) <- rownames(result) <- NULL
@@ -396,7 +396,7 @@ local({
     "0 transcript_index,0 sample_index,gt FROM",
     "(VALUES (1,100,'AAA',['CAA'],'0|1'),(2,101,'A',['G'],'1|1'))",
     "v(event_index,position,reference,alternates,gt)")
-  composed <- rduckvep_haplotypes(con, overlapping, "haps", "vep116_compat",
+  composed <- rduckvep_haplotypes(con, overlapping, "haps", "vep_compat",
     input_mode = "source_records")
   composed <- composed[order(composed$cds), ]
   expect_equal(composed$cds, c("AAAAAAAAAAAA", "CAAAAAAAAAAA"))
@@ -412,14 +412,14 @@ local({
     expect_equal(composed$contributors[[i]]$evidence_flags, c(1L, 1L))
   }
   uncertain <- rduckvep_haplotypes(con, sub("0|1", ".|.", overlapping, fixed = TRUE),
-    "haps", "vep116_compat", input_mode = "source_records", hgvs = TRUE)
+    "haps", "vep_compat", input_mode = "source_records", hgvs = TRUE)
   expect_equal(uncertain$cds, "AGAAAAAAAAAA")
   expect_equal(uncertain$sequence_status, "conditional")
   expect_equal(uncertain$edit_count, 1)
   expect_equal(uncertain$carrier_count, 2L)
   expect_equal(uncertain$nominal_length_diff, 0)
   expect_true(all(is.na(uncertain$hgvsp) & uncertain$hgvsp_status == "incomplete_input"))
-  expect_error(rduckvep_haplotypes(con, overlapping, "haps", "vep116_compat",
+  expect_error(rduckvep_haplotypes(con, overlapping, "haps", "vep_compat",
     input_mode = "source_records", max_leaf_edits = 1), pattern = "max_leaf_edits")
   tied <- paste("SELECT event_index,0 seq_region,position,'A' AS reference,alternates,",
     "0 transcript_index,0 sample_index,gt FROM (VALUES",
@@ -427,7 +427,7 @@ local({
     "r(event_index,position,alternates,gt)")
   for (keep_context in c(FALSE, TRUE)) {
     query <- paste(tied, if (keep_context) "" else "WHERE event_index<3", "ORDER BY event_index DESC")
-    result <- rduckvep_haplotypes(con, query, "haps", "vep116_compat", input_mode = "source_records")
+    result <- rduckvep_haplotypes(con, query, "haps", "vep_compat", input_mode = "source_records")
     expect_equal(result$cds, if (keep_context) "CAAAAAAAAAAA" else "GAAAAAAAAAAA")
     expect_equal(result$edit_count, 2)
     expect_equal(result$carrier_count, 2L)
@@ -435,7 +435,7 @@ local({
   duplicates <- paste("SELECT event_index,0 seq_region,100 AS position,'A' AS reference,",
     "['C'] alternates,0 transcript_index,0 sample_index,gt",
     "FROM (VALUES (1,'1|0'),(2,'0|1')) r(event_index,gt)")
-  result <- rduckvep_haplotypes(con, duplicates, "haps", "vep116_compat", input_mode = "source_records")
+  result <- rduckvep_haplotypes(con, duplicates, "haps", "vep_compat", input_mode = "source_records")
   result <- result[order(result$cds), ]
   expect_equal(result$cds, c("AAAAAAAAAAAA", "CAAAAAAAAAAA"))
   expect_equal(result$contributors[[1]]$projection_status, "shadowed_duplicate")
@@ -445,7 +445,7 @@ local({
   raw_calls <- paste("SELECT i event_index,0 seq_region,99+i AS position,'A' AS reference,",
     "CASE i WHEN 1 THEN ['C','T'] ELSE ['G'] END alternates,0 transcript_index,0 sample_index,",
     "CASE i WHEN 1 THEN '.|1' ELSE '1|1' END gt FROM range(1,3) r(i)")
-  raw <- rduckvep_haplotypes(con, raw_calls, "haps", "vep116_compat", input_mode = "source_records")
+  raw <- rduckvep_haplotypes(con, raw_calls, "haps", "vep_compat", input_mode = "source_records")
   raw <- raw[order(raw$cds), ]
   expect_equal(raw$cds, c("CGAAAAAAAAAA", "GAAAAAAAAAA"))
   expect_equal(raw$protein, c("RKKK", "EKK"))
@@ -462,42 +462,42 @@ local({
   expect_true(all(is.na(do.call(rbind, raw$carriers)$phase_set)))
   for (spelling in c("0|1", "|0|1", ".", "1")) {
     result <- rduckvep_haplotypes(con, sub(".|1", spelling, raw_calls, fixed = TRUE), "haps",
-      "vep116_compat", input_mode = "source_records")
+      "vep_compat", input_mode = "source_records")
     expect_equal(sum(result$carrier_count), 2L)
     expect_equal(nrow(result), if (spelling %in% c("0|1", "1")) 2L else 1L)
   }
   for (replacement in c("NULL AS alternates", "['C',NULL] AS alternates", "[''] AS alternates",
                         "NULL AS gt", "'3|1' AS gt", "'1||1' AS gt")) {
     malformed <- paste("SELECT * REPLACE(", replacement, ") FROM (", raw_calls, ")")
-    expect_error(rduckvep_haplotypes(con, malformed, "haps", "vep116_compat",
+    expect_error(rduckvep_haplotypes(con, malformed, "haps", "vep_compat",
       input_mode = "source_records"))
   }
   for (name in c("event_index", "seq_region", "position", "reference", "transcript_index", "sample_index")) {
     null_input <- paste("SELECT * REPLACE(NULL AS", name, ") FROM (", raw_calls, ")")
-    expect_error(rduckvep_haplotypes(con, null_input, "haps", "vep116_compat",
+    expect_error(rduckvep_haplotypes(con, null_input, "haps", "vep_compat",
       input_mode = "source_records"), pattern = "required input")
   }
   for (replacement in c("'T' AS reference", "['T','C'] AS alternates", "101 AS position")) {
     inconsistent <- paste("SELECT * FROM (", raw_calls, ") UNION ALL SELECT * REPLACE(",
       "1 AS sample_index,", replacement, ") FROM (", raw_calls, ")")
-    expect_error(rduckvep_haplotypes(con, inconsistent, "haps", "vep116_compat",
+    expect_error(rduckvep_haplotypes(con, inconsistent, "haps", "vep_compat",
       input_mode = "source_records"), pattern = "inconsistent source record identity")
   }
   different_gt <- paste("SELECT * FROM (", raw_calls, ") UNION ALL SELECT * REPLACE(",
     "1 AS transcript_index,'1|1' AS gt) FROM (", raw_calls, ")")
-  expect_error(rduckvep_haplotypes(con, different_gt, "haps", "vep116_compat",
+  expect_error(rduckvep_haplotypes(con, different_gt, "haps", "vep_compat",
     input_mode = "source_records"), pattern = "source GT")
   expect_error(rduckvep_haplotypes(con, paste(raw_calls, "UNION ALL", raw_calls), "haps",
-    "vep116_compat", input_mode = "source_records"), pattern = "duplicate call")
+    "vep_compat", input_mode = "source_records"), pattern = "duplicate call")
   expect_error(rduckvep_haplotypes(con, raw_calls, "haps", input_mode = "source_records"),
     pattern = "requires phase_policy")
-  expect_error(rduckvep_haplotypes(con, raw_calls, "haps", "vep116_compat", input_mode = "unknown"))
-  expect_error(rduckvep_haplotypes(con, raw_calls, "haps", "vep116_compat",
+  expect_error(rduckvep_haplotypes(con, raw_calls, "haps", "vep_compat", input_mode = "unknown"))
+  expect_error(rduckvep_haplotypes(con, raw_calls, "haps", "vep_compat",
     input_mode = "source_records", max_ploidy = 1), pattern = "max_ploidy")
-  rduckvep_haplotypes(con, raw_calls, "haps", "vep116_compat", input_mode = "source_records",
+  rduckvep_haplotypes(con, raw_calls, "haps", "vep_compat", input_mode = "source_records",
     table_name = "raw_haplotypes")
   expect_equal(dbGetQuery(con, "SELECT sum(carrier_count) n FROM raw_haplotypes")$n, 2)
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     # Changing any source ALT identity across samples must fail even without
     # duplicate (event, transcript, sample) keys. Input order cannot hide it.
     for (replacement in c("1 AS seq_region", "position+1 AS position", "'T' AS reference",
@@ -534,7 +534,7 @@ local({
     "SELECT consequence_mask FROM duckvep_so_terms() WHERE consequence='missense_variant'")$consequence_mask
   n_call <- paste("SELECT 1 event_index,0 seq_region,102 AS position,'G' AS reference,'A' alternate,",
     "1 alt_index,0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     n_result <- rduckvep_haplotypes(con, n_call, "n_codons", phase_policy = policy)
     expect_equal(n_result$cds, "ATAGCNTGNGCC")
     expect_equal(n_result$protein, "IAXA")
@@ -578,7 +578,7 @@ local({
   cis_calls <- paste("SELECT event_index,0 seq_region,position,reference,alternate,1 alt_index,",
     "0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set",
     "FROM (VALUES (1,103,'T','A'),(2,104,'C','G')) v(event_index,position,reference,alternate)")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     cis <- rduckvep_haplotypes(con, cis_calls, "cis", phase_policy = policy)
     expect_equal(cis$cds, "ATGAGTGCCTAA")
     expect_equal(cis$protein, "MSA*")
@@ -588,7 +588,7 @@ local({
     expect_equal(nrow(cis$protein_differences[[1]]), 0L)
   }
   expect_true(all(blocks$length_change == 0 & blocks$sequence_flags == 0))
-  expect_equal(nrow(rduckvep_haplotypes(con, calls, "haps", "vep116_compat")), 2L)
+  expect_equal(nrow(rduckvep_haplotypes(con, calls, "haps", "vep_compat")), 2L)
   noncoding <- paste("SELECT * REPLACE(0::UBIGINT AS transcript_flags,",
     "NULL::UBIGINT AS cds_start,NULL::UBIGINT AS cds_end,NULL::BLOB AS cds_sequence,",
     "NULL::UTINYINT AS codon_table) FROM (", tx, ")")
@@ -623,7 +623,7 @@ local({
     "[true,true] phase_before,10 phase_set FROM (VALUES (1,100,'C'),(2,105,'G'),",
     "(3,115,'C'),(4,149,'C')) v(event_index,position,alternate)",
     "CROSS JOIN mixed_tx CROSS JOIN range(2) s(i)")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     mixed <- rduckvep_haplotypes(con, mixed_calls, "mixed", phase_policy = policy)
     mixed <- mixed[order(mixed$transcript_index, mixed$cds), ]
     expect_equal(mixed$cds, c("AAAAAAAAAAAA", "AAGAAAAAAAAA", "TTTTTTTTTCTT", "TTTTTTTTTTTT"))
@@ -663,7 +663,7 @@ local({
     "ELSE ['1|1','0|1','.','.|1','0|0'][s.i+1] END gt FROM",
     "(VALUES (1,107,repeat('A',38),['C']),(2,147,'A',['G']))",
     "v(event_index,position,reference,alternates) CROSS JOIN mixed_tx CROSS JOIN range(5) s(i)")
-  unmapped <- rduckvep_haplotypes(con, unmapped_calls, "mixed", "vep116_compat",
+  unmapped <- rduckvep_haplotypes(con, unmapped_calls, "mixed", "vep_compat",
     input_mode = "source_records", max_leaf_edits = 1)
   expect_equal(nrow(unmapped), 12L)
   expect_equal(sum(unmapped$carrier_count), 20L)
@@ -683,7 +683,7 @@ local({
   }
   mismatch <- paste("SELECT * REPLACE(CASE WHEN event_index=1 THEN 'C'||repeat('A',37)",
     "ELSE reference END AS reference) FROM (", unmapped_calls, ")")
-  mismatch <- rduckvep_haplotypes(con, mismatch, "mixed", "vep116_compat", input_mode = "source_records")
+  mismatch <- rduckvep_haplotypes(con, mismatch, "mixed", "vep_compat", input_mode = "source_records")
   expect_equal(sum(mismatch$carrier_count[is.na(mismatch$cds)]), 16L)
   expect_equal(sum(mismatch$carrier_count[mismatch$projection_status == "reference_mismatch"]), 16L)
   decoded <- paste("SELECT *,alternates[1] alternate,1 alt_index,[1,1] alleles,",
@@ -711,7 +711,7 @@ local({
   expect_equal(nrow(restored$contributors[[1]]), 3L)
   identical_indels <- paste("SELECT * REPLACE('AA' AS alternate) FROM (", indels,
     ") WHERE event_index=1 UNION ALL SELECT * FROM (", indels, ") WHERE event_index=2")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     identity <- rduckvep_haplotypes(con, identical_indels, "haps", phase_policy = policy)
     expect_equal(identity$cds, "AAAAAAAAAAAA")
     expect_equal(identity$edit_count, 2)
@@ -745,7 +745,7 @@ local({
     "FROM (VALUES (1,0,102,'GGGT','G'),(2,0,109,'GCT','GGT'),(3,0,111,'T','TGCT'),",
     "(11,1,229,'CACC','C'),(12,1,224,'AGC','ACC'),(13,1,223,'C','CAGC'))",
     "v(event_index,transcript_index,position,reference,alternate) ORDER BY position DESC")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     result <- rduckvep_haplotypes(con, restore_calls, "restore", policy, max_leaf_edits = 3)
     expect_equal(nrow(result), 2L)
     expect_equal(result$cds, rep("ATGGGTGGTGCTGATGATGCTGATGCTGATGGTTAA", 2L))
@@ -781,7 +781,7 @@ local({
     "t.transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set",
     "FROM (VALUES (17,100,'AAAAAAAA','CACAAAAC'),(19,101,'A','G'),(18,104,'A','G'))",
     "e(event_index,position,reference,alternate) CROSS JOIN (VALUES (0),(1)) t(transcript_index)")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     islands <- rduckvep_haplotypes(con, island_calls, "islands", phase_policy = policy, max_leaf_edits = 5)
     islands <- islands[order(islands$transcript_index), ]
     expect_equal(islands$edit_count, c(5, 5))
@@ -816,7 +816,7 @@ local({
   after_frame_calls <- paste("SELECT event_index,0 seq_region,position,reference,alternate,1 alt_index,",
     "0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set",
     "FROM (VALUES (1,103,'A','AC'),(2,104,'AA','A')) v(event_index,position,reference,alternate)")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     after_frame <- rduckvep_haplotypes(con, after_frame_calls, "stops", phase_policy = policy)
     expect_equal(after_frame$cds, "ATGACATAACCC")
     expect_equal(after_frame$protein, "MT*")
@@ -847,7 +847,7 @@ local({
     "transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set",
     "FROM (VALUES (1,0,19,'G','GT'),(2,0,49,'CG','C'),(3,1,150,'AC','A'),(4,1,181,'G','GA'))",
     "v(event_index,transcript_index,position,reference,alternate)")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     early <- rduckvep_haplotypes(con, early_calls, "early_stop", phase_policy = policy)
     early <- early[order(early$transcript_index), ]
     expect_equal(early$protein, c("MGLS*", "MGLS*"))
@@ -908,7 +908,7 @@ local({
     "0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set FROM (", views_tx, ")")
   for (workers in c(1L, 4L)) {
     dbExecute(con, paste("SET threads=", workers))
-    for (policy in c("strict", "vep116_compat")) {
+    for (policy in c("strict", "vep_compat")) {
       views <- rduckvep_haplotypes(con, views_calls, "reference_views", phase_policy = policy)
       views <- views[order(views$transcript_index), ]
       expect_equal(views$cds, c("ATGACNTAA", "ATGACCTAA"))
@@ -972,7 +972,7 @@ local({
   expect_equal(n_codon_independent$event_index, n_codon_source$i)
   expect_identical(n_codon_independent$consequences, n_codon_expected_so)
   expect_identical(n_codon_independent$protein_hgvs, n_codon_expected_independent)
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     n_codon_singletons <- rduckvep_haplotypes(con, n_codon_calls, "n_codon_witnesses",
       phase_policy = policy, hgvs = TRUE)
     n_codon_singletons <- n_codon_singletons[order(n_codon_singletons$transcript_index), ]
@@ -1032,7 +1032,7 @@ local({
   expect_equal(independent$event_index, n_indel_source$i)
   expect_identical(independent$consequences, n_indel_expected_so)
   expect_identical(independent$protein_hgvs, n_indel_expected_hgvs)
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     for (raw in c(FALSE, TRUE)) {
       n_indel_query <- if (raw) paste("SELECT i event_index,i seq_region,position,reference,",
         "[alternate] alternates,i transcript_index,0 sample_index,'1|1' gt FROM n_indel_source") else
@@ -1088,7 +1088,7 @@ local({
     ref_slot_query <- paste0("SELECT * EXCLUDE(alternate),[", selected_alt,
       "] alternates,'%s' gt FROM ref_slot_source")
     ref_slots <- rduckvep_haplotypes(con, sprintf(ref_slot_query, "|0|0"),
-      "n_indel_witnesses", "vep116_compat", input_mode = "source_records", hgvs = TRUE)
+      "n_indel_witnesses", "vep_compat", input_mode = "source_records", hgvs = TRUE)
     ref_slots <- ref_slots[order(ref_slots$transcript_index), ]
     expect_equal(ref_slots$transcript_index, 4:5)
     expect_identical(ref_slots$cds, c("ATGGCNGCCTAA", "ATGGCTGCCTAA"))
@@ -1101,7 +1101,7 @@ local({
     expect_equal(vapply(ref_slots$contributors, nrow, 0L), c(0L, 0L))
 
     mixed_slots <- rduckvep_haplotypes(con, sprintf(ref_slot_query, "0|1"),
-      "n_indel_witnesses", "vep116_compat", input_mode = "source_records", hgvs = TRUE)
+      "n_indel_witnesses", "vep_compat", input_mode = "source_records", hgvs = TRUE)
     lanes <- vapply(mixed_slots$carriers, function(x) x$haplotype_lane[1L], 0L)
     mixed_slots <- mixed_slots[order(mixed_slots$transcript_index, lanes), ]
     expect_equal(mixed_slots$transcript_index, c(4L, 4L, 5L, 5L))
@@ -1114,13 +1114,13 @@ local({
       function(x) x$alt_index[1L], 0), c(1L, 1L))
 
     alt_slots <- rduckvep_haplotypes(con, sprintf(ref_slot_query, "1|1"),
-      "n_indel_witnesses", "vep116_compat", input_mode = "source_records")
+      "n_indel_witnesses", "vep_compat", input_mode = "source_records")
     expect_equal(nrow(alt_slots), 2L)
     expect_identical(alt_slots$sequence_status, rep("conditional", 2L))
     expect_equal(alt_slots$carrier_count, c(2L, 2L))
     expect_equal(vapply(alt_slots$contributors, function(x) x$alt_index[1L], 0), c(1L, 1L))
     omitted <- rduckvep_haplotypes(con, sprintf(ref_slot_query, "0|0"),
-      "n_indel_witnesses", "vep116_compat", input_mode = "source_records")
+      "n_indel_witnesses", "vep_compat", input_mode = "source_records")
     expect_equal(nrow(omitted), 0L)
   }
 
@@ -1128,7 +1128,7 @@ local({
   raw_one_slot <- rduckvep_haplotypes(con, paste(
     "SELECT i event_index,i seq_region,position,reference,[alternate] alternates,",
     "i transcript_index,0 sample_index,'1' gt FROM n_indel_source WHERE i=4"
-  ), "n_indel_witnesses", "vep116_compat", input_mode = "source_records")
+  ), "n_indel_witnesses", "vep_compat", input_mode = "source_records")
   raw_one_slot <- raw_one_slot[order(vapply(raw_one_slot$carriers,
     function(x) x$haplotype_lane[1L], 0L)), ]
   expect_identical(raw_one_slot$cds, c("ATGGCNGCCTAA", "ATGGCGCCTAA"))
@@ -1148,7 +1148,7 @@ local({
   wrong_skip_ref <- rduckvep_haplotypes(con, paste(
     "SELECT i event_index,i seq_region,position,'G' reference,[alternate] alternates,",
     "i transcript_index,0 sample_index,'1|1' gt FROM n_indel_source WHERE i=4"
-  ), "n_indel_witnesses", "vep116_compat", input_mode = "source_records")
+  ), "n_indel_witnesses", "vep_compat", input_mode = "source_records")
   expect_identical(wrong_skip_ref$projection_status, "reference_mismatch")
   expect_true(is.na(wrong_skip_ref$cds) && is.na(wrong_skip_ref$protein))
   expect_equal(wrong_skip_ref$carrier_count, 2L)
@@ -1162,7 +1162,7 @@ local({
   skipped_mixed <- rduckvep_haplotypes(con, paste(
     "SELECT event_index,4 seq_region,position,reference,[alternate] alternates,",
     "4 transcript_index,0 sample_index,'1|1' gt FROM n_skipped_mixed"
-  ), "n_indel_witnesses", "vep116_compat", input_mode = "source_records", hgvs = TRUE,
+  ), "n_indel_witnesses", "vep_compat", input_mode = "source_records", hgvs = TRUE,
     max_leaf_edits = 1)
   expect_equal(nrow(skipped_mixed), 1L)
   expect_identical(skipped_mixed$cds, "ATGGCNGACTAA")
@@ -1207,7 +1207,7 @@ local({
     "CASE transcript_index WHEN 5 THEN 'T' ELSE 'C' END AS reference,",
     "CASE transcript_index WHEN 5 THEN 'C' ELSE 'T' END alternate,1 alt_index,transcript_index,",
     "0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set FROM (", p_tx, ")")
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     p <- rduckvep_haplotypes(con, p_calls, "reference_proteins", phase_policy = policy)
     p <- p[order(p$transcript_index), ]
     expect_equal(p$protein, c("LA*", "M*", "MA*", "MAW", "LA*", ""))
@@ -1250,7 +1250,7 @@ local({
     pattern = "protein difference status 4, max_leaf_differences=1, required=2")
   p_raw <- paste("SELECT event_index,seq_region,position,reference,[alternate] alternates,",
     "transcript_index,sample_index,'.' gt FROM (", p_calls, ")")
-  p_missing <- rduckvep_haplotypes(con, p_raw, "reference_proteins", "vep116_compat",
+  p_missing <- rduckvep_haplotypes(con, p_raw, "reference_proteins", "vep_compat",
     input_mode = "source_records")
   p_missing <- p_missing[order(p_missing$transcript_index), ]
   expect_equal(p_missing$protein, c("MA*", "MUA*", "MAW*", "MAW*", "MA", ""))
@@ -1259,7 +1259,7 @@ local({
   expect_true(all(vapply(p_missing$protein_differences[1:5], nrow, 1L) == 0L))
   expect_true(is.null(p_missing$protein_differences[[6L]]))
   p_retained <- rduckvep_haplotypes(con, sub("'.' gt", "'0|1' gt", p_raw, fixed = TRUE),
-    "reference_proteins", "vep116_compat", input_mode = "source_records", hgvs = TRUE)
+    "reference_proteins", "vep_compat", input_mode = "source_records", hgvs = TRUE)
   p_retained <- p_retained[vapply(p_retained$carriers, function(x) 1L %in% x$haplotype_lane, TRUE), ]
   p_retained <- p_retained[order(p_retained$transcript_index), ]
   expect_equal(p_retained$protein, c("LA*", "M*", "MA*", "MAW", "LA*", ""))
@@ -1285,7 +1285,7 @@ local({
     "CASE e.i WHEN 1 THEN ['C'] ELSE ['T'] END alternates,transcript_index,s.i sample_index,",
     "CASE WHEN s.i=0 THEN CASE e.i WHEN 1 THEN '.' ELSE '0|1' END WHEN s.i=1 THEN '0|0'",
     "ELSE CASE e.i WHEN 1 THEN '1|1' ELSE '0|0' END END gt FROM route_tx,range(1,3) e(i),range(3) s(i)")
-  routes <- rduckvep_haplotypes(con, route_calls, "intronic_routes", "vep116_compat",
+  routes <- rduckvep_haplotypes(con, route_calls, "intronic_routes", "vep_compat",
     input_mode = "source_records")
   routes <- routes[vapply(routes$carriers, function(x) 0 %in% x$sample_index, TRUE), ]
   expect_equal(nrow(routes), 12L)
@@ -1309,7 +1309,7 @@ local({
   expect_equal(dbGetQuery(con, "SELECT count(*) n FROM hap_output")$n, 3)
   expect_equal(dbGetQuery(con, "SELECT sum(len(coding_blocks)) n FROM hap_output")$n, 3)
   expect_error(rduckvep_haplotypes(con, calls, "haps", table_name = "hap_output"))
-  rduckvep_haplotypes(con, calls, "haps", "vep116_compat", table_name = "hap_output", overwrite = TRUE)
+  rduckvep_haplotypes(con, calls, "haps", "vep_compat", table_name = "hap_output", overwrite = TRUE)
   expect_equal(dbGetQuery(con, "SELECT count(*) n FROM hap_output")$n, 2)
   expect_equal(dbGetQuery(con, "SELECT 42 n")$n, 42L)
 })
@@ -1343,7 +1343,7 @@ local({
     "v(k,j,p,ref,alt) ON transcript_index%3=k"))
   expected <- rep(c("p.(Ala4_Ala5insAsp)", "p.[(Arg2_His3delinsProAla;Tyr5His)]",
     "p.[(Gly2del;Ala4CysfsTer2)]"), 2L)
-  for (policy in c("strict", "vep116_compat")) {
+  for (policy in c("strict", "vep_compat")) {
     result <- rduckvep_haplotypes(con, "SELECT * FROM protein_calls ORDER BY position DESC",
       "protein", phase_policy = policy, hgvs = TRUE)
     result <- result[order(result$transcript_index), ]
@@ -1359,7 +1359,7 @@ local({
   one <- "SELECT * FROM protein_calls WHERE transcript_index=0"
   source_calls <- paste("SELECT event_index,seq_region,position,reference,[alternate] alternates,",
     "transcript_index,sample_index,'1|1' gt FROM protein_calls")
-  raw <- rduckvep_haplotypes(con, source_calls, "protein", "vep116_compat",
+  raw <- rduckvep_haplotypes(con, source_calls, "protein", "vep_compat",
     input_mode = "source_records", hgvs = TRUE)
   raw <- raw[order(raw$transcript_index), ]
   expect_identical(raw$hgvsp, expected)

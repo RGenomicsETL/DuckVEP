@@ -9,7 +9,7 @@ void duckhts_test_vep116_raw_gt(char **gt, int *alt_count, int *count,
     int *first, int *second) {
     for (int i = 0; i < *count; i++) {
         duckvep_raw_gt_t parsed;
-        status[i] = duckvep_phase_parse_vep116_raw((const uint8_t *)gt[i], strlen(gt[i]),
+        status[i] = duckvep_phase_parse_vep_raw((const uint8_t *)gt[i], strlen(gt[i]),
             (uint32_t)alt_count[i], &parsed);
         disposition[i] = parsed.disposition;
         ploidy[i] = parsed.source_ploidy;
@@ -88,7 +88,7 @@ void duckhts_test_raw_phase_haplotypes(char **reference, int *genomic_start,
         for (int record = 0; record < 2 && status == DUCKVEP_HAPLOTYPE_STREAM_OK; record++) {
             duckvep_raw_gt_t parsed;
             const char *raw = gt[(size_t)profile * 2u + (size_t)record];
-            if (duckvep_phase_parse_vep116_raw((const uint8_t *)raw, strlen(raw),
+            if (duckvep_phase_parse_vep_raw((const uint8_t *)raw, strlen(raw),
                     (uint32_t)alt_counts[record], &parsed) != DUCKVEP_RAW_GT_OK) {
                 status = DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG;
                 break;

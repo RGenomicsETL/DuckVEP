@@ -1,10 +1,19 @@
 # DuckVEP
 
-## Haplotype policy `duckvep-coding-v2`: a wider domain (issue #12)
+## Wider haplotype domain (issue #12)
 
-- Whole-haplotype prediction now covers complete phased calls of any ploidy (haploid chrX, chrY and MT calls included), literal alleles longer than 50 bases, and transcripts in any supported genetic code. v1 refused these with `non_diploid_call`, `allele_over_50_bases` and `non_standard_codon_table`. The classifier is unchanged: every path v1 predicted has the same output, apart from `prediction_policy`, which now reads `duckvep-coding-v2`.
+- Whole-haplotype prediction covers complete phased calls of any ploidy (haploid chrX, chrY and MT calls included), literal alleles of any length, and transcripts in any supported genetic code. These were refused as `non_diploid_call`, `allele_over_50_bases` and `non_standard_codon_table`; the classifier itself is unchanged. On HG002 one of 157,986 paths changes: a 94-base insertion that was refused is now a frameshift with a gained stop.
 - Start and stop tests follow the transcript's genetic code. The standard code keeps the ATG start rule; another code accepts any of its start codons, and a change between two start codons is not a peptide change.
-- Checked by a metamorphic test (each lane of haploid, triploid and tetraploid calls equals the diploid lane with the same edits), a hand-derived 51-base insertion, and four edits read under NCBI table 2 against a standard-code control. The contract's section 2a records the rules and what #12 still leaves out.
+- Checked by a metamorphic test (each lane of haploid, triploid and tetraploid calls equals the diploid lane with the same edits), a hand-derived 51-base insertion, and four edits read under NCBI table 2 against a standard-code control.
+
+## One name per policy
+
+- The haplotype policy is `duckvep-coding`, the NMD rule is `ejc50` and the VEP-compatible phase policy is `vep_compat`. The version suffixes (`duckvep-coding-v1`, `ejc50-v1`) and the release-named value `vep116_compat` are gone; there is no alias.
+
+## Conformance fuzzing to 100 bases
+
+- The random-allele generator (`generate_witnesses.R --max-random-length`) defaults to 100 bases, and the differential runner admits alleles of 101 bases (100 plus the VCF anchor). Two campaigns of 30,268 alleles each (seeds 173 and 29, about 15,100 alleles over 50 bases in each) agree exactly with executable VEP 116 on consequences, and every HGVS string matches or is absent on both sides.
+- The runner loads a DuckHTS build next to DuckVEP for its VCF, GFF and FASTA readers (`DUCKVEP_READER_EXT`), since DuckVEP no longer ships inside DuckHTS.
 
 ## Model snapshots
 
@@ -14,10 +23,6 @@
 ## v2 host: full-chunk writers (issue #48)
 
 - `duckvep_haplotype_scan` and `duckvep_coding_calls` emit full chunks on the v2 host instead of one row per chunk. The host layer opens each list child once per call and grows it as later rows extend the list; the shared core is unchanged. HG002 (157,986 rows, one core): the scan takes 2.3 s instead of 12.2 to 12.8 s, and the stages total 8.0 s against v1's 7.95 s, with the same rows and checksum.
-
-## Release-neutral phase policy
-
-- `phase_policy` takes `'vep_compat'`, the called-slot order of the pinned executable VEP release (today 116). `'vep116_compat'` is still accepted as its older spelling and selects the same profile. Both hosts and `duckvep_haplotype_load_sql` parse the option through one function, and error messages name `'vep_compat'`.
 
 ## Coexistence with DuckHTS
 

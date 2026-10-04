@@ -214,7 +214,7 @@ run <- function() {
           'alternate,1 alt_index,[1,1] alleles,[true,true] phase_before,NULL::BIGINT phase_set' else
           "[alternate] alternates,'1|1' gt",'FROM events WHERE scene=',scene)
       select <- paste0('SELECT * FROM duckvep_haplotypes(',q(calls),",'anchor',hgvs:=true,phase_policy:=",
-        q(if (route=='strict') 'strict' else 'vep116_compat'),',input_mode:=',
+        q(if (route=='strict') 'strict' else 'vep_compat'),',input_mode:=',
         q(if (route=='strict') 'alt_events' else route),')')
       dbExecute(con,paste(if (scene==1L) paste('CREATE TABLE',table,'AS') else paste('INSERT INTO',table),select))
     }

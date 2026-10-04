@@ -1,12 +1,11 @@
 # Rduckvep
 
-- `rduckvep_haplotypes()` predicts under `duckvep-coding-v2`: complete phased calls of any ploidy, alleles of any length and
-  transcripts in any supported genetic code are in the domain; `prediction_policy` reports the new name.
+- `rduckvep_haplotypes()` covers complete phased calls of any ploidy, alleles of any length and transcripts in any supported
+  genetic code. The policy is reported as `duckvep-coding`, the NMD rule as `ejc50`, and the VEP-compatible phase policy is
+  `phase_policy = "vep_compat"`.
 
 - `rduckvep_save_model()` and `rduckvep_restore_model()` wrap the native model snapshots: a restored model is mapped from its file, loads
   several times faster than from relations, and is shared in memory between R sessions that restore the same file.
-
-- `rduckvep_haplotypes()` takes `phase_policy = "vep_compat"` for the pinned executable VEP release; `"vep116_compat"` is still accepted.
 
 - The webR build keeps its bundled HTSlib, zlib and cgranges private: the side module exports only the DuckDB entry point, so it can be
   loaded next to Rduckhts, which carries its own HTSlib.
@@ -34,7 +33,7 @@
   `rduckvep_prepare_structural_hgvs()` wrap the native BND identity, endpoint-gene
   and structural HGVS builders. No parsing or HGVS logic lives in R.
 - `rduckvep_haplotypes()` adds versioned `prediction_policy`, `prediction_status` and
-  `prediction_reason` (`duckvep-coding-v1` eligibility only; no SO/IMPACT/NMD yet),
+  `prediction_reason` (`duckvep-coding` eligibility only; no SO/IMPACT/NMD yet),
   keyed `carrier_predictions`, `contributor_provenance` and `normalized_edits`. Existing
   columns are unchanged and `nominal_length_diff` stays last.
 - The same-codon classifier (coding-v1 slice 3) adds `haplotype_consequences` and `haplotype_impact`
@@ -58,7 +57,7 @@
   `eligible_classifier_pending` and the reason `start_stop_classifier_pending` no longer occurs. Contributor
   `role` is now assigned per edit: an edit that starts after the first stop is `post_stop` even when it shares an
   interaction block with an earlier edit (a restoring deletion after an early stop was `applied`).
-- NMD attribution (coding-v1 slice 6, rule `ejc50-v1`) adds `nmd_rule`, `nmd_prediction`, `nmd_stop_position`,
+- NMD attribution (coding-v1 slice 6, rule `ejc50`) adds `nmd_rule`, `nmd_prediction`, `nmd_stop_position`,
   `nmd_junction_position` and `nmd_contributors` to `rduckvep_haplotypes()` (before `nominal_length_diff`, which stays
   last), and `nmd_prediction`, `nmd_stop_position` and `nmd_junction_position` to each `carrier_predictions` row. For a newly
   premature stop (`stop_gained`) the prediction is `trigger` when J - S > 50 and `escape` otherwise, with S the final

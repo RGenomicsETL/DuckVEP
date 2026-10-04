@@ -77,7 +77,7 @@ main <- function() {
     FROM (SELECT record_index,POS,REF,ALT,unnest(calls) c FROM read_geno(',
     q(normalizePath(file.path(out, 'calls.vcf'))), ',raw_gt:=true))')
   native_query <- paste0('SELECT * FROM duckvep_haplotypes(', q(calls),
-    ",'grouped',input_mode:='source_records',phase_policy:='vep116_compat')")
+    ",'grouped',input_mode:='source_records',phase_policy:='vep_compat')")
   writeLines(native_query, file.path(out, 'native_query.sql'))
   actual <- DBI::dbGetQuery(con, native_query)
   saveRDS(actual, file.path(out, 'actual.rds'))

@@ -85,24 +85,16 @@ ORDER BY a.input_slot
 query IIITT
 SELECT a.input_slot, a.haplotype_lane, a.phase_set, a.phase_scope, a.status
 FROM (SELECT unnest(duckvep_phase_call([0,1,NULL], [false,false,false],
-                                    {phase_set: 42, phase_policy: 'vep116_compat'})) a)
+                                    {phase_set: 42, phase_policy: 'vep_compat'})) a)
 ORDER BY a.input_slot
 ----
 1	1	NULL	allele_slot	called
 2	2	NULL	allele_slot	called
 3	NULL	NULL	allele_slot	missing
 
-# 'vep_compat' names the pinned executable VEP release; 'vep116_compat' is its older spelling.
-query II
-SELECT duckvep_phase_call([NULL,1,NULL,2], NULL, {phase_policy: 'vep_compat'}) =
-       duckvep_phase_call([NULL,1,NULL,2], NULL, {phase_policy: 'vep116_compat'}),
-       duckvep_phase_call([NULL,1,NULL,2], NULL, {phase_policy: 'vep_compat'}) =
-       duckvep_phase_call([NULL,1,NULL,2], NULL, {phase_policy: 'strict'})
-----
-true	false
-
+# 'vep_compat' is the only compatibility policy name; anything else is refused.
 statement error
-SELECT duckvep_phase_call([0,1], NULL, {phase_policy: 'vep117_compat'})
+SELECT duckvep_phase_call([0,1], NULL, {phase_policy: 'vep116_compat'})
 ----
 phase_policy must be 'strict' or 'vep_compat'
 
@@ -110,7 +102,7 @@ phase_policy must be 'strict' or 'vep_compat'
 query IIT
 SELECT a.input_slot, a.haplotype_lane, a.status
 FROM (SELECT unnest(duckvep_phase_call([NULL,1,NULL,2], NULL,
-                                    {phase_policy: 'vep116_compat'})) a)
+                                    {phase_policy: 'vep_compat'})) a)
 ORDER BY a.input_slot
 ----
 1	NULL	missing
@@ -164,7 +156,7 @@ WITH inputs AS (
  FROM range(5000) r(i)
 ), prepared AS (
  SELECT i, unnest(duckvep_phase_call(gt, phased, {phase_set: i,
-      phase_policy: CASE WHEN i%2=0 THEN 'vep116_compat' ELSE 'strict' END})) a FROM inputs
+      phase_policy: CASE WHEN i%2=0 THEN 'vep_compat' ELSE 'strict' END})) a FROM inputs
 )
 SELECT count(*), count(*) FILTER (WHERE a.status='missing'),
        count(*) FILTER (WHERE a.phase_scope='all_phase_sets') FROM prepared

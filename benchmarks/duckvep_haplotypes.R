@@ -139,7 +139,7 @@ sql <- function(job, input) {
     max_hgvs_reference_bytes = 16384)
   query <- paste0("CREATE OR REPLACE TABLE measured AS SELECT * FROM duckvep_haplotypes(",
     q(if (records) "SELECT * FROM source_records" else "SELECT * FROM calls"), ",'bench',",
-    if (records) "input_mode:='source_records',phase_policy:='vep116_compat'," else "",
+    if (records) "input_mode:='source_records',phase_policy:='vep_compat'," else "",
     if (hgvs) "hgvs:=true," else "",
     paste(names(limits), ":=", limits, collapse = ","), ")")
   DBI::dbExecute(con, query) # Full warm-up, including the mandatory internal sort.

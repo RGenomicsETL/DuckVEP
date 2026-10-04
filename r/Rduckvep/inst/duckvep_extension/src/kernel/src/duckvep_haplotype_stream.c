@@ -269,7 +269,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_project(
     p->transcript_index = tx;
     memset(&p->edit, 0, sizeof(p->edit));
     p->status = stored->source.source_record
-        ? duckvep_compat_vep116_source_cds_edit_build(model, s->exons, s->sequences,
+        ? duckvep_compat_vep_source_cds_edit_build(model, s->exons, s->sequences,
             tx, model->strand[tx], &allele, &p->edit)
         : duckvep_cds_edit_build_prepared_allele(model, s->exons, s->sequences,
             tx, model->strand[tx], &allele, UINT32_MAX, &p->edit);
@@ -369,7 +369,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_call(
         !call || !call->alleles || !call->ploidy || !call->alt_index ||
         call->alt_index > INT32_MAX || call->phase_set.present > 1u ||
         s->buffers.events[s->current_event].source.source_record ||
-        (call->policy != DUCKVEP_PHASE_STRICT && call->policy != DUCKVEP_PHASE_VEP116_COMPAT) ||
+        (call->policy != DUCKVEP_PHASE_STRICT && call->policy != DUCKVEP_PHASE_VEP_COMPAT) ||
         (s->have_phase_policy && s->phase_policy != call->policy) ||
         (set_count && !sets) || set_count > SIZE_MAX / sizeof(*sets) ||
         !find_projection(s, &s->buffers.events[s->current_event], tx))
@@ -383,7 +383,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_call(
             return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
         if (same_phase_set(sets[i], call->phase_set)) declared_set = i;
     }
-    if (call->policy == DUCKVEP_PHASE_VEP116_COMPAT &&
+    if (call->policy == DUCKVEP_PHASE_VEP_COMPAT &&
         (set_count != 1u || sets[0].present))
         return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
 
@@ -421,7 +421,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_call(
             return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INTERNAL_ERROR);
         if (allele >= 0) called_before++;
         uint8_t evidence = 0u;
-        if (call->policy == DUCKVEP_PHASE_VEP116_COMPAT) {
+        if (call->policy == DUCKVEP_PHASE_VEP_COMPAT) {
             if (allele < 0) continue; /* Missing slots do not consume compacted lanes. */
             if (missing) evidence = DUCKVEP_CARRIER_MISSING;
             if (allele == (int32_t)call->alt_index) evidence |= DUCKVEP_CARRIER_CALLED;
@@ -435,7 +435,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_call(
             evidence = DUCKVEP_CARRIER_CALLED;
         }
         if (!evidence) continue;
-        size_t first = broadcast || call->policy == DUCKVEP_PHASE_VEP116_COMPAT ? 0u : declared_set;
+        size_t first = broadcast || call->policy == DUCKVEP_PHASE_VEP_COMPAT ? 0u : declared_set;
         size_t end = broadcast ? set_count : first + 1u;
         for (size_t i = first; i < end; i++) {
             duckvep_haplotype_stream_status_t status = push_call_lane(s, tx, call, sets[i],
@@ -445,7 +445,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_call(
     }
     /* Compaction loses the original missing slot positions, not their evidence.
      * Include the remaining lanes so an all-missing GT is never implicit REF. */
-    if (call->policy == DUCKVEP_PHASE_VEP116_COMPAT && missing) {
+    if (call->policy == DUCKVEP_PHASE_VEP_COMPAT && missing) {
         for (uint32_t lane = (uint32_t)called_before + 1u; lane <= call->ploidy; lane++) {
             duckvep_haplotype_stream_status_t status = push_call_lane(s, tx, call, absent,
                 (uint16_t)lane, DUCKVEP_CARRIER_MISSING, 0u);
@@ -464,7 +464,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
         !call || !call->source_ploidy || call->source_has_missing > 1u || source_selected > 1u ||
         call->disposition < DUCKVEP_RAW_GT_OMITTED_REFERENCE ||
         call->disposition > DUCKVEP_RAW_GT_RETAINED ||
-        (s->have_phase_policy && s->phase_policy != DUCKVEP_PHASE_VEP116_RAW))
+        (s->have_phase_policy && s->phase_policy != DUCKVEP_PHASE_VEP_RAW))
         return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
     const duckvep_haplotype_stored_event_t *event = &s->buffers.events[s->current_event];
     duckvep_haplotype_projection_t *projection = find_projection(s, event, tx);
@@ -484,7 +484,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
                call->source_has_missing != (call->disposition == DUCKVEP_RAW_GT_OMITTED_EMPTY)) {
         return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
     }
-    s->phase_policy = DUCKVEP_PHASE_VEP116_RAW;
+    s->phase_policy = DUCKVEP_PHASE_VEP_RAW;
     s->have_phase_policy = 1u;
     uint32_t allele = event->source.allele_index;
     if (call->disposition == DUCKVEP_RAW_GT_OMITTED_REFERENCE) return DUCKVEP_HAPLOTYPE_STREAM_OK;
@@ -608,14 +608,14 @@ static duckvep_haplotype_stream_status_t prepare_reference_protein(
     return DUCKVEP_HAPLOTYPE_STREAM_OK;
 }
 
-/* ---- coding-v1 eligibility (slice 2): status/reason only, no classifier ---- */
+/* ---- eligibility: status/reason only, no classifier ---- */
 
 static int stop_codon(const uint8_t *c) {
     uint8_t a = c[0] & 0xDFu, b = c[1] & 0xDFu, d = c[2] & 0xDFu;
     return a == 'T' && ((b == 'A' && (d == 'A' || d == 'G')) || (b == 'G' && d == 'A'));
 }
 
-/* Start and stop codons under the transcript's genetic code. The standard code keeps coding-v1's
+/* Start and stop codons under the transcript's genetic code. The standard code requires the
  * canonical ATG start; another code has no single canonical start, so any start codon of that code
  * counts (vertebrate mitochondrial transcripts begin with ATA, ATT or GTG as well as ATG). */
 static int start_codon_of(const uint8_t *c, duckvep_codon_table_t table) {
@@ -696,7 +696,7 @@ static duckvep_prediction_reason_t edit_relation(const duckvep_haplotype_edit_t 
     return overlap;
 }
 
-/* Whole-haplotype classifier (coding-v1 slices 3 to 5). Runs only on a path that is inside the supported
+/* Whole-haplotype classifier. Runs only on a path that is inside the supported
  * domain. It classifies the whole edited peptide against the uncurated reference peptide, never an edit
  * alone. The decision follows the translated sequence of the edited CDS, not the nominal net frame offset
  * of its edits, in this order:
@@ -739,7 +739,7 @@ static int same_peptide(const duckvep_haplotype_stream_t *s, const duckvep_haplo
         !memcmp(leaf->reference_coding_protein + 1, s->buffers.protein + 1, ref_n - 1u);
 }
 
-/* ejc50-v1 (coding-v1 slice 6), decided on the edited spliced transcript of the shared path and never per
+/* ejc50, decided on the edited spliced transcript of the shared path and never per
  * allele. The 5' UTR is not edited (only CDS edits are applied), so the edited stop sits at the CDS cDNA origin
  * plus its edited CDS offset, and the penultimate exon's last base moves by the length change of every edit
  * that starts at or before it: indels upstream and inside that exon shift J, indels after it (the last exon)
@@ -1032,9 +1032,8 @@ void duckvep_haplotype_carrier_prediction(const duckvep_haplotype_leaf_t *leaf,
         *status = DUCKVEP_PREDICTION_INCOMPLETE_INPUT;
         *reason = DUCKVEP_REASON_CROSS_PS_UNRESOLVED;
     }
-    /* coding-v2: a lane of a complete, phased call is one haplotype whatever the call's ploidy (a haploid
-     * call has one lane and nothing to phase), so its prediction is the path's. coding-v1 refused every
-     * call that was not diploid. */
+    /* A lane of a complete, phased call is one haplotype whatever the call's ploidy (a haploid call has one
+     * lane and nothing to phase), so its prediction is the path's. */
 }
 
 duckvep_haplotype_stream_status_t duckvep_haplotype_stream_next(

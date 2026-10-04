@@ -1554,7 +1554,7 @@ static duckvep_cds_edit_status_t delta_source_cds_model_validate(
  * the selected raw allele: lowercase, U and N are skipped without mutation.
  * Empty ALT is the existing undefined-slot deletion. Symbolic alleles and
  * embedded dashes remain unsupported; this path never strips or coerces them. */
-static duckvep_cds_edit_status_t delta_vep116_source_alt_status(
+static duckvep_cds_edit_status_t delta_vep_source_alt_status(
     const uint8_t *alt, uint16_t length) {
     duckvep_cds_edit_status_t status = DUCKVEP_CDS_EDIT_OK;
     for (uint16_t i = 0u; i < length; i++) {
@@ -1567,7 +1567,7 @@ static duckvep_cds_edit_status_t delta_vep116_source_alt_status(
 }
 
 DUCKVEP_INTERNAL_API duckvep_cds_edit_status_t
-duckvep_compat_vep116_source_cds_edit_build(
+duckvep_compat_vep_source_cds_edit_build(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t *exons,
     const duckvep_sequence_pool_t *seq, size_t tx_idx,
@@ -1585,7 +1585,7 @@ duckvep_compat_vep116_source_cds_edit_build(
         event->ref_diff_offset || event->alt_diff_offset || event->feature_allele_offset)
         return DUCKVEP_CDS_EDIT_INVALID_EVENT;
     duckvep_cds_edit_status_t alt_status =
-        delta_vep116_source_alt_status(allele->alt, allele->alt_length);
+        delta_vep_source_alt_status(allele->alt, allele->alt_length);
     if (alt_status == DUCKVEP_CDS_EDIT_INVALID_ALLELE) return alt_status;
 
     const uint8_t *cds;
@@ -1661,7 +1661,7 @@ duckvep_compat_vep116_source_cds_edit_build(
 }
 
 DUCKVEP_INTERNAL_API duckvep_cds_edit_status_t
-duckvep_compat_vep116_outer_cds_edit_build(
+duckvep_compat_vep_outer_cds_edit_build(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t       *exons,
     const duckvep_sequence_pool_t    *seq,
@@ -5096,7 +5096,7 @@ duckvep_feature_substitution_context_fill(
  * VEP-116 consequence/HGVS view enters here.
  */
 duckvep_feature_substitution_result_t
-duckvep_compat_vep116_internal_gap_context_fill(
+duckvep_compat_vep_internal_gap_context_fill(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t       *exons,
     const duckvep_sequence_pool_t    *seq,
@@ -5142,7 +5142,7 @@ duckvep_compat_vep116_internal_gap_context_fill(
     if ((uint64_t)event->feature_end1 -
             (uint64_t)event->feature_start1 + 1u !=
             (uint64_t)feature_ref_len ||
-        duckvep_compat_vep116_outer_cds_edit_build(
+        duckvep_compat_vep_outer_cds_edit_build(
             transcripts, exons, seq, tx_idx, strand, event,
             feature_alt, (uint32_t)feature_alt_len, (int8_t)1, &edit) !=
             DUCKVEP_CDS_EDIT_OK) {
@@ -6425,7 +6425,7 @@ DUCKVEP_INTERNAL_API void duckvep_sequence_delta_fill_for_annotation_observed(
     {
         duckvep_feature_substitution_result_t feature_result;
 
-        feature_result = duckvep_compat_vep116_internal_gap_context_fill(
+        feature_result = duckvep_compat_vep_internal_gap_context_fill(
             transcripts, exons, seq, v, variant_idx, tx_idx, strand,
             scratch, prepared_event, context_out, delta);
         if (feature_result != DUCKVEP_FEATURE_SUBSTITUTION_NOT_APPLICABLE) {

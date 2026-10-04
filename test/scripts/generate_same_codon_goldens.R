@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Same-codon (coding-v1 slice 3) fixtures and goldens. Base R only: no DuckVEP code, no csq.
+# Same-codon fixtures and goldens. Base R only: no DuckVEP code, no csq.
 # One 24-codon coding transcript is laid out on both strands and in one-, two- and three-exon
 # genomic arrangements (codons that straddle an intron included). Every scenario is written in
 # transcript (cDNA) coordinates, mapped to genome VCF records, and its expected consequence is

@@ -116,7 +116,7 @@ static void haplotype_bind(duckdb_bind_info info) {
     valid = !value || (name && (!strcmp(name, "alt_events") || !strcmp(name, "source_records")));
     b->cfg.source_records = name && !strcmp(name, "source_records");
     duckdb_free(name); duckdb_destroy_value(&value);
-    if (!valid || (b->cfg.source_records && b->cfg.policy != DUCKVEP_PHASE_VEP116_COMPAT)) {
+    if (!valid || (b->cfg.source_records && b->cfg.policy != DUCKVEP_PHASE_VEP_COMPAT)) {
         duckdb_bind_set_error(info, "duckvep_haplotypes: input_mode must be 'alt_events' or 'source_records'; source_records requires phase_policy='vep_compat'");
         haplotype_bind_destroy(b); return;
     }
@@ -173,7 +173,7 @@ static void haplotype_bind(duckdb_bind_info info) {
     duckdb_bind_add_result_column(info, "hgvsp", string_type);
     duckdb_bind_add_result_column(info, "hgvsp_status", string_type);
     duckdb_destroy_logical_type(&string_type);
-    /* Slice 2 of the coding-v1 contract: eligibility and provenance only. */
+    /* eligibility and provenance only. */
     string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
     duckdb_bind_add_result_column(info, "prediction_policy", string_type);
     duckdb_bind_add_result_column(info, "prediction_status", string_type);
@@ -210,7 +210,7 @@ static void haplotype_bind(duckdb_bind_info info) {
     string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
     duckdb_bind_add_result_column(info, "haplotype_impact", string_type);
     duckdb_destroy_logical_type(&string_type);
-    /* Slice 6: ejc50-v1 NMD of the shared edited transcript (row summary; per carrier in carrier_predictions). */
+    /* Slice 6: ejc50 NMD of the shared edited transcript (row summary; per carrier in carrier_predictions). */
     string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
     duckdb_bind_add_result_column(info, "nmd_rule", string_type);
     duckdb_bind_add_result_column(info, "nmd_prediction", string_type);
