@@ -145,3 +145,94 @@ SELECT count(*) AS result_rows, count(*) FILTER (WHERE transcript_hgvs IS NOT NU
 FROM mt_result;
 ----
 248673	11027	64ed032e28ff0316a0a8c0ccb2411b0e
+
+# A snapshot of the model restores to the same arrays and the same annotation, reference FASTA included.
+query I
+SELECT duckvep_model_save('mt', '__TEST_DIR__/mt.dvsnap');
+----
+true
+
+query I
+SELECT duckvep_model_restore('mt_snapshot', '__TEST_DIR__/mt.dvsnap');
+----
+true
+
+query I
+SELECT _duckvep_model_fingerprint('mt') = _duckvep_model_fingerprint('mt_snapshot');
+----
+true
+
+statement ok
+DROP TABLE mt_result;
+
+statement ok
+CREATE TABLE mt_result AS
+SELECT a.event_index, a.transcript_index, a.regulation_feature_index, a.gene_index, a.consequence_mask,
+  a.region_mask, a.impact_code, a.status_code, a.reason_code, a.cdna_position, a.cds_position,
+  a.protein_position, a.reference_amino_acid_code, a.alternate_amino_acid_code,
+  a.nmd_prediction_code, a.nmd_escape_reasons, a.overlap_object_code, a.transcript_hgvs,
+  a.protein_hgvs, a.hgvs_shift, a.transcript_hgvs_status, a.transcript_hgvs_reason,
+  a.protein_hgvs_status, a.protein_hgvs_reason
+FROM query(duckvep_annotate_sql('mt_events', 'mt_snapshot', struct_pack(hgvs := true))) a;
+
+
+query IIT
+SELECT count(*) AS result_rows, count(*) FILTER (WHERE transcript_hgvs IS NOT NULL) AS with_hgvs,
+  md5(string_agg(concat_ws('|', event_index, coalesce(transcript_index, -1), coalesce(regulation_feature_index, -1), consequence_mask, region_mask,
+    impact_code, status_code, reason_code, coalesce(cdna_position, -1), coalesce(cds_position, -1), coalesce(protein_position, -1),
+    coalesce(transcript_hgvs, '~'), coalesce(protein_hgvs, '~'), coalesce(hgvs_shift, 0), coalesce(nmd_prediction_code, 0),
+    coalesce(protein_hgvs_status, '~')), chr(10) ORDER BY event_index, transcript_index NULLS FIRST, regulation_feature_index NULLS FIRST)) AS fingerprint
+FROM mt_result;
+----
+248673	11027	64ed032e28ff0316a0a8c0ccb2411b0e
+
+statement error
+SELECT duckvep_model_restore('mt_snapshot', '__TEST_DIR__/mt.dvsnap');
+----
+model name already exists
+
+statement error
+SELECT duckvep_model_save('no_such_model', '__TEST_DIR__/none.dvsnap');
+----
+unknown model name
+
+statement error
+SELECT duckvep_model_restore('missing', '__TEST_DIR__/missing.dvsnap');
+----
+cannot open the snapshot file
+
+# A file that is not a snapshot, and a snapshot with one changed byte, are refused.
+statement ok
+COPY (SELECT repeat('x', 8192) AS line) TO '__TEST_DIR__/garbage.dvsnap' (FORMAT csv, HEADER false, QUOTE '', ESCAPE '');
+
+statement error
+SELECT duckvep_model_restore('garbage', '__TEST_DIR__/garbage.dvsnap');
+----
+not a DuckVEP model snapshot
+
+statement ok
+COPY (SELECT content[:5000] || chr(1)::BLOB || content[5002:] AS content FROM read_blob('__TEST_DIR__/mt.dvsnap')) TO '__TEST_DIR__/damaged.dvsnap' (FORMAT blob);
+
+statement error
+SELECT duckvep_model_restore('damaged', '__TEST_DIR__/damaged.dvsnap');
+----
+checksum does not match
+
+statement ok
+COPY (SELECT content[:octet_length(content) - 64] AS content FROM read_blob('__TEST_DIR__/mt.dvsnap')) TO '__TEST_DIR__/short.dvsnap' (FORMAT blob);
+
+statement error
+SELECT duckvep_model_restore('short', '__TEST_DIR__/short.dvsnap');
+----
+truncated
+
+# The original may be dropped; the restored model keeps its own storage. A second restore shares the file.
+query II
+SELECT duckvep_model_drop('mt'), duckvep_model_restore('mt_again', '__TEST_DIR__/mt.dvsnap');
+----
+true	true
+
+query II
+SELECT duckvep_model_drop('mt_snapshot'), duckvep_model_drop('mt_again');
+----
+true	true

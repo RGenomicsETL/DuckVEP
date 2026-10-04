@@ -110,6 +110,11 @@ typedef struct duckvep_owned_model {
 	size_t cds_sequence_capacity;
 	size_t flank_sequence_capacity;
 	size_t interval_feature_capacity;
+	/* A model restored from a snapshot borrows its arrays from this storage (a read-only file
+	 * mapping, or one block where the platform has no mapping) instead of owning each one. */
+	void *snapshot_base;
+	size_t snapshot_bytes;
+	int snapshot_mapped;
 } duckvep_owned_model_t;
 
 /* Lifted-interval execution view of a model with wrapped circular objects
@@ -265,6 +270,9 @@ int duckvep_core_model_install(duckvep_registry_t *registry, const char *name,
 	const duckvep_model_sources_t *sources, const char *label,
 	char *final_error, size_t final_error_size);
 uint64_t duckvep_core_model_fingerprint(const duckvep_owned_model_t *model);
+/* Opens and checks the model's reference FASTA against its regions, as a relation load does. */
+int duckvep_core_model_validate_reference(const char *reference_fasta, duckvep_owned_model_t *model,
+	char *error, size_t error_size);
 void duckvep_model_entry_destroy(duckvep_model_entry_t *entry);
 duckvep_model_entry_t *duckvep_registry_find_locked(duckvep_registry_t *, const char *);
 

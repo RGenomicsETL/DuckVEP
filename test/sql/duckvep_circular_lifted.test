@@ -12234,3 +12234,24 @@ SELECT (SELECT count(*) FROM res_mix), (SELECT count(*) FROM res_mix_c), (SELECT
   (SELECT count(DISTINCT object) FROM res_mix);
 ----
 2474	1976	498	0	0	0	0	3
+
+# A model with origin-crossing objects survives a snapshot: the wrapped coordinates are found again at
+# restore, the lifted view is rebuilt, and annotation is identical.
+query II
+SELECT duckvep_model_save('circ_0', '__TEST_DIR__/circ_0.dvsnap'), duckvep_model_restore('circ_0_snapshot', '__TEST_DIR__/circ_0.dvsnap');
+----
+true	true
+
+query I
+SELECT _duckvep_model_fingerprint('circ_0') = _duckvep_model_fingerprint('circ_0_snapshot');
+----
+true
+
+query III
+SELECT (SELECT count(*) FROM query(duckvep_annotate_sql('ev_0', 'circ_0', struct_pack(hgvs := true, upstream_distance := 40, downstream_distance := 40)))) > 0,
+  (SELECT count(*) FROM (SELECT * FROM query(duckvep_annotate_sql('ev_0', 'circ_0', struct_pack(hgvs := true, upstream_distance := 40, downstream_distance := 40)))
+     EXCEPT SELECT * FROM query(duckvep_annotate_sql('ev_0', 'circ_0_snapshot', struct_pack(hgvs := true, upstream_distance := 40, downstream_distance := 40))))),
+  (SELECT count(*) FROM (SELECT * FROM query(duckvep_annotate_sql('ev_0', 'circ_0_snapshot', struct_pack(hgvs := true, upstream_distance := 40, downstream_distance := 40)))
+     EXCEPT SELECT * FROM query(duckvep_annotate_sql('ev_0', 'circ_0', struct_pack(hgvs := true, upstream_distance := 40, downstream_distance := 40)))));
+----
+true	0	0

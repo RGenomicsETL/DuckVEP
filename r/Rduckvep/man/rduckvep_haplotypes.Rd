@@ -23,7 +23,9 @@ rduckvep_haplotypes(
 
 \item{model_name}{Name of an already loaded DuckVEP model.}
 
-\item{phase_policy}{Strict GT/PS interpretation or VEP-116 called-slot order.
+\item{phase_policy}{Strict GT/PS interpretation, or `vep_compat` for the
+called-slot order of the pinned executable VEP release (`vep116_compat`
+is accepted as its older spelling).
 Decoded missing calls remain incomplete; source-record input uses the
 pinned raw parser and explicitly conditional missing-slot interpretation.}
 

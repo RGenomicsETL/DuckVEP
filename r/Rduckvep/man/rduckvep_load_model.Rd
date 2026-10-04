@@ -30,19 +30,19 @@ SELECT statements for the optional relations.}
 
 \item{reference_fasta}{Optional path of an indexed reference FASTA.}
 
-\item{transcript_coverage_complete}{Optional logical (\code{NA} is an error).}
+\item{transcript_coverage_complete}{Optional logical (`NA` is an error).}
 }
 \value{
-\code{TRUE}, invisibly, when the model is loaded.
+`TRUE`, invisibly, when the model is loaded.
 }
 \description{
 The v1 host runs the three (plus optional) relation queries on a private
-connection with \code{duckvep_model_load()}. The v2 host cannot: its model sink is
-a COPY format, so the same load is a sequence of \code{COPY} statements into
-staging followed by \code{duckvep_model_publish()}, and those statements come from
-\code{duckvep_model_load_sql()}. This function picks the host by what the loaded
+connection with `duckvep_model_load()`. The v2 host cannot: its model sink is
+a COPY format, so the same load is a sequence of `COPY` statements into
+staging followed by `duckvep_model_publish()`, and those statements come from
+`duckvep_model_load_sql()`. This function picks the host by what the loaded
 extension provides and hides the difference; the result is the same resident
-model. One visible difference remains: on v2 the queries run on \code{con} in its
+model. One visible difference remains: on v2 the queries run on `con` in its
 own transaction, so temporary tables and uncommitted rows are visible to
 them; on v1 the queries run on a separate connection and see only committed,
 permanent relations.

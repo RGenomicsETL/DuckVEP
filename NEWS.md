@@ -1,5 +1,10 @@
 # DuckVEP
 
+## Model snapshots
+
+- `duckvep_model_save(name, path)` writes a loaded model's native arrays to one file, and `duckvep_model_restore(name, path)` loads a model by mapping that file read-only. A relation load copies the model through the table scan, the sort, the materialized result and the native arrays; a restore copies nothing. Ensembl 116 GRCh38 (644,427 transcripts, one thread): 0.54 s and 1.3 GiB peak RSS, against 3.0 s and 3.4 to 5.2 GiB from relations, and the mapped pages are shared between processes that restore the same file.
+- A snapshot is validated, not trusted: header, section bounds and a checksum of every byte, the loaders' region and coordinate rules, the kernel's model validation and the reference FASTA check all run at restore. Wrapped circular models are lifted again. The mapped bytes are charged to the native budget. Both hosts share the code (`src/core/duckvep_core_snapshot.c`); platforms without file mapping read the file into one block.
+
 ## v2 host: full-chunk writers (issue #48)
 
 - `duckvep_haplotype_scan` and `duckvep_coding_calls` emit full chunks on the v2 host instead of one row per chunk. The host layer opens each list child once per call and grows it as later rows extend the list; the shared core is unchanged. HG002 (157,986 rows, one core): the scan takes 2.3 s instead of 12.2 to 12.8 s, and the stages total 8.0 s against v1's 7.95 s, with the same rows and checksum.

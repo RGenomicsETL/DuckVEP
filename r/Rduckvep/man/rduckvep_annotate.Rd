@@ -15,7 +15,9 @@ rduckvep_annotate(con, events_table, model_name, ...)
 
 \item{...}{Named builder options (for annotation: `hgvs`, `rich`,
 `upstream_distance`, `downstream_distance`; for Ensembl regions and
-transcripts: `species_id`; for receipts: `regulation_features_table`).
+transcripts: `species_id`; for receipts: `regulation_features_table`; for
+the loss-of-function relation: `gerp`, `ancestor`, `phylocsf`,
+`min_intron_size`, `gerp_end_trunc_cutoff`, `check_complete_cds`).
 Other builders accept no options. Each value must be a length-one string,
 logical, integer, double or `NA`.}
 }

@@ -136,10 +136,17 @@ QUERIES = {
     "lifted_projected": """SELECT 'RESULT lifted_projected ' || count(*) || ' ' || hash(list(a ORDER BY hash(a))) FROM
  query(duckvep_annotate_projected_sql('f_cev', 'fc')) a;""",
 }
+# The same models restored from snapshots (duckvep_model_restore): 'fms' and 'fcs'.
+QUERIES["hgvs_restored"] = QUERIES["hgvs"].replace("'fm'", "'fms'").replace("RESULT hgvs ", "RESULT hgvs_restored ")
+QUERIES["lifted_hgvs_restored"] = QUERIES["lifted_hgvs"].replace("'fc'", "'fcs'").replace(
+    "RESULT lifted_hgvs ", "RESULT lifted_hgvs_restored ")
+RESTORE = "SELECT 'LOADED ' || duckvep_model_restore('{model}', '{path}');"
 # The model each annotation phase runs on, and the query that proves a load published nothing.
 MODEL_OF = {"haplotype": "fm", "discovery": "fm", "coding_calls": "fm", "coding_calls_haplotype": "fm", "hgvs": "fm", "regulation": "fm", "projected": "fm",
-            "lifted_hgvs": "fc", "lifted": "fc", "lifted_projected": "fc"}
-LOAD_PHASES = {"load": ("fm", "hgvs"), "load_circular": ("fc", "lifted_hgvs")}
+            "lifted_hgvs": "fc", "lifted": "fc", "lifted_projected": "fc",
+            "hgvs_restored": "fms", "lifted_hgvs_restored": "fcs"}
+LOAD_PHASES = {"load": ("fm", "hgvs"), "load_circular": ("fc", "lifted_hgvs"),
+               "restore": ("fms", "hgvs_restored"), "restore_circular": ("fcs", "lifted_hgvs_restored")}
 
 BASELINE_SQL = "SELECT 'TOTAL ' || current_bytes FROM duckvep_native_budget() WHERE owner = 'total';"
 
@@ -248,6 +255,9 @@ def main():
     parser.add_argument("--jobs", type=int, default=8)
     args = parser.parse_args()
     loads = {"fm": LOAD.format(fasta=args.fasta), "fc": LOAD_CIRCULAR.format(fasta=args.fasta)}
+    snapshots = tempfile.mkdtemp(prefix="duckvep-fault-")
+    for source, restored in (("fm", "fms"), ("fc", "fcs")):
+        loads[restored] = RESTORE.format(model=restored, path=os.path.join(snapshots, source + ".dvsnap"))
 
     # Count pass: allocations per phase, golden results, and the bytes a pooled
     # annotation worker legitimately retains (idle limit 0 trims its buffers).
@@ -256,18 +266,26 @@ def main():
     for model, tag in (("fm", "NLOAD"), ("fc", "NLOADC")):
         script += ["SELECT duckvep_fault_arm(0);", loads[model],
                    "SELECT '%s ' || duckvep_fault_allocations();" % tag]
+    # Snapshots of both models, written once here and restored by every restore iteration.
+    for source, restored, tag in (("fm", "fms", "NRESTORE"), ("fc", "fcs", "NRESTOREC")):
+        script += ["SELECT duckvep_fault_arm(0);",
+                   "SELECT duckvep_model_save('%s', '%s');" % (source, os.path.join(snapshots, source + ".dvsnap")),
+                   "SELECT duckvep_fault_arm(0);", loads[restored],
+                   "SELECT '%s ' || duckvep_fault_allocations();" % tag]
     script += ["SELECT duckvep_fault_arm(0);"]
     for name, query in QUERIES.items():
         script += [query, "SELECT 'NQUERY %s ' || duckvep_fault_allocations();" % name,
                    "SELECT duckvep_fault_arm(0);"]
     script += ["SELECT duckvep_model_drop('fm');", "SELECT duckvep_model_drop('fc');",
+               "SELECT duckvep_model_drop('fms');", "SELECT duckvep_model_drop('fcs');",
                BASELINE_SQL.replace("TOTAL", "USED")]
     rc, out = run(args.extension, "\n".join(script), args.duckdb)
-    if rc not in (0, 1) or out.count("LOADED true") != 2:
+    if rc not in (0, 1) or out.count("LOADED true") != 4:
         print(out[-4000:])
         raise SystemExit("count pass failed (exit %d)" % rc)
     base = int(value(out, "BASE "))
-    n_load = {"load": int(value(out, "NLOAD ")), "load_circular": int(value(out, "NLOADC "))}
+    n_load = {"load": int(value(out, "NLOAD ")), "load_circular": int(value(out, "NLOADC ")),
+              "restore": int(value(out, "NRESTORE ")), "restore_circular": int(value(out, "NRESTOREC "))}
     golden = {name: value(out, "RESULT %s " % name) for name in QUERIES}
     for name, text in golden.items():
         if int(text.split()[0]) == 0:

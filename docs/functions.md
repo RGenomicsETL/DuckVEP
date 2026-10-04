@@ -1,6 +1,6 @@
 # Function reference
 
-DuckVEP registers 27 public SQL functions: 22 scalar functions and 5 table functions. This page lists all of them, grouped by purpose. Internal helpers whose names start with `_duckvep_` or `__duckvep_` are implementation details and are not documented. `scripts/check-function-docs.py` (`make check-function-docs`) fails when this page misses or adds a public function relative to `duckdb_functions()`, and it runs every example below.
+DuckVEP registers 29 public SQL functions: 24 scalar functions and 5 table functions. This page lists all of them, grouped by purpose. Internal helpers whose names start with `_duckvep_` or `__duckvep_` are implementation details and are not documented. `scripts/check-function-docs.py` (`make check-function-docs`) fails when this page misses or adds a public function relative to `duckdb_functions()`, and it runs every example below.
 
 Every `sql` example on this page runs against the fixture model in `test/data/duckvep/readme.sql`, in the order it appears on the page: later examples use tables created by earlier ones. Blocks marked `sql no-run` are illustrative fragments or need external data.
 
@@ -32,6 +32,8 @@ FROM query(duckvep_annotate_sql('demo_events', 'demo', {hgvs: true}))
 | | [`duckvep_model_receipt_sql`](#duckvep_model_receipt_sql) | scalar | SQL that summarizes a prepared model with counts and content hashes. |
 | | [`duckvep_model_load`](#duckvep_model_load) | table | Compile relations into a named, immutable, resident model. |
 | | [`duckvep_model_drop`](#duckvep_model_drop) | scalar | Unload a model and return its memory. |
+| | [`duckvep_model_save`](#duckvep_model_save) | scalar | Write a loaded model to a snapshot file. |
+| | [`duckvep_model_restore`](#duckvep_model_restore) | scalar | Load a model by mapping a snapshot file. |
 | [Annotation: SQL builders](#annotation-sql-builders) | [`duckvep_annotate_sql`](#duckvep_annotate_sql) | scalar | SQL that annotates a relation of alleles with consequences, impact and HGVS. |
 | | [`duckvep_annotate_projected_sql`](#duckvep_annotate_projected_sql) | scalar | SQL that annotates ordered small variants and returns projected-edit facts. |
 | | [`duckvep_transcript_projection_sql`](#duckvep_transcript_projection_sql) | scalar | SQL that presents transcript positions, codons and peptides for annotated events. |
@@ -235,6 +237,43 @@ SELECT loaded FROM duckvep_model_load('scratch',
   'SELECT * FROM readme_exons ORDER BY transcript_index, exon_start');
 SELECT duckvep_model_drop('scratch') AS dropped,
        duckvep_model_drop('scratch') AS dropped_again;
+```
+
+<a id="duckvep_model_save"></a>
+
+### duckvep_model_save
+
+Writes a loaded model to a snapshot file: the model's native arrays as they are in memory, with a header and a checksum. A snapshot is the fast way to load the same model again, in this process or another one (see [`duckvep_model_restore`](#duckvep_model_restore)).
+
+Signature:
+
+```text
+duckvep_model_save(name VARCHAR, path VARCHAR) -> BOOLEAN
+```
+
+Returns true. The file is written beside its target and renamed, so a reader never sees a partial snapshot. An unknown model name, an empty name or path, and a file that cannot be written are errors. A snapshot records the path of the model's reference FASTA, not its bytes. It is tied to the DuckVEP build that wrote it: a build with a different model layout refuses it, and the model is then loaded from its relations again.
+
+```sql
+SELECT duckvep_model_save('demo', 'demo.dvsnap') AS saved;
+```
+
+<a id="duckvep_model_restore"></a>
+
+### duckvep_model_restore
+
+Loads a model from a snapshot written by [`duckvep_model_save`](#duckvep_model_save). The file is mapped read-only instead of copied, so restoring costs the validation passes only (about 0.5 s for the Ensembl 116 GRCh38 model, against about 3 s from relations on one thread), and every process that restores the same file shares one copy of it in memory.
+
+Signature:
+
+```text
+duckvep_model_restore(name VARCHAR, path VARCHAR) -> BOOLEAN
+```
+
+Returns true once the model is published under `name`. A snapshot is not trusted: the header, the section bounds and a checksum of every byte are verified, the region and coordinate rules of the relation load are checked again, the kernel validates the model as it does for a relation load, and the reference FASTA named by the snapshot is opened and checked against the regions. A file that fails any of these publishes nothing and is an error, as are a name that is already loaded and a snapshot that does not fit the native budget. The mapped bytes are charged to the `model` owner of the budget. The snapshot file must stay unchanged while a model restored from it is loaded.
+
+```sql
+SELECT duckvep_model_restore('demo_restored', 'demo.dvsnap') AS restored;
+SELECT duckvep_model_drop('demo_restored') AS dropped;
 ```
 
 ---

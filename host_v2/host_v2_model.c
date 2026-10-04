@@ -13,6 +13,7 @@
 #include "host_v2_stage.h"
 
 #include "core/duckvep_core_model.h"
+#include "core/duckvep_core_snapshot.h"
 #include "core/duckvep_core_model_script.h"
 
 #include <pthread.h>
@@ -762,6 +763,79 @@ cleanup:
 }
 
 /* ---------------------------------------------------------------------------
+ * duckvep_model_save(name, path) and duckvep_model_restore(name, path): model
+ * snapshots (src/core/duckvep_core_snapshot.c), the same code as on v1
+ * ------------------------------------------------------------------------- */
+
+static void snapshot_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb_v2_error_info_handle *error,
+                          bool restore) {
+    const char *label = restore ? "duckvep_model_restore" : "duckvep_model_save";
+    duckdb_v2_error_info_handle detail = NULL;
+    model_state *state = NULL;
+    duckdb_v2_vector_view views[2];
+    duckdb_v2_vector_handle output = NULL;
+    void *output_data = NULL;
+    uint64_t *output_validity = NULL;
+    char message[DUCKVEP_SQL_ERROR_SIZE + 256];
+    idx_t rows = 0;
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_user_data(info, (void **)&state, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &rows, &detail));
+    if (!load_views(info, 2, views, error)) {
+        goto cleanup;
+    }
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_result(info, &output, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_flatten(output, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_set_size(output, rows, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(output, &output_data, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(output, &output_validity, &detail));
+    for (idx_t row = 0; row < rows; ++row) {
+        char *name = NULL, *path = NULL;
+        int done = 0;
+        if (row_is_valid(&views[0], row) && row_is_valid(&views[1], row)) {
+            duckdb_v2_str name_text = string_at(&views[0], row), path_text = string_at(&views[1], row);
+            name = duckvep_core_string_copy(name_text.ptr, name_text.len);
+            path = duckvep_core_string_copy(path_text.ptr, path_text.len);
+        }
+        message[0] = '\0';
+        if (!name || !*name || !path || !*path) {
+            (void)snprintf(message, sizeof message, "%s: name and path must be non-empty strings", label);
+        } else if (restore) {
+            done = duckvep_core_model_snapshot_install(state->registry, name, path, message, sizeof message);
+        } else {
+            duckvep_model_entry_t *entry = duckvep_registry_pin(state->registry, name);
+            if (!entry) {
+                (void)snprintf(message, sizeof message, "%s: unknown model name", label);
+            } else {
+                done = duckvep_core_model_snapshot_save(&entry->model, path, message, sizeof message);
+                duckvep_registry_unpin(state->registry, entry);
+            }
+        }
+        duckvep_budget_free(name);
+        duckvep_budget_free(path);
+        if (!done) {
+            report(*error, message);
+            goto cleanup;
+        }
+        ((bool *)output_data)[row] = true;
+        mark_valid(output_validity, row);
+    }
+cleanup:
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+static void save_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb_v2_context_handle context,
+                      duckdb_v2_error_info_handle *error) {
+    (void)context;
+    snapshot_exec(info, error, false);
+}
+
+static void restore_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb_v2_context_handle context,
+                         duckdb_v2_error_info_handle *error) {
+    (void)context;
+    snapshot_exec(info, error, true);
+}
+
+/* ---------------------------------------------------------------------------
  * _duckvep_model_fingerprint(name): FNV-1a of the loaded arrays (a diagnostic
  * for comparing a v1 and a v2 load of the same inputs), NULL for no such model
  * ------------------------------------------------------------------------- */
@@ -1058,6 +1132,8 @@ bool host_v2_register_model(duckdb_v2_extension_handle extension, duckdb_v2_cont
     static const char *const publish_names[] = {"name", "options"};
     static const char *const one_type[] = {"VARCHAR"};
     static const char *const one_name[] = {"name"};
+    static const char *const snapshot_types[] = {"VARCHAR", "VARCHAR"};
+    static const char *const snapshot_names[] = {"name", "path"};
     static const char *const load_types[] = {"VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR", "ANY"};
     static const char *const load_names[] = {"name", "regions_query", "transcripts_query", "exons_query",
                                              "options"};
@@ -1083,6 +1159,10 @@ bool host_v2_register_model(duckdb_v2_extension_handle extension, duckdb_v2_cont
                                2, "BOOLEAN", publish_exec, error) &&
          register_model_scalar(extension, context, state, "duckvep_model_drop", one_type, one_name, 1, "BOOLEAN",
                                drop_exec, error) &&
+         register_model_scalar(extension, context, state, "duckvep_model_save", snapshot_types, snapshot_names, 2,
+                               "BOOLEAN", save_exec, error) &&
+         register_model_scalar(extension, context, state, "duckvep_model_restore", snapshot_types,
+                               snapshot_names, 2, "BOOLEAN", restore_exec, error) &&
          register_model_scalar(extension, context, state, "_duckvep_model_fingerprint", one_type, one_name, 1,
                                "UBIGINT", fingerprint_exec, error) &&
          register_model_scalar(extension, context, NULL, "duckvep_model_load_sql", load_types, load_names, 4,

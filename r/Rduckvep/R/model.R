@@ -55,3 +55,38 @@ rduckvep_load_model <- function(con, name, regions_query, transcripts_query, exo
   }
   invisible(TRUE)
 }
+
+.duckvep_model_path_call <- function(con, func, name, path) {
+  if (!all(vapply(list(name, path), function(x) is.character(x) && length(x) == 1L && !is.na(x) && nzchar(x), NA))) {
+    stop("name and path must be non-empty strings", call. = FALSE)
+  }
+  DBI::dbGetQuery(con, paste0("SELECT ", func, "(", .duckvep_builder_literal(con, name), ", ",
+                              .duckvep_builder_literal(con, path), ") AS done"))
+  invisible(TRUE)
+}
+
+#' Save and restore a resident model as a snapshot file
+#'
+#' `rduckvep_save_model()` writes a loaded model's native arrays to one file with
+#' `duckvep_model_save()`. `rduckvep_restore_model()` loads a model from that
+#' file with `duckvep_model_restore()`: the file is mapped read-only instead of
+#' copied, so restoring is several times faster than loading the relations, and
+#' every R session that restores the same file shares one copy of it in memory.
+#' A snapshot is validated when it is restored and is tied to the DuckVEP build
+#' that wrote it; a build with a different model layout refuses it. It records
+#' the path of the model's reference FASTA, not its bytes.
+#'
+#' @param con A DBI connection with DuckVEP loaded.
+#' @param name Model name: a loaded model to save, or a new name to restore under.
+#' @param path Path of the snapshot file.
+#' @return `TRUE`, invisibly.
+#' @export
+rduckvep_save_model <- function(con, name, path) {
+  .duckvep_model_path_call(con, "duckvep_model_save", name, path)
+}
+
+#' @rdname rduckvep_save_model
+#' @export
+rduckvep_restore_model <- function(con, name, path) {
+  .duckvep_model_path_call(con, "duckvep_model_restore", name, path)
+}

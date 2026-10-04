@@ -1,5 +1,8 @@
 # Rduckvep
 
+- `rduckvep_save_model()` and `rduckvep_restore_model()` wrap the native model snapshots: a restored model is mapped from its file, loads
+  several times faster than from relations, and is shared in memory between R sessions that restore the same file.
+
 - `rduckvep_haplotypes()` takes `phase_policy = "vep_compat"` for the pinned executable VEP release; `"vep116_compat"` is still accepted.
 
 - The webR build keeps its bundled HTSlib, zlib and cgranges private: the side module exports only the DuckDB entry point, so it can be

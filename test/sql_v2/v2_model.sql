@@ -13,6 +13,18 @@ COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' 
 COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'temp-model', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
 SELECT CASE WHEN duckvep_model_publish('temp-model') THEN true ELSE error('publish of a TEMP-table model') END;
 SELECT CASE WHEN _duckvep_model_fingerprint('temp-model') = 16162758230738989510 THEN true ELSE error('TEMP model equals the README model fingerprint') END;
+-- Snapshots: the same core as v1. A saved model restores to the same arrays; bad input is refused.
+SELECT CASE WHEN duckvep_model_save('temp-model', 'build/v2_temp_model.dvsnap') AND duckvep_model_restore('temp-snapshot', 'build/v2_temp_model.dvsnap') THEN true ELSE error('snapshot round trip') END;
+SELECT CASE WHEN _duckvep_model_fingerprint('temp-snapshot') = 16162758230738989510 THEN true ELSE error('restored model equals the README model fingerprint') END;
+-- expect error: model name already exists
+SELECT duckvep_model_restore('temp-snapshot', 'build/v2_temp_model.dvsnap');
+-- expect error: unknown model name
+SELECT duckvep_model_save('no-such-model', 'build/v2_none.dvsnap');
+-- expect error: cannot open the snapshot file
+SELECT duckvep_model_restore('missing', 'build/v2_missing.dvsnap');
+-- expect error: name and path must be non-empty strings
+SELECT duckvep_model_restore('', 'build/v2_temp_model.dvsnap');
+SELECT CASE WHEN duckvep_model_drop('temp-snapshot') THEN true ELSE error('drop of a restored model') END;
 -- Haplotype jobs (slice 5): options and the job lifecycle. The published temp-model is the model.
 -- expect error: the JOB and MODEL options are required
 COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', USE_TMP_FILE FALSE);

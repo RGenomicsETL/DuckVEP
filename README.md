@@ -183,6 +183,7 @@ The main cases:
 Interactive only works if the engine keeps up.
 - **The public SQL builder** annotates **1,034,768 alleles per second on one core** in compact output. That is every model-addressable allele of GIAB HG002 (4,095,611), with all 1,383,580 regulatory and motif features resident, straight through `FROM query(duckvep_annotate_sql(...))` ([throughput report](benchmarks/duckvep_throughput.md)).
 - **End to end against FastVEP**, VCF in and table out, including DuckVEP’s own coordinate sort: DuckVEP finished **2.55×** faster on one core (65 s against 164 s) and **2.12×** faster on four. That is for a compact output contract on the full GIAB HG002 GRCh38 benchmark (4,096,123 ALT alleles). Complete-field comparisons, CSQ with HGVS, and every caveat are in the [FastVEP benchmark](benchmarks/benchmark_duckvep_fastvep.md).
+- **Loading a model again is a file mapping.** `duckvep_model_save` writes a loaded model as a snapshot, and `duckvep_model_restore` maps it back in about half a second for the full human model, with one copy in memory shared by every process that restores it.
 - **Memory** is bounded, not hoped for. Each job’s native memory is charged against an enforced budget, and exceeding it is an explicit capacity error, never a truncated result. Three concurrent 5-million-allele gnomAD jobs are certified on one 20-thread host ([scale runner](docs/scale-runner.md)).
 
 ## From R

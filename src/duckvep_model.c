@@ -1,4 +1,5 @@
 #include "duckvep_model.h"
+#include "core/duckvep_core_snapshot.h"
 #include "kernel/src/duckvep_model_internal.h"
 #include "kernel/src/duckvep_budget.h"
 
@@ -715,6 +716,96 @@ duckvep_model_drop_scalar(duckdb_function_info info,
 
 
 
+/* duckvep_model_save(name, path): writes the loaded model's arrays to a snapshot file. */
+static void
+duckvep_model_save_scalar(duckdb_function_info info,
+	duckdb_data_chunk input, duckdb_vector output)
+{
+	duckvep_registry_t *registry;
+	duckdb_vector name_vector, path_vector;
+	bool *values;
+	idx_t row, rows;
+
+	registry = duckdb_scalar_function_get_extra_info(info);
+	rows = duckdb_data_chunk_get_size(input);
+	name_vector = duckdb_data_chunk_get_vector(input, 0);
+	path_vector = duckdb_data_chunk_get_vector(input, 1);
+	values = duckdb_vector_get_data(output);
+	for (row = 0; row < rows; row++) {
+		duckvep_model_entry_t *entry;
+		char error[DUCKVEP_SQL_ERROR_SIZE];
+		char *name, *path;
+		int saved;
+
+		name = duckvep_vector_string(name_vector, row);
+		path = duckvep_vector_string(path_vector, row);
+		if (name == NULL || *name == '\0' || path == NULL || *path == '\0') {
+			duckvep_budget_free(name);
+			duckvep_budget_free(path);
+			duckdb_scalar_function_set_error(info,
+			    "duckvep_model_save: name and path must be non-empty strings");
+			return;
+		}
+		entry = duckvep_registry_pin(registry, name);
+		duckvep_budget_free(name);
+		if (entry == NULL) {
+			duckvep_budget_free(path);
+			duckdb_scalar_function_set_error(info, "duckvep_model_save: unknown model name");
+			return;
+		}
+		memset(error, 0, sizeof(error));
+		saved = duckvep_core_model_snapshot_save(&entry->model, path, error, sizeof(error));
+		duckvep_registry_unpin(registry, entry);
+		duckvep_budget_free(path);
+		if (!saved) {
+			duckdb_scalar_function_set_error(info, error);
+			return;
+		}
+		values[row] = true;
+	}
+}
+
+/* duckvep_model_restore(name, path): maps a snapshot and installs it as a model. */
+static void
+duckvep_model_restore_scalar(duckdb_function_info info,
+	duckdb_data_chunk input, duckdb_vector output)
+{
+	duckvep_registry_t *registry;
+	duckdb_vector name_vector, path_vector;
+	bool *values;
+	idx_t row, rows;
+
+	registry = duckdb_scalar_function_get_extra_info(info);
+	rows = duckdb_data_chunk_get_size(input);
+	name_vector = duckdb_data_chunk_get_vector(input, 0);
+	path_vector = duckdb_data_chunk_get_vector(input, 1);
+	values = duckdb_vector_get_data(output);
+	for (row = 0; row < rows; row++) {
+		char error[DUCKVEP_SQL_ERROR_SIZE + 256];
+		char *name, *path;
+		int restored;
+
+		name = duckvep_vector_string(name_vector, row);
+		path = duckvep_vector_string(path_vector, row);
+		if (name == NULL || *name == '\0' || path == NULL || *path == '\0') {
+			duckvep_budget_free(name);
+			duckvep_budget_free(path);
+			duckdb_scalar_function_set_error(info,
+			    "duckvep_model_restore: name and path must be non-empty strings");
+			return;
+		}
+		memset(error, 0, sizeof(error));
+		restored = duckvep_core_model_snapshot_install(registry, name, path, error, sizeof(error));
+		duckvep_budget_free(name);
+		duckvep_budget_free(path);
+		if (!restored) {
+			duckdb_scalar_function_set_error(info, error);
+			return;
+		}
+		values[row] = true;
+	}
+}
+
 /* Internal diagnostic: FNV-1a of the loaded arrays, for comparing loads across hosts. */
 static void
 duckvep_model_fingerprint_scalar(duckdb_function_info info,
@@ -828,6 +919,28 @@ duckvep_register_model_functions(duckdb_connection connection,
 	duckdb_scalar_function_set_function(scalar, duckvep_model_drop_scalar);
 	(void)duckdb_register_scalar_function(connection, scalar);
 	duckdb_destroy_scalar_function(&scalar);
+
+	{
+		static const struct { const char *name; duckdb_scalar_function_t function; } snapshots[2] = {
+			{"duckvep_model_save", duckvep_model_save_scalar},
+			{"duckvep_model_restore", duckvep_model_restore_scalar}};
+		size_t i;
+
+		for (i = 0; i < 2; i++) {
+			scalar = duckdb_create_scalar_function();
+			duckdb_scalar_function_set_name(scalar, snapshots[i].name);
+			duckdb_scalar_function_add_parameter(scalar, varchar_type);
+			duckdb_scalar_function_add_parameter(scalar, varchar_type);
+			duckdb_scalar_function_set_return_type(scalar, bool_type);
+			duckdb_scalar_function_set_volatile(scalar);
+			duckvep_registry_retain(registry);
+			duckdb_scalar_function_set_extra_info(scalar, registry,
+			    duckvep_registry_release);
+			duckdb_scalar_function_set_function(scalar, snapshots[i].function);
+			(void)duckdb_register_scalar_function(connection, scalar);
+			duckdb_destroy_scalar_function(&scalar);
+		}
+	}
 
 	{
 		duckdb_logical_type ubigint_type = duckdb_create_logical_type(DUCKDB_TYPE_UBIGINT);

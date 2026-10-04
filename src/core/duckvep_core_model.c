@@ -1,4 +1,5 @@
 #include "duckvep_core_model.h"
+#include "duckvep_core_snapshot.h"
 #include "kernel/src/duckvep_model_internal.h"
 #include "kernel/src/duckvep_budget.h"
 
@@ -328,6 +329,17 @@ duckvep_model_reserve_interval_features(duckvep_owned_model_t *model,
 
 static void duckvep_lifted_destroy(duckvep_lifted_model_t *);
 
+/* Frees an array the model owns; an array inside a snapshot's storage is released with it. */
+static void
+duckvep_model_array_free(const duckvep_owned_model_t *model, void *array)
+{
+	const char *base = model->snapshot_base, *at = array;
+
+	if (base != NULL && at >= base && at < base + model->snapshot_bytes)
+		return;
+	duckvep_budget_free(array);
+}
+
 void
 duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 {
@@ -339,9 +351,9 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 	}
 	if (model->kernel != NULL)
 		duckvep_model_close(model->kernel);
-	duckvep_budget_free(model->known_seq_regions);
-	duckvep_budget_free(model->sequence_lengths);
-	duckvep_budget_free(model->region_circular);
+	duckvep_model_array_free(model, model->known_seq_regions);
+	duckvep_model_array_free(model, model->sequence_lengths);
+	duckvep_model_array_free(model, model->region_circular);
 	if (model->sequence_names != NULL) {
 		size_t region;
 
@@ -361,41 +373,41 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 		duckvep_reference_descriptor_close(model->reference_fai_descriptor);
 		duckvep_reference_descriptor_close(model->reference_gzi_descriptor);
 	}
-	duckvep_budget_free(model->seq_regions);
-	duckvep_budget_free(model->transcript_starts);
-	duckvep_budget_free(model->transcript_ends);
-	duckvep_budget_free(model->strands);
-	duckvep_budget_free(model->transcript_flags);
-	duckvep_budget_free(model->gene_indices);
-	duckvep_budget_free(model->exon_offsets);
-	duckvep_budget_free(model->exon_counts);
-	duckvep_budget_free(model->cds_starts);
-	duckvep_budget_free(model->cds_ends);
-	duckvep_budget_free(model->cds_sequence_offsets);
-	duckvep_budget_free(model->cds_sequence_lengths);
-	duckvep_budget_free(model->codon_tables);
-	duckvep_budget_free(model->pre_cds_sequence_offsets);
-	duckvep_budget_free(model->pre_cds_sequence_lengths);
-	duckvep_budget_free(model->post_cds_sequence_offsets);
-	duckvep_budget_free(model->post_cds_sequence_lengths);
-	duckvep_budget_free(model->exon_starts);
-	duckvep_budget_free(model->exon_ends);
-	duckvep_budget_free(model->exon_cdna_starts);
-	duckvep_budget_free(model->exon_cdna_ends);
-	duckvep_budget_free(model->exon_phases);
-	duckvep_budget_free(model->exon_end_phases);
-	duckvep_budget_free(model->mature_mirna_offsets);
-	duckvep_budget_free(model->mature_mirna_starts);
-	duckvep_budget_free(model->mature_mirna_ends);
-	duckvep_budget_free(model->peptide_edit_offsets);
-	duckvep_budget_free(model->peptide_edit_positions);
-	duckvep_budget_free(model->peptide_edit_alts);
-	duckvep_budget_free(model->cds_sequence_bytes);
-	duckvep_budget_free(model->flank_sequence_bytes);
-	duckvep_budget_free(model->interval_feature_seq_regions);
-	duckvep_budget_free(model->interval_feature_starts);
-	duckvep_budget_free(model->interval_feature_ends);
-	duckvep_budget_free(model->interval_feature_kinds);
+	duckvep_model_array_free(model, model->seq_regions);
+	duckvep_model_array_free(model, model->transcript_starts);
+	duckvep_model_array_free(model, model->transcript_ends);
+	duckvep_model_array_free(model, model->strands);
+	duckvep_model_array_free(model, model->transcript_flags);
+	duckvep_model_array_free(model, model->gene_indices);
+	duckvep_model_array_free(model, model->exon_offsets);
+	duckvep_model_array_free(model, model->exon_counts);
+	duckvep_model_array_free(model, model->cds_starts);
+	duckvep_model_array_free(model, model->cds_ends);
+	duckvep_model_array_free(model, model->cds_sequence_offsets);
+	duckvep_model_array_free(model, model->cds_sequence_lengths);
+	duckvep_model_array_free(model, model->codon_tables);
+	duckvep_model_array_free(model, model->pre_cds_sequence_offsets);
+	duckvep_model_array_free(model, model->pre_cds_sequence_lengths);
+	duckvep_model_array_free(model, model->post_cds_sequence_offsets);
+	duckvep_model_array_free(model, model->post_cds_sequence_lengths);
+	duckvep_model_array_free(model, model->exon_starts);
+	duckvep_model_array_free(model, model->exon_ends);
+	duckvep_model_array_free(model, model->exon_cdna_starts);
+	duckvep_model_array_free(model, model->exon_cdna_ends);
+	duckvep_model_array_free(model, model->exon_phases);
+	duckvep_model_array_free(model, model->exon_end_phases);
+	duckvep_model_array_free(model, model->mature_mirna_offsets);
+	duckvep_model_array_free(model, model->mature_mirna_starts);
+	duckvep_model_array_free(model, model->mature_mirna_ends);
+	duckvep_model_array_free(model, model->peptide_edit_offsets);
+	duckvep_model_array_free(model, model->peptide_edit_positions);
+	duckvep_model_array_free(model, model->peptide_edit_alts);
+	duckvep_model_array_free(model, model->cds_sequence_bytes);
+	duckvep_model_array_free(model, model->flank_sequence_bytes);
+	duckvep_model_array_free(model, model->interval_feature_seq_regions);
+	duckvep_model_array_free(model, model->interval_feature_starts);
+	duckvep_model_array_free(model, model->interval_feature_ends);
+	duckvep_model_array_free(model, model->interval_feature_kinds);
 	if (model->interval_index != NULL) {
 		/* cgranges 0.1.1 does not release its interval array. */
 		duckvep_budget_free(model->interval_index->r);
@@ -408,6 +420,7 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 		model->interval_feature_index->r = NULL;
 		cr_destroy(model->interval_feature_index);
 	}
+	duckvep_core_snapshot_release(model->snapshot_base, model->snapshot_bytes, model->snapshot_mapped);
 	memset(model, 0, sizeof(*model));
 }
 
@@ -2592,6 +2605,13 @@ duckvep_registry_release(void *pointer)
 	pthread_mutex_destroy(&registry->mutex);
 	duckvep_budget_free(registry);
 }
+int
+duckvep_core_model_validate_reference(const char *reference_fasta, duckvep_owned_model_t *model,
+	char *error, size_t error_size)
+{
+	return duckvep_validate_reference_fasta(reference_fasta, model, error, error_size);
+}
+
 int
 duckvep_core_model_load_relations(duckvep_owned_model_t *model,
 	const duckvep_model_sources_t *sources, char *error, size_t error_size)

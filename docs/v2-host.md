@@ -13,7 +13,7 @@ public functions.
 | Build | `make release` (the root `CMakeLists.txt`) | `make release_v2` (`host_v2/CMakeLists.txt`) |
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
 | Ships | yes: CRAN and the community repository | no: preview, waits for DuckDB 2.0.0 |
-| Functions | all 27 public functions | all 27 (slices 1 to 6): `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the thirteen `duckvep_*_sql` builders, `duckvep_model_load` / `duckvep_model_drop` (as the COPY sink below), and the internal `_duckvep_annotate_*` natives with `__duckvep_projection_code`, and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order`; slice 5: `duckvep_haplotypes` (as `duckvep_haplotype_load_sql`, the COPY job sink and `duckvep_haplotype_scan`), `duckvep_coding_transcripts`, `duckvep_coding_calls` |
+| Functions | all 29 public functions | all 29 (slices 1 to 6, and the snapshot pair `duckvep_model_save` and `duckvep_model_restore`): `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the thirteen `duckvep_*_sql` builders, `duckvep_model_load` / `duckvep_model_drop` (as the COPY sink below), and the internal `_duckvep_annotate_*` natives with `__duckvep_projection_code`, and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order`; slice 5: `duckvep_haplotypes` (as `duckvep_haplotype_load_sql`, the COPY job sink and `duckvep_haplotype_scan`), `duckvep_coding_transcripts`, `duckvep_coding_calls` |
 
 The v2 host is a separate CMake project, so a v1 build does not compile or link
 any v2 file, and `duckdb_capi/` and MainDistributionPipeline are untouched. Since
@@ -357,7 +357,7 @@ plan are unchanged (the fault functions are v1 test-build only).
 
 ## Final status (issue #8)
 
-Every one of the 27 public v1 functions runs on v2; equality with v1 is recorded in `test/sql_v2/equality_golden.json`
+Every one of the 29 public v1 functions runs on v2; equality with v1 is recorded in `test/sql_v2/equality_golden.json`
 (585 cases recorded from the v1 host, re-verified against the live v1 host by `make test_v2`).
 
 | v1 function | v2 | equality with v1 |
