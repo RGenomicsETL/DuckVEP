@@ -12,7 +12,7 @@ model <- "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb"
 metadata <- file.path(source_root, "benchmarks/data/scale_contracts/canonical-metadata.parquet")
 panel <- "/root/duckvep/data/gnomad-v4.1/panels/genomes-v1-77d2cdff65171780/panel-1000000.parquet"
 extension <- file.path(source_root, "build/release/extension/duckvep/duckvep.duckdb_extension")
-source(file.path(source_root, "benchmarks/benchmark_duckvep_fastvep_fields.R"), local = TRUE)
+source(file.path(source_root, "benchmarks/duckvep_field_projection.R"), local = TRUE)
 version <- if (identical(source_root, normalizePath(getwd()))) "after" else "main"
 con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extensions = "true")))
 on.exit(dbDisconnect(con, shutdown = TRUE))
@@ -35,7 +35,7 @@ run(paste0("CREATE TEMP TABLE events AS SELECT row_number() OVER (ORDER BY seq_r
   "NULL::UBIGINT AS mate_position FROM ", input,
   " ORDER BY seq_region, position, reference, alternate"))
 run("CREATE TEMP VIEW ordered_events AS SELECT * FROM events ORDER BY seq_region, position, event_index")
-run("CREATE TEMP TABLE fastvep_events AS WITH anchored AS (
+run("CREATE TEMP TABLE field_events AS WITH anchored AS (
  SELECT e.*, r.name AS chrom, length(reference) != length(alternate) AND
  left(reference,1)=left(alternate,1) AS strip_anchor
  FROM events e JOIN duckvep_bench_model.duckvep_sequence_regions r USING(seq_region)
@@ -46,8 +46,8 @@ run("CREATE TEMP TABLE fastvep_events AS WITH anchored AS (
  chrom || ':' || (position + strip_anchor::UBIGINT)::VARCHAR || CASE WHEN
  position + strip_anchor::UBIGINT = position + length(reference) - 1 THEN '' ELSE
  '-' || (position + length(reference) - 1)::VARCHAR END AS native_location FROM anchored")
-run("CREATE TEMP VIEW fastvep_ordered_events AS SELECT * FROM fastvep_events ORDER BY seq_region, position, record_index, alt_index")
-run(paste0("CREATE TEMP TABLE fastvep_metadata AS SELECT transcript_index, NULL::VARCHAR AS symbol, ",
+run("CREATE TEMP VIEW field_ordered_events AS SELECT * FROM field_events ORDER BY seq_region, position, record_index, alt_index")
+run(paste0("CREATE TEMP TABLE field_metadata AS SELECT transcript_index, NULL::VARCHAR AS symbol, ",
   "canonical, NULL::VARCHAR AS tsl, NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds FROM read_parquet(", q(metadata), ")"))
 load_sql <- "SELECT * FROM duckvep_model_load('grch38',
  'SELECT seq_region, sequence_length FROM duckvep_bench_model.duckvep_sequence_regions ORDER BY seq_region',
@@ -63,16 +63,16 @@ compact <- "SELECT event_index, transcript_index, gene_index, consequence_mask, 
  FROM query(duckvep_annotate_sql('ordered_events', 'grch38'))"
 compact_count <- "SELECT count(*) AS n FROM query(duckvep_annotate_sql('ordered_events', 'grch38'))"
 complete <- if (version == "main")
-  duckvep_fastvep_field_query(con, "native_tab17", include_identity = TRUE) else
-  duckvep_fastvep_field_query(con, "native_tab17", include_identity = TRUE, model_name = "grch38")
+  duckvep_field_field_query(con, "native_tab17", include_identity = TRUE) else
+  duckvep_field_field_query(con, "native_tab17", include_identity = TRUE, model_name = "grch38")
 if (version == "main") {
-  complete <- sub("'fastvep_comparison'", "'grch38'", complete, fixed = TRUE)
+  complete <- sub("'field_comparison'", "'grch38'", complete, fixed = TRUE)
   complete_count <- "SELECT count(*) AS n FROM (
    SELECT unnest(_duckvep_annotate_small_projected('grch38', seq_region, position,
-     reference, alternate, 5000, 5000)) FROM fastvep_ordered_events)"
+     reference, alternate, 5000, 5000)) FROM field_ordered_events)"
 } else {
   complete_count <- "SELECT count(*) AS n FROM query(duckvep_annotate_projected_sql(
-    'fastvep_ordered_events', 'grch38'))"
+    'field_ordered_events', 'grch38'))"
 }
 fingerprint_only <- length(args) == 3L
 if (fingerprint_only) run(load_sql)

@@ -15,7 +15,7 @@ stopifnot(corpus %in% c("gnomad1m", "bench"))
 model <- Sys.getenv("DUCKVEP_SCALE_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
 panel <- "/root/duckvep/data/gnomad-v4.1/panels/genomes-v1-77d2cdff65171780/panel-1000000.parquet"
 metadata <- "benchmarks/data/scale_contracts/canonical-metadata.parquet"
-source("benchmarks/benchmark_duckvep_fastvep_fields.R", local = TRUE)
+source("benchmarks/duckvep_field_projection.R", local = TRUE)
 con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extensions = "true")))
 on.exit(dbDisconnect(con, shutdown = TRUE))
 q <- function(x) as.character(dbQuoteString(con, x))
@@ -40,7 +40,7 @@ run(paste0("CREATE TEMP TABLE events AS SELECT row_number() OVER (ORDER BY seq_r
   "NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region, ",
   "NULL::UBIGINT AS mate_position FROM ", input, " ORDER BY seq_region, position, reference, alternate"))
 run("CREATE TEMP VIEW ordered_events AS SELECT * FROM events ORDER BY seq_region, position, event_index")
-run("CREATE TEMP TABLE fastvep_events AS WITH anchored AS (
+run("CREATE TEMP TABLE field_events AS WITH anchored AS (
  SELECT e.*, r.name AS chrom, length(reference) != length(alternate) AND
  left(reference,1)=left(alternate,1) AS strip_anchor
  FROM events e JOIN duckvep_bench_model.duckvep_sequence_regions r USING(seq_region)
@@ -51,8 +51,8 @@ run("CREATE TEMP TABLE fastvep_events AS WITH anchored AS (
  chrom || ':' || (position + strip_anchor::UBIGINT)::VARCHAR || CASE WHEN
  position + strip_anchor::UBIGINT = position + length(reference) - 1 THEN '' ELSE
  '-' || (position + length(reference) - 1)::VARCHAR END AS native_location FROM anchored")
-run("CREATE TEMP VIEW fastvep_ordered_events AS SELECT * FROM fastvep_events ORDER BY seq_region, position, record_index, alt_index")
-run(paste0("CREATE TEMP TABLE fastvep_metadata AS SELECT transcript_index, NULL::VARCHAR AS symbol, ",
+run("CREATE TEMP VIEW field_ordered_events AS SELECT * FROM field_events ORDER BY seq_region, position, record_index, alt_index")
+run(paste0("CREATE TEMP TABLE field_metadata AS SELECT transcript_index, NULL::VARCHAR AS symbol, ",
   "canonical, NULL::VARCHAR AS tsl, NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds FROM read_parquet(", q(metadata), ")"))
 budget <- function(label) {
   b <- tryCatch(get("SELECT owner, current_bytes, high_water_bytes FROM duckvep_native_budget()"), error = function(e) NULL)
@@ -78,7 +78,7 @@ n_in <- get("SELECT count(*) AS n FROM events")$n
 emit("input_rows", n_in)
 compact_s <- elapsed(n <- get("SELECT count(*) AS n FROM query(duckvep_annotate_sql('ordered_events', 'grch38'))")$n)
 emit("compact_rows", n); emit("compact_s", round(compact_s, 3))
-complete_s <- elapsed(n <- get("SELECT count(*) AS n FROM query(duckvep_annotate_projected_sql('fastvep_ordered_events', 'grch38'))")$n)
+complete_s <- elapsed(n <- get("SELECT count(*) AS n FROM query(duckvep_annotate_projected_sql('field_ordered_events', 'grch38'))")$n)
 emit("complete17_rows", n); emit("complete17_s", round(complete_s, 3))
 emit("peak_rss_after_annotation_kib", status("VmHWM"))
 invisible(budget("annotate"))

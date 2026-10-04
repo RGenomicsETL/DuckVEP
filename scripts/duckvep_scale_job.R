@@ -66,7 +66,7 @@ result_path <- file.path(job_dir, "result.tsv")
 unlink(result_path)
 
 canonical <- file.path(repo, "benchmarks/data/scale_contracts/canonical-metadata.parquet")
-source(file.path(repo, "benchmarks/benchmark_duckvep_fastvep_fields.R"), local = TRUE)
+source(file.path(repo, "benchmarks/duckvep_field_projection.R"), local = TRUE)
 
 con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extensions = "true")))
 q <- function(x) as.character(dbQuoteString(con, x))
@@ -135,7 +135,7 @@ prepare_events <- function(need_complete) {
     " ORDER BY seq_region, position, reference, alternate"))
   run("CREATE OR REPLACE TEMP VIEW ordered_events AS SELECT * FROM events ORDER BY seq_region, position, event_index")
   if (need_complete) {
-    run("CREATE OR REPLACE TEMP TABLE fastvep_events AS WITH anchored AS (
+    run("CREATE OR REPLACE TEMP TABLE field_events AS WITH anchored AS (
  SELECT e.*, r.name AS chrom, length(reference) != length(alternate) AND left(reference,1)=left(alternate,1) AS strip_anchor
  FROM events e JOIN duckvep_bench_model.duckvep_sequence_regions r USING(seq_region)
  ) SELECT * EXCLUDE(strip_anchor), event_index AS record_index, 1::BIGINT AS alt_index,
@@ -144,8 +144,8 @@ prepare_events <- function(need_complete) {
  [CASE WHEN strip_anchor THEN coalesce(nullif(substr(alternate,2),''),'-') ELSE alternate END] AS native_alternates,
  chrom || ':' || (position + strip_anchor::UBIGINT)::VARCHAR || CASE WHEN position + strip_anchor::UBIGINT = position + length(reference) - 1 THEN ''
  ELSE '-' || (position + length(reference) - 1)::VARCHAR END AS native_location FROM anchored")
-    run("CREATE OR REPLACE TEMP VIEW fastvep_ordered_events AS SELECT * FROM fastvep_events ORDER BY seq_region, position, record_index, alt_index")
-    run(paste0("CREATE OR REPLACE TEMP TABLE fastvep_metadata AS SELECT transcript_index, NULL::VARCHAR AS symbol, ",
+    run("CREATE OR REPLACE TEMP VIEW field_ordered_events AS SELECT * FROM field_events ORDER BY seq_region, position, record_index, alt_index")
+    run(paste0("CREATE OR REPLACE TEMP TABLE field_metadata AS SELECT transcript_index, NULL::VARCHAR AS symbol, ",
       "canonical, NULL::VARCHAR AS tsl, NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds FROM read_parquet(",
       q(canonical), ")"))
   }
@@ -153,7 +153,7 @@ prepare_events <- function(need_complete) {
 }
 mode_query <- function(mode) {
   if (mode == "compact") return("SELECT * FROM query(duckvep_annotate_sql('ordered_events', 'grch38'))")
-  complete <- duckvep_fastvep_field_query(con, "native_tab17", include_identity = TRUE, model_name = "grch38")
+  complete <- duckvep_field_field_query(con, "native_tab17", include_identity = TRUE, model_name = "grch38")
   sub("SELECT p.record_index", "SELECT p.event_index, p.record_index", complete, fixed = TRUE)
 }
 run_mode <- function(mode, panel_rows, sequence) {

@@ -7,7 +7,7 @@ model <- Sys.getenv("DUCKVEP_SCALE_MODEL", "/root/duckvep/data/models/homo_sapie
 extension <- Sys.getenv("DUCKVEP_SCALE_EXTENSION", "build/release/extension/duckvep/duckvep.duckdb_extension")
 root <- normalizePath(".")
 output <- file.path(root, "benchmarks/data/scale_contracts")
-source_file <- file.path(root, "benchmarks/data/duckvep_fastvep/fields_replay_9bf888e/worker-*.parquet")
+source_file <- file.path(root, "benchmarks/data/scale_contracts/field_replay_9bf888e/worker-*.parquet")
 metadata <- file.path(output, "canonical-metadata.parquet")
 if (!file.exists(model) || !file.exists(metadata)) stop("model or canonical metadata is missing")
 if (!file.exists(extension)) stop("release extension is missing")
@@ -28,7 +28,7 @@ run("SET memory_limit='8GB'")
 run(paste0("SET temp_directory=", q(file.path(tempdir(), "scale-spill"))))
 run("SET preserve_insertion_order=false")
 run(paste0("ATTACH ", q(normalizePath(model)), " AS duckvep_bench_model (READ_ONLY)"))
-source("benchmarks/benchmark_duckvep_fastvep_fields.R", local = TRUE)
+source("benchmarks/duckvep_field_projection.R", local = TRUE)
 
 # The sorted length-prefixed JSON stream is versioned separately from DuckDB hash().
 # JSON object keys follow the declared SELECT order; NULL fields are retained.
@@ -85,7 +85,7 @@ run("CREATE TEMP TABLE events AS SELECT row_number() OVER (ORDER BY seq_region, 
  NULL::UINTEGER AS mate_seq_region, NULL::UBIGINT AS mate_position
  FROM duckvep_bench_model.bench_variants ORDER BY seq_region, position, reference, alternate")
 run("CREATE TEMP VIEW ordered_events AS SELECT * FROM events ORDER BY seq_region, position, event_index")
-run("CREATE TEMP TABLE fastvep_events AS WITH anchored AS (
+run("CREATE TEMP TABLE field_events AS WITH anchored AS (
  SELECT e.*, r.name AS chrom, length(reference) != length(alternate) AND left(reference,1)=left(alternate,1) AS strip_anchor
  FROM events e JOIN duckvep_bench_model.duckvep_sequence_regions r USING(seq_region)
  ) SELECT * EXCLUDE(strip_anchor), event_index AS record_index, 1::BIGINT AS alt_index,
@@ -94,10 +94,10 @@ run("CREATE TEMP TABLE fastvep_events AS WITH anchored AS (
  [CASE WHEN strip_anchor THEN coalesce(nullif(substr(alternate,2),''),'-') ELSE alternate END] AS native_alternates,
  chrom || ':' || (position + strip_anchor::UBIGINT)::VARCHAR || CASE WHEN position + strip_anchor::UBIGINT = position + length(reference) - 1 THEN ''
  ELSE '-' || (position + length(reference) - 1)::VARCHAR END AS native_location FROM anchored")
-run("CREATE TEMP VIEW fastvep_ordered_events AS SELECT * FROM fastvep_events ORDER BY seq_region, position, record_index, alt_index")
-run(paste0("CREATE TEMP TABLE fastvep_metadata AS SELECT transcript_index, NULL::VARCHAR AS symbol,
+run("CREATE TEMP VIEW field_ordered_events AS SELECT * FROM field_events ORDER BY seq_region, position, record_index, alt_index")
+run(paste0("CREATE TEMP TABLE field_metadata AS SELECT transcript_index, NULL::VARCHAR AS symbol,
  canonical, NULL::VARCHAR AS tsl, NULL::VARCHAR AS appris, NULL::VARCHAR AS ccds FROM read_parquet(", q(metadata), ")"))
-if (get("SELECT count(*) AS n FROM fastvep_metadata WHERE canonical IS NULL")$n != 0) stop("missing canonical status")
+if (get("SELECT count(*) AS n FROM field_metadata WHERE canonical IS NULL")$n != 0) stop("missing canonical status")
 run("SELECT * FROM duckvep_model_load('grch38',
  'SELECT seq_region, sequence_length FROM duckvep_bench_model.duckvep_sequence_regions ORDER BY seq_region',
  'SELECT * FROM duckvep_bench_model.duckvep_transcripts ORDER BY seq_region, transcript_start, transcript_index',
@@ -111,13 +111,13 @@ compact_fields <- c("event_index", "transcript_index", "gene_index", "consequenc
   "nmd_prediction_code", "nmd_escape_reasons", "regulation_feature_index", "overlap_object_code")
 compact <- paste0("SELECT ", paste(compact_fields, collapse = ", "),
   " FROM query(duckvep_annotate_sql('ordered_events', 'grch38'))")
-complete_fields <- c("event_index", "record_index", "alt_index", duckvep_fastvep_fields("native_tab17"))
-complete <- duckvep_fastvep_field_query(con, "native_tab17", include_identity = TRUE,
+complete_fields <- c("event_index", "record_index", "alt_index", duckvep_field_fields("native_tab17"))
+complete <- duckvep_field_field_query(con, "native_tab17", include_identity = TRUE,
   model_name = "grch38")
 complete <- sub("SELECT p.record_index", "SELECT p.event_index, p.record_index", complete, fixed = TRUE)
 count_text <- function(text, needle) lengths(regmatches(text, gregexpr(needle, text, fixed = TRUE)))
-built <- get("SELECT duckvep_annotate_projected_sql('fastvep_ordered_events', 'grch38') AS sql")$sql
-unsupported <- try(get("SELECT duckvep_annotate_projected_sql('fastvep_ordered_events', 'grch38', {hgvs: true})"), silent = TRUE)
+built <- get("SELECT duckvep_annotate_projected_sql('field_ordered_events', 'grch38') AS sql")$sql
+unsupported <- try(get("SELECT duckvep_annotate_projected_sql('field_ordered_events', 'grch38', {hgvs: true})"), silent = TRUE)
 if (!inherits(unsupported, "try-error")) stop("projected builder accepted an unsupported option")
 if (count_text(built, "_duckvep_annotate_small_projected(") != 1L ||
     count_text(built, "_duckvep_annotate_small_projected_hgvs(") != 0L ||

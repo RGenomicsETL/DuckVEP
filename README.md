@@ -182,7 +182,7 @@ The main cases:
 
 Interactive only works if the engine keeps up.
 - **The public SQL builder** annotates **1,034,768 alleles per second on one core** in compact output. That is every model-addressable allele of GIAB HG002 (4,095,611), with all 1,383,580 regulatory and motif features resident, straight through `FROM query(duckvep_annotate_sql(...))` ([throughput report](benchmarks/duckvep_throughput.md)).
-- **End to end against FastVEP**, VCF in and table out, including DuckVEP’s own coordinate sort: DuckVEP finished **2.55×** faster on one core (65 s against 164 s) and **2.12×** faster on four. That is for a compact output contract on the full GIAB HG002 GRCh38 benchmark (4,096,123 ALT alleles). Complete-field comparisons, CSQ with HGVS, and every caveat are in the [FastVEP benchmark](benchmarks/benchmark_duckvep_fastvep.md).
+- **End to end against vep-rs**, the fastest VEP reimplementation we know of, VCF in and table out on all of GIAB HG002 (4,070,522 alleles, Ensembl 116): DuckVEP finished in **6.8 s** on 16 threads against 9.4 s, on two thirds of the CPU time, and vep-rs finished 1.12× sooner on one thread. The two agree on 99.995% of 34 million consequence tuples; executable VEP sides with DuckVEP on 1,689 of the 1,691 that differ. Details and caveats are in the [vep-rs benchmark](benchmarks/benchmark_duckvep_vep_rs.md).
 - **Loading a model again is a file mapping.** `duckvep_model_save` writes a loaded model as a snapshot, and `duckvep_model_restore` maps it back in about half a second for the full human model, with one copy in memory shared by every process that restores it.
 - **Memory** is bounded, not hoped for. Each job’s native memory is charged against an enforced budget, and exceeding it is an explicit capacity error, never a truncated result. Three concurrent 5-million-allele gnomAD jobs are certified on one 20-thread host ([scale runner](docs/scale-runner.md)).
 
@@ -248,7 +248,7 @@ The extension uses the stable DuckDB C API (tested on DuckDB 1.5 and the 2.0 pre
 - [Compatibility and errata](ERRATA.md): every known difference from VEP, classified, with witnesses
 - [Design and implementation contract](design/duckvep.md): model build, the sweep, NMD, phased edits, structural events, HGVS, supplementary annotation
 - [Haplotype contract `duckvep-coding`](design/duckvep_haplotype_contract.md) and its [scale qualification](benchmarks/data/haplotype_scale/README.md)
-- Reports: [conformance](benchmarks/duckvep_conformance.md), [throughput](benchmarks/duckvep_throughput.md), [FastVEP comparison](benchmarks/benchmark_duckvep_fastvep.md), [haplotypes](benchmarks/duckvep_haplotypes.md), [scale runner](docs/scale-runner.md)
+- Reports: [conformance](benchmarks/duckvep_conformance.md), [throughput](benchmarks/duckvep_throughput.md), [vep-rs comparison](benchmarks/benchmark_duckvep_vep_rs.md), [haplotypes](benchmarks/duckvep_haplotypes.md), [scale runner](docs/scale-runner.md)
 - [Corpus workflow](design/duckvep_corpus_workflow.md) and [conformance harness](test/duckvep/conformance/README.md)
 
 DuckVEP grew up inside [DuckHTS](https://github.com/RGenomicsETL/duckhts) and was extracted with its history.

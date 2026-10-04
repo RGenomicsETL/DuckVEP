@@ -67,23 +67,6 @@ readme_evidence <- function(root = ".") {
   }))
   hgvs_summary$field <- sub("^HGVSC$", "HGVSc", sub("^HGVSP$", "HGVSp", hgvs_summary$field))
 
-  gnu_time <- function(file) {
-    lines <- readLines(path("benchmarks", "data", "duckvep_fastvep", file))
-    value <- function(label) trimws(sub(".*: ", "", grep(label, lines, value = TRUE, fixed = TRUE)))
-    stopifnot(value("Exit status") == "0")
-    parts <- as.numeric(strsplit(value("Elapsed (wall clock) time"), ":", fixed = TRUE)[[1L]])
-    sum(parts * 60^(rev(seq_along(parts)) - 1L))
-  }
-  runs <- function(engine, threads) {
-    files <- list.files(path("benchmarks", "data", "duckvep_fastvep"),
-      pattern = sprintf("^%s_giab_threads%d(_run[0-9]+)?\\.time$", engine, threads))
-    median(vapply(files, gnu_time, numeric(1)))
-  }
-  fastvep <- data.frame(cores = c(1L, 4L),
-    duckvep = c(runs("duckvep", 1L), runs("duckvep", 4L)),
-    fastvep = c(runs("fastvep", 1L), runs("fastvep", 4L)))
-  fastvep$ratio <- fastvep$fastvep / fastvep$duckvep
-
   throughput <- read.csv(path("benchmarks", "data", "duckvep_throughput.csv"),
     colClasses = c(source_revision = "character"))
   throughput <- throughput[throughput$workload == "ensembl116_grch38_giab_sites_hash40" &
@@ -108,6 +91,6 @@ readme_evidence <- function(root = ".") {
   public <- public[when == max(when), ]
   public <- public[nrow(public), ]
 
-  list(conformance = conformance, hgvs = hgvs_summary, fastvep = fastvep,
+  list(conformance = conformance, hgvs = hgvs_summary,
     throughput = throughput, public = public, giab_alt_alleles = 4096123L)
 }

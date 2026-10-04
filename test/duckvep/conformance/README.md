@@ -1,6 +1,6 @@
 # DuckVEP consequence tests
 
-Ensembl VEP 116 is the behavioral oracle. The Rust prototype and fastVEP are not.
+Ensembl VEP 116 is the behavioral oracle. Other reimplementations are not.
 
 `data/so_consequences.tsv` is generated directly from VEP 116's
 `%OVERLAP_CONSEQUENCES` table. `make duckvep-so-spec` verifies the pinned
@@ -361,7 +361,7 @@ automatically. Registry-built models instead store `model_regions` and nested
 relations, including every exon, mature-miRNA segment and peptide edit. They do
 not rewrite the artifact or recompute biological fields. Model-load queries
 refer directly to the attached catalog so they also work from separate DuckDB
-connections. The FastVEP benchmark worker uses the same projections.
+connections.
 
 Then run, for example:
 

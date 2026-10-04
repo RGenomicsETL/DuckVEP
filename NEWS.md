@@ -1,5 +1,10 @@
 # DuckVEP
 
+## vep-rs replaces FastVEP as the comparison
+
+- New benchmark against vep-rs 0.3.1 with executable VEP 116 adjudicating every disagreement (`benchmarks/benchmark_duckvep_vep_rs.sh`, report in `benchmarks/benchmark_duckvep_vep_rs.md`). On GIAB HG002 (4,070,522 alleles, Ensembl 116, 16 threads) DuckVEP takes 6.8 s against 9.4 s; on one thread vep-rs is 1.12× faster. The tools agree on 34,146,531 of 34,148,222 tuples on shared transcripts, and VEP sides with DuckVEP on 1,689 of the 1,691 that differ.
+- The FastVEP benchmark, its scripts, tests and recorded data are removed. The field projection and the replay input that the scale runner also uses stay, as `benchmarks/duckvep_field_projection.R` and `benchmarks/data/scale_contracts/field_replay_9bf888e`.
+
 ## Wider haplotype domain (issue #12)
 
 - Whole-haplotype prediction covers complete phased calls of any ploidy (haploid chrX, chrY and MT calls included), literal alleles of any length, and transcripts in any supported genetic code. These were refused as `non_diploid_call`, `allele_over_50_bases` and `non_standard_codon_table`; the classifier itself is unchanged. On HG002 one of 157,986 paths changes: a 94-base insertion that was refused is now a frameshift with a gained stop.

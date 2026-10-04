@@ -42,7 +42,7 @@ documents <- c(
   design = "design/duckvep.md",
   conformance = "benchmarks/duckvep_conformance.md",
   throughput = "benchmarks/duckvep_throughput.md",
-  fastvep = "benchmarks/benchmark_duckvep_fastvep.md",
+  vep_rs = "benchmarks/benchmark_duckvep_vep_rs.md",
   haplotypes = "benchmarks/duckvep_haplotypes.md",
   `haplotypes-indel` = "benchmarks/duckvep_haplotypes_indel.md",
   projection = "benchmarks/benchmark_duckvep_projection.md",
@@ -50,7 +50,7 @@ documents <- c(
   `mane-grch37` = "design/duckvep_mane_grch37.md"
 )
 titles <- c(errata = "Compatibility and errata", design = "Design and implementation contract", conformance = "Conformance against Ensembl VEP",
-  throughput = "Throughput", fastvep = "DuckVEP and FastVEP", haplotypes = "Haplotypes",
+  throughput = "Throughput", vep_rs = "DuckVEP and vep-rs", haplotypes = "Haplotypes",
   `haplotypes-indel` = "Haplotypes with indels", projection = "Transcript projection",
   `corpus-workflow` = "Corpus workflow", `mane-grch37` = "MANE v1.5 mapped to GRCh37")
 
