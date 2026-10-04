@@ -598,7 +598,6 @@ static const char *reason_name(duckvep_prediction_reason_t reason, duckvep_cds_e
     case DUCKVEP_REASON_NONCANONICAL_STOP: return "noncanonical_stop";
     case DUCKVEP_REASON_INTERNAL_STOP: return "internal_stop";
     case DUCKVEP_REASON_NON_LITERAL_ALLELE: return "non_literal_allele";
-    case DUCKVEP_REASON_ALLELE_OVER_50: return "allele_over_50_bases";
     case DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING: return "start_stop_classifier_pending";
     default: return "invalid_sequence";
     }

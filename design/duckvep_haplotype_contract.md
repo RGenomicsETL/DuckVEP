@@ -45,7 +45,7 @@ v2 changes which paths are eligible, not how an eligible path is classified. Eve
 | v1 refusal | v2 rule | Why the v1 classifier applies unchanged |
 |---|---|---|
 | `non_diploid_call` | A lane of a complete, phased call is predicted at any ploidy. A haploid call has one lane and nothing to phase. An unphased slot still makes the call `incomplete_input`. | A lane is one chromosome copy; its prediction depends on its edits only. |
-| `allele_over_50_bases` | Literal alleles of any length, bounded by the workspace limits (`max_allele_bytes`, `max_sequence_bases`), which fail explicitly. | The classifier reads the edited CDS; the cap was the csq comparison domain, not a property of the method. |
+| `allele_over_50_bases` | Literal alleles of any length, bounded by the workspace limits (`max_allele_bytes`, `max_sequence_bases`), which fail explicitly. | The classifier reads the edited CDS at any edit length. The 50-base cap was a v1 scoping choice with no recorded rationale; v2 removes it, and the reason code with it. Alleles over 50 bases have no csq comparison in the test evidence. |
 | `non_standard_codon_table` | Any genetic code the kernel supports. The start rule is ATG for the standard code (as in v1) and any start codon of the transcript's code otherwise; stops and translation follow the code. The first residue is the initiator, so a change between two start codons is not a peptide change. | Translation was already table-aware; only the start and stop tests were written for the standard code. |
 
 **Oracles.** csq remains the authority on its comparable domain (diploid, standard code), where v2 equals v1. Outside it:

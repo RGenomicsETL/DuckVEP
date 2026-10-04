@@ -115,7 +115,6 @@ typedef enum {
     DUCKVEP_REASON_NONCANONICAL_STOP,
     DUCKVEP_REASON_INTERNAL_STOP,
     DUCKVEP_REASON_NON_LITERAL_ALLELE,
-    DUCKVEP_REASON_ALLELE_OVER_50,
     /* No longer emitted since slice 5 (every eligible path is decided); kept so the numbering is stable. */
     DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING
 } duckvep_prediction_reason_t;

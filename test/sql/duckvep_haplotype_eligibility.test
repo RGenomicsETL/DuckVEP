@@ -79,7 +79,7 @@ CREATE TABLE hap_elig_calls AS SELECT e.event_index,e.seq_region,e.position,e.re
 # Keyed eligibility per sample/phase/lane. Samples: 1 cis pair, 2 trans control, 3 missing allele,
 # 4 unphased heterozygous, 5 heterozygous in PS 10 and PS 20 (cross-PS), 6 hom-alt plus one het PS, 7 SNV inside a
 # deletion, 8 contradictory SNVs, 9 two insertions in one gap, 10 duplicated record, 11 REF mismatch,
-# 12 intronic plus exonic, 13 deletion across an exon boundary, 14 51-base and 15 50-base insertions,
+# 12 intronic plus exonic, 13 deletion across an exon boundary, 14 a 51-base in-frame and 15 a 50-base frameshifting insertion,
 # 16 stop-creating MNV with a later SNV, 17 haploid call, 18 N allele, 30 MNV, 40 multiallelic ALT 2,
 # 21-26 transcripts 1-6 outside the CDS domain.
 
