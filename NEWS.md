@@ -1,118 +1,101 @@
 # DuckVEP
 
-## A single heterozygous site needs no phase (issue #12)
+## Strict handling of a single unphased heterozygote (issue #12)
 
-- Under the strict policy, an unphased heterozygous call that is the sample's only heterozygous or missing call on a transcript is read in slot order: the two haplotypes are the one with the allele and the one without. Two or more such sites, or an unphased site beside a phased one, stay `incomplete_input`. On HG002 this resolves 782 of 1,110 unphased-heterozygous paths; 157,343 of 158,137 paths are now predicted.
+- Under `phase_policy := 'strict'`, an unphased heterozygous call that is the sample's only heterozygous or missing call on a transcript is read in slot order: one haplotype carries the allele and the other does not. Two or more such sites, or an unphased site beside a phased one, produce `incomplete_input`. In the HG002 measurement, 782 of 1,110 such paths were resolved and 157,343 of 158,137 paths were predicted.
 
-## Read-through of a lost stop, and NMD exceptions (issue #13)
+## Lost-stop read-through and NMD exceptions (issue #13)
 
-- When the stop is lost, `protein` continues through the transcript's stored 3' flank to the next stop, or to the end of the flank; `sequence_flags` bit 16 marks it. On HG002 every one of the 363 single-edit paths with a numbered new stop in the per-variant protein HGVS has exactly that length.
-- New column `nmd_exceptions` (before `nominal_length_diff`): `start_proximal` when the premature stop lies within the first 100 coding bases, `long_exon` when it lies in an exon longer than 407 bases. The `ejc50` prediction is unchanged; on HG002, 234 of the 795 stop-gained paths it calls `trigger` carry an exception.
+- When a stop is lost, `protein` continues through the stored 3′ transcript flank to the next stop or the end of that flank; `sequence_flags` bit 16 marks read-through. In the HG002 measurement, all 363 single-edit paths with a numbered new stop in per-variant protein HGVS had the corresponding protein length.
+- `nmd_exceptions` reports `start_proximal` when a premature stop lies within the first 100 coding bases and `long_exon` when its exon exceeds 407 bases. The `ejc50` prediction is independent of these exception labels. In HG002, 234 of the 795 stop-gained paths predicted to `trigger` carried an exception.
 
-## Haplotypes on transcripts with an unannotated CDS start or end (issue #12)
+## Haplotype annotation of incomplete CDS models (issue #12)
 
-- Whole-haplotype prediction now covers `cds_start_NF` and `cds_end_NF` transcripts, including those that begin inside a codon. On HG002 predicted paths rise from 149,897 to 156,413 of 157,986, and no previously decided path changes.
-- With no annotated end, a stop is `stop_gained`, a frame still displaced at the end of the annotation is a frameshift, and an edit confined to the trailing partial codon is an `incomplete_terminal_codon_variant`. With no annotated start there is no start test.
-- Checked by hand-derived cases and, on HG002, by comparing single-edit haplotypes with the per-variant annotation: 91,212 of 91,708 are identical and the rest fall in named policy differences.
+- Whole-haplotype prediction supports `cds_start_NF` and `cds_end_NF` transcripts, including CDS starts inside a codon. In the recorded HG002 comparison, predicted paths numbered 149,897 in the baseline run and 156,413 in the expanded-domain run, among 157,986 paths; paths decided by the baseline retained their results.
+- Without an annotated CDS end, an edited stop is `stop_gained`, a frame still displaced at the annotation end is a frameshift, and an edit confined to the trailing partial codon is `incomplete_terminal_codon_variant`. Without an annotated start, no start-codon test is applied.
+- Hand-derived cases and an HG002 comparison of single-edit haplotypes with per-variant annotation found 91,212 identical results among 91,708 paths; the others fall into named policy differences.
 
-## vep-rs replaces FastVEP as the comparison
+## vep-rs comparison (version 0.3.1)
 
-- New benchmark against vep-rs 0.3.1 with executable VEP 116 adjudicating every disagreement (`benchmarks/benchmark_duckvep_vep_rs.sh`, report in `benchmarks/benchmark_duckvep_vep_rs.md`). On GIAB HG002 (4,070,522 alleles, Ensembl 116, 16 threads) DuckVEP takes 6.8 s against 9.4 s; on a single core the two are level (33.5 s against 34.4 s with vep-rs pinned; its `--fork 1` uses more than one core). The tools agree on 34,146,531 of 34,148,222 tuples on shared transcripts, and VEP sides with DuckVEP on 1,689 of the 1,691 that differ.
-- The FastVEP benchmark, its scripts, tests and recorded data are removed. The field projection and the replay input that the scale runner also uses stay, as `benchmarks/duckvep_field_projection.R` and `benchmarks/data/scale_contracts/field_replay_9bf888e`.
+- On GIAB HG002 (4,070,522 alleles, Ensembl 116), the recorded 16-thread end-to-end run measured 6.8 s for DuckVEP and 9.4 s for vep-rs. Separate one-core runs measured 33.5 s and 34.4 s; vep-rs `--fork 1` used more than one core. The tools agree on 34,146,531 of 34,148,222 consequence tuples on shared transcripts. Executable VEP sides with DuckVEP on 1,689 of the 1,691 disagreements. Methods and runner: [vep-rs comparison](benchmarks/benchmark_duckvep_vep_rs.md).
 
-## Wider haplotype domain (issue #12)
+## Whole-haplotype input domain (issue #12)
 
-- Whole-haplotype prediction covers complete phased calls of any ploidy (haploid chrX, chrY and MT calls included), literal alleles of any length, and transcripts in any supported genetic code. These were refused as `non_diploid_call`, `allele_over_50_bases` and `non_standard_codon_table`; the classifier itself is unchanged. On HG002 one of 157,986 paths changes: a 94-base insertion that was refused is now a frameshift with a gained stop.
-- Start and stop tests follow the transcript's genetic code. The standard code keeps the ATG start rule; another code accepts any of its start codons, and a change between two start codons is not a peptide change.
-- Checked by a metamorphic test (each lane of haploid, triploid and tetraploid calls equals the diploid lane with the same edits), a hand-derived 51-base insertion, and four edits read under NCBI table 2 against a standard-code control.
+- `duckvep_haplotypes` accepts complete phased calls of any ploidy, literal alleles of any length, and transcripts using supported genetic codes. Start and stop tests use the transcript's genetic code: table 1 uses the ATG start rule; other tables use their start-codon sets, and a change between start codons is not a peptide change.
+- In the recorded HG002 comparison, one of 157,986 paths differed: a 94-base insertion is classified as a frameshift with a gained stop. Hand-derived tests cover a 51-base insertion and four edits under NCBI table 2; a metamorphic test compares haploid, triploid and tetraploid calls with diploid lanes carrying the same edits.
 
-## One name per policy
+## Haplotype policy identifiers
 
-- The haplotype policy is `duckvep-coding`, the NMD rule is `ejc50` and the VEP-compatible phase policy is `vep_compat`. The version suffixes (`duckvep-coding-v1`, `ejc50-v1`) and the release-named value `vep116_compat` are gone; there is no alias.
+- Output identifies the prediction policy as `duckvep-coding`, the NMD rule as `ejc50`, and the VEP-compatible phase policy as `vep_compat`.
 
-## Conformance fuzzing to 100 bases
+## VEP conformance campaigns for long alleles
 
-- The random-allele generator (`generate_witnesses.R --max-random-length`) defaults to 100 bases, and the differential runner admits alleles of 101 bases (100 plus the VCF anchor). Two campaigns of 30,268 alleles each (seeds 173 and 29, about 15,100 alleles over 50 bases in each) agree exactly with executable VEP 116 on consequences, and every HGVS string matches or is absent on both sides.
-- The runner loads a DuckHTS build next to DuckVEP for its VCF, GFF and FASTA readers (`DUCKVEP_READER_EXT`), since DuckVEP no longer ships inside DuckHTS.
+- The random-allele generator `generate_witnesses.R --max-random-length` defaults to 100 bases; the differential runner accepts alleles of 101 bases, including the VCF anchor. Two campaigns of 30,268 alleles each (seeds 173 and 29, approximately 15,100 alleles over 50 bases per campaign) matched executable VEP 116 on consequences, with each HGVS string either matching or absent on both sides.
+- The runner uses `DUCKVEP_READER_EXT` to load a DuckHTS build for VCF, GFF and FASTA readers. The field projection and replay inputs used by the scale runner are `benchmarks/duckvep_field_projection.R` and `benchmarks/data/scale_contracts/field_replay_9bf888e`.
 
 ## Model snapshots
 
-- `duckvep_model_save(name, path)` writes a loaded model's native arrays to one file, and `duckvep_model_restore(name, path)` loads a model by mapping that file read-only. A relation load copies the model through the table scan, the sort, the materialized result and the native arrays; a restore copies nothing. Ensembl 116 GRCh38 (644,427 transcripts, one thread): 0.54 s and 1.3 GiB peak RSS, against 3.0 s and 3.4 to 5.2 GiB from relations, and the mapped pages are shared between processes that restore the same file.
-- A snapshot is validated, not trusted: header, section bounds and a checksum of every byte, the loaders' region and coordinate rules, the kernel's model validation and the reference FASTA check all run at restore. Wrapped circular models are lifted again. The mapped bytes are charged to the native budget. Both hosts share the code (`src/core/duckvep_core_snapshot.c`); platforms without file mapping read the file into one block.
+- `duckvep_model_save(name, path)` writes a loaded model's native arrays to one file. `duckvep_model_restore(name, path)` validates and maps that file read-only. For Ensembl 116 GRCh38 (644,427 transcripts, one thread), the recorded restore took 0.54 s with 1.3 GiB peak RSS; relation loading took 3.0 s and 3.4–5.2 GiB. Processes restoring the same file share mapped pages.
+- Restore verifies the header, section bounds, full-file checksum, model coordinates and reference FASTA. Wrapped circular models are lifted on restore, and mapped bytes count against the native budget. Platforms without file mapping read the file into one block.
 
-## v2 host: full-chunk writers (issue #48)
+## DuckDB C API v2 preview host (issue #8)
 
-- `duckvep_haplotype_scan` and `duckvep_coding_calls` emit full chunks on the v2 host instead of one row per chunk. The host layer opens each list child once per call and grows it as later rows extend the list; the shared core is unchanged. HG002 (157,986 rows, one core): the scan takes 2.3 s instead of 12.2 to 12.8 s, and the stages total 8.0 s against v1's 7.95 s, with the same rows and checksum.
+- `make release_v2` builds a v2 preview extension for DuckDB's stable C API v2, alongside the v1 release build. It uses the pinned preview SDK in `duckdb_capi_v2/` and `duckvep-package.json`; its footer is `C_STRUCT`, its extension API version is `v2.0.0`, and loading it executes no SQL.
+- The recorded v2 preview-host campaign covered 27 public functions, with behavior and outputs compared against v1 in [`docs/v2-host.md`](docs/v2-host.md). A v1 comparison of `duckvep_so_terms`, `duckvep_allele_geometry` and `duckvep_breakend_geometry` covered 52 test cases.
 
-## Coexistence with DuckHTS
+## Native resource control on the v2 host (issue #8)
 
-- The webR side module exports only `duckvep_init_c_api` and binds its bundled HTSlib, zlib and cgranges locally (`SIDE_MODULE=2`, an explicit export list and `-Bsymbolic`). It used to export 1,445 bundled symbols and import 127 of them through the GOT, where Rduckhts's own HTSlib could replace them. Native builds already exported one symbol. `test/scripts/check_wasm_exports.py` checks the webR CI build.
-- DuckHTS 1.5.2 and earlier register their own, older `duckvep_*` functions. Loaded next to DuckVEP they split model loading and annotation across the two extensions (`unknown model name`); the README says to use a newer DuckHTS.
+- `duckvep_native_budget`, `duckvep_native_budget_set`, `duckvep_native_budget_reset_high_water` and `duckvep_worker_limits_set` use the process-wide budget on the v2 preview host. Model publication, annotation workers, haplotype scans and the coding-calls reader share the budget. A capacity refusal publishes no model, leaves the connection usable and reports an explicit error (`test/sql_v2/v2_budget.sql`).
 
-## DuckDB C API v2 host, slice 6: resource control (issue #8)
+## Haplotype capture on the v2 host (issue #8)
 
-- `duckvep_native_budget`, `duckvep_native_budget_set`, `duckvep_native_budget_reset_high_water` and `duckvep_worker_limits_set` run on the v2 preview host through the shared `src/core/duckvep_core_budget.c` (v1 uses it too; its output is unchanged). The v2 model publish, annotation workers, haplotype scan and coding_calls reader are charged to the same budget, and over a tiny budget they give the explicit capacity error, publish nothing and leave the connection usable (`test/sql_v2/v2_budget.sql`). All 27 public functions now run on v2, with equality to v1 recorded; see the final status table in `docs/v2-host.md`.
+- `duckvep_haplotypes`, `duckvep_coding_transcripts` and `duckvep_coding_calls` run on the v2 preview host. Because v2 has no private connection, `duckvep_haplotype_load_sql` returns caller-side statements. The `duckvep_stage` COPY format captures rows for one `JOB` into spillable column collections, and `duckvep_haplotype_scan('<job>')` replays them once.
+- Full-row hashes match v1 across vertical, same-codon, frame, start/stop and NMD suites, 47 policy, limit and error cases, and discovery and `coding_calls` fixtures. HG002 through `duckvep_coding_calls` produced 157,986 rows with checksum `1456007180270799092358516`. Details: [`docs/v2-host.md`](docs/v2-host.md).
 
-## DuckDB C API v2 host, slice 5: haplotype capture (issue #8)
+## Loss-of-function relation (issue #41)
 
-- `duckvep_haplotypes`, `duckvep_coding_transcripts` and `duckvep_coding_calls` run on the v2 preview host. The replay stream, its bounded workspace and the result writers moved to `src/core/duckvep_core_haplotypes.c` (DuckDB only through the host layer), the fused VCF/BCF reader to `src/core/duckvep_core_coding_calls.c` and discovery to `src/core/duckvep_core_discovery.c`; v1 keeps its private-connection input and its named parameters and its output is unchanged (all v1 gates pass). v2 has no private connection, so `duckvep_haplotype_load_sql` returns the caller-side statements (the normalization v1 runs internally, wrapped around the caller's query), the `duckvep_stage` COPY format takes a `JOB` and captures the rows into spillable column collections, and `duckvep_haplotype_scan('<job>')` replays them once. Output equals v1 on the vertical, same-codon, frame, start/stop and NMD suites, 47 policy, limit and error cases and the discovery and `coding_calls` fixtures (full-row hashes), and HG002 through `duckvep_coding_calls` gives 157,986 rows with checksum `1456007180270799092358516`. See `docs/v2-host.md`.
+- `duckvep_lof_sql(annotations, transcripts, reference [, options])` returns per-variant, per-transcript LOFTEE-style `lof`, `lof_filter`, `lof_flags`, `lof_info` and `lof_unchecked` fields from annotation, transcript and reference relations. Implemented rules follow `konradjk/loftee` at `a46b502`; missing resources are named in `lof_unchecked`, and MaxEntScan splice predictions are not implemented.
+- With GRCh38 chr21, ancestor, PhyloCSF and GERP weighting off, comparison with VEP 116 and LOFTEE matched `LoF`, `LoF_filter`, `LoF_flags` and `LoF_info` for 59,668 pairs from 6,845 HG002 and ClinVar variants, and 2,499 pairs from a 177-allele two-strand set. See [LoF evidence](benchmarks/duckvep_lof.md).
 
-## `duckvep_lof_sql` on the v2 host (issue #8)
+## Annotation and projection on the v2 host (issue #8)
 
-- The text assembly and option rules of `duckvep_lof_sql` moved to `src/core/duckvep_core_lof.c` and both hosts call it; its text is byte-identical on v1 and v2 over a 34-case option matrix, and its SQL runs on v2 over the README and rich models with rows equal to v1's. A DECIMAL is not accepted as a number option on either host.
+- `duckvep_annotate_sql`, `duckvep_annotate_projected_sql` and `duckvep_transcript_projection_sql` execute on the v2 preview host. Their output matches v1 for compact, rich, HGVS with a reference FASTA, projected and mixed structural/breakend events across three models, plus 11,100-row multi-vector runs.
+- A separate v1-host measurement used 100,000 GIAB sites, compact output, one pinned core and five alternating runs: median throughput was 1,040 ns per variant against 1,080 ns per variant for main, with identical rows.
 
-## DuckDB C API v2 host, slice 4b: the annotation natives (issue #8)
+## Model loading on the v2 host (issue #8)
 
-- The ten `_duckvep_annotate_*` natives (batch preparation, per-worker state, kernel run, HGVS and projection, result writers) moved from `src/duckvep_annotate.c` to `src/core/duckvep_core_annotate_run.c`, which reaches DuckDB only through a small host layer (`duckvep_host.h`); the v1 layer is macros over the same v1 C API calls, so v1 results are byte-identical. The v2 preview host registers the natives and `__duckvep_projection_code`, so `duckvep_annotate_sql`, `duckvep_annotate_projected_sql` and `duckvep_transcript_projection_sql` execute there, and their output equals v1's row for row (compact, rich, HGVS with a reference FASTA, projected, and mixed structural/breakend events, on three models, plus 11,100-row multi-vector runs). v1 throughput is unchanged: on 100,000 GIAB sites (compact, one pinned core, five alternating runs each) the median is 1,040 ns per variant against 1,080 for main, with identical rows.
+- `duckvep_model_load_sql()` returns statements for caller-side execution. The v2 preview host stages relation rows with `COPY ... (FORMAT duckvep_stage)` in the caller's transaction, so temporary tables and uncommitted rows are visible; `duckvep_model_publish()` builds and installs the model. A failed or cancelled COPY stages nothing, and a failed publish installs nothing. Byte-equal model fingerprints were checked for three fixture models across hosts. The host-specific usage is documented in [`docs/v2-host.md`](docs/v2-host.md).
 
-## DuckDB C API v2 host, slice 4a: the model sink (issue #8)
+## SQL builders on the v2 host (issue #8)
 
-- The resident model (arrays, the six relation loaders and their validation, FASTA check, lifting, kernel, registry) moved to `src/core` and reads *row sources*; v1 backs them with its private-connection queries and loads exactly as before. The v2 preview host loads through `COPY ... (FORMAT duckvep_stage)` into spillable staging in the caller's own transaction (TEMP tables and uncommitted rows are visible), then `duckvep_model_publish()` builds and installs the model; `duckvep_model_load_sql()` returns the statements, and `rduckvep_load_model()` runs either form. A failed or cancelled COPY stages nothing and a failed publish installs nothing. Both hosts load byte-equal models: the new internal `_duckvep_model_fingerprint()` is equal for three fixture models. `docs/v2-host.md` lists the user-facing differences.
+- The v2 preview host serves the twelve SQL builders: `duckvep_ensembl_*_sql`, `duckvep_model_receipt_sql`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql` and the five `duckvep_prepare_*_sql` functions. Their generated SQL matches v1 in a 192-case matrix covering option keys, defaults, invalid options, identifier quoting and NULL arguments. Preparation queries return the same rows on both hosts.
 
-## DuckDB C API v2 host, slice 3 (issue #8)
+## Additional row functions on the v2 host (issue #8)
 
-- The text assembly of the twelve SQL builders (`duckvep_ensembl_*_sql`, `duckvep_model_receipt_sql`, `duckvep_annotate_sql`, `duckvep_annotate_projected_sql`, `duckvep_transcript_projection_sql`, the five `duckvep_prepare_*_sql`) moved to `src/core`, and both hosts call it. The text each builder returns is byte-identical to the previous build over a 192-case matrix (every option key, defaults, invalid options, identifier quoting, NULL arguments). The v2 preview host serves all twelve; the preparation builders' SQL runs there and gives the v1 rows.
+- `duckvep_repeat_alleles`, `duckvep_phase_call`, `_duckvep_revcomp`, `_duckvep_raw_gt` and `_duckvep_record_order` produce v1-matching results in 126 cases, including nested output beyond one vector, NULLs inside lists and structs, and errors. `_duckvep_revcomp` and `_duckvep_raw_gt` return NULL children for NULL inputs.
 
-## LOFTEE-equivalent loss-of-function relation (issue #41)
+## Haplotype scale qualification (issue #2)
 
-- `duckvep_lof_sql(annotations, transcripts, reference [, options])` is a builder, used as `FROM query(duckvep_lof_sql(...))`. From the rows of `duckvep_annotate_projected_sql`, the model's transcript relation (exon list, biotype, strand, CDS bounds) and a reference-chunk relation, it returns per variant and transcript `lof` (`HC`, `LC` or NULL), `lof_filter`, `lof_flags` and `lof_info`, formatted like LOFTEE's, plus `lof_unchecked`, which names every check that could not run. The rules are joins and a `CASE`: no plugin system, no new engine code. They follow konradjk/loftee at `a46b502` for stop-gained, frameshift, splice donor and splice acceptor variants on protein-coding transcripts: END_TRUNC (LOFTEE's distance convention; the unweighted 50 bp rule, or the GERP-weighted rule when a `gerp` relation is given), NO_EXON_NUMBER, SINGLE_EXON, EXON_INTRON_UNDEF, INCOMPLETE_CDS (with `check_complete_cds`), SMALL_INTRON (`min_intron_size`, default 15), GC_TO_GT_DONOR, 5UTR_SPLICE, 3UTR_SPLICE, NON_CAN_SPLICE, NAGNAG_SITE, ANC_ALLELE (with an `ancestor` relation) and PHYLOCSF_WEAK and PHYLOCSF_UNLIKELY_ORF (with a `phylocsf` relation). A missing resource is reported in `lof_unchecked`, never guessed. The MaxEntScan splice predictions, which LOFTEE leaves off by default, are not implemented. `rduckvep_lof_sql()` is the R wrapper.
-- Parity with VEP 116 and the LOFTEE plugin (GRCh38, chr21, ancestor, PhyloCSF and GERP weighting off): exact agreement of LoF, LoF_filter and LoF_flags on all 59,668 variant-transcript pairs of 6,845 HG002 and ClinVar variants and on all 2,499 pairs of a 177-allele synthetic set on both strands, with no missing or extra pair; `LoF_info` also agrees. See `benchmarks/duckvep_lof.md` and `scripts/lof_parity.py`.
+- `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)` returns resident-model transcript ordinals touched by a normalized coding event. It matches the annotation builder's CDS-overlap pairs, including its shared-anchor, interbase-insertion and short-intron rules. On whole HG002 it matched 247,374 pairs with no missing or extra pair.
+- CDS and protein difference alignment measured 23.3 s to 3.4 s (6.8×) on the HG002 genome. Its widening band proves the full-matrix optimum, including traceback ties. `max_alignment_cells` applies to the band required by the alignment; an unfit band is rejected with its cell count. A 20 kb coding sequence with a deletion and substitution used 322 million cells under the positional bound and 180 thousand for the required band; the longest human transcripts required 11.7 billion full-matrix cells, above the native budget.
+- In Ensembl 116 GRCh38 model-load measurements, load time was 3.5 s to 2.5 s and the high-water mark was 2.7 GiB to 1.6 GiB. In the cold mode-B HG002 qualification with identical input, model, core and caps, DuckVEP took 12.58 s and `bcftools csq` 19.66 s (ratio 0.640; the 0.5 gate was not met); warm execution measured 0.429. A 5,000,000-record single-sample MANE job took 16.4 s within the 16 GiB, 4 GiB native and 8 GB DuckDB caps. See the [qualification record](benchmarks/data/haplotype_scale/README.md).
 
-## DuckDB C API v2 host, slice 2 (issue #8)
+## Circular sequence regions (issue #7)
 
-- The host-neutral row logic of the ported functions moved to `src/core`, and both hosts call it (the v1 callbacks keep their own vector reads and writes). The v2 preview host now also serves `duckvep_repeat_alleles`, `duckvep_phase_call`, `_duckvep_revcomp`, `_duckvep_raw_gt` and `_duckvep_record_order`, identical to the v1 host on 126 test cases, including nested output beyond one vector, NULLs inside lists and structs, and errors.
-- Fixed: `_duckvep_revcomp` read an uninitialized string slot for NULL inputs (an intermittent crash) and returned `''` for them; it now returns NULL. `_duckvep_raw_gt` left the fields of NULL results valid with garbage; they are now NULL.
+- Transcripts, exons, regulatory features and motifs that cross a circular region's origin are annotated on lifted intervals. Rotation tests compare consequences, projected edits, peptides, NMD and HGVS; circular models without wrapped objects, including human MT, match the linear path byte for byte. Ensembl Genomes 63 includes 19 public origin-crossing transcripts, 18 bacterial or archaeal.
+- Structural, breakend and phased edit-set entry points reject models containing wrapped circular objects. VEP 116 models origin-crossing transcripts as reversed-bound intervals and is not an oracle for those cases. In three cached genomes, VEP agrees on the other transcripts except flank rows available only through the origin; rotation and linear-model checks provide the crossing-transcript evidence. The survey is in [`benchmarks/data/circular_source_survey.md`](benchmarks/data/circular_source_survey.md).
+- An origin-focused throughput test measured a 17–20% one-thread cost for interval lifting; output checksums matched across thread counts and rotations.
 
-## DuckDB C API v2 host, slice 1 (issue #8)
+## Enforced native memory budget (issue #3)
 
-- A second, preview build of the extension targets DuckDB's stable C API v2 (`make release_v2`, footer `C_STRUCT`, extension API `v2.0.0`), next to the unchanged v1 build that ships. It uses only stable v2 functions against a pinned preview SDK (`duckdb_capi_v2/`, pins in `duckvep-package.json`) and runs no SQL at LOAD. This slice ports `duckvep_so_terms`, `duckvep_allele_geometry` and `duckvep_breakend_geometry`, whose results are identical to the v1 host's on 52 test cases. `docs/v2-host.md` maps all 25 public functions to the remaining slices.
+- Native owners allocate through one process-wide atomic budget, default **4 GiB**. Blocks are charged before allocation, large blocks use page-rounded capacity, and a growing `realloc` keeps the old block charged. Refusal reports requested, used and permitted bytes; model publication fails without disturbing loaded models.
+- `duckvep_native_budget()` reports current and high-water bytes per owner. `duckvep_native_budget_set(bytes)` changes the ceiling, and `duckvep_native_budget_reset_high_water()` resets high-water marks.
+- Annotation allows at most **6** concurrent workers. Each worker has a **128 MiB** scratch lease and a **256 MiB** emitted-output allowance; idle workers retain at most **64 MiB**. The measured emitted-output peak was 110–128 MiB. `duckvep_worker_limits_set(workers, scratch_bytes, emit_bytes, idle_bytes)` configures these limits. An allele or vector exceeding its lease returns a capacity error.
+- `make test_fault_injection` tests allocation failures under AddressSanitizer and LeakSanitizer. htslib buffers are outside this budget; each open FASTA index uses a fixed reservation.
 
-## Haplotype scale qualification (issue #2, slice 7)
+## Native SQL builder interface
 
-- `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)` returns the ascending model ordinals of the transcripts the VCF event touches in coding sequence, from the resident interval index. It finds exactly the (event, transcript) pairs of the annotation builder's CDS overlap: the event is normalized inside the scalar as the builder does (a shared anchor base creates no overlap, an insertion is an interbase point, introns of at most 13 bases inside the CDS count as coding), so a whole-genome VCF reduces to its coding records before any per-record work. Records in an intron, UTR, flank or intergenic sequence, alleles that are not literal bases and events without a difference return an empty list. Integer arguments of any width and signedness bind. Lifted circular models are refused, like `duckvep_haplotypes`. It stays a separate scalar next to `duckvep_haplotypes` (whose input is a caller-staged relation of calls); `rduckvep_coding_transcripts()` is its R wrapper. On whole HG002 it matches the builder on 247,374 pairs with none missing or extra.
-- The CDS and protein difference alignment of `duckvep_haplotypes` is 6.8 times faster on the HG002 genome (23.3 s to 3.4 s of prediction). Its band starts at the length change and widens until the optimum is proved to lie inside it, so the traceback, ties included, is that of the full matrix; rows inside the common prefix are closed-form; equal-length comparisons scan for differing runs. Output is byte-identical. `max_alignment_cells` is now checked against the band an alignment needs, not against the band of a feasible positional bound: a 20 kb coding sequence with a deletion and a substitution needed 322 million cells and needs 180 thousand, and the longest human transcripts needed 11.7 billion (more than the native budget), so long transcripts with several edits no longer fail. A band that is still to be tried and does not fit is refused with an explicit `max_alignment_cells` error naming its cell count.
-- Model load validates stored sequences with a table, computes the first-stop cache with a table lookup per codon, and no longer copies the sequence pools a second time when rows arrive in transcript order: 3.5 s to 2.5 s for Ensembl 116 GRCh38, and a load high-water mark of 1.6 GiB instead of 2.7 GiB.
-- `benchmarks/haplotype_scale/` and `benchmarks/data/haplotype_scale/` hold the scale qualification: on identical HG002 input, transcript model, core and caps, cold DuckVEP mode B takes 12.58 s against 19.66 s for `bcftools csq` (ratio 0.640, the 0.5 gate is not met; warm execution is 0.429), and a 5,000,000-record single-sample MANE job runs in 16.4 s inside the 16 GiB, 4 GiB native and 8 GB DuckDB caps.
-
-## Circular sequence regions (issue #7, slice 2)
-
-- Models with origin-crossing transcripts, exons, regulatory or motif features can now be pinned and annotated. A circular region that carries such an object executes on a lifted linear interval: positions shift by a multiple of the region length, every object is admitted at three images, wrapped spans become `[s, e + L]`, and one row is kept per event and source object. Consequences, projected edits, peptides, NMD and HGVS are identical under rotation of reference, model and events, and equal an ordinary linear model. Reference windows that wrap are fetched from the existing worker scratch. `model_sha256` is unchanged; circular regions without a wrapped object, human MT included, produce byte-identical output.
-- Structural, breakend and phased edit-set entry points still refuse a model with a wrapped circular object, with an explicit error.
-- Circular coordinates are independent of the mitochondrial codon table: `codon_table` selects a translation rule and says nothing about topology.
-- Public origin-crossing transcripts exist (19 in Ensembl Genomes 63, 18 of them bacterial or archaeal) but VEP 116 models them as intervals with reversed bounds, so it is not an oracle for them. On three genomes with a VEP cache, DuckVEP equals VEP on every other transcript except flank rows that exist only through the origin; the crossing object is property-proved and linear-model-proved. See `benchmarks/data/circular_source_survey.md`, `ERRATA.md` and `scripts/circular_vep_differential.py`.
-- `benchmarks/duckvep_circular_origin.py` records one- and multi-thread throughput, output equality and peak memory on an origin-focused workload: lifting costs about 17-20% of one-thread throughput and the output checksum is identical across threads and rotations.
-- `make test_properties` builds and runs the native theft/greatest properties (`test_properties_sanitized` adds ASan and UBSan).
-
-## Enforced native budget and bounded execution (issue #3)
-
-- Every native owner (model arrays, interval indexes, reference readers, workspaces, per-worker result and text arenas, SQL builders) allocates through one process-wide atomic budget, default **4 GiB**. Blocks are charged before allocation, with page-rounded capacity for large blocks and the old block still charged while a `realloc` grows. A refusal is an explicit `capacity error: ... budget exceeded (requested N bytes, M in use, limit L)`; nothing is truncated. A model load that exceeds the budget publishes nothing and leaves every loaded model usable.
-- `duckvep_native_budget()` reports current and high-water bytes per owner; `duckvep_native_budget_set(bytes)` sets the ceiling (it cannot go below the bytes already charged); `duckvep_native_budget_reset_high_water()` restarts the high-water marks.
-- Annotation admits at most **6** concurrent workers; each holds a **128 MiB** native scratch lease and a **256 MiB** emitted-output allowance (raised from 64 MiB, which complete-17 exceeded on gene-dense input; the peak measured is 110-128 MiB), charged as it grows, and an idle worker keeps at most **64 MiB**. `duckvep_worker_limits_set(workers, scratch_bytes, emit_bytes, idle_bytes)` changes them. An allele or vector over its lease is a capacity error.
-- `make test_fault_injection` builds an AddressSanitizer + LeakSanitizer extension whose allocator can fail the Nth allocation and fails every allocation of model load and annotation in turn. htslib's own buffers are not routed through the budget; a fixed reservation stands in for each open FASTA index.
-
-## Breaking change: native SQL builders
-
-DuckVEP registers functions without modifying the database catalog during `LOAD`. Preparation, annotation and projection run SQL emitted by native scalar builders in the caller's connection. Existing macro invocations must be migrated; `LOAD` does not install compatibility macros.
+DuckVEP registers functions without modifying the database catalog during `LOAD`. Preparation, annotation and projection run SQL emitted by native scalar builders in the caller's connection. Existing macro calls must use the builder interface; `LOAD` does not install compatibility macros.
 
 | Before | After |
 | --- | --- |
@@ -123,19 +106,18 @@ DuckVEP registers functions without modifying the database catalog during `LOAD`
 | `FROM duckvep_transcript_projection('events', 'annotations', 'transcripts')` | `FROM query(duckvep_transcript_projection_sql('events', 'annotations', 'transcripts'))` |
 | `FROM duckvep_model_receipt('regions', 'transcripts', ...)` | `FROM query(duckvep_model_receipt_sql('regions', 'transcripts', ...))` |
 
-`duckvep_annotate_sql()` requires the model name. Optional builder settings are fields of a STRUCT rather than named function parameters. `Rduckvep` exposes matching `rduckvep_*_sql()` wrappers and `rduckvep_annotate()` for a data-frame result.
+`duckvep_annotate_sql()` requires a model name. Optional builder settings are fields of a trailing STRUCT. `Rduckvep` provides matching `rduckvep_*_sql()` wrappers and `rduckvep_annotate()` for a data-frame result.
 
-## Species structural evidence and builder robustness (issue #4 item 6)
+## Species structural evidence and builder behavior (issue #4)
 
-- New executable differential `test/duckvep/conformance/species_sv_vep116_differential.R` compares DEL, DUP, DUP:TANDEM, INV, symbolic INS, paired BND and structural HGVS against digest-pinned VEP 116 for mouse GRCm39, fly BDGP6.54 and Arabidopsis TAIR10. Results, pins and the retained BND counterexamples are in `benchmarks/data/sv_species_evidence.md`.
-- `duckvep_prepare_breakend_pairs_sql()` resolved mates with a nested-loop join and was quadratic (100,000 records took 20 s); it is now a hash join and about 100 times faster there, with identical output.
-- `duckvep_prepare_sv_geometry_sql()` no longer fails a whole batch with an INT64 overflow error on extreme POS/END/CIPOS/CIEND values; such rows return `unsupported_geometry`.
-- `test/sql/duckvep_builder_errors.test` and `Rduckvep`'s `test_builder_errors.R` cover NULL, malformed and extreme input for all five STR/SV/BND/HGVS builders; `benchmarks/benchmark_sv_builders.R` measures their time and peak RSS.
-- The human and species differential scripts read model, FASTA, cache and extension paths from `DUCKVEP_GRCH38_MODEL`, `DUCKVEP_GRCH38_FASTA`, `DUCKVEP_GRCH38_VEP_CACHE`, `DUCKVEP_GRCH37_FASTA` and `DUCKVEP_EXTENSION_FILE`, keeping the previous values as defaults. `scripts/run_species_vep116_docker.sh` honors `VEP_BUFFER_SIZE`.
+- `test/duckvep/conformance/species_sv_vep116_differential.R` compares DEL, DUP, DUP:TANDEM, INV, symbolic INS, paired BND and structural HGVS with digest-pinned VEP 116 for mouse GRCm39, fly BDGP6.54 and Arabidopsis TAIR10. Results, pins and retained BND examples are in [`benchmarks/data/sv_species_evidence.md`](benchmarks/data/sv_species_evidence.md).
+- `duckvep_prepare_breakend_pairs_sql()` resolves mates with a hash join. On 100,000 records the measured run took 20 s with the nested-loop implementation and was about 100 times faster with the hash join, with identical output.
+- `duckvep_prepare_sv_geometry_sql()` reports extreme POS/END/CIPOS/CIEND values as `unsupported_geometry` rather than failing the batch with an INT64 overflow.
+- `test/sql/duckvep_builder_errors.test` and `Rduckvep`'s `test_builder_errors.R` cover NULL, malformed and extreme inputs for all five STR/SV/BND/HGVS builders. `benchmarks/benchmark_sv_builders.R` records time and peak RSS.
 
-## BND record identity and structural HGVS (issue #4 items 3 and 4)
+## Breakend identity and structural HGVS (issue #4)
 
-- `duckvep_prepare_breakend_pairs_sql()` validates MATEID/EVENT identity, mate coordinates, mate orientation and inserted-sequence length above `duckvep_breakend_geometry()`. It returns one row per physical VCF record with a stable `reason`; a mate is looked up, never merged. Fusion, phase and inserted-only sequence are never asserted from ALT syntax.
-- `duckvep_prepare_breakend_fusion_sql()` joins that identity with caller-supplied endpoint genes and reports partner-gene evidence per physical record (`fusion_asserted` is always false).
-- `duckvep_prepare_structural_hgvs_sql()` emits unshifted genomic HGVS and an equivalent literal edit for exact-span symbolic DEL, DUP and INV; every other allele is `unavailable` or `unsupported` with a reason. VEP 116 emits no HGVS for symbolic structural alleles or breakends. See `docs/structural-identity-hgvs.md`.
-- `duckvep_breakend_geometry()` returned NULL STRUCT rows with uninitialised children for non-breakend input, which crashed when the vector was copied (for example under `TRY`); children are now NULL.
+- `duckvep_prepare_breakend_pairs_sql()` validates MATEID/EVENT identity, mate coordinates, orientation and inserted-sequence length. It returns one row per physical VCF record with a stable reason; mate records are not merged. Fusion, phase and inserted-only sequence are not inferred from ALT syntax.
+- `duckvep_prepare_breakend_fusion_sql()` joins identity evidence to caller-supplied endpoint genes and reports partner-gene candidates per physical record. It does not assert a fusion or frame.
+- `duckvep_prepare_structural_hgvs_sql()` emits unshifted genomic HGVS and an equivalent literal edit for exact-span symbolic DEL, DUP and INV. Other alleles return `unavailable` or `unsupported` with a reason. VEP 116 emits no HGVS for symbolic structural alleles or breakends; see [`docs/structural-identity-hgvs.md`](docs/structural-identity-hgvs.md).
+- `duckvep_breakend_geometry()` returns NULL child fields for non-breakend input.

@@ -2,8 +2,8 @@ DuckVEP SQL transcript presentation
 ================
 
 This measures the complete 23-column result of
-`query(duckvep_transcript_projection_sql(events, annotations, transcripts))` as a
-DuckDB temporary table. It is the SQL reference, not a fused native
+`query(duckvep_transcript_projection_sql(events, annotations, transcripts))`
+as a DuckDB temporary table. It is the SQL reference, not a fused native
 implementation. The literal alleles and consequence rows are prepared
 before timing. The timer includes the macro’s validation, joins,
 coordinate projection, codon/peptide calculation and complete output
@@ -18,7 +18,7 @@ CDS phase padding from those inputs. The unchanged independent-event
 generator adds 1,000 seed-173 random alleles to its targeted witnesses.
 Only record IDs are relabelled so repeated source alleles retain
 separate event keys. Each set is repeated eight times with distinct
-keys. These tiny warm models are a reproducible adapter workload, not a
+keys. These warm models are a reproducible adapter workload, not a
 genome-scale annotation or file-ingestion benchmark.
 
 The `withheld_sequence` workload retains the forward model’s CDS
@@ -37,6 +37,32 @@ and every typed row sorted by all columns, including duplicates and
 NULLs. It must match across passes and worker counts.
 
 ## Measured materialization
+
+The plots show the latest recorded source revision on one host. Time
+ranges are observed minima and maxima across three iterations; RSS is
+the process high-water mark, not isolated operator memory. Worker-count
+points are shown by case because model and output cardinalities differ
+across cases.
+
+<figure>
+<img src="figures/projection-timing.png"
+alt="Projection SQL time by case and worker count. Points are medians; ranges are observed minima and maxima." />
+<figcaption aria-hidden="true">Projection SQL time by case and worker
+count. Points are medians; ranges are observed minima and
+maxima.</figcaption>
+</figure>
+
+<figure>
+<img src="figures/projection-rss.png"
+alt="Whole-process peak RSS by case and worker count." />
+<figcaption aria-hidden="true">Whole-process peak RSS by case and worker
+count.</figcaption>
+</figure>
+
+<details>
+<summary>
+Recorded materialization measurements
+</summary>
 
 | source_revision | case              | threads | input_alleles | expanded_transcript_rows | output_rows | json_utf8_bytes | iterations | median_seconds | min_seconds | max_seconds | peak_rss_bytes |
 |:----------------|:------------------|--------:|--------------:|-------------------------:|------------:|----------------:|-----------:|---------------:|------------:|------------:|---------------:|
@@ -67,7 +93,14 @@ NULLs. It must match across passes and worker counts.
 | 41c000abfd72    | withheld_sequence |       1 |         10144 |                    10144 |       10144 |         4589514 |          3 |          0.028 |       0.028 |       0.029 |      224993280 |
 | 41c000abfd72    | withheld_sequence |       4 |         10144 |                    10144 |       10144 |         4589514 |          3 |          0.021 |       0.021 |       0.022 |      260194304 |
 
+</details>
+
 ## Identity and complete output
+
+<details>
+<summary>
+Build, input and output identities
+</summary>
 
 |     | source_revision                          | extension_sha256                                                 | build_binding                 | machine                                                    | cpu                                 | duckdb_version |
 |:----|:-----------------------------------------|:-----------------------------------------------------------------|:------------------------------|:-----------------------------------------------------------|:------------------------------------|:---------------|
@@ -82,6 +115,8 @@ NULLs. It must match across passes and worker counts.
 | 3   | reverse           | da6bbb2e1cd5c354a62a831aa37bcbef417dbefcfe4f55260650be03dc72cb7f | 7a30f5acd27936582d7a1856e95baea8b92de01e2a6c93312c915a7d16fb8c02 | 01d1f025213063a747cb0c53cdcbea67262f32ab1dbdb56aa4131d72142e6d26 | 3f297fdf19db2876b614b01cc77077aa82394810fd38fc17eacc2a686c1f5a3a |
 | 5   | three_exon_phase2 | d7d75e06f61766d825b288f4846e827db1cedd7193c9ce722e59d0bb27d756ae | 4e554456fd7f761f54ea25ac8def4bcfd92dc8810e69ea8058e2d7c2917c6dbc | 01d1f025213063a747cb0c53cdcbea67262f32ab1dbdb56aa4131d72142e6d26 | 4c983975b15fe4d200158a9c1d87f25ce874345bdaeba45431679338744e4ce5 |
 | 25  | withheld_sequence | 3f79dffd03a5d552e89d15a3eb393c0dd2428ef86cf2f02ce32cf8ddbd1dfe3e | 41defe13bfea82d43afc45dd1016c678fc199e634eab215309477ee0bc821685 | 01d1f025213063a747cb0c53cdcbea67262f32ab1dbdb56aa4131d72142e6d26 | 1e00b0c3afefe1a03e0f07e0888a5a00eb8a41304d3330ba79acbd8d7a11ba82 |
+
+</details>
 
 The first `f0184155b0fa` runs establish this complete-contract baseline.
 Later rows retain that measurement rather than replace it. The following

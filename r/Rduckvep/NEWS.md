@@ -1,88 +1,17 @@
 # Rduckvep
 
-- `rduckvep_haplotypes()` returns the new `nmd_exceptions` column, reads a lost stop through into the 3' flank in `protein`, and
-  predicts transcripts whose CDS start or end is not annotated.
-
-- `rduckvep_haplotypes()` covers complete phased calls of any ploidy, alleles of any length and transcripts in any supported
-  genetic code. The policy is reported as `duckvep-coding`, the NMD rule as `ejc50`, and the VEP-compatible phase policy is
-  `phase_policy = "vep_compat"`.
-
-- `rduckvep_save_model()` and `rduckvep_restore_model()` wrap the native model snapshots: a restored model is mapped from its file, loads
-  several times faster than from relations, and is shared in memory between R sessions that restore the same file.
-
-- The webR build keeps its bundled HTSlib, zlib and cgranges private: the side module exports only the DuckDB entry point, so it can be
-  loaded next to Rduckhts, which carries its own HTSlib.
-
-- `rduckvep_lof_sql()` wraps the native `duckvep_lof_sql()` builder, LOFTEE's HC/LC loss-of-function call with its filters, flags and info as a relation
-  over `duckvep_annotate_projected_sql` rows. No rules live in R; options (`gerp`, `ancestor`, `phylocsf`, `min_intron_size`,
-  `gerp_end_trunc_cutoff`, `check_complete_cds`) are forwarded as the builder's STRUCT.
-
-- `rduckvep_coding_calls()` wraps the new SQL table function `duckvep_coding_calls(model, path)`: a fused native reader of a
-  (bgzipped) VCF or BCF that discards records outside coding sequence before decoding genotypes and returns the calls relation of
-  `rduckvep_haplotypes()` (same discovery as `rduckvep_coding_transcripts()`, output identical to building the calls in SQL). The
-  model must have been loaded with `seq_region_name` in its regions query.
-- `rduckvep_coding_transcripts()` wraps the SQL scalar `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)`:
-  the (event, transcript) pairs of the annotation builder's CDS overlap, found from the resident interval index (the fast
-  discovery route for haplotype calls on whole-genome input). The bundled extension also makes `rduckvep_haplotypes()`
-  aligns CDS and protein differences much faster with unchanged output. `max_alignment_cells` is now checked against the
-  band an alignment needs rather than a feasible bound, so long transcripts with several edits fit the default; see the
-  project NEWS.md and `benchmarks/data/haplotype_scale/README.md`.
-
-- The bundled extension annotates models that contain origin-crossing transcripts, exons or
-  regulation features on circular sequence regions (lifted-interval execution); see the project
-  NEWS.md. Structural, breakend and phased entry points still refuse such models.
-
-- `rduckvep_prepare_breakend_pairs()`, `rduckvep_prepare_breakend_fusion()` and
-  `rduckvep_prepare_structural_hgvs()` wrap the native BND identity, endpoint-gene
-  and structural HGVS builders. No parsing or HGVS logic lives in R.
-- `rduckvep_haplotypes()` adds versioned `prediction_policy`, `prediction_status` and
-  `prediction_reason` (`duckvep-coding` eligibility only; no SO/IMPACT/NMD yet),
-  keyed `carrier_predictions`, `contributor_provenance` and `normalized_edits`. Existing
-  columns are unchanged and `nominal_length_diff` stays last.
-- The same-codon classifier (coding-v1 slice 3) adds `haplotype_consequences` and `haplotype_impact`
-  before `nominal_length_diff`, and a `predicted` status. It classifies the combined haplotype for
-  eligible paths with no frame, start or stop effect: synonymous (LOW), missense, inframe insertion or
-  deletion, or protein-altering (MODERATE). Other eligible paths stay `eligible_classifier_pending`,
-  now with reason `frame_classifier_pending` or `start_stop_classifier_pending`.
-- The frame opening/restoration classifier (coding-v1 slice 4) decides frame-shifting and stop-gain paths from the
-  translated haplotype: `stop_gained` for a new first stop before the reference terminator, `frameshift_variant`
-  when that stop intersects a displaced-frame interval or the frame is still displaced when the CDS runs out,
-  and, for a frame restored before termination, `synonymous_variant` or `protein_altering_variant`. Edits after
-  the first stop stay contributors. `carrier_predictions` gains `haplotype_impact` and `haplotype_consequences`
-  per carrier, so an ineligible carrier no longer hides the set of eligible carriers of the same row. The
-  reason `frame_classifier_pending` no longer occurs; only start/terminal-codon paths stay
-  `start_stop_classifier_pending`.
-- The start/stop classifier (coding-v1 slice 5) decides the remaining paths: `start_lost` alone when the
-  edited CDS does not begin with ATG (initiation and NMD unknown, other predictions suppressed), `stop_lost`
-  when no stop is left (plus `frameshift_variant` for a frame still displaced at the CDS end, which previously
-  gave `frameshift_variant` alone; no downstream extension is invented), and `stop_retained_variant` (LOW) for
-  a changed terminal codon that is still a stop with an unchanged peptide. No eligible path stays
-  `eligible_classifier_pending` and the reason `start_stop_classifier_pending` no longer occurs. Contributor
-  `role` is now assigned per edit: an edit that starts after the first stop is `post_stop` even when it shares an
-  interaction block with an earlier edit (a restoring deletion after an early stop was `applied`).
-- NMD attribution (coding-v1 slice 6, rule `ejc50`) adds `nmd_rule`, `nmd_prediction`, `nmd_stop_position`,
-  `nmd_junction_position` and `nmd_contributors` to `rduckvep_haplotypes()` (before `nominal_length_diff`, which stays
-  last), and `nmd_prediction`, `nmd_stop_position` and `nmd_junction_position` to each `carrier_predictions` row. For a newly
-  premature stop (`stop_gained`) the prediction is `trigger` when J - S > 50 and `escape` otherwise, with S the final
-  nucleotide of the first stop codon and J the final nucleotide of the penultimate exon, both in edited spliced-transcript
-  coordinates (indels upstream or inside the penultimate exon move J; a single-exon transcript always escapes and has no
-  J). Known termination without a new premature stop is `not_applicable`; `start_lost`, an edited CDS with no stop (a
-  frame that runs off the CDS, `stop_lost`), unresolved exon topology and every failed or ineligible path are `unknown`.
-  `nmd_contributors` lists the applied contributors (the edits up to and including the stop) plus the `post_stop`
-  indels that moved J (changed length at or before the penultimate exon's last base; their `role` stays `post_stop`), and is
-  NULL unless the prediction is `trigger` or `escape`. The
-  prediction is decided on the whole haplotype, not per allele, and is an EJC-distance heuristic only: no reinitiation,
-  no long-exon exception, no `NMD_transcript_variant` biotype term. Existing columns and their values are unchanged.
-- The extension's SQL preparation and annotation entry points are native builders:
-  `query(duckvep_annotate_sql('events', 'model', {hgvs: true}))` replaces
-  direct annotation macro calls. `rduckvep_annotate_sql()` and the other
-  `rduckvep_*_sql()` functions invoke those builders; `rduckvep_annotate()`
-  returns annotated events as a data frame. See the project NEWS.md for the
-  migration table.
+- `rduckvep_haplotypes()` predicts consequences for phased whole-coding haplotypes under `duckvep-coding`. It accepts complete phased calls of any ploidy, literal alleles of any length, and transcripts using supported genetic codes. The phase policy is `vep_compat`; the NMD rule is `ejc50`.
+- Haplotype results include `prediction_policy`, `prediction_status`, `prediction_reason`, `carrier_predictions`, `contributor_provenance`, `normalized_edits`, `haplotype_consequences`, `haplotype_impact`, `nmd_rule`, `nmd_prediction`, `nmd_stop_position`, `nmd_junction_position`, `nmd_contributors` and `nmd_exceptions`; `nominal_length_diff` is the last column. Carrier-level predictions include consequences, impact and NMD positions. Contributor roles distinguish edits applied to the expressed sequence from edits after the first stop. `nmd_exceptions` reports `start_proximal` when the premature stop lies within the first 100 coding bases and `long_exon` when its edited-transcript exon exceeds 407 bases; these labels do not change the junction-rule prediction.
+- The `ejc50` rule reports `trigger` when the edited distance from the first premature stop to the penultimate-exon junction exceeds 50 nt, and `escape` at 50 nt or less. A single-exon transcript escapes. Missing termination, start loss, unresolved exon topology and failed or ineligible paths have an unknown prediction. The rule does not include reinitiation, a long-exon exception or the `NMD_transcript_variant` biotype term. The [haplotype fixtures](../../test/data/haplotype/README.md) and [contract](../../design/duckvep_haplotype_contract.md) specify the full behavior.
+- Whole-haplotype start and stop classification uses the edited CDS and its genetic code. A lost stop is read through the stored 3′ transcript flank in `protein`, or through the end of that flank; `sequence_flags` bit 16 marks read-through. An incomplete annotated CDS start or end is handled according to the available sequence, including transcripts that begin inside a codon.
+- `rduckvep_save_model()` and `rduckvep_restore_model()` write and restore native model snapshots. Restore maps the snapshot read-only; processes that restore the same file share mapped pages.
+- The webR side module exports `duckvep_init_c_api` and binds its bundled HTSlib, zlib and cgranges locally. `SIDE_MODULE=2`, an explicit export list and `-Bsymbolic` isolate those symbols when the module is loaded beside Rduckhts.
+- DuckHTS releases through 1.5.2 register legacy `duckvep_*` functions under names also used by DuckVEP. Loading both extensions can split model loading and annotation across separate registries and produce `unknown model name`; use DuckHTS newer than 1.5.2 with DuckVEP.
+- `rduckvep_lof_sql()` wraps `duckvep_lof_sql()` and returns a relation with LOFTEE-compatible `lof`, `lof_filter`, `lof_flags`, `lof_info` and `lof_unchecked` fields. Its options are `gerp`, `ancestor`, `phylocsf`, `min_intron_size`, `gerp_end_trunc_cutoff` and `check_complete_cds`. `rduckvep_prepare_breakend_pairs()`, `rduckvep_prepare_breakend_fusion()` and `rduckvep_prepare_structural_hgvs()` wrap the native breakend identity, endpoint-gene and structural HGVS builders.
+- `rduckvep_coding_calls()` reads VCF or BCF into the calls relation consumed by `rduckvep_haplotypes()`, discovering coding transcripts before decoding genotypes. The model's `seq_region_name` values must match VCF `CHROM`. `rduckvep_coding_transcripts()` returns the model ordinals touched by a normalized coding event; a shared indel anchor alone does not count. A pinned HG002 measurement reports 23.3 s to 3.4 s (6.8×) for CDS and protein difference alignment; `max_alignment_cells` is checked against the cell count of the required alignment band. See the [qualification method and receipts](../../benchmarks/data/haplotype_scale/README.md).
+- Models with origin-crossing transcripts, exons or regulatory features on circular regions use lifted-interval annotation. Structural, breakend and phased-edit entry points reject a model containing a wrapped circular object.
+- SQL preparation and annotation functions are native builders. Use `query(duckvep_annotate_sql(...))` with `rduckvep_annotate_sql()` or call `rduckvep_annotate()` for a data frame; builder options are passed in a trailing STRUCT.
 
 # Rduckvep 0.1.0
 
-- First release as a separate package. DuckVEP and its R front end were extracted
-  from DuckHTS/Rduckhts with their history; `rduckhts_haplotypes()` is now
-  `rduckvep_haplotypes()`, and `rduckvep_connect()`/`rduckvep_load()` replace the
-  Rduckhts connection helpers for DuckVEP work.
+- First standalone release of DuckVEP's R front end, extracted from DuckHTS/Rduckhts with its Git history. The package entry point is `rduckvep_haplotypes()` (the Rduckhts wrapper was `rduckhts_haplotypes()`); `rduckvep_connect()` and `rduckvep_load()` provide DuckVEP connection helpers.

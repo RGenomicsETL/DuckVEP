@@ -1,7 +1,7 @@
 # DuckVEP corpus and release-conformance policy
 
-Status: current evidence-integrity policy. Scripts, manifests, test fixtures, and rendered
-reports are the executable authorities for individual campaigns.
+Scripts, manifests, test fixtures, and rendered reports are the executable authorities for
+individual campaigns and follow this evidence-integrity policy.
 
 This note controls what a DuckVEP conformance result means. It does not prescribe staging
 commands, enumerate transient source locations, or duplicate campaign results.
@@ -57,11 +57,11 @@ draw. Failed and unresolved rows remain in the pair artifact.
 
 Verify an upstream checksum, immutable object version, or release manifest when acquiring an
 artifact. Preserve that acquisition receipt beside an immutable or read-only local object.
-For ordinary reuse, validate cheap path/inventory metadata rather than rehashing a large
-unchanged artifact. Verify bytes again only at an explicit transfer, publication, or
-release-audit boundary.
+For ordinary reuse, validate cheap path/inventory metadata rather than rereading the bytes
+of a large immutable artifact. Verify content again at an explicit transfer, publication,
+or release-audit boundary.
 
-Every execution still validates input, object-pair, and result cardinalities. Those
+Each execution validates input, object-pair, and result cardinalities. Those
 semantic denominators reveal truncation or selective filtering that a repeated byte digest
 cannot. Logical model receipts identify prepared biological relations without treating a
 physical DuckDB-file rewrite as a model change.
@@ -96,8 +96,8 @@ cross geometry states that an incidental callset may not cover.
 
 A counterexample is minimized, classified, and made a fixed witness or required generated
 stratum. Re-running a broad distribution and hoping to rediscover it is not regression
-coverage. The checked campaign registry, pair artifacts, and rendered reports own the
-current campaign matrix and measured denominators.
+coverage. The checked campaign registry, pair artifacts, and rendered reports own the campaign
+matrix and measured denominators.
 
 ## Advance a VEP release as a new authority
 
@@ -121,7 +121,7 @@ attestation verifier, restricted to the repository's named provenance workflow,
 hosted runner, permitted branch and source commit. The workflow builds and executes
 the campaign itself; it does not sign imported local results. A signature establishes
 origin under that repository/workflow trust policy, not biological agreement.
-Publication must still reconstruct the complete comparisons and retain failures.
+Publication reconstructs the complete comparisons and retains failures.
 Unsigned historical observations remain evidence with their original provenance.
 
 Cross-machine reproducibility requires a versioned pack, not a historical result with a
@@ -130,5 +130,5 @@ of source/derivation/assembly/normalization/seed/cardinality identities, and exp
 pair-level summaries. Publish only redistributable data; controlled inputs require a
 reproducible derivation schema and a portable public or synthetic gate.
 
-Until such a pack is published and verified from a clean download, a campaign may establish
-semantic evidence without claiming one-command portability on another machine.
+A campaign establishes semantic evidence; one-command portability on another machine
+requires a published pack verified from a clean download.

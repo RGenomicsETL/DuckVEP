@@ -187,8 +187,8 @@ cases. The ordinary, AddressSanitizer, and UndefinedBehaviorSanitizer targets ea
 175 tests and 204,759 assertions. That seed exposed an over-broad statistical oracle after
 93,064 generated frame-changing cases: VEP's insertion-length-aware terminal-codon
 reconstruction is a fallback only for an empty or `X`-containing local alternate peptide.
-The minimized concrete-`*` scene now has a fixed regression, while the corrected random
-oracle still observed 49 genuine fallback cases and 1,877 stop-gained frame changes.
+The minimized concrete-`*` scene has a fixed regression. On this seed, the random
+oracle observed 49 genuine fallback cases and 1,877 stop-gained frame changes.
 
 Once a rare state is discovered, its generator receives a dedicated stratum instead of
 depending on its accidental probability under a broad distribution. The terminal missing-
@@ -727,10 +727,10 @@ make test-duckvep-haplotype-mechanics DUCKVEP_HAPLOTYPE_ARGS="--cases 1000 --see
 The campaign also loads the built extension (`--extension`) and reads the generated
 VCF through `read_geno()` and `read_bcf_samples()`. This third path derives allele
 slots, sample identity and variant alleles from decoded calls, then runs the same
-native projector/carrier/rebuild pipeline. Both generator-fed paths remain separate
-checks, and the existing Haplosaurus verifier controls are unchanged. Six additional
-routing controls require valid changed allele slots/ALT to change the haplotype and
-missing/duplicate calls, a different model chromosome or reversed record order to fail.
+native projector/carrier/rebuild pipeline. Both generator-fed paths are separate checks.
+The Haplosaurus verifier controls test sequence and carrier results. Six routing controls
+require valid changed allele slots/ALT to change the haplotype and missing/duplicate calls,
+a different model chromosome or reversed record order to fail.
 The genotype path retains reader ordinals instead of sorting incorrect input. The complete typed
 calls, metrics and controls are retained with the extension's SHA-256. Supplying
 `--extension-receipt` validates the
@@ -866,9 +866,9 @@ shared lane comparator. These source sets do not certify physical-edit multiplic
 Counts distinguish unavailable paths from sequence differences where every path
 is available. Four corruptions guard the grouped comparator; eleven additional
 controls guard lane identity and content, including a lane swap that leaves grouped
-results unchanged. The multi-sample campaign retains its twelfth shared-source
-control. Both campaigns check the complete native transcript domain, positive
-carrier counts and exact list lengths before grouping output. Eight shared
+results unchanged. The multi-sample campaign has twelve shared-source controls. Both
+campaigns check the complete native transcript domain, positive carrier counts and exact
+list lengths before grouping output. Eight shared
 controls reject extra/NULL transcript rows, zero-carrier rows, missing transcripts,
 wrong/missing counts, duplicate transcript domains and total-count mismatches.
 Eight group controls additionally check empty source sets, missing/null fields,
@@ -1085,9 +1085,9 @@ Each command compares 29,520 models, 194,448 source records and 177,120 sample/f
 lanes, including exact nominal-length and raw mutation flags. Forty-two corruption
 controls and 18 metadata controls are required. For this input grammar, a complete
 alignment matrix bounded by the reference length plus each record's longest ALT fits
-the explicit cell budget. The query workspace default is unchanged. The source-bound
-default-limit failure remains in the length ledger alongside both completed runs;
-it has no native comparison verdict. Per-run upstream group-owner checks do not
+the explicit cell budget. The query workspace default is 268435456 bytes. The
+length ledger records the source-bound default-limit failure alongside both completed
+runs; it has no native comparison verdict. Per-run upstream group-owner checks do not
 waive the separate cross-run grouped-metadata disagreements.
 
 The `DuckVEP execution provenance` workflow builds and executes on GitHub-hosted
@@ -1193,7 +1193,7 @@ Add `--noncoding-contributors` to `haplotype_sql_differential.R` to run a separa
 receipted augmented corpus after the original gate passes. It adds one homozygous
 deep-intronic allele per transcript, reruns the pinned executable Haplosaurus, and
 requires its complete observation to
-remain unchanged. Public replay must retain the added source on all six diploid lanes,
+match the pinned result. Public replay includes that source on all six diploid lanes,
 including lanes with no coding edit, while preserving CDS/protein and coding flags.
 Five additional corruption controls guard full carrier keys, sequence, provenance and
 projection status. This checks literal replay, not splice prediction or combined SO.
@@ -1309,7 +1309,7 @@ coding-context evaluator on every original edit set, including reference lanes.
 It verifies complete CDS/displayed-protein replay and rejects false supported
 consequences for compound indels, including net-zero sets. This is a support-limit
 audit, not a combined-SO differential; unsupported rows remain explicit and are
-never counted as biological agreement. The original corpus and assertions are unchanged.
+never counted as biological agreement. The audit uses the original corpus and assertions.
 It also opens every actual interaction block through the shared coding-window
 API and checks its residues against the complete translated context. Separate
 reference/alternate peptide offsets preserve earlier in-frame shifts; the local
@@ -1324,10 +1324,9 @@ flanks; unrelated blocks do not become part of that local predicate's operands.
 Single-record genomic insertion-length reach remains separate. The support audit
 records supported endpoint blocks separately and rejects out-of-CDS
 support, partial facts on failure and contradictory frame/in-frame facts.
-The whole-context compound-indel substitution guard remains unchanged.
-A later local missense predicate is not
-evidence that translation reached that block. Neither local predicates nor
-unsupported results are collapsed into a whole-haplotype consequence set.
+Compound-indel substitutions are checked in the whole context. A later local
+missense predicate alone does not establish that translation reached that block. Neither
+local predicates nor unsupported results are collapsed into a whole-haplotype consequence set.
 Each block also records the full translation's `first_stop_position1` (zero when
 absent), `frame_status`, and `stop_overlaps_displacement`. The last fact intersects
 that stop's three alternate CDS bases with actual frame-changing/restoring edit
@@ -1335,9 +1334,8 @@ spans. A stop after restoration is distinct from one inside displaced bases;
 these observations do not classify SO terms or establish protein rescue.
 The public `haplotype_sql_differential.R` lane separately compares
 `stop_in_displaced_frame` to rebuilt per-base coordinate markers for every occupied
-carrier in both policies. Its original sequence/oracle assertions and denominators
-are unchanged; frame comparisons, failures and a flipped-fact rejection control
-are additional metrics, not VEP compound-consequence agreement.
+carrier in both policies. The lane reports frame comparisons, failures and a
+flipped-fact rejection control separately from VEP compound-consequence agreement.
 
 The additional `bcftools csq -p a` observation builds bcftools/HTSlib 1.23 from
 the exact `src/bcftools-1.23` tree in RBCFTools commit
@@ -1352,11 +1350,10 @@ or a replacement production classifier. In particular, seed 173's DHT000002
 restores its DNA frame yet translates to `MGLS*`; downstream contributors remain
 required. The native, SQL and R fixed witnesses preserve this case independently
 of the optional external audit.
-The assertion-enabled source build currently aborts at `csq.c:2433` on seed
-173's DHT000895. Its four original records succeed with each sample separately
-and with `cis,shared`, but fail with `cis,trans`. Retain that cohort-dependent
-failure; an assertion-disabled local binary is not evidence that the source-built
-lane passed.
+For seed 173's DHT000895, the assertion-enabled source build aborts at `csq.c:2433`.
+Its four original records succeed with each sample separately and with `cis,shared`, but
+fail with `cis,trans`. Retain that cohort-dependent failure; an assertion-disabled local
+binary is not evidence that the source-built lane passed.
 
 `compound_sample_audit.R --audit-artifacts results/<compound-coding-run>` is an
 additional sample-separability investigation. The original source-built binary
@@ -1367,10 +1364,10 @@ instead of mutating a prefix node shared by another leaf. The original source,
 binary, cohort failure and VEP oracle are untouched; the patched build is not
 relabeled as upstream conformance. The audit checks the full occupied-carrier
 domain and full row multisets, retains missing/extra rows and duplicate counts,
-and fails on any discrepancy. On the existing two seeds the patch removes the
-assertion and preserves every distinct consequence row, but cohort emission
-still has extra duplicate rows. Those duplicates are unresolved evidence, not
-discarded rows or a passing conformance result.
+and fails on any discrepancy. On the two recorded seeds, the patch removes the assertion
+and preserves every distinct consequence row, but cohort emission has extra duplicate rows.
+Those duplicates are unresolved evidence, not discarded rows or a passing conformance
+result.
 
 This is **not** a public phased-executor certificate: the R harness materializes
 decoded calls, and it does not test native DuckDB carrier streaming, strict phase/PS
@@ -1378,5 +1375,5 @@ interpretation, compound SO/HGVS, structural
 composition or arbitrary ploidy. Haplosaurus exposes sequence differences and frame
 flags, not a compound SO/HGVS oracle. Its offline container also defaults to two lanes
 without inferring VCF ploidy; that behavior must not silently define DuckVEP's ploidy
-contract. The existing independent-event and pure-C property campaigns remain separate
-and unchanged.
+contract. Independent-event differentials and pure-C properties provide separate
+evidence from this audit.

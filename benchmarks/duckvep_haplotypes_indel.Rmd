@@ -8,6 +8,7 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 root <- normalizePath(Sys.getenv("DUCKHTS_REPO_ROOT", getwd()), mustWork = TRUE)
+dir.create(file.path(root, "benchmarks/figures"), showWarnings = FALSE)
 current <- read.csv(file.path(root, "benchmarks/data/duckvep_haplotypes_indel.csv"),
   colClasses = "character")
 history <- read.csv(file.path(root, "benchmarks/data/duckvep_haplotypes.csv"),
@@ -49,7 +50,11 @@ summary <- do.call(rbind, lapply(groups, function(at) {
   }
   data.frame(current[at[1L], keys[-5L]],
     baseline_median_s = median(as.numeric(baseline$seconds[at])),
+    baseline_min_s = min(as.numeric(baseline$seconds[at])),
+    baseline_max_s = max(as.numeric(baseline$seconds[at])),
     current_median_s = median(as.numeric(current$seconds[at])),
+    current_min_s = min(as.numeric(current$seconds[at])),
+    current_max_s = max(as.numeric(current$seconds[at])),
     current_max_rss_mib = max(as.numeric(current$peak_process_rss_kib[at])) / 1024,
     full_output_equal = if (current$mode[at[1L]] == "native") NA else
       all(equal(current$xor_hash[at], baseline$xor_hash[at])) &&
@@ -342,6 +347,89 @@ these rows was appended to the existing benchmark history, and its equality
 guard remains unchanged. Rendering this diagnostic report is not a passing
 benchmark-promotion verdict.
 
+## Timing and output identity
+
+Points show three-pass medians; ranges show the observed minima and maxima.
+Source labels distinguish the same-input baseline and diagnostic checkpoint.
+These are timing records, not paired speedup claims: the singleton SQL modes
+have unequal full-output fingerprints across revisions.
+
+![Same-input benchmark timings by source revision and mode; output identity is shown below.](figures/phase-indel-timing.png)
+
+```{r phase-indel-timing, include=FALSE}
+plot_workload <- function(x) paste0("T", x$transcripts, " · S", x$samples,
+  " · O", x$overlap)
+baseline_timing <- data.frame(summary[c("transcripts", "samples", "overlap", "mode")],
+  revision = substr(baseline_revision, 1L, 7L),
+  median_s = summary$baseline_median_s, min_s = summary$baseline_min_s,
+  max_s = summary$baseline_max_s)
+current_timing <- data.frame(summary[c("transcripts", "samples", "overlap", "mode")],
+  revision = substr(revision, 1L, 7L),
+  median_s = summary$current_median_s, min_s = summary$current_min_s,
+  max_s = summary$current_max_s)
+timing_plot_data <- rbind(baseline_timing, current_timing)
+timing_plot_data$workload <- plot_workload(timing_plot_data)
+timing_plot_data$workload <- factor(timing_plot_data$workload,
+  levels = rev(unique(timing_plot_data$workload)))
+timing_plot_data$revision <- factor(timing_plot_data$revision,
+  levels = c(substr(baseline_revision, 1L, 7L), substr(revision, 1L, 7L)))
+timing_plot <- ggplot2::ggplot(timing_plot_data,
+  ggplot2::aes(x = median_s, y = workload, color = revision)) +
+  ggplot2::geom_errorbar(ggplot2::aes(xmin = min_s, xmax = max_s),
+    width = 0.18, orientation = "y", position = ggplot2::position_dodge(width = 0.65),
+    linewidth = 0.7) +
+  ggplot2::geom_point(position = ggplot2::position_dodge(width = 0.65), size = 2.8) +
+  ggplot2::facet_wrap(~ mode, ncol = 1, scales = "free_y",
+    labeller = ggplot2::as_labeller(c(native = "Native replay", sql = "Decoded SQL",
+      sql_records = "Source-record SQL", sql_singletons = "Singleton SQL (HGVS disabled)",
+      sql_singletons_hgvs = "Singleton SQL (HGVS enabled)"))) +
+  ggplot2::scale_x_log10(expand = ggplot2::expansion(mult = c(0.04, 0.36))) +
+  ggplot2::scale_color_manual(values = c("#6B7280", "#087E8B"), name = "Source") +
+  ggplot2::labs(x = "Median time (seconds; log scale)", y = NULL) +
+  ggplot2::theme_minimal(base_size = 14) +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank(),
+    strip.text = ggplot2::element_text(face = "bold"))
+ggplot2::ggsave(file.path(root, "benchmarks/figures/phase-indel-timing.png"),
+  timing_plot, device = ragg::agg_png, width = 9, height = 9, dpi = 144, bg = "white")
+
+fingerprint_plot_data <- rbind(
+  data.frame(summary[c("transcripts", "samples", "overlap", "mode")],
+    contract = "Literal replay", equal = summary$replay_equal),
+  data.frame(summary[c("transcripts", "samples", "overlap", "mode")],
+    contract = "Complete output", equal = summary$full_output_equal)
+)
+fingerprint_plot_data <- fingerprint_plot_data[!is.na(fingerprint_plot_data$equal), ]
+fingerprint_plot_data$workload <- plot_workload(fingerprint_plot_data)
+fingerprint_plot_data$workload <- factor(fingerprint_plot_data$workload,
+  levels = rev(unique(fingerprint_plot_data$workload)))
+fingerprint_plot_data$mode <- factor(fingerprint_plot_data$mode,
+  levels = unique(fingerprint_plot_data$mode))
+fingerprint_plot_data$status <- ifelse(fingerprint_plot_data$equal,
+  "Identical fingerprint", "Different fingerprint")
+fingerprint_plot <- ggplot2::ggplot(fingerprint_plot_data,
+  ggplot2::aes(x = contract, y = workload, fill = status)) +
+  ggplot2::geom_tile(color = "white", linewidth = 1, height = 0.82) +
+  ggplot2::geom_text(ggplot2::aes(label = ifelse(equal, "identical", "different")),
+    color = "white", fontface = "bold", size = 3.5) +
+  ggplot2::facet_wrap(~ mode, ncol = 1, scales = "free_y") +
+  ggplot2::scale_fill_manual(values = c("Identical fingerprint" = "#009E73",
+    "Different fingerprint" = "#D55E00"), guide = "none") +
+  ggplot2::labs(x = NULL, y = NULL) +
+  ggplot2::theme_minimal(base_size = 14) +
+  ggplot2::theme(panel.grid = ggplot2::element_blank(),
+    axis.text.x = ggplot2::element_text(face = "bold"),
+    strip.text = ggplot2::element_text(face = "bold"))
+ggplot2::ggsave(file.path(root, "benchmarks/figures/phase-indel-fingerprints.png"),
+  fingerprint_plot, device = ragg::agg_png, width = 9, height = 7, dpi = 144,
+  bg = "white")
+```
+
+![Across-revision equality of literal-replay and complete-output fingerprints.](figures/phase-indel-fingerprints.png)
+
+The equality grid compares recorded fingerprints within matching workloads.
+A matching literal-replay projection does not imply equality of the complete
+output contract.
+
 ## Workload and execution
 
 [The benchmark driver](duckvep_haplotypes.R) uses the same registered 180-base
@@ -368,9 +456,14 @@ the R/DuckDB host, setup, warm-up, output and post-query checks.
 
 ## All measured configurations
 
+<details>
+<summary>All measured medians and process RSS values</summary>
+
 ```{r timing}
 knitr::kable(summary, row.names = FALSE, digits = 4)
 ```
+
+</details>
 
 `NA` marks the native count sink, which has no serialized SQL-row fingerprint.
 Counts, input identities, output contracts, sequence bytes and JSON byte lengths
@@ -378,12 +471,17 @@ match between revisions. The unequal singleton fingerprints mean those timings
 are **same-input, different-output measurements**, not identical-output work.
 Matching byte lengths do not establish matching values.
 
+<details>
+<summary>Input and output denominators by measured configuration</summary>
+
 ```{r denominators}
 denominators <- c(keys[-5L], "input_records", "projected_events", "input_calls",
   "input_physical_records", "input_record_sample_calls", "input_candidate_sample_rows",
   "output_leaves", "output_carriers", "cds_bytes", "protein_bytes", "json_bytes")
 knitr::kable(current[current$pass == "1", denominators], row.names = FALSE)
 ```
+
+</details>
 
 ## Retained output differences
 
@@ -393,9 +491,14 @@ the two singleton modes at both transcript counts, with three passes each.
 Literal replay fingerprints agree. The complete observations below retain the
 unequal hash values; no field was normalized away to obtain a match.
 
+<details>
+<summary>Unequal fingerprint values by configuration</summary>
+
 ```{r unequal-fingerprints}
 knitr::kable(differences[differences$pass == "1", ], row.names = FALSE)
 ```
+
+</details>
 
 A [retained four-event, one-transcript reproduction](data/duckvep_haplotypes_indel_witness.jsonl.gz) isolates the deletion
 `GC>G` at CDS position 67: its block `local_consequence_mask` changes from
@@ -434,9 +537,14 @@ does not reopen historical files. Input controls reject missing, malformed or
 altered job hashes and self-consistently rehashed jobs with changed events or
 configuration. Rendering then reruns the complete typed, exact-key comparison.
 
+<details>
+<summary>Complete-output keyed audit counts</summary>
+
 ```{r complete-output-audit}
 knitr::kable(full_audit, row.names = FALSE)
 ```
+
+</details>
 
 Across `r sum(full_audit$joined_rows)` keyed row pairs,
 `r sum(full_audit$changed_rows)` differ only in the declared deletion mask above.
@@ -459,6 +567,9 @@ does not measure N-rich annotation, whole-haplotype consequences or compound HGV
 Use the clean extension-receipt procedure in the baseline report, then run
 `benchmarks/duckvep_haplotypes.R` with `--passes 3 --cpu 2` and these six workloads:
 
+<details>
+<summary>Workload arguments for reproducing each configuration</summary>
+
 ```{r workloads}
 workloads <- unique(current[c("transcripts", "samples", "overlap")])
 workloads$modes <- vapply(seq_len(nrow(workloads)), function(i) {
@@ -468,6 +579,8 @@ workloads$modes <- vapply(seq_len(nrow(workloads)), function(i) {
 }, "")
 knitr::kable(workloads, row.names = FALSE)
 ```
+
+</details>
 
 Pass `--extension-receipt PATH` and the listed `--transcripts`, `--samples`,
 `--overlap` and `--modes` to each invocation. Preserve every result and receipt;
@@ -679,17 +792,22 @@ No DuckHTS build, test, conformance or diagnostic jobs overlapped the `d6d188d` 
 The same isolation applies to `a4ab9f5`, measured from 02:53:38 to 02:54:19 +0200
 on September 11, 2026.
 The `de3d008` campaign ran from 00:59:19 to 00:59:59 +0200 on September 11, 2026;
-a previously launched small read-only classification/oracle diagnostic completed
-at 01:00:01, so concurrent diagnostic activity cannot be excluded. This measured
-run is retained without replacement. Other shared-host activity was not controlled.
+a small read-only classification/oracle diagnostic completed at 01:00:01, so
+concurrent diagnostic activity cannot be excluded. Other shared-host activity was
+not controlled.
 The `6e1a1de` driver ran from 21:28:02 to 21:28:42 +0200 on September 12, 2026,
 after the build, test and conformance jobs finished. No other local DuckHTS builds,
 tests, conformance, benchmarks or diagnostic computations overlapped its timers;
 read-only GitHub status and clock checks continued.
 
+<details>
+<summary>Per-revision translation checkpoint timings</summary>
+
 ```{r translation-timing}
 knitr::kable(translation_summary, digits = 6, row.names = FALSE)
 ```
+
+</details>
 
 Each checkpoint's 15 matched rows have identical non-timing result fields, including every SQL
 full-output fingerprint, output denominator and native workspace/count metric.

@@ -12,6 +12,23 @@ append-only by source revision, corpus, and resident model. Independent
 frozen distributions and seeds are kept separate so a fix cannot improve
 its own hand-picked witnesses and hide a regression elsewhere.
 
+## Audited pair outcomes
+
+<figure>
+<img src="figures/conformance-outcomes.png"
+alt="Exact and non-exact transcript/object pair counts for the latest tested run per corpus." />
+<figcaption aria-hidden="true">Exact and non-exact transcript/object
+pair counts for the latest tested run per corpus.</figcaption>
+</figure>
+
+These are audited pair counts for named corpora, not population
+error-rate estimates.
+
+<details>
+<summary>
+Scope, oracle authority and statistical interpretation
+</summary>
+
 Official Ensembl Variation release VCFs provide a separate product-audit
 lane. Their indexed `VE` relation can be compared in ordinary CI without
 starting Perl VEP; `CSQ` is a lossy presentation of those stored rows.
@@ -26,41 +43,40 @@ step.
 
 ## Declared conformance closure
 
-The independent-event consequence engine is closed as a semantic
-implementation campaign for the declared model and event surfaces:
-admitted Ensembl transcript, mature-miRNA, RegulatoryFeature, and
-MotifFeature objects; independent literal small alleles; exact typed
-DEL, DUP, tandem-DUP, INV, INS, and CNV events; structural tandem
-repeats (`STR`); paired breakends; supported BioPerl codon tables and
-exceptional Ensembl peptide edits; and the separately declared VEP
-NMD-plugin result. DEL/DUP/tandem-DUP/INV/INS/CNV and BND have generated
-executable-VEP differentials. Structural `STR` has source-derived
-VEP-116 semantics plus fixed SQL/R and randomized C coverage; raw repeat
-reconstruction is a separate input-preparation operation. The evidence
-spans GRCh38, GRCh37, and *P. falciparum*, executable witnesses,
-indexed-cache corpora, generated state exploration, sanitizer runs, and
-pure-C oracle properties.
+The independent-event conformance contract covers the declared model and
+event surfaces: admitted Ensembl transcript, mature-miRNA,
+RegulatoryFeature, and MotifFeature objects; independent literal small
+alleles; exact typed DEL, DUP, tandem-DUP, INV, INS, and CNV events;
+structural tandem repeats (`STR`); paired breakends; supported BioPerl
+codon tables and exceptional Ensembl peptide edits; and the separately
+declared VEP NMD-plugin result. DEL/DUP/tandem-DUP/INV/INS/CNV and BND
+have generated executable-VEP differentials. Structural `STR` has
+source-derived VEP-116 semantics plus fixed SQL/R and randomized C
+coverage; raw repeat reconstruction is a separate input-preparation
+operation. The evidence spans GRCh38, GRCh37, and *P. falciparum*,
+executable witnesses, indexed-cache corpora, generated state
+exploration, sanitizer runs, and pure-C oracle properties.
 
-“Closed” means future consequence changes are routine engineering behind
-these regression gates. VEP 116 parses `CIPOS`/`CIEND` into inner/outer
-structural coordinates, but its registered consequence predicates use
-nominal `POS`/`END`; DuckVEP therefore annotates that nominal span while
-the surrounding relation preserves the uncertainty metadata. The
-checked-in 12-record GRCh38 confidence witness records this directly:
-nominal and `IMPRECISE;CIPOS;CIEND` forms of CNV, DEL, DUP, tandem DUP,
-INV, and INS produced 466/466 exact transcript pairs, and both engines
-had equal nominal/imprecise consequence multisets for all six event-kind
-pairs. VEP can also expand a bounded `<CNV:TR>` from `RN`, `RUS`, and
-`RUC` or `RB` into a literal allele before consequence calculation.
-Implementing that lossless expansion and mapping VEP’s finite supported
-symbolic vocabulary into the typed event API are narrower input-
-preparation tasks, not missing consequence predicates. VEP itself
-rejects unrecognised types such as CPX, so this closure does not promise
+VEP 116 parses `CIPOS`/`CIEND` into inner/outer structural coordinates,
+but its registered consequence predicates use nominal `POS`/`END`;
+DuckVEP therefore annotates that nominal span while the surrounding
+relation preserves the uncertainty metadata. The checked-in 12-record
+GRCh38 confidence witness records this directly: nominal and
+`IMPRECISE;CIPOS;CIEND` forms of CNV, DEL, DUP, tandem DUP, INV, and INS
+produced 466/466 exact transcript pairs, and both engines had equal
+nominal/imprecise consequence multisets for all six event-kind pairs.
+VEP can also expand a bounded `<CNV:TR>` from `RN`, `RUS`, and `RUC` or
+`RB` into a literal allele before consequence calculation. Implementing
+that lossless expansion and mapping VEP’s finite supported symbolic
+vocabulary into the typed event API are narrower input- preparation
+tasks, not missing consequence predicates. VEP itself rejects
+unrecognised types such as CPX, so this closure does not promise
 arbitrary symbolic parsing. Untested species/releases and phased
-multi-record haplotypes remain outside the closure. Haplotype grouping
-and combined consequence attribution are the next semantic vertical and
-require their own executable oracle and performance campaign. Any newly
-observed fixed-event mismatch reopens this contract rather than being
+multi-record haplotypes remain outside this contract. Phased coding
+consequences have a separate [correctness and throughput
+contract](../design/duckvep_haplotype_contract.md); compound HGVS and
+broader domain composition remain open in \#11 and \#50. Any newly
+observed fixed-event mismatch fails this contract rather than being
 relabelled as unsupported.
 
 ## Evidence units and statistical interpretation
@@ -86,26 +102,46 @@ intervals. The release gate itself is deterministic and stricter: any
 discordance, unresolved state, extra emission, or missing emission fails
 the audited run.
 
+</details>
+
 ## Latest tested revision per corpus
 
-| revision | corpus                            | model                      | assembly       | species               | oracle_source | oracle    |  pairs | exact         | unresolved | resolved_disagreements | descriptive_independent_pair_upper_95 |
-|:---------|:----------------------------------|:---------------------------|:---------------|:----------------------|:--------------|:----------|-------:|:--------------|-----------:|-----------------------:|:--------------------------------------|
-| b204dd49 | GRCh38 dbSNP                      | final-dbsnp                | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  73620 | 73620/73620   |          0 |                      0 | 0.01%                                 |
-| b204dd49 | GRCh38 GIAB                       | final-giab                 | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  54905 | 54905/54905   |          0 |                      0 | 0.01%                                 |
-| 22803a40 | GRCh38 ClinVar coding             | final-coding               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 287836 | 287836/287836 |          0 |                      0 | 0.00%                                 |
-| 22803a40 | GRCh38 ClinVar cross-chromosome   | final-clinvar              | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 316397 | 316397/316397 |          0 |                      0 | 0.00%                                 |
-| 7dd90ce8 | GRCh37                            | final-grch37               | GRCh37         | homo_sapiens          | cache         | VEP 116.0 | 486464 | 486464/486464 |          0 |                      0 | 0.00%                                 |
-| e9a7d6b  | P. falciparum model-derived seed11663 | plasmodium-falciparum-63 | GCA000002765v3 | plasmodium_falciparum | cache | VEP 116.0 | 32131 | 32131/32131 | 0 | 0 | 0.01% |
-| 360619ed | GRCh38 paired BND                 | grch38_breakend_multichrom | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  91428 | 91428/91428   |          0 |                      0 | 0.00%                                 |
-| 96b4cd45 | GRCh38 GIAB + core regulation     | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  14955 | 14955/14955   |          0 |                      0 | 0.02%                                 |
-| 96b4cd45 | GRCh38 exact SV + core regulation | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 120224 | 120224/120224 |          0 |                      0 | 0.00%                                 |
+<details>
+<summary>
+Exact counts, corpus revisions and descriptive pair statistics
+</summary>
 
-Each row is the newest tested ancestor of the current source for that
-named corpus. Expensive corpora do not inherit evidence from a later run
-of another corpus, and a newly tested corpus does not hide older
-still-applicable evidence. The SO and impact tables keep the same runs
-separate so the largest corpus cannot hide a smaller species- or
-assembly-specific frontier.
+| revision | corpus                            | model                      | assembly       | species               | oracle_source | oracle    |  pairs | exact         | unresolved | resolved_disagreements | engine_extra | engine_missing | descriptive_independent_pair_upper_95 |
+|:---------|:----------------------------------|:---------------------------|:---------------|:----------------------|:--------------|:----------|-------:|:--------------|-----------:|-----------------------:|-------------:|---------------:|:--------------------------------------|
+| b204dd49 | GRCh38 dbSNP                      | final-dbsnp                | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  73620 | 73620/73620   |          0 |                      0 |            0 |              0 | 0.01%                                 |
+| b204dd49 | GRCh38 GIAB                       | final-giab                 | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  54905 | 54905/54905   |          0 |                      0 |            0 |              0 | 0.01%                                 |
+| 22803a40 | GRCh38 ClinVar coding             | final-coding               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 287836 | 287836/287836 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 22803a40 | GRCh38 ClinVar cross-chromosome   | final-clinvar              | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 316397 | 316397/316397 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 7dd90ce8 | GRCh37                            | final-grch37               | GRCh37         | homo_sapiens          | cache         | VEP 116.0 | 486464 | 486464/486464 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 7dd90ce8 | P. falciparum                     | plasmodium-falciparum-63   | GCA000002765v3 | plasmodium_falciparum | cache         | VEP 116.0 |  40732 | 40732/40732   |          0 |                      0 |            0 |              0 | 0.01%                                 |
+| 360619ed | GRCh38 paired BND                 | grch38_breakend_multichrom | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  91428 | 91428/91428   |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 96b4cd45 | GRCh38 GIAB + core regulation     | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  14955 | 14955/14955   |          0 |                      0 |            0 |              0 | 0.02%                                 |
+| 96b4cd45 | GRCh38 exact SV + core regulation | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 120224 | 120224/120224 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+
+</details>
+
+Exact and non-exact pair counts partition each displayed denominator.
+Unresolved is an engine status, not an agreement category; unresolved
+pairs remain in the full denominator. Engine-extra and engine-missing
+pairs contribute to non-exact counts, not to exact agreement.
+
+Each row is the newest tested ancestor of the current source when the
+ledger contains an ancestor for that corpus; otherwise it is the last
+recorded row for that corpus. Expensive corpora do not inherit evidence
+from a later run of another corpus, and a newly tested corpus does not
+hide older still-applicable evidence. The SO and impact tables keep the
+same runs separate so the largest corpus cannot hide a smaller species-
+or assembly-specific frontier.
+
+<details>
+<summary>
+Full conformance ledger, properties and species receipts
+</summary>
 
 ## Independent-event HGVS differential
 
@@ -214,48 +250,26 @@ candidate traversal.
 
 ## Prepared model receipts
 
-| revision | species               | release | assembly       | regions | transcripts | coding_backed | exons     | mature_miRNA_segments | peptide_edits | regulatory_regions | motif_features | codon_tables     | model_sha256 |
-|:---------|:----------------------|:--------|:---------------|:--------|:------------|:--------------|:----------|:----------------------|:--------------|:-------------------|:---------------|:-----------------|:-------------|
-| 96b4cd45 | homo_sapiens          | 116     | GRCh38         | 194     | 644,427     | 369,631       | 5,068,416 | 2,806                 | 389           | 380,818            | 1,002,762      | 1:369618;2:13    | 296bc9063356 |
-| 8498b92a | homo_sapiens          | 116     | GRCh37         | 84      | 195,379     | 94,610        | 1,186,433 | 3,788                 | 129           | 0                  | 0              | 1:94597;2:13     | 25459e62e50d |
-| 4faca0dd | plasmodium_falciparum | 63/116  | GCA000002765v3 | 16      | 5,791       | 5,389         | 15,097    | 0                     | 4             | 0                  | 0              | 1:5356;4:3;11:30 | d9c705682375 |
+| revision | species                 | release | assembly       | regions | transcripts | coding_backed | exons     | mature_miRNA_segments | peptide_edits | regulatory_regions | motif_features | codon_tables     | model_sha256 |
+|:---------|:------------------------|:--------|:---------------|:--------|:------------|:--------------|:----------|:----------------------|:--------------|:-------------------|:---------------|:-----------------|:-------------|
+| 96b4cd45 | homo_sapiens            | 116     | GRCh38         | 194     | 644,427     | 369,631       | 5,068,416 | 2,806                 | 389           | 380,818            | 1,002,762      | 1:369618;2:13    | 296bc9063356 |
+| 8498b92a | homo_sapiens            | 116     | GRCh37         | 84      | 195,379     | 94,610        | 1,186,433 | 3,788                 | 129           | 0                  | 0              | 1:94597;2:13     | 25459e62e50d |
+| 8498b92a | plasmodium_falciparum   | 63/116  | GCA000002765v3 | 16      | 5,791       | 5,389         | 15,097    | 0                     | 4             | 0                  | 0              | 1:5356;4:3;11:30 | c011cdd4deab |
+| fe20ef30 | homo_sapiens            | 116     | GRCh37         | 84      | 195,379     | 94,610        | 1,186,433 | 3,788                 | 129           | 0                  | 0              | 1:94597;2:13     | 21e113d91481 |
+| f7955e2b | homo_sapiens            | 116     | GRCh38         | 194     | 644,427     | 369,631       | 5,068,416 | 2,806                 | 389           | 380,818            | 1,002,762      | 1:369618;2:13    | 392fa11d6c8f |
+| f7955e2b | plasmodium_falciparum   | 63/116  | GCA000002765v3 | 16      | 5,791       | 5,389         | 15,097    | 0                     | 4             | 0                  | 0              | 1:5356;4:3;11:30 | d9c705682375 |
+| f544b337 | mus_musculus            | 116     | GRCm39         | 61      | 481,483     | 269,905       | 3,759,315 | 29                    | 177           | 0                  | 0              | 1:269892;2:13    | ae39ffc9e647 |
+| 0ceeeba4 | drosophila_melanogaster | 116     | BDGP6.54       | 1,870   | 41,600      | 30,710        | 196,664   | 0                     | 677           | 0                  | 0              | 1:30697;5:13     | e6deea1ac2b0 |
+| 013ce4fd | arabidopsis_thaliana    | 63/116  | TAIR10         | 7       | 54,013      | 48,316        | 313,952   | 325                   | 0             | 0                  | 0              | 1:48228;11:88    | 5b3fac7c92db |
+| eb7c6861 | tetrahymena_thermophila | 63/116  | JCVI-TTA1-2.2  | 1,158   | 25,655      | 24,725        | 114,990   | 0                     | 24,725        | 0                  | 0              | 6:24725;NA:930   | 23fc4aa4ebee |
 
 These are complete model-build receipts, not counts inferred from a
 differential. The ledger retains the full source-manifest, reference,
 and model SHA-256 values, the exact VEP transcript filter, every count
 above, CDS/flank base totals, and the external artifact name. The
-Plasmodium row uses Ensembl Genomes release-63 source data, the
-GCA000002765v3 FASTA and VEP/core-116 executable libraries. The current
-receipt definition gives `d9c7056823755f83d5b189b9e59fdd1129ebe3e342095453e0d2208f3081d81b`.
-The July row in the ledger has hash `c011cdd4deab…`, which cannot be
-reproduced from the public `plasmodium_falciparum_core_63_116_2` core at
-mysql-eg-publicsql.ebi.ac.uk:4157. The July model and input VCF are not
-retained; its 40,732-pair differential is historical, not the evidence for
-the current model.
-
-### Protist Docker oracle environment
-
-| Image | VEP | Indexed cache | Cache archive SHA-256 |
-|:------|:----|:--------------|:---------------------|
-| `ensemblorg/ensembl-vep@sha256:f354dd8d09073e4d943acbbd02f5eb234a9d9e9d444371c1c349910f2123de11` | 116.0 | `plasmodium_falciparum/63_GCA000002765v3` | `2ed9cdafff5e96a4c1430fdd3993b38504ef9ed35e314d213fd009ab6fea36ab` |
-
-Cache URL: `https://ftp.ebi.ac.uk/ensemblgenomes/pub/release-63/protists/variation/indexed_vep_cache/plasmodium_falciparum_vep_63_GCA000002765v3.tar.gz`.
-`scripts/run_species_vep116_docker.sh` mounts the extracted cache and
-indexed FASTA read-only and disables networking. The seed-11663
-model-derived VCF has 5,366 reference-checked variants, SHA-256 `0cf5cd410b76fbb72318ffdee4862ffd2150ee0a20cb2a8ccbe7ac6ecd0a24a2`.
-The oracle JSON has SHA-256 `69e0bb4a7a8eca7da9f871fe7561a4acaeea80d265ffc6ebc54f8ff560634c3a`.
-The full-outer-join differential has 32,131 exact transcript pairs, no
-unresolved pairs and no discordant consequence sets. See
-`benchmarks/data/plasmodium_seed11663_corpus.md` for the generator and
-`benchmarks/data/plasmodium_seed11663_differential.md` for the code-table,
-contig, biotype, strand, allele-shape, SO-term and codon-witness breakdowns.
-Table 4 TGG→TGA witnesses are synonymous (W→W), whereas table 1 witnesses
-are stop gained (W→stop). Table 11 ATG→GTG witnesses are classified
-start lost by both tools, so they do not establish alternative-start retention.
-This run compares transcript consequence sets, not impact classes or HGVS.
-The registry stage entry point delegates to `r/duckhtsbench`, which is not
-present in this checkout; the model-derived generator and full-outer-join
-comparator are reproducible directly from the recorded commands.
+Plasmodium row is an Ensembl Genomes release-63 cache paired with the
+VEP/core-116 executable libraries, which is why both release numbers are
+recorded.
 
 ## History
 
@@ -341,7 +355,6 @@ comparator are reproducible directly from the recorded commands.
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_16180339                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_27182818                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_31415927                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
-| 2026-09-28 | e9a7d6b         | plasmodium_model_seed11663                                | plasmodium-falciparum-63   |   32131 |       32131 |          0 |      32131 |                   0 | 100.00%    | 0.01%                                 |
 
 ## Randomized executable-VEP state exploration
 
@@ -362,19 +375,19 @@ with differing alleles up to 49 bases.
 
 The combined denominator counts pair comparisons across seed runs, not
 distinct alleles: the 268 fixed witnesses are deliberately shared and
-random draws may overlap. Neither the original generator nor its
-acceptance rules were changed.
+random draws may overlap. All compared runs use the same generator and
+acceptance rules.
 
-### Fresh-seed counterexample retained
+### Repeat-clipping witness
 
 Seed 27182818 at `7d40756adc75` matched every consequence pair but
 emitted one extra HGVSc: `chrDuck:250 CGT>CCC`, transcript `DUCK1-201`,
 yielded `c.*10[3]` where VEP emitted no HGVSc. The pure-C properties
 passed on that revision too. VEP skips transcript allele clipping only
 for two-copy duplication; larger multiplications must undergo clipping
-and coordinate projection. The fix removes the early repeat-formatting
-path instead of changing the oracle or excluding the event. The original
-failing HGVS rows remain in the append-only ledger.
+and coordinate projection before HGVSc repeat formatting. The ledger
+retains the failing observation and its matching regression run under
+the same generator and oracle.
 
 | revision |  pairs | match | both_absent | discordant |
 |:---------|-------:|------:|------------:|-----------:|
@@ -636,34 +649,34 @@ single-digit observations densely explored, and marginal counters do not
 establish coverage of their cross-products. The fresh-seed HGVS failure
 above is direct evidence of this limit. Dedicated rare-state strata and
 retained counterexamples complement broad draws; they do not justify a
-population error-rate claim. Full phased SO/HGVS, broader structural
-composition and stale real-corpus campaigns still need their own
-current-revision evidence.
+population error-rate claim. Compound phased HGVS and broader domain
+composition are separate contracts in \#11 and \#50. Real-corpus
+evidence is bound to the named revision, model and oracle.
 
 ## Phased replay with noncoding contributors
 
 | source_revision |     seed | policy        | input_records | input_calls | input_allele_slots | observed_carriers | provenance_memberships |
 |:----------------|---------:|:--------------|--------------:|------------:|-------------------:|------------------:|-----------------------:|
 | eb83f6ff        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| eb83f6ff        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| eb83f6ff        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | eb83f6ff        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| eb83f6ff        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| eb83f6ff        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 | d1c591b7        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| d1c591b7        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| d1c591b7        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | d1c591b7        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| d1c591b7        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| d1c591b7        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 | 8f9987e3        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| 8f9987e3        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| 8f9987e3        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | 8f9987e3        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| 8f9987e3        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| 8f9987e3        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 | 7f4a4e28        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| 7f4a4e28        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| 7f4a4e28        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | 7f4a4e28        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| 7f4a4e28        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| 7f4a4e28        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 | 9b1b8a0d        |      173 | strict        |          3764 |       11292 |              22584 |              6000 |                  14292 |
-| 9b1b8a0d        |      173 | vep_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
+| 9b1b8a0d        |      173 | vep116_compat |          3764 |       11292 |              22584 |              6000 |                  14292 |
 | 9b1b8a0d        | 20260906 | strict        |          3802 |       11406 |              22812 |              6000 |                  14406 |
-| 9b1b8a0d        | 20260906 | vep_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
+| 9b1b8a0d        | 20260906 | vep116_compat |          3802 |       11406 |              22812 |              6000 |                  14406 |
 
 Sources eb83f6ff1d03d05a3c9f8135c8ef355b7f431ee7,
 d1c591b76f8a9a07036736ac0666a004eb58e0eb,
@@ -682,7 +695,7 @@ comparisons per policy. The supplemental corpus adds one homozygous
 intronic SNV per transcript while preserving every original VCF record.
 Running unmodified Haplosaurus on those inputs leaves its complete
 observations unchanged. DuckHTS must retain the intronic contributors,
-including on previously implicit reference lanes, with unchanged literal
+including on implicit reference lanes, with unchanged literal
 CDS/protein and an `outside_cds` contributor status.
 
 Both policies pass all 120,000 carrier comparisons and 286,980
@@ -691,7 +704,7 @@ under each policy and revision; these are not independent statistical
 trials. Five deliberately corrupted outputs per policy/seed are
 rejected. Fixed SQL/R tests additionally cover UTRs, insertions, missing
 calls and coding-overlapping projection failures; a native two-strand
-span enumeration supplies 6,774 assertions for the fix.
+span enumeration supplies 6,774 assertions of contributor retention.
 
 This certifies the declared literal-replay cases, not altered splicing,
 combined SO/HGVS, broad phase compatibility or exhaustive rare
@@ -701,8 +714,8 @@ this augmentation opt-in and does not replace the original corpus or
 verifier. The [phased replay benchmark](duckvep_haplotypes.md) records
 sorted native and public SQL execution separately, with workspace and
 process memory. The current SQL benchmark includes local coding-block
-SO; these Haplosaurus comparisons do not certify those masks.
-Whole-haplotype SO/HGVS remains unfinished.
+SO; these Haplosaurus comparisons do not certify those masks or evaluate
+whole-haplotype SO/HGVS.
 
 ## Raw genotype compatibility audit
 
@@ -756,8 +769,8 @@ alone. This does not justify changing HTSlib-faithful genotype decoding
 or treating an unknown call as biologically known. Exact raw-input
 emulation needs retained source GT and source-record allele context,
 with upstream conditional sequence explicitly distinguished from
-strict-phase evidence. Whole-haplotype SO/HGVS and typed structural
-composition remain separate unfinished requirements.
+strict-phase evidence. These raw-input measurements do not assess
+whole-haplotype SO/HGVS or typed structural composition.
 
 The constant-space native raw-GT parser separately records **0
 disagreements across 14040 source calls**. An optional observer sidecar
@@ -1312,7 +1325,7 @@ carry several terms.
 | GRCh38 ClinVar coding             |             27 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 ClinVar cross-chromosome   |             28 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh37                            |             26 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
-| P. falciparum model-derived seed11663 |             21 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
+| P. falciparum                     |             20 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 paired BND                 |             14 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 GIAB + core regulation     |             15 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 exact SV + core regulation |             27 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
@@ -1342,6 +1355,7 @@ counted once within each corpus.
 | GRCh38 dbSNP                      | HIGH     |    118 |         118 |          0 |        118 |                   0 | 100.00%    | 3.08%                                 |
 | GRCh38 GIAB                       | HIGH     |      4 |           4 |          0 |          4 |                   0 | 100.00%    | 60.24%                                |
 | GRCh37                            | HIGH     |  46645 |       46645 |          0 |      46645 |                   0 | 100.00%    | 0.01%                                 |
+| P. falciparum                     | HIGH     |   4309 |        4309 |          0 |       4309 |                   0 | 100.00%    | 0.09%                                 |
 | GRCh38 GIAB + core regulation     | HIGH     |      3 |           3 |          0 |          3 |                   0 | 100.00%    | 70.76%                                |
 | GRCh38 exact SV + core regulation | HIGH     |  40135 |       40135 |          0 |      40135 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 ClinVar coding             | LOW      |   5952 |        5952 |          0 |       5952 |                   0 | 100.00%    | 0.06%                                 |
@@ -1349,6 +1363,7 @@ counted once within each corpus.
 | GRCh38 dbSNP                      | LOW      |    349 |         349 |          0 |        349 |                   0 | 100.00%    | 1.05%                                 |
 | GRCh38 GIAB                       | LOW      |    260 |         260 |          0 |        260 |                   0 | 100.00%    | 1.41%                                 |
 | GRCh37                            | LOW      |  23354 |       23354 |          0 |      23354 |                   0 | 100.00%    | 0.02%                                 |
+| P. falciparum                     | LOW      |    210 |         210 |          0 |        210 |                   0 | 100.00%    | 1.74%                                 |
 | GRCh38 GIAB + core regulation     | LOW      |     98 |          98 |          0 |         98 |                   0 | 100.00%    | 3.69%                                 |
 | GRCh38 exact SV + core regulation | LOW      |    821 |         821 |          0 |        821 |                   0 | 100.00%    | 0.45%                                 |
 | GRCh38 ClinVar coding             | MODERATE |  59108 |       59108 |          0 |      59108 |                   0 | 100.00%    | 0.01%                                 |
@@ -1356,6 +1371,7 @@ counted once within each corpus.
 | GRCh38 dbSNP                      | MODERATE |    125 |         125 |          0 |        125 |                   0 | 100.00%    | 2.91%                                 |
 | GRCh38 GIAB                       | MODERATE |     31 |          31 |          0 |         31 |                   0 | 100.00%    | 11.22%                                |
 | GRCh37                            | MODERATE |  23319 |       23319 |          0 |      23319 |                   0 | 100.00%    | 0.02%                                 |
+| P. falciparum                     | MODERATE |   1937 |        1937 |          0 |       1937 |                   0 | 100.00%    | 0.19%                                 |
 | GRCh38 GIAB + core regulation     | MODERATE |     41 |          41 |          0 |         41 |                   0 | 100.00%    | 8.60%                                 |
 | GRCh38 exact SV + core regulation | MODERATE |    766 |         766 |          0 |        766 |                   0 | 100.00%    | 0.48%                                 |
 | GRCh38 paired BND                 | MODIFIER |  21774 |       21774 |          0 |      21774 |                   0 | 100.00%    | 0.02%                                 |
@@ -1364,6 +1380,7 @@ counted once within each corpus.
 | GRCh38 dbSNP                      | MODIFIER |  73028 |       73028 |          0 |      73028 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 GIAB                       | MODIFIER |  54610 |       54610 |          0 |      54610 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh37                            | MODIFIER | 393146 |      393146 |          0 |     393146 |                   0 | 100.00%    | 0.00%                                 |
+| P. falciparum                     | MODIFIER |  34276 |       34276 |          0 |      34276 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 GIAB + core regulation     | MODIFIER |  14813 |       14813 |          0 |      14813 |                   0 | 100.00%    | 0.02%                                 |
 | GRCh38 exact SV + core regulation | MODIFIER |  78502 |       78502 |          0 |      78502 |                   0 | 100.00%    | 0.00%                                 |
 
@@ -1412,45 +1429,51 @@ positional threshold differently.
 
 ## Species product matrix
 
-The receipt column is the SHA-256 of the model's current-definition receipt in
-[`duckvep_model_receipts.csv`](data/duckvep_model_receipts.csv). Exact pairs count
-normalized `(variant ID, transcript ID, SO-term set)` agreements with the
-indexed-cache oracle; the corpus links specify the sampling and comparator.
-Human ledger rows predate their most recent receipt rebuilds, so their receipt
-hashes identify the current product definition, not the binary artifact used by
-those historical differential runs.
+The receipt column is the SHA-256 of the model’s current-definition
+receipt in
+[`duckvep_model_receipts.csv`](data/duckvep_model_receipts.csv). Exact
+pairs count normalized `(variant ID, transcript ID, SO-term set)`
+agreements with the indexed-cache oracle; the corpus links specify the
+sampling and comparator. Human ledger rows predate their most recent
+receipt rebuilds, so their receipt hashes identify the current product
+definition, not the binary artifact used by those historical
+differential runs.
 
-| Species / assembly | Receipt SHA-256 | Corpus | Exact pairs |
-| --- | --- | --- | ---: |
-| Human GRCh38 | `392fa11d6c8fc9d2fa060fb870cf7566016916325e0a12b8d168a12df0fd3c01` | [ClinVar cross-chromosome](#latest-tested-revision-per-corpus) | 316,397 / 316,397 |
-| Human GRCh37 | `21e113d9148132491bc935f3d1b0ec7d50663f450b62e346cb1f0f447de0b290` | [GRCh37](#latest-tested-revision-per-corpus) | 486,464 / 486,464 |
-| *P. falciparum* GCA000002765v3 | `d9c7056823755f83d5b189b9e59fdd1129ebe3e342095453e0d2208f3081d81b` | [seed11663](data/plasmodium_seed11663_differential.md) | 32,131 / 32,131 |
-| Mouse GRCm39 | `ae39ffc9e647d0a096a13b737599d480fae2b94d3a202938a8eeaa44208c62be` | [seed11639](data/mouse_seed11639_differential.md) | 400,145 / 400,145 |
-| Fly BDGP6.54 | `e6deea1ac2b0097589df9da501bd4a1ddf47ec5f8e0d4291ee49e727352533c8` | [seed11654](data/fly_seed11654_differential.md) | 36,136 / 36,136 |
-| Arabidopsis TAIR10 | `5b3fac7c92db9c2dfd13cc83df457a993ece29b5b703343194c5363136d0a12f` | [seed11663](data/plant_seed11663_differential.md) | 21,772 / 21,772 |
-| Tetrahymena JCVI-TTA1-2.2 | `23fc4aa4ebee8dd2dbb515a9a8a5c6436a7da99c71e5844d7150c13e0bb6352a` | [seed11606](data/tetrahymena_seed11606_differential.md) | 100,201 / 100,201 |
+| Species / assembly             | Receipt SHA-256                                                    | Corpus                                                         |       Exact pairs |
+|--------------------------------|--------------------------------------------------------------------|----------------------------------------------------------------|------------------:|
+| Human GRCh38                   | `392fa11d6c8fc9d2fa060fb870cf7566016916325e0a12b8d168a12df0fd3c01` | [ClinVar cross-chromosome](#latest-tested-revision-per-corpus) | 316,397 / 316,397 |
+| Human GRCh37                   | `21e113d9148132491bc935f3d1b0ec7d50663f450b62e346cb1f0f447de0b290` | [GRCh37](#latest-tested-revision-per-corpus)                   | 486,464 / 486,464 |
+| *P. falciparum* GCA000002765v3 | `d9c7056823755f83d5b189b9e59fdd1129ebe3e342095453e0d2208f3081d81b` | [seed11663](data/plasmodium_seed11663_differential.md)         |   32,131 / 32,131 |
+| Mouse GRCm39                   | `ae39ffc9e647d0a096a13b737599d480fae2b94d3a202938a8eeaa44208c62be` | [seed11639](data/mouse_seed11639_differential.md)              | 400,145 / 400,145 |
+| Fly BDGP6.54                   | `e6deea1ac2b0097589df9da501bd4a1ddf47ec5f8e0d4291ee49e727352533c8` | [seed11654](data/fly_seed11654_differential.md)                |   36,136 / 36,136 |
+| Arabidopsis TAIR10             | `5b3fac7c92db9c2dfd13cc83df457a993ece29b5b703343194c5363136d0a12f` | [seed11663](data/plant_seed11663_differential.md)              |   21,772 / 21,772 |
+| Tetrahymena JCVI-TTA1-2.2      | `23fc4aa4ebee8dd2dbb515a9a8a5c6436a7da99c71e5844d7150c13e0bb6352a` | [seed11606](data/tetrahymena_seed11606_differential.md)        | 100,201 / 100,201 |
 
-### Issue #5 completion evidence
+### Issue \#5 completion evidence
 
-- **Deterministic receipts and exact indexed-cache differentials:** the matrix
-  above and each product's source/model/corpus records, including the table-6
-  [Tetrahymena pins](data/tetrahymena_jcvi_tta1_sources.md).
-- **Genetic-code translation or failure before publication:** coding-table
-  counts appear in the receipt ledger; every admitted pair is exact against
-  VEP 116. Unsupported table IDs fail projection in
+- **Deterministic receipts and exact indexed-cache differentials:** the
+  matrix above and each product’s source/model/corpus records, including
+  the table-6 [Tetrahymena pins](data/tetrahymena_jcvi_tta1_sources.md).
+- **Genetic-code translation or failure before publication:**
+  coding-table counts appear in the receipt ledger; every admitted pair
+  is exact against VEP 116. Unsupported table IDs fail projection in
   `test/sql/duckvep_projection.test`.
-- **Actual alternative codons:** [table-6 TAA/TAG](data/tetrahymena_seed11606_corpus.md),
-  fly table-5 TGG/TGA, Pf table-4 and table-11 witnesses and plant table-11
-  initiation witnesses are exercised by the Docker comparisons. The
-  [offline excerpts](../test/data/duckvep/species/README.md) compare source codons
-  under table 6 and table 1 in both SQL and installed-package R.
-- **Distinct GRCh37 / no fabricated MANE:** the GRCh37 row retains its own
-  receipt and differential. `test/sql/duckvep_mane_grch37.test` enforces
-  GRCh37 MANE ownership; missing mappings remain absent.
-- **Coexistence, packaging and ownership:** `test/sql/duckvep_species_coexistence.test`
-  and `r/Rduckvep/inst/tinytest/test_species_coexistence.R` load three
-  assembly-specific models at once, check local ordinals and receipts, and
-  exercise independent model dropping and FASTA pinning. The SQL/R release
-  tests, randomized coverage and sanitizer evidence are recorded in the
-  preceding conformance sections. The offline fixtures are source excerpts
-  rather than whole-model performance or oracle substitutes.
+- **Actual alternative codons:** [table-6
+  TAA/TAG](data/tetrahymena_seed11606_corpus.md), fly table-5 TGG/TGA,
+  Pf table-4 and table-11 witnesses and plant table-11 initiation
+  witnesses are exercised by the Docker comparisons. The [offline
+  excerpts](../test/data/duckvep/species/README.md) compare source
+  codons under table 6 and table 1 in both SQL and installed-package R.
+- **Distinct GRCh37 / no fabricated MANE:** the GRCh37 row retains its
+  own receipt and differential. `test/sql/duckvep_mane_grch37.test`
+  enforces GRCh37 MANE ownership; missing mappings remain absent.
+- **Coexistence, packaging and ownership:**
+  `test/sql/duckvep_species_coexistence.test` and
+  `r/Rduckvep/inst/tinytest/test_species_coexistence.R` load three
+  assembly-specific models at once, check local ordinals and receipts,
+  and exercise independent model dropping and FASTA pinning. The SQL/R
+  release tests, randomized coverage and sanitizer evidence are recorded
+  in the preceding conformance sections. The offline fixtures are source
+  excerpts rather than whole-model performance or oracle substitutes.
+
+</details>

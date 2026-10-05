@@ -9,7 +9,7 @@ Rscript benchmarks/benchmark_sv_builders.R /path/to/copy/duckvep.duckdb_extensio
   benchmarks/data/duckvep_sv_builders_1m.csv 1000000
 ```
 
-Extension SHA-256 `bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3` (`7a741c0` plus this branch's two builder fixes); Linux x86_64,
+Extension SHA-256 `bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3` (source `7a741c0` with the INT64 overflow guard and hash-join mate lookup); Linux x86_64,
 Intel i5-13500, R `duckdb` package running DuckDB v1.5.5 with the v1.2.0 stable C API extension; raw rows are in
 [duckvep_sv_builders_100k.csv](duckvep_sv_builders_100k.csv) and [duckvep_sv_builders_1m.csv](duckvep_sv_builders_1m.csv).
 
@@ -57,13 +57,7 @@ alleles, and 10% reference mismatches.
 Ten times the rows takes 9.7-10.8 times as long for every builder: all five are linear at these sizes. The heaviest working set is the pairs
 builder at one million records (about 1 GB over the idle process).
 
-## Defects the measurement found
+## Performance comparisons and guard behavior
 
-- **Quadratic BND mate lookup.** The first run of the pairs builder took 20.2 s for 100,000 records (and 16 s for 50,000 pairs in the profile),
-  against 0.055 s for 10,176 unpaired real records. The plan was a nested-loop join because the mate lookup joined on
-  `m.event_index = mi.first_index AND mi.n = 1`. The uniqueness test is now folded into the join key, `m.event_index = CASE WHEN mi.n = 1 THEN
-  mi.first_index END`, giving a hash join: 100,000 records in 0.207 s (about 100 times faster) with byte-identical results on all tests. The 40,000-record
-  SQL test in `test/sql/duckvep_structural.test` pins correctness at this scale.
-- **INT64 overflow aborting a batch.** `duckvep_prepare_sv_geometry_sql` added `POS`, `END` and the CI bounds in INT64, so one row with `POS =
-  9223372036854775807` raised an error for the whole statement. Sums now use HUGEINT with `TRY_CAST`, and such rows return `unsupported_geometry`.
-  `test/sql/duckvep_builder_errors.test` covers this with the other error-recovery cases.
+- **BND mate lookup.** The nested-loop plan joined on `m.event_index = mi.first_index AND mi.n = 1` and took 20.2 s for 100,000 records (16 s for 50,000 pairs in the profile). The hash-join formulation folds uniqueness into the join key, `m.event_index = CASE WHEN mi.n = 1 THEN mi.first_index END`; it processes 100,000 records in 0.207 s, about 100 times faster, with byte-identical results on all tests. The 40,000-record SQL test in `test/sql/duckvep_structural.test` pins correctness at this scale. The 0.055 s real-call-set result covers 10,176 unpaired records and is not a comparable pair-building workload.
+- **INT64 geometry overflow.** INT64 arithmetic for `POS`, `END` and confidence-interval bounds caused a row with `POS = 9223372036854775807` to abort the statement. The geometry builder uses HUGEINT sums with `TRY_CAST`; this row returns `unsupported_geometry`. `test/sql/duckvep_builder_errors.test` covers this with the other error-recovery cases.

@@ -1,6 +1,6 @@
 # DuckVEP scale runner
 
-`scripts/duckvep_scale_run.sh` runs N concurrent DuckVEP annotation jobs over one gnomAD panel, each in its own cgroup v2 scope with the agreed ceilings, and writes one receipt (`receipt.csv`) and one summary (`summary.md`). It annotates through the public builders (`FROM query(duckvep_annotate_sql(...))` for compact output, the projected builder plus the complete-17 field query for complete output), streams each result to Parquet, and never collects output in R.
+`scripts/duckvep_scale_run.sh` runs N concurrent DuckVEP annotation jobs over one input panel, each in its own cgroup v2 scope with the configured ceilings, and writes one receipt (`receipt.csv`) and one summary (`summary.md`). It annotates through the public builders (`FROM query(duckvep_annotate_sql(...))` for compact output, the projected builder plus the complete-17 field query for complete output), streams each result to Parquet, and never collects output in R.
 
 ## Ceilings (enforced, never advisory)
 
@@ -12,7 +12,7 @@
 
 Every job ends `ok`, `capacity_error` (an explicit DuckVEP or DuckDB capacity error such as `capacity error: native memory (model) budget exceeded` or `Out of Memory Error`) or `failed`, with the reason. Output is written to `*.partial` and renamed only after success, so a capacity error publishes nothing. A cgroup OOM kill (`memory.events` `oom_kill` > 0) is always `failed`, even if the job had reported success. The receipt's `ceilings_met` is true only when the job was `ok` and the ceilings were enforced.
 
-Emit allowance: the extension default for the per-worker emitted-output allowance is 256 MiB (it was 64 MiB). On the gene-dense 1M panel (13.5M output rows) complete-17 output peaks at about 110 to 128 MiB of emitted buffers and fails with an explicit `capacity error: per-worker emitted-output lease budget exceeded` at 64 MiB; that run's receipt is `benchmarks/data/scale_contracts/runs/smoke-2x1M-emit64/`. The allowance is charged as it grows, so the cap reserves nothing; six workers x (128 + 256) MiB is a ceiling, not a reservation, and the measured native high-water is about 1.5 GiB of the 4 GiB budget. `--emit-mib 64` reproduces the old ceiling.
+Emit allowance: the extension default for the per-worker emitted-output allowance is 256 MiB. In the gene-dense 1M panel run (13.5M output rows), complete-17 output used about 110 to 128 MiB of emitted buffers and a 64 MiB cap produced `capacity error: per-worker emitted-output lease budget exceeded`; receipt: `benchmarks/data/scale_contracts/runs/smoke-2x1M-emit64/`. `--emit-mib 64` reproduces that measured failure. The allowance is charged as it grows, so the cap reserves nothing; six workers x (128 + 256) MiB is a ceiling, not a reservation. Measured native high-water was about 1.5 GiB of the 4 GiB budget.
 
 Regulation: jobs load the resident RegulatoryFeature and MotifFeature intervals from the model's `duckvep_regulation_features` (the production configuration) by default and record their count in the receipt and summary. `--no-regulation` runs without them.
 
@@ -31,22 +31,21 @@ Frozen artifacts: at start the runner copies the extension into `OUT/artifacts/`
 
 Disk pre-flight: jobs x spill quota, plus an output budget of jobs x (estimated output bytes per mode, summed over modes) x 2 for the `.partial` copy x 1.5 margin, plus `--min-free-gib`. The estimate is the panel row count (or `--limit-rows`) times 12 B/row (compact) and 48 B/row (complete17), rounded up from the committed smoke receipts (`runs/smoke-2x1M-regulation`: 11.2 and 46.2 B/row). Outputs are deleted after hashing without `--keep-output`, but they coexist while jobs run, so they are budgeted either way. Spill lives in a dedicated `$SPILL_PARENT/<run-id>` per campaign; only that directory is removed.
 
-## The consumer's run (10 jobs x 5M alleles, 64 cores, 256 GB)
+## Run
 
-Prerequisites: Linux with cgroup v2 mounted at `/sys/fs/cgroup`; root (or a systemd that lets you `systemd-run --scope -p MemoryMax=...`); R with the `DBI` and `duckdb` packages (DuckDB 1.5 or later); `sha256sum`, `awk`, `du`; an immutable, checksummed extension (a released one, or a `make release` build copied outside the build directory; do not rebuild or replace it during the campaign); the GRCh38 model `homo_sapiens_116_GRCh38_final.duckdb`; the 5M panel Parquet; at least 10 x 32 GiB + 10 GiB free disk on the spill filesystem; about 176 GiB of RAM for the ceilings (10 x 16 GiB) plus the OS, and 60 cores (10 x 6 threads).
+A certified run requires Linux with cgroup v2 and either usable `systemd-run` or permission to write to the cgroup. R with `DBI` and `duckdb` (DuckDB 1.5 or later), `sha256sum`, `awk` and `du` are also required. `--cgroup none` requires `--allow-unenforced` and cannot produce a certified run. Supply readable paths to the panel, model and extension; the output directory must be new or empty.
 
 ```sh
-scripts/duckvep_scale_run.sh --jobs 10 --panel /data/genomes-5M.parquet \
-  --model /data/homo_sapiens_116_GRCh38_final.duckdb \
-  --extension /data/duckvep.duckdb_extension \
-  --threads-per-job 6 --out /scratch/duckvep-scale-10x5M
+scripts/duckvep_scale_run.sh --jobs 2 --panel /data/panel.parquet \
+  --model /data/model.duckdb --extension /data/duckvep.duckdb_extension \
+  --threads-per-job 6 --out /scratch/duckvep-scale
 ```
 
-`--panel` takes a file path or a name (`1M`, `5M`, `25M`, `100M`, `exome2M`, `structural`) that resolves through `$DUCKVEP_GNOMAD_ROOT/panels/`. The consumer has no staged gnomAD tree, so pass the path of the `panel-5000000.parquet` we send. Check its SHA-256 against `benchmarks/data/scale_contracts/panels/panel-receipts.tsv` (`genomes-5M`, `file_sha256`); the runner records the SHA-256 of the panel, model and extension it used, at start and end. The model and panel paths must not be replaced or modified during a campaign either; a change fails the run.
+`--panel` accepts a Parquet path or a name (`1M`, `5M`, `25M`, `100M`, `exome2M`, `structural`) resolved through `$DUCKVEP_GNOMAD_ROOT/panels/`. The runner records SHA-256 values for the panel, model and extension at the start and end; a change during the run fails certification. It copies the extension into `OUT/artifacts/` and loads that copy. Extensions under a build directory require `--allow-live-extension`; the loaded copy remains fixed for the campaign.
 
-The pre-flight refuses, with the reason, when the host cannot hold the jobs: RAM below jobs x 16 GiB + 4 GiB, jobs x threads above the core count, free disk below jobs x spill quota + the output budget + `--min-free-gib` (10), no cgroup v2, or no usable `systemd-run`. `--oversubscribe` overrides the capacity checks only; it never disables enforcement. `--cgroup manual` writes `cgroup.procs` directly on hosts without `systemd-run`; `--cgroup none` needs `--allow-unenforced` and the receipt and summary then say "ceilings not enforced".
+Pre-flight checks available RAM against jobs x process memory ceiling plus 4 GiB, total job threads against available cores, free space against spill quotas and the output budget plus `--min-free-gib` (default 10), and cgroup support. `--oversubscribe` overrides host-capacity checks only; the configured ceilings remain enforced. `--cgroup manual` uses direct cgroup writes. The receipt and summary mark `--cgroup none` runs as unenforced.
 
-To send back: the whole `--out` directory except spill leftovers, or at minimum `receipt.csv`, `summary.md` and `run.tsv`, plus `job-*/job.log` if any job is not `ok`. `artifacts/` (the extension copy) need not be sent. `run.tsv` carries the host, kernel, core and RAM counts, load average, panel/model/extension SHA-256, git revision and every ceiling that was applied.
+`run.tsv` records the host, kernel, core and RAM counts, load average, input hashes, git revision and applied ceilings. Keep `receipt.csv`, `summary.md`, `run.tsv`, and `job-*/job.log` for any job that is not `ok` when reviewing a run.
 
 ## What is recorded
 

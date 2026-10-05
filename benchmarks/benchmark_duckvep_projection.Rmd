@@ -6,6 +6,7 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 root <- normalizePath(Sys.getenv("DUCKHTS_REPO_ROOT", getwd()), mustWork = TRUE)
+dir.create(file.path(root, "benchmarks/figures"), showWarnings = FALSE)
 runs <- read.csv(file.path(root, "benchmarks/data/duckvep_projection.csv"),
   stringsAsFactors = FALSE, check.names = FALSE)
 stopifnot(all(runs$build_binding != "diagnostic_unbound"))
@@ -30,8 +31,8 @@ a reverse model, and a three-exon model with two-base CDS phase padding from
 those inputs. The unchanged independent-event generator adds 1,000 seed-173
 random alleles to its targeted witnesses. Only record IDs are relabelled so
 repeated source alleles retain separate event keys. Each set is repeated eight
-times with distinct keys. These tiny warm models are a reproducible adapter
-workload, not a genome-scale annotation or file-ingestion benchmark.
+times with distinct keys. These warm models are a reproducible adapter workload,
+not a genome-scale annotation or file-ingestion benchmark.
 
 The `withheld_sequence` workload retains the forward model's CDS coordinates
 but supplies NULL CDS sequence, genetic code and flanks, as an importer may do
@@ -48,6 +49,76 @@ including duplicates and NULLs. It must match across passes and worker counts.
 
 ## Measured materialization
 
+The plots show the latest recorded source revision on one host. Time ranges are
+observed minima and maxima across three iterations; RSS is the process high-water
+mark, not isolated operator memory. Worker-count points are shown by case because
+model and output cardinalities differ across cases.
+
+![Projection SQL time by case and worker count. Points are medians; ranges are observed minima and maxima.](figures/projection-timing.png)
+
+![Whole-process peak RSS by case and worker count.](figures/projection-rss.png)
+
+```{r projection-plots, include=FALSE}
+latest_revision <- tail(unique(runs$source_revision), 1L)
+plot_runs <- runs[runs$source_revision == latest_revision, ]
+stopifnot(nrow(plot_runs) == 8L, !anyDuplicated(plot_runs[c("case", "threads")]),
+  setequal(plot_runs$case, c("forward", "reverse", "three_exon_phase2", "withheld_sequence")),
+  all(plot_runs$threads %in% c(1L, 4L)), all(plot_runs$iterations == 3L),
+  length(unique(plot_runs$run_date)) == 1L, length(unique(plot_runs$cpu)) == 1L,
+  length(unique(plot_runs$machine)) == 1L, length(unique(plot_runs$extension_sha256)) == 1L)
+for (case in split(plot_runs, plot_runs$case)) {
+  stopifnot(length(unique(case$output_sha256)) == 1L,
+    length(unique(case$input_vcf_sha256)) == 1L, length(unique(case$model_gff_sha256)) == 1L)
+}
+plot_runs$case <- factor(plot_runs$case, levels = rev(unique(plot_runs$case)))
+plot_runs$workers <- factor(plot_runs$threads, levels = c(1L, 4L),
+  labels = c("1 thread", "4 threads"))
+timing_plot <- ggplot2::ggplot(plot_runs,
+  ggplot2::aes(y = case, x = median_seconds, color = workers)) +
+  ggplot2::geom_errorbar(ggplot2::aes(xmin = min_seconds, xmax = max_seconds),
+    orientation = "y", width = 0.18, position = ggplot2::position_dodge(width = 0.65),
+    linewidth = 0.7) +
+  ggplot2::geom_point(position = ggplot2::position_dodge(width = 0.65), size = 3) +
+  ggplot2::geom_text(ggplot2::aes(label = sprintf("%.3f s", median_seconds)),
+    position = ggplot2::position_dodge(width = 0.65), vjust = -0.8, size = 3.5,
+    show.legend = FALSE) +
+  ggplot2::scale_x_continuous(limits = c(0, NA), expand = ggplot2::expansion(mult = c(0, 0.08))) +
+  ggplot2::scale_color_manual(values = c("1 thread" = "#6B7280", "4 threads" = "#087E8B"),
+    breaks = c("1 thread", "4 threads"), name = "Worker threads") +
+  ggplot2::labs(title = "SQL projection materialization",
+    subtitle = paste(unique(plot_runs$run_date), substr(latest_revision, 1L, 8L),
+      unique(plot_runs$cpu), sep = " | "), x = "Median time (seconds)", y = NULL) +
+  ggplot2::theme_minimal(base_size = 14) +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
+ggplot2::ggsave(file.path(root, "benchmarks/figures/projection-timing.png"),
+  timing_plot + ggplot2::theme(plot.title.position = "plot"),
+  device = ragg::agg_png, width = 9, height = 5.5, dpi = 144,
+  bg = "white")
+
+plot_runs$peak_rss_mib <- plot_runs$peak_rss_bytes / 2^20
+rss_plot <- ggplot2::ggplot(plot_runs,
+  ggplot2::aes(y = case, x = peak_rss_mib, color = workers)) +
+  ggplot2::geom_point(position = ggplot2::position_dodge(width = 0.65), size = 3) +
+  ggplot2::geom_text(ggplot2::aes(label = sprintf("%.0f MiB", peak_rss_mib)),
+    position = ggplot2::position_dodge(width = 0.65), vjust = -0.8, size = 3.5,
+    show.legend = FALSE) +
+  ggplot2::scale_x_continuous(limits = c(0, NA), expand = ggplot2::expansion(mult = c(0, 0.08))) +
+  ggplot2::scale_color_manual(values = c("1 thread" = "#6B7280", "4 threads" = "#087E8B"),
+    breaks = c("1 thread", "4 threads"), name = "Worker threads") +
+  ggplot2::labs(title = "Fresh-process peak memory",
+    subtitle = paste(unique(plot_runs$run_date), substr(latest_revision, 1L, 8L),
+      unique(plot_runs$cpu), sep = " | "), x = "Peak process RSS (MiB)", y = NULL) +
+  ggplot2::theme_minimal(base_size = 14) +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank())
+ggplot2::ggsave(file.path(root, "benchmarks/figures/projection-rss.png"),
+  rss_plot + ggplot2::theme(plot.title.position = "plot"),
+  device = ragg::agg_png, width = 9, height = 5.5, dpi = 144,
+  bg = "white")
+```
+
+<details>
+<summary>Recorded materialization measurements</summary>
+
 ```{r timings}
 table <- runs[c("source_revision", "case", "threads", "input_alleles",
   "expanded_transcript_rows", "output_rows", "json_utf8_bytes", "iterations",
@@ -56,7 +127,12 @@ table$source_revision <- substr(table$source_revision, 1L, 12L)
 knitr::kable(table)
 ```
 
+</details>
+
 ## Identity and complete output
+
+<details>
+<summary>Build, input and output identities</summary>
 
 ```{r identity}
 knitr::kable(unique(runs[c("source_revision", "extension_sha256", "build_binding",
@@ -64,6 +140,8 @@ knitr::kable(unique(runs[c("source_revision", "extension_sha256", "build_binding
 knitr::kable(unique(runs[c("case", "input_vcf_sha256", "model_gff_sha256",
   "reference_sha256", "output_sha256")]))
 ```
+
+</details>
 
 The first `f0184155b0fa` runs establish this complete-contract baseline. Later
 rows retain that measurement rather than replace it. The following comparison

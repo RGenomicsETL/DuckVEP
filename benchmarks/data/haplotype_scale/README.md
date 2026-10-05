@@ -1,13 +1,13 @@
-# Haplotype scale qualification (issue #2, slice 7)
+# Haplotype scale qualification
 
-The last slice of the signed `duckvep-coding-v1` contract (`design/duckvep_haplotype_contract.md`, section 4): DuckVEP must be at least 2x faster than
-the pinned `bcftools csq` on identical input, transcript model and core, under the same caps, and must qualify a 5M-physical-variant single-sample
+The signed `duckvep-coding-v1` contract (`design/duckvep_haplotype_contract.md`, section 4) requires DuckVEP to be at least 2x faster than
+the pinned `bcftools csq` on identical input, transcript model and core, under the same caps, and to qualify a 5M-physical-variant single-sample
 GRCh38 job on the MANE-selected model.
 
-## 2026-09-30, issue #34 slice 1: the fused native reader (gate met)
+## Fused native-reader measurement (2026-09-30; gate met)
 
 `duckvep_coding_calls(model, path)` reads the (bgzipped) VCF or BCF with the bundled zlib-only htslib, maps CHROM by name, runs the shared discovery (`src/core/duckvep_core_discovery.c`, the same code as `duckvep_coding_transcripts`) on every ALT allele
-and decodes FORMAT, GT and PS only for the records that touch coding sequence (25,969 of 4,023,088). It emits the calls relation of mode B. The measurement below is the unchanged gate: fresh process, one core (`taskset -c 6`, cgroup 16 GiB, native budget 4 GiB,
+and decodes FORMAT, GT and PS only for the records that touch coding sequence (25,969 of 4,023,088). It emits the calls relation of mode B. The gate measurement uses a fresh process, one core (`taskset -c 6`, cgroup 16 GiB, native budget 4 GiB,
 DuckDB threads 1), median of three, csq (`-p a -Ou -o /dev/null`) alternating with DuckVEP, load at most 3 at each start (waited once for one minute), sibling thread 0% busy in every run. Files: `perf34_slice1/` (receipt `process.tsv`, per-run stage output, `identity.txt`).
 The harness is `benchmarks/haplotype_scale/cli_worker.sh` (DuckDB v1.5.1 CLI, no R); the R worker has the same pipeline as `--mode F`. Extension: release build of source tree `8713686b` (sha256 `ab4dc8e7...`), copied to an immutable file first.
 
@@ -18,7 +18,7 @@ The harness is `benchmarks/haplotype_scale/cli_worker.sh` (DuckDB v1.5.1 CLI, no
 | DuckVEP fused, inline (`--mode I`: `duckvep_haplotypes` over the reader, nothing staged), CLI | 8.24 / 8.20 / 8.16 | 8.20 | 2.10x |
 | same pipeline from R (`worker.R --mode F`, R and DuckDB R package start-up included, reported separately) | 8.59 / 8.60 / 8.64 | 8.60 | 2.01x |
 
-Host note: csq ran 1.6 to 2.6 s faster than in the 2026-09-29 round (19.66 s) on a quieter host, so the ratio is judged inside this round. Against the old csq median the ratio would be 2.39x. Mode B on this round's host was not re-run for the gate; its last measure is 12.58 s.
+Host note: the 2026-09-30 csq runs were 1.6 to 2.6 s faster than the 2026-09-29 median (19.66 s). The ratio uses measurements from the same round. Against the 2026-09-29 csq median, the ratio would be 2.39x. Mode B was not rerun on the 2026-09-30 host; its gate measurement on 2026-09-29 was 12.58 s.
 
 Stages, medians of the three staged CLI runs (the CLI's own timers; the wall clock adds about 0.1 s of start-up and shutdown):
 
@@ -29,19 +29,19 @@ Stages, medians of the three staged CLI runs (the CLI's own timers; the wall clo
 | discovery, prediction and complete Parquet output | 2.88 | 2.57 |
 | process wall | 12.58 | 8.21 |
 
-What remains in the 3.08 s stage is the zlib inflate of 2.9 GB (a diagnostic `gzip -dc` is 6.8 s of single-threaded zlib-ng-less work, `bgzip -dc` with libdeflate 1.0 s; htslib's BGZF inflate with zlib blocks lies between them) plus about 4 million line splits and interval lookups. Load (2.4 s) is the next lever and is outside this slice. Sys time is 1.6 s of the 8.2 (page faults of the model).
+What remains in the 3.08 s stage is the zlib inflate of 2.9 GB (a diagnostic `gzip -dc` is 6.8 s of single-threaded zlib-ng-less work, `bgzip -dc` with libdeflate 1.0 s; htslib's BGZF inflate with zlib blocks lies between them) plus about 4 million line splits and interval lookups. Model load takes 2.4 s outside the measured stage. Sys time is 1.6 s of the 8.2 (page faults of the model).
 
 Caps observed: memory.peak 3.83 GiB (4,107,853,824 bytes; cap 16 GiB), native pass total 1,651 MiB of 4,096 (model 1,304, index 14, workspace 333), DuckDB spill 0, all 15 processes exit 0.
 
-Output identity. The output of the fused pipeline has 157,986 rows and full-output checksum `1456007180270799092358516`, equal to slice 7's mode B, in all nine audited-by-checksum outputs (F, I and R, three each; the checksum is `sum(hash(row))` over the Parquet, as in `worker.R`). (The brief quoted 158,004 rows; the slice 7 receipts and this run both have 157,986, and the checksum is the same.) Stronger: `benchmarks/haplotype_scale/verify_coding_calls.sh` builds mode B's calls relation and the reader's in one session and compares them as multisets, every column: 247,374 calls each, 0 only in the reader, 0 only in mode B, equal order-independent hashes.
+Output identity. The fused pipeline has 157,986 rows and full-output checksum `1456007180270799092358516`, matching the mode B receipts and all nine audited-by-checksum outputs (F, I and R, three each; the checksum is `sum(hash(row))` over the Parquet, as in `worker.R`). `benchmarks/haplotype_scale/verify_coding_calls.sh` builds mode B's calls relation and the reader's in one session and compares them as multisets, every column: 247,374 calls each, 0 only in the reader, 0 only in mode B, equal order-independent hashes.
 
 Differences from the mode B SQL that cannot show in HG002's output, by design: the PS of a sample is read by FORMAT key (mode B takes the last `:` field, which is PS in HG002), the record ordinal counts every data record, a coding record without GT or a file without FORMAT/GT is an error (mode B would parse garbage), and multi-sample files give one row per sample with `sample_index` from 0 (mode B reads the first sample only).
 
-Gates: `make release`, `test_release` (31 SQL files including `duckvep_coding_calls.test`), `test_release_asan`, `test_properties`, `test_haplotype_contract`, `test_fault_injection` (861 failed allocations, all clean, including new call sites in the reader and the discovery module), `check-function-docs` (26 functions, 29 examples), R tinytests (10,711 expectations, all pass), `scripts/check-rduckvep-bundle.sh`, `git diff --check`, clang `-Werror=string-concatenation` on the new files.
+Gates: `make release`, `test_release` (31 SQL files including `duckvep_coding_calls.test`), `test_release_asan`, `test_properties`, `test_haplotype_contract`, `test_fault_injection` (861 failed allocations, all clean, including reader and discovery call sites), `check-function-docs` (26 functions, 29 examples), R tinytests (10,711 expectations, all pass), `scripts/check-rduckvep-bundle.sh`, `git diff --check`, clang `-Werror=string-concatenation` on the reader and discovery files.
 
-## Verdict
+## Mode-B gate measurement (2026-09-29)
 
-**(Superseded by the 2026-09-30 section above: the gate is met with the fused reader.) As measured on 2026-09-29, the gate was not met.** The maintainer closed #2 on its correctness contract, and the gate moved unchanged to #34. Judged on mode B (identical unsorted VCF, decode through Parquet), cold process, model load included, whole-process wall clock
+The gate was not met in this run. Judged on mode B (identical unsorted VCF, decode through Parquet), cold process, model load included, whole-process wall clock
 (R and DuckDB start-up included), one core, three fresh processes each:
 
 | | wall s (median of 3) |
@@ -61,11 +61,11 @@ DuckVEP takes 0.640 of csq's time: 1.56x faster, 2.75 s (28% of the target) shor
 | mode A cold / warm | 0.337 / 0.134 |
 | mode B cold against csq writing BCF (`-Ob`, 32.48 s) | 0.387 |
 
-This is the second measurement of the qualification. The first (before discovery was made exact, see "Pipeline") gave 10.87 s against 18.27 s (0.595); the host was quieter then, and the exact
+An earlier measurement, before exact discovery, gave 10.87 s against 18.27 s (0.595); the host was quieter then, and exact
 discovery costs about 1.2 s of stage time in mode B (per-ALT event normalization, see below). The ratio is a comparison inside one round of alternating runs, but the round to round noise of this shared host is
 visible in csq itself (18.1 s to 20.9 s). The contract's recorded baseline (22.2 s on 2026-09-28, target 11.1 s) was measured on core 2.
 
-The floor is two costs that DuckVEP cannot remove from inside the extension: DuckDB inflates the 2.9 GB VCF text with its bundled miniz (the same job with `bgzip -dc` feeding it has a stage 1.6 s shorter)
+Mode B includes two substantial costs: DuckDB inflates the 2.9 GB VCF text with its bundled miniz (the same job with `bgzip -dc` feeding it has a stage 1.6 s shorter)
 and loading the 1.8 GB transcript model takes 2.5 s (csq parses its 108 MB GFF3 on every run). Load + stage + predict is 11.8 s of the 12.6 s process; the stage (6.4 s) is dominated by the decode.
 
 ## What was measured
@@ -81,7 +81,7 @@ DuckDB thread. Observed maxima are under "Caps observed". csq ran under the same
 Pins (`inputs.tsv`, by content hash): input `hg002.ens.vcf.gz` sha256 `54e5d09d...` (4,023,088 records, 4,070,522 ALT alleles; it is the file that
 `test/data/haplotype/hg002_strict.oracle.tsv` names), Ensembl 116 GRCh38 GFF3 `08e881d9...`, FASTA `1e74081a...`, model `homo_sapiens_116_GRCh38_final.duckdb`
 (`model_sha256` `03019059...`, the receipt in `hg002_domain.accounting.tsv`), bcftools `1.23.1-70-g6dbd8fef` with htslib 1.22.1, R 4.6.0 with DuckDB 1.5.5. The
-DuckVEP extension is the release build of the source tree `3d23d8a6` (`git rev-parse HEAD:src`, unchanged by the later documentation and bundle commits); the binary's sha256 is in `inputs.tsv`.
+DuckVEP extension is the release build of source tree `3d23d8a6` (`git rev-parse HEAD:src`); the binary's SHA-256 is in `inputs.tsv`.
 
 ### The csq baseline
 
@@ -203,13 +203,13 @@ of about 525 million (the exact band for thousands of edits), hence its larger c
 | `max_alignment_cells := 100000` on the HG002 calls | `CDS difference status 3, max_alignment_cells=100000, required=166049 at transcript 669`; nothing published; bytes unchanged; reusable |
 | the builder's default capacities on the HG002 calls | succeeds (157,986 rows) since capacity follows the band an alignment needs |
 
-Before the capacity change below, the unmodified build could not run the 5M MANE job at any admissible cap: `max_alignment_cells=268435456` failed with `required=451073810 at transcript 3762` and
-`3221225472` with `required=11659140506 at transcript 6435` (`base_capacity_refusal.tsv`); the final build runs it at 268,435,456.
+At base commit `01f37f4`, the 5M MANE job failed at both tested alignment caps: `max_alignment_cells=268435456` failed with `required=451073810 at transcript 3762`, and
+`3221225472` failed with `required=11659140506 at transcript 6435` (`base_capacity_refusal.tsv`). The capacity-following-band build runs it at 268,435,456.
 
 ## Optimizations, each with its A/B effect
 
-Every change leaves output byte-identical (the same full-output checksum in every variant) and the SQL, contract and goldens suites unchanged. Profiling (`perf`) of the 22 s prediction of the first
-measurement showed 67% in `duckvep_sequence_differences`; the model load and the coding transcripts lookup came next.
+All measured optimization variants produce byte-identical output with the same full-output checksum; the SQL, contract and goldens suites pass. Profiling (`perf`) of the 22 s prediction in the first
+measurement showed 67% in `duckvep_sequence_differences`; model load and coding-transcript lookup were the next largest costs.
 
 | variant (commit) | model load s | predict + Parquet s | process wall s (mode A cold) |
 |---|---|---|---|
@@ -219,17 +219,16 @@ measurement showed 67% in `duckvep_sequence_differences`; the model load and the
 | + table fast paths for translation, first stop and normalization | 2.51 | 2.80 | 6.44 |
 | final | 2.50 | 2.72 | 6.35 |
 
-1. **Alignment work** (`duckvep_sequence_differences`): the CDS and protein difference alignment filled the band of a feasible positional path, the whole matrix after any frameshift. The band now starts at the length change and
+1. **Alignment work** (`duckvep_sequence_differences`): the baseline CDS and protein difference alignment filled the band of a feasible positional path, then the whole matrix after any frameshift. The optimized band starts at the length change and
    widens until every path leaving it provably costs more (so the traceback, ties included, is that of the full matrix); rows inside the common prefix are closed-form and not computed; equal-length comparisons
    scan for differing runs; the counting pass is skipped when capacity cannot overflow; validation is word-wise. 22.21 s to 3.40 s. Checked against the previous implementation on 8 million random and repeat-rich cases
    (also under ASan/UBSan) and, committed, against the independent full-matrix oracle on 40,000 long repeat-rich pairs.
-2. **Model load**: model open validated each flank and CDS byte with a branchy test; a table over eight-byte groups does the same test. Rows that arrive in transcript order no longer have their sequence pools copied a
+2. **Model load**: model open validates flank and CDS bytes by testing eight-byte groups. Transcript-ordered rows avoid copying their sequence pools a
    second time (load high-water 2,680 to 1,582 MiB). 3.45 s to 2.77 s.
-3. **Codon fast paths**: three unambiguous bases index the amino-acid table directly, in translation and in the first-stop scan, and whole-sequence normalization is a table; ambiguous and invalid codons take the unchanged
-   exact path. Model load 2.77 to 2.51 s (the first-stop cache), prediction 3.40 to 2.80 s.
-4. **Capacity follows the band an alignment needs** (`7e49a27`): the trace capacity was compared with the cells of the feasible bound before any work. A deletion and a substitution 8,000 bases apart in a 20 kb sequence needed 322
-   million cells for a result within a few columns of the diagonal; TTN needed 11.7 billion, more than the native budget, so the 5M MANE job could not run at all. Capacity is now checked against the band of each attempt; a band still to be tried
-   that does not fit is refused explicitly with its cell count (the SQL tests' pinned limits are unchanged). Successful output is identical.
+3. **Codon fast paths**: three unambiguous bases index the amino-acid table directly in translation and the first-stop scan, and whole-sequence normalization uses a table; ambiguous and invalid codons take the exact
+   path. Model load 2.77 to 2.51 s (the first-stop cache), prediction 3.40 to 2.80 s.
+4. **Capacity follows the band an alignment needs** (`7e49a27`): the trace capacity is checked against the cells in the feasible bound before work begins. A deletion and a substitution 8,000 bases apart in a 20 kb sequence needed 322
+   million cells for a result within a few columns of the diagonal; TTN needed 11.7 billion, beyond the native budget. The base build failed the 5M MANE job at both tested caps; the capacity-following-band variant completes it at 268,435,456 cells. Capacity is checked against each attempted band, and an inadmissible band is refused with its cell count. SQL tests pin the configured capacity limits. Successful output is identical.
 5. **`duckvep_coding_transcripts`**: transcript discovery from the resident interval index, with the annotation builder's event normalization, exact pair for pair. It is public (SQL docs in the README, `rduckvep_coding_transcripts()` in R) rather than
    a runner helper; see Discovery. It is not folded into `duckvep_haplotypes` because that builder consumes a relation of calls the caller stages (the calls carry genotype and phase that only the caller can build); the scalar is the
    fast way to produce the (event, transcript) rows of that relation.
@@ -248,10 +247,9 @@ performance work on it is left to the maintainer's decision on the gate.
 
 ## What would close the gap
 
-The 2.75 s is mostly not in DuckVEP's own path: the miniz inflate of the VCF (a libdeflate decoder saves about 1.5 s and gets the ratio to 0.561), model load 2.5 s, R start-up and shutdown about 0.8 s, and prediction and
-Parquet 2.9 s. Reaching 0.5 needs another 1.2 s beyond a libdeflate decoder; the candidates are a libdeflate-backed decoder (outside this extension), a cheaper exact discovery (per-ALT normalization is about 0.8 s of the stage),
-streaming the model-load queries instead of materializing 1.1 GB of results, and avoiding the flank sequence load for coding-only jobs (the loader currently requires flanks whenever a CDS is present). No performance change was made after the
-discovery fix.
+The 2.75 s gap is mostly outside DuckVEP's prediction path: VCF miniz inflation (a libdeflate decoder saves about 1.5 s and yields a 0.561 ratio), model load (2.5 s), R start-up and shutdown (about 0.8 s), and prediction plus
+Parquet output (2.9 s). Reaching 0.5 needs another 1.2 s beyond a libdeflate decoder. Candidate work includes a libdeflate-backed decoder (outside this extension), cheaper exact discovery (per-ALT normalization is about 0.8 s of the stage),
+streaming model-load queries instead of materializing 1.1 GB of results, and avoiding flank sequence loading for coding-only jobs (the loader requires flanks whenever a CDS is present).
 
 ## Files
 

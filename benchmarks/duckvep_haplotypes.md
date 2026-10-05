@@ -6,23 +6,24 @@ Phased replay: native stream and public SQL
 Compound-replay source: e3ec6d231cc7e5c769685761a4739c8fcffc30ff;
 same-input baseline: 84770198dd9e43ddd4aa936d2f5bf9c3deabe550. Native
 measurements cover literal phased replay. SQL materializes all current
-fields, including local coding-block SO. HGVS generation is disabled;
-whole-haplotype SO/HGVS is unfinished and its computation is not timed
-here. Native and decoded SQL consume standalone ALT events and decoded
-calls. The additional source-record SQL lane measures literal GT parsing
-and replay; standalone native raw-record execution and conditional
-source omissions are not timed. All runs use one thread pinned to CPU 2
-on an Intel Core i5-13500, DuckDB 1.5.3, and a source-bound clean
-extension build. The native bridge uses the same kernel sources compiled
-with `-O3 -DNDEBUG`; receipts retain compiler/version, binary and
-fixture hashes, worker jobs, GNU-time logs and complete result
-fingerprints.
+fields, including local coding-block SO. HGVS generation is disabled in
+these recorded output contracts; the measurements do not time
+whole-haplotype SO/HGVS. Native and decoded SQL consume standalone ALT
+events and decoded calls. The additional source-record SQL lane measures
+literal GT parsing and replay; standalone native raw-record execution
+and conditional source omissions are not timed. All runs use one thread
+pinned to CPU 2 on an Intel Core i5-13500, DuckDB 1.5.3, and a
+source-bound clean extension build. The native bridge uses the same
+kernel sources compiled with `-O3 -DNDEBUG`; receipts retain
+compiler/version, binary and fixture hashes, worker jobs, GNU-time logs
+and complete result fingerprints.
 
 ## Workload and verification
 
-The [registry](https://github.com/RGenomicsETL/duckhts/blob/develop/r/duckhtsbench/inst/benchmark_registry.tsv) stages two
-committed, checksum-verified fixtures without network access: a 180-base
-CDS and four ALT events. Two substitutions share a codon; an
+The
+[registry](https://github.com/RGenomicsETL/duckhts/blob/develop/r/duckhtsbench/inst/benchmark_registry.tsv)
+stages two committed, checksum-verified fixtures without network access:
+a 180-base CDS and four ALT events. Two substitutions share a codon; an
 insertion/deletion pair displaces and restores the frame. Four diploid
 sample templates repeat across the cohort, producing exactly three
 occupied paths per transcript. Strict phase uses PS=10. Transcript
@@ -64,6 +65,11 @@ current HGVS-on/off comparison. The recorded contract determines which
 fields were measured; historical full fingerprints are used only for
 projections identical to their recorded schema.
 
+<details>
+<summary>
+Recorded replay input and output denominators
+</summary>
+
 | transcripts | samples | overlap | input_records | projected_events | input_calls | output_leaves | output_carriers | prefixes_created | translated_bases |
 |------------:|--------:|--------:|--------------:|-----------------:|------------:|--------------:|----------------:|-----------------:|-----------------:|
 |        1024 |       4 |       1 |          4096 |             4096 |       16384 |          3072 |            7168 |             6144 |           552960 |
@@ -73,6 +79,8 @@ projections identical to their recorded schema.
 |        1024 |     256 |       1 |          4096 |             4096 |     1048576 |          3072 |          458752 |             6144 |           552960 |
 |       10240 |      64 |      16 |          2560 |            40960 |     2621440 |         30720 |         1146880 |            61440 |          5529600 |
 
+</details>
+
 `input_records` counts distinct source ALT events, not candidate/sample
 rows. `projected_events` counts event/transcript pairs.
 `output_carriers` counts memberships of sample/lane keys in completed
@@ -81,6 +89,24 @@ peptide strings. Prefix creation and active pool peaks below are
 observed in the native stream, not inferred SQL counters.
 
 ## Timing and process memory
+
+The figure reports medians and observed min–max ranges. Native replay,
+decoded SQL and source-record SQL use separate panels because their
+timed work differs; their times are not speedup comparisons. Input and
+carrier contracts also differ between the two SQL modes.
+
+<figure>
+<img src="figures/phase-timing.png"
+alt="Haplotype replay time by execution mode. Points are medians; ranges are observed minima and maxima across three passes." />
+<figcaption aria-hidden="true">Haplotype replay time by execution mode.
+Points are medians; ranges are observed minima and maxima across three
+passes.</figcaption>
+</figure>
+
+<details>
+<summary>
+Pass-level timing and process-memory observations
+</summary>
 
 | transcripts | samples | overlap | mode        | min_s | median_s | max_s | max_process_rss_mib |
 |------------:|--------:|--------:|:------------|------:|---------:|------:|--------------------:|
@@ -98,12 +124,19 @@ observed in the native stream, not inferred SQL counters.
 |       10240 |      64 |      16 | native      | 0.169 |    0.171 | 0.173 |              73.852 |
 |       10240 |      64 |      16 | sql         | 4.066 |    4.095 | 4.127 |            2139.703 |
 
+</details>
+
 Both compared revisions return each block’s local SO mask, coding status
 and position relative to the first stop. A shared coding context
 evaluates physical blocks on completed replay. Full-output fingerprints
 and input/output denominators match across the compared configurations.
 The native count sink omits local SO evaluation. HGVS-enabled
 performance requires a separate workload.
+
+<details>
+<summary>
+Matched SQL timing observations by source revision
+</summary>
 
 | transcripts | samples | overlap | median_s_before | median_s_after | median_change_percent | max_process_rss_mib_before | max_process_rss_mib_after |
 |------------:|--------:|--------:|----------------:|---------------:|----------------------:|---------------------------:|--------------------------:|
@@ -113,6 +146,8 @@ performance requires a separate workload.
 |        1024 |      64 |      64 |           0.344 |          0.344 |                 0.000 |                    377.574 |                   378.086 |
 |        1024 |     256 |       1 |           1.295 |          1.307 |                 0.927 |                    958.684 |                   958.125 |
 |       10240 |      64 |      16 |           4.093 |          4.095 |                 0.049 |                   2138.895 |                  2139.703 |
+
+</details>
 
 Each recorded pass uses a fresh process and a full warm-up. Native
 timing starts after workspace initialization and includes ordered-feed
@@ -139,6 +174,11 @@ fingerprint aggregates depend on the output schema, so a schema change
 also prevents interpreting process RSS as an identical-work memory
 comparison.
 
+<details>
+<summary>
+Complete SQL output-size measurements
+</summary>
+
 | transcripts | samples | overlap | output_leaves | cds_bytes | protein_bytes | json_bytes |
 |------------:|--------:|--------:|--------------:|----------:|--------------:|-----------:|
 |        1024 |       4 |       1 |          3072 |    552960 |        184320 |    5142266 |
@@ -148,12 +188,30 @@ comparison.
 |        1024 |     256 |       1 |          3072 |    552960 |        184320 |   35028730 |
 |       10240 |      64 |      16 |         30720 |   5529600 |       1843200 |  121850254 |
 
+</details>
+
 CDS/protein bytes count the sequence views returned once per occupied
 leaf. JSON bytes are the measured UTF-8 size of complete canonicalized
 SQL rows, including carriers, contributors, blocks and differences; they
 are not bytes written to disk.
 
 ## Sparse native state
+
+The points show measured native workspace capacity across the recorded
+transcript/sample configurations. Labels give the workspace size;
+immutable model storage is reported separately in the table.
+
+<figure>
+<img src="figures/phase-workspace.png"
+alt="Native workspace capacity for each recorded transcript, sample and overlap configuration." />
+<figcaption aria-hidden="true">Native workspace capacity for each
+recorded transcript, sample and overlap configuration.</figcaption>
+</figure>
+
+<details>
+<summary>
+Per-workload native state observations
+</summary>
 
 | transcripts | samples | overlap | peak_transcripts | peak_carriers | peak_prefixes | peak_events | peak_projections | peak_allele_bytes | workspace_bytes | model_bytes |
 |------------:|--------:|--------:|-----------------:|--------------:|--------------:|------------:|-----------------:|------------------:|----------------:|------------:|
@@ -163,6 +221,8 @@ are not bytes written to disk.
 |        1024 |      64 |      64 |               64 |          7168 |           384 |           4 |              256 |                10 |          749628 |       34136 |
 |        1024 |     256 |       1 |                1 |           448 |             6 |           4 |                4 |                10 |           45264 |       34136 |
 |       10240 |      64 |      16 |               16 |          1792 |            96 |           4 |               64 |                10 |          189564 |      338264 |
+
+</details>
 
 Native workspace bytes count actual preallocated buffer capacities and
 state, separately from immutable model allocations. The fixed fixture is
@@ -262,6 +322,11 @@ The source-bound raw lane uses three fresh-process passes at the current
 source, with one thread pinned to CPU 2. Its timing and process RSS
 appear in the timing table above; its input and output denominators are:
 
+<details>
+<summary>
+Source-record SQL input and output denominators
+</summary>
+
 | transcripts | samples | overlap | input_physical_records | input_record_sample_calls | input_candidate_sample_rows | output_leaves | output_carriers |
 |------------:|--------:|--------:|-----------------------:|--------------------------:|----------------------------:|--------------:|----------------:|
 |        1024 |      64 |      16 |                    256 |                     16384 |                      262144 |          4096 |          131072 |
@@ -270,15 +335,24 @@ appear in the timing table above; its input and output denominators are:
 |--------------:|----------:|--------------:|-----------:|
 |          4096 |    737280 |        245760 |   14151208 |
 
+</details>
+
 The raw-lane comparison uses the same source revisions as the decoded
 comparison. Input hashes, complete output fingerprints, all listed
 denominators, thread count and output contract match between revisions.
 Different output denominators preclude treating raw versus decoded time
 as an implementation speedup.
 
+<details>
+<summary>
+Source-record SQL timing observations by revision
+</summary>
+
 | transcripts | samples | overlap | median_s_before | median_s_after | median_change_percent | max_process_rss_mib_before | max_process_rss_mib_after |
 |------------:|--------:|--------:|----------------:|---------------:|----------------------:|---------------------------:|--------------------------:|
 |        1024 |      64 |      16 |           0.728 |          0.722 |                -0.824 |                    612.758 |                   611.914 |
+
+</details>
 
 ## Singleton HGVS materialization
 
@@ -324,6 +398,11 @@ retain the derived FASTA/index, actual versus independent HGVS,
 source/binary/input hashes, jobs and process logs. Process RSS includes
 setup, warm-up and post-query aggregates, not just native workspace.
 
+<details>
+<summary>
+Singleton HGVS timings, output denominators and revision comparison
+</summary>
+
 Measured source: `e3ec6d231cc7e5c769685761a4739c8fcffc30ff`. One thread,
 CPU 2, Intel i5-13500, DuckDB 1.5.3.
 
@@ -351,6 +430,8 @@ match within each mode.
 |        1024 |      64 |      16 | sql_singletons_hgvs |           0.349 |        0.343 |        0.359 |                    409.6328 |          0.348 |       0.346 |       0.348 |                   409.0586 |               -0.2865 |
 |       10240 |      64 |      16 | sql_singletons      |           4.136 |        4.123 |        4.151 |                   2191.0039 |          4.107 |       4.107 |       4.110 |                  2190.9570 |               -0.7012 |
 |       10240 |      64 |      16 | sql_singletons_hgvs |           4.210 |        4.208 |        4.340 |                   2191.3047 |          4.179 |       4.170 |       4.187 |                  2191.1094 |               -0.7363 |
+
+</details>
 
 Singleton HGVS borrows the decoded stream’s successful physical CDS
 projection. VEP’s uploaded-feature interpretation and shifted-HGVS

@@ -1,7 +1,7 @@
 # DuckVEP architecture
 
-Status: current implementation contract. Code and tests are authoritative for implemented
-behavior; the remaining gaps are linked by full URL in the relevant sections below.
+This document describes the implemented DuckVEP architecture. Code and tests define
+executable behavior; open compatibility scope and evidence are linked in the relevant sections.
 
 ## Purpose and compatibility
 
@@ -10,9 +10,9 @@ VEP 116 (`57ea5c52340acc1f156267f810ad162e26597082`) with Ensembl core
 `c0cf13daa961d80584bad797b2eb0ff3a7500ef3` and variation
 `2fb834b987ede3824e200197a838ce11e91aeb4b`. The behavioral target is not
 human-only: the kernel accepts every NCBI codon table supported by VEP 116's BioPerl
-translator. Full-model acceptance currently covers human GRCh37 and GRCh38; non-human
-acceptance covers *Plasmodium falciparum* from Ensembl Genomes 63 paired with VEP 116,
-including its codon tables 1, 4, and 11. Evidence for one species or assembly is never
+translator. The declared full-model parity matrix covers human GRCh37 and GRCh38;
+non-human parity covers *Plasmodium falciparum* from Ensembl Genomes 63 paired with VEP 116,
+including codon tables 1, 4, and 11. Evidence for one species or assembly is never
 treated as evidence for another.
 
 The kernel emits structured transcript consequences. VEP-compatible CSQ text and HGVS are
@@ -135,8 +135,9 @@ They are not allocation sizes and do not clip the event. Statistical sweep scene
 zero, 1, 50, 100, 4,999, 5,000, 5,001, 10,000, 50,000, and 65,535-base distances, including
 alleles wider than the requested flank. The current scalar adapter has no guaranteed state
 across DuckDB vector edges, so it seeds each native vector and continues inside that vector.
-A future stateful table-function adapter may carry the same frontiers across vectors; it
-must not create a second candidate-selection authority.
+A stateful table-function adapter can carry the same frontiers across vectors only when its
+host lifecycle exposes explicit carry state; it must not create a second candidate-selection
+authority.
 
 The resident model is immutable and shared among DuckDB workers. Each checked-out workspace
 owns its active/candidate arrays, exon cursors, result builder, reference window, and faidx
@@ -388,12 +389,12 @@ putting that selection in the receipt and validation evidence.
 
 The extension validates the columns it reads and rejects inconsistent values; the exact
 source-column projections are executable in the SQL builders and acceptance fixtures.
-A future release adapter may add source handling, but it must still produce the same
-canonical region, transcript, and regulation relations. The loader accepts an 11-column
-CDS-only projection or a 13-column complete-flank projection. These express different
-available sequence evidence, not interface generations; missing transcript flanks remain
-explicitly unresolved when required. A changed model contract requires an explicit receipt
-and tests, not reinterpretation or replacement of a previously receipted artifact.
+A release adapter that adds source handling must produce the same canonical region,
+transcript, and regulation relations. The loader accepts an 11-column CDS-only projection or
+a 13-column complete-flank projection. These express different available sequence evidence;
+missing transcript flanks remain explicitly unresolved when required. A changed model
+contract requires an explicit receipt and tests. A receipted artifact retains the meaning
+of its declared contract.
 
 Promoting a new VEP target therefore requires three independent proofs: a pinned public
 source/release manifest and reference identity, canonical-model receipt validation, and
@@ -405,10 +406,10 @@ The prepared region relation contains `sequence_length` and a Boolean `circular`
 from the same Ensembl core release as its `seq_region`. The builder accepts one
 `circular_seq` attribute with value `1` per circular region and rejects duplicate
 or invalid circular attributes; absence means linear. Model identity is `model_sha256`,
-whose hashed-row definition remains unchanged. `topology_sha256` separately hashes
-region name, length and circular flag, and the receipt lists circular regions. Any
-future change to hashed rows requires a versioned definition and re-recording every
-receipt in the same commit. Circular topology is a property of the reference sequence region;
+which covers the declared model rows. `topology_sha256` separately hashes region name,
+length and circular flag, and the receipt lists circular regions. A change to hashed rows
+requires a versioned definition and re-recording every receipt in the same commit. Circular
+topology is a property of the reference sequence region;
 `codon_table` is an independently sourced translation rule. A mitochondrial
 codon table does not imply that a region is circular, and a circular region does
 not imply mitochondrial translation. Ordinary human Ensembl-116 MT transcripts
@@ -455,13 +456,12 @@ the model is loaded (`src/kernel/src/duckvep_lift.c`):
   needs to be mapped back to source coordinates.
 
 A region is lifted only when it is circular and holds a wrapped object. A circular region
-without one, such as human Ensembl-116 MT, runs on the unchanged linear kernel and its output
-is byte-identical to the pre-lift extension (`test/sql/duckvep_circular_mt.test` pins a
-fingerprint recorded before the change); in particular it reports no upstream or downstream
-consequence across the origin, exactly as VEP does. Lifting is a property of the model contents,
-not of the flag alone. The registry no longer refuses wrapped models; structural, breakend and
-phased edit-set entry points still do, with an explicit error, because their lifted semantics
-are not built. `2B + 3L` must stay below `2^31 - 1`. HGVS 3' normalization on a circle shorter than
+without one, such as human Ensembl-116 MT, runs on the linear kernel and matches the output
+fingerprint pinned by `test/sql/duckvep_circular_mt.test`; it reports no upstream or downstream
+consequence across the origin, exactly as VEP does. Lifting is a property of model contents,
+not of the circular flag alone. Model loading accepts wrapped models; structural, breakend and
+phased edit-set entry points reject them with an explicit error because their lifted semantics
+are not defined. `2B + 3L` must stay below `2^31 - 1`. HGVS 3' normalization on a circle shorter than
 about 2 kb sees the sequence repeat, because the 1000-base shift window on each side wraps onto
 itself; VEP defines no behavior there.
 
@@ -482,9 +482,9 @@ transcript); Ensembl Genomes 63 has 19 inverted transcripts on circular regions,
 collections and one trans-spliced plastid rps12, three of whose genomes have a VEP cache. On those genomes
 (`benchmarks/data/circular_vep_differential/`) DuckVEP equals VEP on every SO term of the other 152, 937 and 553
 transcripts, except flank rows that exist only through the origin, and HGVS 3' shifts within 1,100 bases of it,
-where VEP clips its window at the sequence end; and it equals an extension built before lifting existed
-everywhere except those origin-reaching rows. VEP models the crossing transcript itself as an interval with reversed
-bounds (no row for most events inside it, or an `intergenic_variant` transcript consequence) and aborts `--hgvs` on
+where VEP clips its window at the sequence end; comparison with the non-lifted extension
+baseline is exact except for those origin-reaching rows. VEP models the crossing transcript
+itself as an interval with reversed bounds (no row for most events inside it, or an `intergenic_variant` transcript consequence) and aborts `--hgvs` on
 some events in its translation. That is a difference in what is modelled, not agreement or refutation. Circular-coordinate
 support for a crossing object is therefore **property-proved and linear-model-proved, not oracle-proved**:
 rotation equivariance, equality with an ordinary linear model per object, and the native properties. The survey,
@@ -1333,7 +1333,7 @@ neighboring BND can change the executable oracle's transcript set. One VEP proce
 retained for cache reuse; only the semantic event buffer is isolated. Chromosomes stay
 contiguous and positions increase within each chromosome in the generated VCF.
 
-The public SO mask now binds all 41 terms registered by VEP 116. Six regulatory-region and
+The public SO mask binds all 41 terms registered by VEP 116. Six regulatory-region and
 transcription-factor-binding-site terms are produced by a separate interval-feature
 evaluator over the same event geometry. Their five hot columns live in a separate resident
 SoA, not in fake transcript rows; cold funcgen metadata remains an ordinary DuckDB relation.
@@ -1368,8 +1368,8 @@ HGVS is a consumer of the projected edit, not a formatter over consequence names
 current event keeps the uploaded span, VEP feature span, minimized REF/ALT edit, insertion
 boundary, and anchor side separately. The transcript model keeps complete spliced
 pre-CDS/CDS/post-CDS sequence, and the sequence layer can apply one edit or a grouped edit
-set and compare the resulting peptide. Those facts must remain stable while phased work
-is added.
+set and compare the resulting peptide. These semantic facts are shared by independent and
+phased paths.
 
 The implemented internal layer makes that ownership explicit:
 
@@ -1452,12 +1452,11 @@ The execution split is:
   set used for phased consequence classification.
 
 The hot transcript sweep therefore emits or retains numeric projected-edit facts; it does
-not allocate HGVS strings. Rendering is late, after filtering. Before a public phased API
-is fixed, the same prepared CDS edit set must become the phased executor's input rather
-than a second trimming or projection authority. External VEP-116 differentials must expand
-from the current Ensembl/GRCh38 independent-event coverage to transcript catalogs with
-sequence corrections, other assemblies/species, all shift modes, exact structural events,
-and compound edits.
+not allocate HGVS strings. Rendering is late, after filtering. The phased executor consumes
+the same prepared CDS edit set rather than introducing a second trimming or projection
+authority. External VEP-116 differentials cover independent events on Ensembl/GRCh38;
+additional evidence must cover transcript catalogs with sequence corrections, other
+assemblies/species, all shift modes, exact structural events, and compound edits.
 Apply-then-diff sequence equivalence remains an independent property oracle. Exact
 structural HGVS can later consume typed exact events. BND HGVS
 additionally needs the paired relation's mate and orientation facts; imprecise structural
@@ -1598,7 +1597,7 @@ indefinitely open prerequisite for every release.
   100,268 transcript pairs were exact. Its generated set contained SNVs, MNVs, insertions,
   deletions, and delins; duplicate rejection deliberately makes the accepted shape counts
   non-uniform rather than resampling a cosmetically balanced result.
-- The current eight-seed GRCh38 structural campaign generated 40,375 events on chromosomes
+- The eight-seed GRCh38 structural campaign generated 40,375 events on chromosomes
   1, 2, 6, 11, 17, 21, 22, and X and compared 2,140,911 emitted transcript pairs with the
   executable indexed VEP 116 cache. Every pair was resolved and exact, with no missing or
   extra emission. This is evidence for the sampled exact single-locus states, not a claim
@@ -1626,9 +1625,8 @@ indefinitely open prerequisite for every release.
 - Pinned shards of those official release VCFs are a fast CI audit of Ensembl's published
   Variation release product, not a VEP executable oracle. Compare DuckVEP rows with the
   indexed `VE` relation rather than the lossy `CSQ` presentation, and retain differences
-  as product-lineage evidence. Release 116 already differs from cache-mode VEP at
-  `X/Y:276322 G>A`, so executable-VEP witnesses and generated corpora remain the semantic
-  compatibility gate.
+  as product-lineage evidence. Release 116 differs from cache-mode VEP at `X/Y:276322 G>A`,
+  so executable-VEP witnesses and generated corpora remain the semantic compatibility gate.
 - Release engineering should publish receipt-hashed DuckDB model artifacts outside git,
   keyed by Ensembl/Ensembl Genomes release, species, assembly, transcript-filter policy,
   source relation hashes, and kernel/model ABI. A Zenodo record with a versioned manifest,
@@ -1724,9 +1722,9 @@ cases retain repository commit, file hash, source line/test name,
 model and expected result. These suites are modest and do
 not enumerate this document's whole state relation, so they cannot replace the finite rule
 proof, named compatibility witnesses, or the statistical and corpus campaigns. The legacy
-monolithic VEP tests are already preserved in the `ensembl-tools` Git history and are
-smaller than the current suite. Ensembl migrated its CVS history to Git; VEP's own
-“subversion” label is the point-release component, not an Apache Subversion repository.
+monolithic VEP tests in the `ensembl-tools` Git history are smaller than the current suite.
+Ensembl's CVS history is in Git; VEP's own “subversion” label denotes the point-release
+component, not an Apache Subversion repository.
 
 The certificate has three separate proof obligations:
 
@@ -1803,12 +1801,11 @@ baselines preceding source `e25c151` are about 841,000 input alleles/s for the
 transcript-only GIAB topology sample, 801,000/s for its regulation/motif form, 332,000/s
 for repeated coding SNVs, 112,000/s for repeated coding non-SNVs, 135,000/s for the
 repeated mixed coding set, and 74,000 semantic BND events/s. They include stable-API list
-materialization and aggregation but exclude model load and input staging. Because the
-current hot-path source has not rerun those identical workloads, they are historical
-nearest baselines rather than current-head no-regression evidence. The current-revision
-measurement is the annotation-dense matrix below. The one-million-input-allele target is
-not met on every final-model workload; output-row rates are a second denominator, not a
-substitute for the site-rate target. Exact revisions, checksums, row counts, resource
+materialization and aggregation but exclude model load and input staging. These recorded
+rates are nearest baselines, not current-head no-regression evidence. The annotation-dense
+matrix below is a measurement at its recorded source revision, not a general claim about
+later builds. The one-million-input-allele target is not met on every final-model workload;
+output-row rates are a second denominator, not a substitute for the site-rate target. Exact revisions, checksums, row counts, resource
 measurements, and conditions live in the generated
 [conformance report](../benchmarks/duckvep_conformance.md) and
 [throughput report](../benchmarks/duckvep_throughput.md).

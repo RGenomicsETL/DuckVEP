@@ -25,14 +25,16 @@ pkgdown::build_site(pkg = package_dir, new_process = FALSE, install = FALSE,
   preview = FALSE, override = list(destination = destination))
 
 landing_css <- normalizePath("scripts/site/landing.css", winslash = "/", mustWork = TRUE)
+dir.create(file.path(site_root, "assets"))
+stopifnot(file.copy(landing_css, file.path(site_root, "assets", "landing.css")))
 landing_header <- normalizePath("scripts/site/landing-header.html", winslash = "/", mustWork = TRUE)
 docs_header <- normalizePath("scripts/site/docs-header.html", winslash = "/", mustWork = TRUE)
 
-metadata <- function(title, header) {
+metadata <- function(title, header, css) {
   c("---", paste0("title: ", title), "output:", "  html:", "    options:",
-    "      toc: true", "    meta:",
+    "      toc: true", "      embed_resources: false", "    meta:",
     paste0("      css: [\"@default@1.14.69\", \"@article@1.14.69\", ",
-      "\"@site@1.14.69\", \"", landing_css, "\"]"),
+      "\"@site@1.14.69\", \"", css, "\"]"),
     paste0("      include_before: \"", header, "\""), "---")
 }
 
@@ -42,6 +44,7 @@ documents <- c(
   design = "design/duckvep.md",
   conformance = "benchmarks/duckvep_conformance.md",
   throughput = "benchmarks/duckvep_throughput.md",
+  throughput_evidence = "benchmarks/duckvep_throughput_evidence.md",
   vep_rs = "benchmarks/benchmark_duckvep_vep_rs.md",
   haplotypes = "benchmarks/duckvep_haplotypes.md",
   `haplotypes-indel` = "benchmarks/duckvep_haplotypes_indel.md",
@@ -50,7 +53,8 @@ documents <- c(
   `mane-grch37` = "design/duckvep_mane_grch37.md"
 )
 titles <- c(errata = "Compatibility and errata", design = "Design and implementation contract", conformance = "Conformance against Ensembl VEP",
-  throughput = "Throughput", vep_rs = "DuckVEP and vep-rs", haplotypes = "Haplotypes",
+  throughput = "Throughput", throughput_evidence = "Throughput methods and receipts",
+  vep_rs = "DuckVEP and vep-rs", haplotypes = "Haplotypes",
   `haplotypes-indel` = "Haplotypes with indels", projection = "Transcript projection",
   `corpus-workflow` = "Corpus workflow", `mane-grch37` = "MANE v1.5 mapped to GRCh37")
 
@@ -113,7 +117,7 @@ relink <- function(path, from, page_prefix) {
 readme <- readLines("README.md", warn = FALSE, encoding = "UTF-8")
 readme <- readme[readme != "# DuckVEP"]
 landing <- file.path(site_root, "index.html")
-litedown::mark(text = c(metadata("DuckVEP", landing_header), readme), output = landing)
+litedown::mark(text = c(metadata("DuckVEP", landing_header, "assets/landing.css"), readme), output = landing)
 
 docs_root <- file.path(site_root, "docs")
 dir.create(docs_root)
@@ -129,11 +133,11 @@ for (page in names(documents)) {
     markdown <- markdown[-c(first, if (first %in% setext) first + 1L)]
   }
   output <- file.path(docs_root, paste0(page, ".html"))
-  litedown::mark(text = c(metadata(titles[[page]], docs_header), markdown), output = output)
+  litedown::mark(text = c(metadata(titles[[page]], docs_header, "../assets/landing.css"), markdown), output = output)
 }
 index <- c("# Reports and design", "",
   sprintf("- [%s](%s.html)", titles[names(documents)], names(documents)))
-litedown::mark(text = c(metadata("Reports and design", docs_header), index),
+litedown::mark(text = c(metadata("Reports and design", docs_header, "../assets/landing.css"), index),
   output = file.path(docs_root, "index.html"))
 
 # Relink only once every page exists, so fragments resolve against real ids.

@@ -8,6 +8,7 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 root <- normalizePath(Sys.getenv("DUCKHTS_REPO_ROOT", getwd()), mustWork = TRUE)
+dir.create(file.path(root, "benchmarks/figures"), showWarnings = FALSE)
 history_path <- file.path(
   root, "test", "duckvep", "conformance", "data", "conformance_history.csv"
 )
@@ -94,7 +95,7 @@ latest_runs <- do.call(rbind, lapply(names(corpus_labels), function(corpus) {
   tested_ancestors <- revision_ancestry[
     revision_ancestry %in% rows$source_revision
   ]
-  revision <- if (length(tested_ancestors)) {
+  revision <- if (length(tested_ancestors) > 0L) {
     tested_ancestors[[1L]]
   } else {
     rows$source_revision[[nrow(rows)]]
@@ -112,7 +113,7 @@ state_overall <- overall[
 ]
 state_revisions <- unique(state_overall$source_revision)
 state_ancestry <- revision_ancestry[revision_ancestry %in% state_revisions]
-latest_state_revision <- if (length(state_ancestry)) {
+latest_state_revision <- if (length(state_ancestry) > 0L) {
   state_ancestry[[1L]]
 } else if (nrow(state_overall)) {
   state_overall$source_revision[[nrow(state_overall)]]
@@ -148,7 +149,7 @@ if (nrow(hgvs_runs)) {
       tested_ancestors <- revision_ancestry[
         revision_ancestry %in% rows$source_revision
       ]
-      revision <- if (length(tested_ancestors)) {
+      revision <- if (length(tested_ancestors) > 0L) {
         tested_ancestors[[1L]]
       } else {
         rows$source_revision[[nrow(rows)]]
@@ -181,7 +182,7 @@ if (nrow(nmd_history)) {
       tested_ancestors <- revision_ancestry[
         revision_ancestry %in% rows$source_revision
       ]
-      revision <- if (length(tested_ancestors)) {
+      revision <- if (length(tested_ancestors) > 0L) {
         tested_ancestors[[1L]]
       } else {
         rows$source_revision[[nrow(rows)]]
@@ -216,6 +217,15 @@ resident model. Independent frozen distributions and seeds are kept separate so
 a fix cannot improve its own hand-picked witnesses and hide a regression
 elsewhere.
 
+## Audited pair outcomes
+
+![Exact and non-exact transcript/object pair counts for the latest tested run per corpus.](figures/conformance-outcomes.png)
+
+These are audited pair counts for named corpora, not population error-rate estimates.
+
+<details>
+<summary>Scope, oracle authority and statistical interpretation</summary>
+
 Official Ensembl Variation release VCFs provide a separate product-audit lane. Their
 indexed `VE` relation can be compared in ordinary CI without starting Perl VEP; `CSQ` is
 a lossy presentation of those stored rows. This is not an executable-VEP oracle: in
@@ -228,8 +238,7 @@ build step.
 
 ## Declared conformance closure
 
-The independent-event consequence engine is closed as a semantic implementation campaign
-for the declared model and event surfaces: admitted Ensembl transcript, mature-miRNA,
+The independent-event conformance contract covers the declared model and event surfaces: admitted Ensembl transcript, mature-miRNA,
 RegulatoryFeature, and MotifFeature objects; independent literal small alleles; exact typed
 DEL, DUP, tandem-DUP, INV, INS, and CNV events; structural tandem repeats (`STR`); paired
 breakends; supported BioPerl codon tables and exceptional Ensembl peptide edits; and the
@@ -240,8 +249,7 @@ separate input-preparation operation. The evidence spans GRCh38, GRCh37, and
 *P. falciparum*, executable witnesses, indexed-cache corpora, generated state exploration,
 sanitizer runs, and pure-C oracle properties.
 
-“Closed” means future consequence changes are routine engineering behind these regression
-gates. VEP 116 parses `CIPOS`/`CIEND` into inner/outer structural coordinates, but its
+VEP 116 parses `CIPOS`/`CIEND` into inner/outer structural coordinates, but its
 registered consequence predicates use nominal `POS`/`END`; DuckVEP therefore annotates
 that nominal span while the surrounding relation preserves the uncertainty metadata.
 The checked-in 12-record GRCh38 confidence witness records this directly: nominal and
@@ -253,10 +261,11 @@ allele before consequence calculation. Implementing that lossless expansion and 
 VEP's finite supported symbolic vocabulary into the typed event API are narrower input-
 preparation tasks, not missing consequence predicates. VEP itself rejects unrecognised
 types such as CPX, so this closure does not promise arbitrary symbolic parsing. Untested
-species/releases and phased multi-record haplotypes remain outside the closure. Haplotype
-grouping and combined consequence attribution are the next semantic vertical and require
-their own executable oracle and performance campaign. Any newly observed fixed-event
-mismatch reopens this contract rather than being relabelled as unsupported.
+species/releases and phased multi-record haplotypes remain outside this contract.
+Phased coding consequences have a separate [correctness and throughput contract](../design/duckvep_haplotype_contract.md);
+compound HGVS and broader domain composition remain open in #11 and #50.
+Any newly observed fixed-event mismatch fails this contract rather than being
+relabelled as unsupported.
 
 ## Evidence units and statistical interpretation
 
@@ -277,7 +286,12 @@ bounds; separate stratum values are also not simultaneous confidence intervals. 
 release gate itself is deterministic and stricter: any discordance, unresolved state,
 extra emission, or missing emission fails the audited run.
 
+</details>
+
 ## Latest tested revision per corpus
+
+<details>
+<summary>Exact counts, corpus revisions and descriptive pair statistics</summary>
 
 ```{r latest}
 latest_table <- data.frame(
@@ -292,17 +306,60 @@ latest_table <- data.frame(
   exact = paste0(latest_runs$exact_agree, "/", latest_runs$n),
   unresolved = latest_runs$unresolved,
   resolved_disagreements = latest_runs$resolved_discordant,
+  engine_extra = latest_runs$engine_extra,
+  engine_missing = latest_runs$engine_missing,
   descriptive_independent_pair_upper_95 = percent(latest_runs$upper95),
   stringsAsFactors = FALSE
 )
 knitr::kable(latest_table, row.names = FALSE)
 ```
 
-Each row is the newest tested ancestor of the current source for that named
-corpus. Expensive corpora do not inherit evidence from a later run of another
+</details>
+
+```{r conformance-outcomes, include=FALSE}
+outcome_data <- rbind(
+  data.frame(corpus = latest_runs$corpus_label, n = latest_runs$n,
+    outcome = "Exact agreement", count = latest_runs$exact_agree),
+  data.frame(corpus = latest_runs$corpus_label, n = latest_runs$n,
+    outcome = "Non-exact pairs", count = latest_runs$exact_discordant)
+)
+outcome_data$corpus <- paste0(outcome_data$corpus, " (n=",
+  format(outcome_data$n, big.mark = ",", scientific = FALSE), ")")
+outcome_data$corpus <- factor(outcome_data$corpus, levels = rev(unique(outcome_data$corpus)))
+outcome_plot <- ggplot2::ggplot(outcome_data,
+  ggplot2::aes(x = count, y = corpus, color = outcome)) +
+  ggplot2::geom_point(position = ggplot2::position_dodge(width = 0.65), size = 2.7) +
+  ggplot2::geom_text(ggplot2::aes(label = format(count, big.mark = ",",
+    scientific = FALSE)), position = ggplot2::position_dodge(width = 0.65),
+    hjust = -0.2, size = 3.2, show.legend = FALSE) +
+  ggplot2::scale_x_continuous(trans = scales::log1p_trans(),
+    breaks = c(0, 1, 10, 100, 1000, 10000, 100000, 1000000),
+    labels = scales::label_comma(), expand = ggplot2::expansion(mult = c(0.02, 0.24))) +
+  ggplot2::scale_color_manual(values = c("Exact agreement" = "#009E73",
+    "Non-exact pairs" = "#D55E00"), name = "Pair outcome") +
+  ggplot2::labs(x = "Transcript/object pair count (log1p scale)", y = NULL) +
+  ggplot2::theme_minimal(base_size = 14) +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank(),
+    legend.position = "top")
+ggplot2::ggsave(file.path(root, "benchmarks/figures/conformance-outcomes.png"),
+  outcome_plot, device = ragg::agg_png, width = 9, height = 6.5, dpi = 144,
+  bg = "white")
+```
+
+Exact and non-exact pair counts partition each displayed denominator. Unresolved
+is an engine status, not an agreement category; unresolved pairs remain in the
+full denominator. Engine-extra and engine-missing pairs contribute to non-exact
+counts, not to exact agreement.
+
+Each row is the newest tested ancestor of the current source when the ledger
+contains an ancestor for that corpus; otherwise it is the last recorded row for
+that corpus. Expensive corpora do not inherit evidence from a later run of another
 corpus, and a newly tested corpus does not hide older still-applicable evidence.
 The SO and impact tables keep the same runs separate so the largest corpus cannot
 hide a smaller species- or assembly-specific frontier.
+
+<details>
+<summary>Full conformance ledger, properties and species receipts</summary>
 
 ## Independent-event HGVS differential
 
@@ -659,17 +716,17 @@ if (nrow(latest_state_runs)) {
 
 The combined denominator counts pair comparisons across seed runs, not distinct
 alleles: the 268 fixed witnesses are deliberately shared and random draws may
-overlap. Neither the original generator nor its acceptance rules were changed.
+overlap. All compared runs use the same generator and acceptance rules.
 
-### Fresh-seed counterexample retained
+### Repeat-clipping witness
 
 Seed 27182818 at `7d40756adc75` matched every consequence pair but emitted one
 extra HGVSc: `chrDuck:250 CGT>CCC`, transcript `DUCK1-201`, yielded `c.*10[3]`
 where VEP emitted no HGVSc. The pure-C properties passed on that revision too.
 VEP skips transcript allele clipping only for two-copy duplication; larger
-multiplications must undergo clipping and coordinate projection. The fix removes
-the early repeat-formatting path instead of changing the oracle or excluding the
-event. The original failing HGVS rows remain in the append-only ledger.
+multiplications must undergo clipping and coordinate projection before HGVSc repeat
+formatting. The ledger retains the failing observation and its matching regression
+run under the same generator and oracle.
 
 ```{r fresh-seed-hgvs-counterexample}
 counterexample_revisions <- c(
@@ -857,9 +914,10 @@ knitr::kable(property_runs, row.names = FALSE)
 property_ancestry <- revision_ancestry[
   revision_ancestry %in% property_history$source_revision
 ]
-stopifnot(length(property_ancestry) > 0L)
+property_revision <- if (length(property_ancestry) > 0L) property_ancestry[[1L]] else
+  tail(unique(property_history$source_revision), 1L)
 last_property <- tail(property_history[
-  property_history$source_revision == property_ancestry[[1L]],
+  property_history$source_revision == property_revision,
   , drop = FALSE
 ], 1L)
 latest_properties <- property_history[
@@ -973,8 +1031,9 @@ counter with single-digit observations densely explored, and marginal counters
 do not establish coverage of their cross-products. The fresh-seed HGVS failure
 above is direct evidence of this limit. Dedicated rare-state strata and retained
 counterexamples complement broad draws; they do not justify a population
-error-rate claim. Full phased SO/HGVS, broader structural composition and stale
-real-corpus campaigns still need their own current-revision evidence.
+error-rate claim. Compound phased HGVS and broader domain composition are separate
+contracts in #11 and #50. Real-corpus evidence is bound to the named revision,
+model and oracle.
 
 ## Phased replay with noncoding contributors
 
@@ -1005,7 +1064,7 @@ checks: 6,000 complete lanes, 4,000 occupied carriers, 3,000 output leaves,
 The supplemental corpus adds one homozygous intronic SNV per transcript while
 preserving every original VCF record. Running unmodified Haplosaurus on those
 inputs leaves its complete observations unchanged. DuckHTS must retain the
-intronic contributors, including on previously implicit reference lanes, with
+intronic contributors, including on implicit reference lanes, with
 unchanged literal CDS/protein and an `outside_cds` contributor status.
 
 Both policies pass all `r format(sum(replay$observed_carriers), big.mark = ",")`
@@ -1014,7 +1073,7 @@ provenance memberships. The same biological lanes are counted separately under
 each policy and revision; these are not independent statistical trials. Five deliberately
 corrupted outputs per policy/seed are rejected. Fixed SQL/R tests additionally
 cover UTRs, insertions, missing calls and coding-overlapping projection failures;
-a native two-strand span enumeration supplies 6,774 assertions for the fix.
+a native two-strand span enumeration supplies 6,774 assertions of contributor retention.
 
 This certifies the declared literal-replay cases, not altered splicing, combined
 SO/HGVS, broad phase compatibility or exhaustive rare configurations. The
@@ -1023,7 +1082,7 @@ keeps this augmentation opt-in and does not replace the original corpus or
 verifier. The [phased replay benchmark](duckvep_haplotypes.md) records sorted
 native and public SQL execution separately, with workspace and process memory.
 The current SQL benchmark includes local coding-block SO; these Haplosaurus
-comparisons do not certify those masks. Whole-haplotype SO/HGVS remains unfinished.
+comparisons do not certify those masks or evaluate whole-haplotype SO/HGVS.
 
 ## Raw genotype compatibility audit
 
@@ -1079,8 +1138,8 @@ Thus raw-parser compatibility cannot be recovered from typed calls alone. This
 does not justify changing HTSlib-faithful genotype decoding or treating an unknown
 call as biologically known. Exact raw-input emulation needs retained source GT and
 source-record allele context, with upstream conditional sequence explicitly
-distinguished from strict-phase evidence. Whole-haplotype SO/HGVS and typed
-structural composition remain separate unfinished requirements.
+distinguished from strict-phase evidence. These raw-input measurements do not
+assess whole-haplotype SO/HGVS or typed structural composition.
 
 ```{r raw-genotype-parser}
 parser_calls <- sum(phase_current$raw_parser_calls)
@@ -2061,3 +2120,5 @@ those historical differential runs.
   tests, randomized coverage and sanitizer evidence are recorded in the
   preceding conformance sections. The offline fixtures are source excerpts
   rather than whole-model performance or oracle substitutes.
+
+</details>

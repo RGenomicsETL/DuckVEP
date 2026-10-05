@@ -1,6 +1,6 @@
 # Native budget and bounded execution: evidence
 
-Measured with `benchmarks/scale_budget.R` (one pinned core, `taskset -c 2`; DuckDB R 1.5.5; one DuckDB thread; 8 GB `memory_limit`; immutable copies of each binary named `duckvep.duckdb_extension`; the read-only GRCh38 model and the 1,000,000-allele gnomAD panel `genomes-v1-77d2cdff65171780/panel-1000000.parquet`). `base` is `origin/main` at 42cc36f (circular lifted execution, same-codon classifier, species SV builders) built from a `git archive` of that commit; `budget` is this branch rebased onto it. Runs alternate base, budget; each row is the median of five.
+Measured with `benchmarks/scale_budget.R` (one pinned core, `taskset -c 2`; DuckDB R 1.5.5; one DuckDB thread; 8 GB `memory_limit`; immutable copies of each binary named `duckvep.duckdb_extension`; the read-only GRCh38 model and the 1,000,000-allele gnomAD panel `genomes-v1-77d2cdff65171780/panel-1000000.parquet`). The base build is `origin/main` at 42cc36f (circular lifted execution, same-codon classifier, species SV builders), built from a git archive of that commit; the budget build contains native-budget changes on that baseline. Runs alternate base and budget; each row is the median of five.
 
 | Build | Binary SHA-256 |
 |---|---|
@@ -44,7 +44,7 @@ The load high-water is the reordering step that copies coding sequence and flank
 
 ## Frozen receipts
 
-`Rscript benchmarks/scale_contracts.R` with `DUCKVEP_SCALE_EXTENSION` set to the immutable budget binary printed `verified: compact, compact_regulation, complete17, 41942 retained cells; model 0301905915b038b6b1f5db04d7dda1041ac5e30a7732ec700dd82b1616402c1b`. The script fails on any row-count, hash or SHA-256 drift, and `git status` shows no receipt file changed.
+`Rscript benchmarks/scale_contracts.R` with `DUCKVEP_SCALE_EXTENSION` set to the immutable budget binary printed `verified: compact, compact_regulation, complete17, 41942 retained cells; model 0301905915b038b6b1f5db04d7dda1041ac5e30a7732ec700dd82b1616402c1b`. The script fails on any row-count, hash or SHA-256 drift.
 
 ## Fault injection
 
@@ -54,4 +54,4 @@ The per-carrier consequence and impact lists of `duckvep_haplotypes` are written
 
 ## Emitted-output allowance: 64 MiB to 256 MiB
 
-Scale-runner smoke (2 jobs x 6 threads, ceilings enforced, 1M-allele genome panel from chr20/21/22/Y, 13,518,845 output rows) with the original 64 MiB per-worker emitted-output allowance: compact succeeded, complete-17 failed in both jobs with `capacity error: per-worker emitted-output lease budget exceeded (requested 27262976 bytes, 57683968 in use, limit 67108864)`. The error was explicit and nothing was published (receipt: `runs/smoke-2x1M-emit64/`). With 128 MiB complete-17 succeeded and the emit high-water was 118-128 MiB. The default is now 256 MiB, about twice the measured peak; the allowance is charged as it grows, so the higher cap reserves nothing. The 4 GiB budget, 6 workers, 128 MiB scratch and 64 MiB idle retention are unchanged.
+Scale-runner smoke used 2 jobs x 6 threads, enforced ceilings, and a 1M-allele genome panel from chr20/21/22/Y (13,518,845 output rows). At a 64 MiB per-worker emitted-output allowance, compact succeeded and complete-17 failed in both jobs with `capacity error: per-worker emitted-output lease budget exceeded (requested 27262976 bytes, 57683968 in use, limit 67108864)`; no output was published (`runs/smoke-2x1M-emit64/`). At 128 MiB, complete-17 succeeded with emit high-water 118-128 MiB. The scale-runner configuration sets a 256 MiB per-worker default, about twice the measured peak. The allowance is charged as it grows and the higher cap reserves nothing. The run used a 4 GiB budget, 6 workers, 128 MiB scratch, and 64 MiB idle retention.

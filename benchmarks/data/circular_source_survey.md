@@ -19,10 +19,9 @@ the region above. The survey joined the attribute to its region, counted
 transcripts whose `seq_region_start > seq_region_end`, then joined exons by
 `exon_transcript.rank` and counted adjacent rank pairs whose genomic starts
 reverse the expected direction for their transcript strand. No wrapped
-transcript was found in these two release/species combinations. This is not
-a survey of all public Ensembl releases or species; a public crossing
-transcript suitable for an executable VEP differential remained unidentified after this survey; the wider
-survey below identifies some.
+transcript was found in these two release/species combinations. The survey does
+not cover all public Ensembl releases or species; the wider survey below
+reports the broader database set and its crossing transcripts.
 
 SHA-256 of the compressed `transcript.txt.gz` downloads, respectively:
 `8aa0bf8182e8e6db9d3f6c8be809d39f6e72d3d34570b9ca5fe3657e650f0d59`
@@ -31,7 +30,7 @@ SHA-256 of `seq_region_attrib.txt.gz`, respectively:
 `9a352ddd9753e9ade957f4bec9e1e7f69033cb` and
 `0cf0ee6a200b65eea7031e8c591cabc67cc4c777d8b53cd594af7990e143fe16`.
 
-## Wider survey (issue #7 slice 2)
+## Wider Ensembl survey
 
 `scripts/survey_circular_transcripts.py` reads `attrib_type`, `seq_region_attrib` and, only for
 databases that declare a `circular_seq = 1` region, `transcript` from the public MySQL dumps,
@@ -54,7 +53,7 @@ objects: 18 in ten bacterial and archaeal genomes of `bacteria_0_collection` (fo
 *Pyrococcus horikoshii* OT3, five plasmid and chromosome genes of *Synechocystis* sp. PCC 6803) and one in
 the *Daucus carota* plastid, `KZM81246`, a trans-spliced rps12 whose exons are ranked 1 to 3 across the
 inverted-repeat boundary so that the circular builder classifies it as origin-crossing. Every one has
-`seq_region_start > seq_region_end` and passes the exon-rank validation of slice 1.
+`seq_region_start > seq_region_end` and passes the exon-rank validation described above.
 
 ## Executable VEP differential
 
@@ -85,7 +84,7 @@ What the comparison establishes, and what it does not:
 - **Residual disagreements are not caused by lifting.** The one different SO pair (*N. equitans* insertion at the
   first base of `AAR39122`, VEP `inframe_insertion&stop_retained_variant`, DuckVEP
   `coding_sequence_variant&inframe_insertion`) and the six interior HGVSp differences (one to four per genome)
-  are identical in the extension built from 5b6d195, before lifting existed. Each receipt's
+  also occur with the extension at revision `5b6d195`, which has no circular lifting. Each receipt's
   `lifted_vs_prelift_linear` block compares the lifted result to that extension on the unwrapped transcripts:
   no interior difference in any genome, 24 near-origin differences in carrot (the HGVS windows above) and none
   elsewhere, plus the DuckVEP-only flank rows.

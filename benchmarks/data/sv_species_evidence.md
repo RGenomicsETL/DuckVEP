@@ -1,6 +1,6 @@
-# Species structural evidence against VEP 116 (issue #4 item 6)
+# Species structural evidence against VEP 116
 
-The structural preparation builders and executable Ensembl VEP 116 differentials now run on the closed species matrix
+The structural preparation builders and executable Ensembl VEP 116 differentials cover the closed species matrix
 ([#5](https://github.com/RGenomicsETL/DuckVEP/issues/5)): **mouse GRCm39** and two non-vertebrates, **fly BDGP6.54** and
 **Arabidopsis TAIR10**. The oracle is the digest-pinned image
 `ensemblorg/ensembl-vep@sha256:f354dd8d09073e4d943acbbd02f5eb234a9d9e9d444371c1c349910f2123de11` with the pinned indexed caches and
@@ -244,13 +244,11 @@ not re-validated per species.
 ## Models, pins and provenance
 
 - Extension: `duckvep.duckdb_extension` SHA-256 `bbc690cc3fac46f1651a8c6854030fe8bf9e938572eb6288a153dca6970cedf3`, built from
-  `7a741c0` plus this branch's native builder fixes (INT64 overflow guard in `duckvep_prepare_sv_geometry_sql`, hash-join mate lookup in
-  `duckvep_prepare_breakend_pairs_sql`); the fixes do not change any result in these tables. Every run loads an immutable copy of it.
+  `7a741c0` with an INT64 overflow guard in `duckvep_prepare_sv_geometry_sql` and hash-join mate lookup in
+  `duckvep_prepare_breakend_pairs_sql`. These fixes do not affect the results in these tables. Every run loads an immutable copy.
 - Mouse: the existing pinned model (`model_sha256 ae39ffc9...`, receipt in `duckvep_model_receipts.csv`).
-- Fly and Arabidopsis were **rebuilt** from the pinned sources with `scripts/build_species_model.R`. The freshly staged `core.duckdb` bytes differ
+- Fly and Arabidopsis models were built from the pinned sources with `scripts/build_species_model.R`. The staged `core.duckdb` bytes differ
   from the recorded snapshot digest (DuckDB files are not byte-reproducible), and `model_sha256` covers `source_manifest_sha256`, so the raw
   hashes differ (`d84f5392...` for fly, `521c53d0...` for Arabidopsis). Recomputing `duckvep_model_receipt_sql` over the rebuilt tables with the
   *pinned* manifest digest reproduces the recorded hashes `e6deea1a...` (fly) and `5b3fac7c...` (Arabidopsis) exactly, with matching
-  counts, so the row content is identical. The FASTA, FASTA index, and indexed-cache archive hashes were re-verified against the source pins.
-- No receipt in `duckvep_model_receipts.csv` was changed.
-- Disk: the three staged inputs and caches used about 11 GB and were deleted after the runs.
+  counts, so the row content is identical. The FASTA, FASTA index, and indexed-cache archive hashes match the source pins. Staging the three inputs and caches used about 11 GB.

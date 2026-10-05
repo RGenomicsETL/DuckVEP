@@ -1,26 +1,18 @@
-# v2 host tests
+# DuckDB v2 host tests
 
-- `equality_cases.sql`: queries run on both hosts; results are compared with
-  `equality_golden.json`, the recorded output of the v1 host (`run_v2_tests.py --record`).
-  A case named `... error` must fail with a `duckvep_*:` message; every other case must succeed.
-- `v2_native.sql`: v2-only assertions (registration kinds, no catalog objects, NULL
-  invariants of struct results, table-function rescans).
-- Run with `DUCKVEP_V2_DUCKDB=<DuckDB CLI built at the pinned revision> make test_v2`.
-  The PyPI `duckdb>=2.0.0.dev0` wheels are different snapshots of a preview ABI that is not
-  frozen and cannot load this extension; see `docs/v2-host.md`.
+Run the build, binary, static and SQL gates with a DuckDB CLI built at the SDK revision pinned in `duckvep-package.json`:
 
-## HG002 host-scale check
+```sh
+DUCKVEP_V2_DUCKDB=/path/to/pinned/duckdb make test_v2
+```
 
-`scripts/check_v2_hg002.sh` runs the v1 haplotype query and the v2 builder/COPY/scan
-path with separate DuckDB CLIs, pins each process with `taskset`, and records CLI stage
-timers, peak RSS, native-budget snapshots, SQL scripts and Parquet outputs. It checks
-model fingerprints, schema and the complete nested row multiset with two-way
-`EXCEPT ALL`; it does not use hashes as an equality proof. `--v1-reference` additionally
-compares the freshly generated v1 output with a saved v1 Parquet file.
+The runtime suite checks `LOAD` twice on writable and read-only databases, no catalog or database-file changes, v2-only assertions, model-sink and native-budget behavior, and the 585 equality cases in `equality_golden.json`. The golden contains v1-host results; if a v1 extension exists at `build/release/duckvep.duckdb_extension`, the runner compares it with the live v1 host too. A case named `... error` must produce a DuckVEP error; other cases must succeed. The suite and API pin are detailed in [the v2 host guide](../../docs/v2-host.md).
 
-Build compatible extensions first and use a v2 CLI from the revision pinned in
-`duckvep-package.json`. Example inputs are supplied through environment variables or
-flags, not repository-specific data paths:
+## Whole-HG002 parity
+
+`scripts/check_v2_hg002.sh` is a separate full-data check. It runs v1 and v2 with separate DuckDB CLIs, records stage timings, peak RSS, native-budget snapshots, SQL and Parquet outputs, and compares fingerprints, schema and the complete nested row multiset with two-way `EXCEPT ALL`. `--v1-reference` additionally compares the fresh v1 output with the supplied saved Parquet file. The measured parity receipt is [`benchmarks/data/v2_hg002/bbe2ec4/`](../../benchmarks/data/v2_hg002/bbe2ec4/README.md); its wall times are descriptive measurements, not a throughput qualification.
+
+Build matching extensions before the check. The v2 CLI must match the pinned SDK revision. Supply local data paths through flags or environment variables; the output directory must be empty:
 
 ```sh
 scripts/check_v2_hg002.sh \
@@ -32,7 +24,3 @@ scripts/check_v2_hg002.sh \
   --v1-reference "$HG002_V1_PARQUET" --out-dir "$HG002_RUN_DIR" \
   --cpu-list 2 --threads 1
 ```
-
-The output directory must be empty. The full-data check is separate from `make test_v2`
-and must be run serially by the coordinator; no full HG002 timing run is implied by
-this SQL test suite.

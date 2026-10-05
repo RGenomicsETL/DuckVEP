@@ -8,6 +8,7 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 root <- normalizePath(Sys.getenv("DUCKHTS_REPO_ROOT", getwd()), mustWork = TRUE)
+dir.create(file.path(root, "benchmarks/figures"), showWarnings = FALSE)
 history_path <- file.path(root, "benchmarks/data/duckvep_haplotypes.csv")
 hash_columns <- names(read.csv(history_path, nrows = 0L))
 hash_columns <- hash_columns[grepl("(^source_revision$|_(xor|sum)_hash$|^(xor|sum)_hash$)", hash_columns)]
@@ -107,8 +108,8 @@ stopifnot(!anyNA(raw_matched), !anyDuplicated(raw_matched[fingerprint_keys]))
 
 Compound-replay source: `r revision`; same-input baseline: `r baseline_revision`.
 Native measurements cover literal phased replay. SQL materializes all current
-fields, including local coding-block SO. HGVS generation is disabled;
-whole-haplotype SO/HGVS is unfinished and its computation is not timed here.
+fields, including local coding-block SO. HGVS generation is disabled in these
+recorded output contracts; the measurements do not time whole-haplotype SO/HGVS.
 Native and decoded SQL consume standalone ALT events and decoded calls.
 The additional source-record SQL lane measures literal GT parsing and replay;
 standalone native raw-record execution and conditional source omissions are not timed.
@@ -157,11 +158,16 @@ category. Historical contracts do not certify this numeric field.
 The recorded contract determines which fields were measured; historical full
 fingerprints are used only for projections identical to their recorded schema.
 
+<details>
+<summary>Recorded replay input and output denominators</summary>
+
 ```{r denominators}
 knitr::kable(core[c("transcripts", "samples", "overlap", "input_records",
   "projected_events", "input_calls", "output_leaves", "output_carriers",
   "prefixes_created", "translated_bases")], row.names = FALSE)
 ```
+
+</details>
 
 `input_records` counts distinct source ALT events, not candidate/sample rows.
 `projected_events` counts event/transcript pairs. `output_carriers` counts
@@ -171,9 +177,47 @@ pool peaks below are observed in the native stream, not inferred SQL counters.
 
 ## Timing and process memory
 
+The figure reports medians and observed min–max ranges. Native replay, decoded
+SQL and source-record SQL use separate panels because their timed work differs;
+their times are not speedup comparisons. Input and carrier contracts also differ
+between the two SQL modes.
+
+![Haplotype replay time by execution mode. Points are medians; ranges are observed minima and maxima across three passes.](figures/phase-timing.png)
+
+```{r phase-timing, include=FALSE}
+timing_plot_data <- summary
+timing_plot_data$workload <- paste0("T", timing_plot_data$transcripts, " · S",
+  timing_plot_data$samples, " · O", timing_plot_data$overlap)
+timing_plot_data$workload <- factor(timing_plot_data$workload,
+  levels = rev(unique(timing_plot_data$workload)))
+timing_plot_data$mode <- factor(timing_plot_data$mode,
+  levels = c("native", "sql", "sql_records"),
+  labels = c("Native replay", "Decoded SQL", "Source-record SQL"))
+timing_plot <- ggplot2::ggplot(timing_plot_data,
+  ggplot2::aes(x = median_s, y = workload)) +
+  ggplot2::geom_errorbar(ggplot2::aes(xmin = min_s, xmax = max_s), width = 0.16,
+    orientation = "y", color = "#6B7280", linewidth = 0.7) +
+  ggplot2::geom_point(color = "#087E8B", size = 3) +
+  ggplot2::geom_text(ggplot2::aes(label = sprintf("%.3g s", median_s)),
+    hjust = -0.15, size = 4) +
+  ggplot2::facet_wrap(~ mode, ncol = 1, scales = "free_y") +
+  ggplot2::scale_x_log10(expand = ggplot2::expansion(mult = c(0.04, 0.28))) +
+  ggplot2::labs(x = "Median SQL time (seconds; log scale)", y = NULL) +
+  ggplot2::theme_minimal(base_size = 14) +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank(),
+    strip.text = ggplot2::element_text(face = "bold"))
+ggplot2::ggsave(file.path(root, "benchmarks/figures/phase-timing.png"), timing_plot,
+  device = ragg::agg_png, width = 9, height = 6.5, dpi = 144, bg = "white")
+```
+
+<details>
+<summary>Pass-level timing and process-memory observations</summary>
+
 ```{r timing}
 knitr::kable(summary, row.names = FALSE, digits = 3)
 ```
+
+</details>
 
 Both compared revisions return each block's local SO mask, coding status and
 position relative to the first stop. A shared coding context evaluates physical
@@ -181,11 +225,16 @@ blocks on completed replay. `r if (same_contract) "Full-output fingerprints and 
 The native count sink omits local SO evaluation. HGVS-enabled performance
 requires a separate workload.
 
+<details>
+<summary>Matched SQL timing observations by source revision</summary>
+
 ```{r sql-comparison}
 knitr::kable(comparison[comparison$mode == "sql", c("transcripts", "samples", "overlap", "median_s_before",
   "median_s_after", "median_change_percent", "max_process_rss_mib_before",
   "max_process_rss_mib_after")], row.names = FALSE, digits = 3)
 ```
+
+</details>
 
 Each recorded pass uses a fresh process and a full warm-up. Native timing starts
 after workspace initialization and includes ordered-feed construction, GT routing,
@@ -208,10 +257,15 @@ scopes are intentionally different: their times are not a speedup comparison.
 Post-run fingerprint aggregates depend on the output schema, so a schema change
 also prevents interpreting process RSS as an identical-work memory comparison.
 
+<details>
+<summary>Complete SQL output-size measurements</summary>
+
 ```{r output-size}
 knitr::kable(public[c("transcripts", "samples", "overlap", "output_leaves",
   "cds_bytes", "protein_bytes", "json_bytes")], row.names = FALSE)
 ```
+
+</details>
 
 CDS/protein bytes count the sequence views returned once per occupied leaf.
 JSON bytes are the measured UTF-8 size of complete canonicalized SQL rows,
@@ -220,11 +274,46 @@ written to disk.
 
 ## Sparse native state
 
+The points show measured native workspace capacity across the recorded
+transcript/sample configurations. Labels give the workspace size; immutable
+model storage is reported separately in the table.
+
+![Native workspace capacity for each recorded transcript, sample and overlap configuration.](figures/phase-workspace.png)
+
+```{r phase-workspace, include=FALSE}
+workspace_plot_data <- core
+workspace_plot_data$workspace_kib <- workspace_plot_data$workspace_bytes / 1024
+workspace_plot_data$workload <- paste0("T", workspace_plot_data$transcripts,
+  " · S", workspace_plot_data$samples, " · O", workspace_plot_data$overlap)
+workspace_plot_data$workload <- factor(workspace_plot_data$workload,
+  levels = rev(unique(workspace_plot_data$workload)))
+workspace_plot <- ggplot2::ggplot(workspace_plot_data,
+  ggplot2::aes(x = workspace_kib, y = workload, color = factor(overlap))) +
+  ggplot2::geom_point(size = 3) +
+  ggplot2::geom_text(ggplot2::aes(label = sprintf("%.1f KiB", workspace_kib)),
+    hjust = -0.2, size = 3.5, show.legend = FALSE) +
+  ggplot2::scale_x_continuous(limits = c(0, NA),
+    expand = ggplot2::expansion(mult = c(0.02, 0.20))) +
+  ggplot2::scale_color_manual(values = c("1" = "#6B7280", "16" = "#087E8B",
+    "64" = "#009E73"), name = "Overlap") +
+  ggplot2::labs(x = "Native workspace capacity (KiB)", y = NULL) +
+  ggplot2::theme_minimal(base_size = 14) +
+  ggplot2::theme(panel.grid.minor = ggplot2::element_blank(),
+    strip.text = ggplot2::element_text(face = "bold"))
+ggplot2::ggsave(file.path(root, "benchmarks/figures/phase-workspace.png"), workspace_plot,
+  device = ragg::agg_png, width = 9, height = 5.5, dpi = 144, bg = "white")
+```
+
+<details>
+<summary>Per-workload native state observations</summary>
+
 ```{r state}
 knitr::kable(core[c("transcripts", "samples", "overlap", "peak_transcripts",
   "peak_carriers", "peak_prefixes", "peak_events", "peak_projections",
   "peak_allele_bytes", "workspace_bytes", "model_bytes")], row.names = FALSE)
 ```
+
+</details>
 
 Native workspace bytes count actual preallocated buffer capacities and state,
 separately from immutable model allocations. The fixed fixture is borrowed;
@@ -316,6 +405,9 @@ The source-bound raw lane uses three fresh-process passes at the current source,
 with one thread pinned to CPU 2. Its timing and process RSS appear in the timing
 table above; its input and output denominators are:
 
+<details>
+<summary>Source-record SQL input and output denominators</summary>
+
 ```{r raw-denominators}
 knitr::kable(raw[c("transcripts", "samples", "overlap", "input_physical_records",
   "input_record_sample_calls", "input_candidate_sample_rows", "output_leaves", "output_carriers")],
@@ -323,16 +415,23 @@ knitr::kable(raw[c("transcripts", "samples", "overlap", "input_physical_records"
 knitr::kable(raw[c("output_leaves", "cds_bytes", "protein_bytes", "json_bytes")], row.names = FALSE)
 ```
 
+</details>
+
 The raw-lane comparison uses the same source revisions as the decoded comparison.
 `r if (raw_same_contract) "Input hashes, complete output fingerprints, all listed denominators, thread count and output contract match between revisions." else "Input hashes, all listed denominators, thread count and the complete prior local-SO/HGVS-schema projection match. The full output contracts differ; their complete byte counts and fingerprints remain separate."`
 Different output denominators preclude
 treating raw versus decoded time as an implementation speedup.
+
+<details>
+<summary>Source-record SQL timing observations by revision</summary>
 
 ```{r raw-comparison}
 knitr::kable(comparison[comparison$mode == "sql_records", c("transcripts", "samples", "overlap",
   "median_s_before", "median_s_after", "median_change_percent", "max_process_rss_mib_before",
   "max_process_rss_mib_after")], row.names = FALSE, digits = 3)
 ```
+
+</details>
 
 ## Singleton HGVS materialization
 
@@ -371,6 +470,9 @@ complete outputs intentionally differ and are never reported as identical work.
 The worker receipts retain the derived FASTA/index, actual versus independent HGVS,
 source/binary/input hashes, jobs and process logs. Process RSS includes setup,
 warm-up and post-query aggregates, not just native workspace.
+
+<details>
+<summary>Singleton HGVS timings, output denominators and revision comparison</summary>
 
 ```{r singleton-hgvs, results='asis'}
 if (!nrow(singleton_history)) {
@@ -451,6 +553,8 @@ if (length(singleton_revisions) >= 2L) {
   print(knitr::kable(comparison, row.names = FALSE, digits = 4))
 }
 ```
+
+</details>
 
 Singleton HGVS borrows the decoded stream's successful physical CDS projection.
 VEP's uploaded-feature interpretation and shifted-HGVS placement remain distinct;

@@ -1,6 +1,6 @@
 # DuckVEP targets workflow
 
-Status: current optional orchestration for executable corpus campaigns.
+Optional `{targets}` orchestration for executable corpus campaigns.
 
 This pipeline does not implement another workflow engine or command runner. The ownership
 split is:
@@ -26,12 +26,11 @@ running it; neither package is linked into the extension or bundled R package.
 
 The pipeline stores paths and receipts, not DuckDB connections, resident DuckVEP models,
 or copied corpus objects. It builds the release extension once, binds that build to the
-current clean Git revision, and lets all campaign branches reuse the read-only artifact.
-Each branch has its own output directory under `.tmp/duckvep_targets/results/`.
-The evidence runner hashes the model, FASTA/index, and source VCF it actually consumes
-when an executed campaign publishes a new receipt. Those are provenance reads, not a
-second invalidation cache; `{targets}` prevents the entire runner from being invoked for
-an unchanged branch.
+clean Git revision, and lets all campaign branches reuse the read-only artifact. Each
+branch has its own output directory under `.tmp/duckvep_targets/results/`.
+On campaign execution, the evidence runner hashes the model, FASTA/index, and source VCF
+it consumes when publishing a receipt. These are provenance reads, not an invalidation
+cache; `{targets}` reruns a branch when a declared dependency changes.
 Budget concurrency explicitly: the number of concurrent targets workers multiplies the
 per-campaign VEP `fork` and DuckDB `duckdb_threads` values. The checked-in witness uses one
 of each, and large-corpus manifests should do the same accounting before enabling a
@@ -47,7 +46,7 @@ workflow bug.
 
 This is intentionally a thin `{targets}` project, not a DuckVEP workflow engine. DuckVEP
 does not implement its own branch scheduler, object store, retry database, timestamp
-policy, or digest cache. The evidence runner can still be called directly, but incremental
+policy, or digest cache. The evidence runner supports direct invocation; incremental
 multi-campaign execution belongs to `{targets}` and external command execution belongs to
 `blit`.
 
@@ -91,22 +90,21 @@ The archive SHA-256 is a maintainer-recorded digest of a complete HTTPS transfer
 checked against Ensembl's published BSD `sum` and block count, not a claimed
 publisher-supplied SHA-256. Subsequent acquisitions must match that fixed content pin.
 
-Other already acquired caches can use `make duckvep-cache-receipt` with their verified
+Other caches with verified acquisitions can use `make duckvep-cache-receipt` with their
 source URL and identity. Supported identities are `sha256:HEX`, `md5:HEX`,
 `bsd-sum:SUM:BLOCKS`, or `http-etag:ETAG:BYTES`. Acquisition and extraction stay outside
 the network-free extension build.
 
 `gff_index_policy` defaults to `ignore`, which always restages and indexes the declared
-GFF. Set it to `require` only when the manifest intentionally declares the existing `.tbi`
-companion. Unlike the standalone runner's `auto` default, targets never changes behavior
-merely because an optional index appeared beside an unchanged input.
+GFF. Set it to `require` only when the manifest intentionally declares the `.tbi` companion.
+The targets workflow does not infer indexing behavior from the presence of an optional index.
 
 Branch at a complete campaign or a deliberately coarse corpus shard. Do not create one
 target per variant. Carry the campaign ID in every output name rather than relying on
 branch order. `{targets}` deliberately chooses the appropriate timestamp-trust behavior
-for the filesystem; the script does not override `trust_timestamps`. Large immutable
-objects remain where they already live, while `format = "file"` tracks the declared input
-and output paths.
+for the filesystem; the script does not override `trust_timestamps`. Large immutable objects
+stay at their declared paths, while `format = "file"` tracks the declared input and output
+paths.
 
 `error = "continue"` lets independent campaign branches finish after one branch fails, and
 `workspace_on_error = TRUE` makes a failed branch inspectable with `tar_workspace()`. The

@@ -101,8 +101,8 @@ alleles, raw sequence ambiguity and curated reference proteins. Unknown local re
 can coexist with missense or frame-change facts; they do not justify discarding all
 sequence predicates. The [SNV comparison](test/duckvep/conformance/data/ambiguous_codon_consensus/summary.csv)
 retains all 28,800 original SNVs over 125 ACGTN codons and 24 tables: 230,400 HGVSp
-and 57,600 SO comparisons agree. The
-[failing baseline](test/duckvep/conformance/data/ambiguous_codon_baseline) remains available.
+and 57,600 SO comparisons agree. The [baseline result set](test/duckvep/conformance/data/ambiguous_codon_baseline)
+records the failing observations.
 These forward, phase-zero internal-codon tests do not establish all transcript contexts.
 
 For length-changing records, a literally matching N in an erased anchor or shared

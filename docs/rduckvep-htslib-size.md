@@ -1,8 +1,10 @@
-# Indexed FASTA build size
+# Indexed FASTA extension size
 
-| Linux amd64 release artifact | Bytes | Source |
+These Linux amd64 measurements compare two build configurations, not parent and child revisions:
+
+| Build | Bytes | Provenance |
 | --- | ---: | --- |
-| Before (full HTSlib) | 1,397,206 | HTSlib design memo, revision `2d613d92` |
-| After (zlib-only, section GC) | 609,614 | `make release`, this checkout, `stat -c %s build/release/duckvep.duckdb_extension` |
+| Full HTSlib, isolated design study | 1,397,206 | HTSlib design memo, revision `2d613d92` |
+| zlib-only HTSlib with section garbage collection | 609,614 | `make release` at commit `d3babd4`; `stat -c %s build/release/duckvep.duckdb_extension` |
 
-The before measurement was made in the isolated design study, not by building the parent of this commit; toolchain and revision differ. Both numbers include DuckDB extension metadata. The resulting Linux shared library dynamically links zlib, libm and libc, not curl, crypto, bzip2, lzma or libdeflate. `make test_release` passed all eight SQL tests and the SQL lambda guard. Windows and macOS dead-strip results require their own builds.
+Both sizes include DuckDB extension metadata. The 609,614-byte Linux shared library dynamically links zlib, libm and libc; it does not link curl, crypto, bzip2, lzma or libdeflate. At `d3babd4`, `make test_release` passed all eight SQL tests and the SQL lambda guard. Windows and macOS dead-strip measurements require platform-specific builds.

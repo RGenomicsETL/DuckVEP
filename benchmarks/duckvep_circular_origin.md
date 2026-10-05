@@ -1,6 +1,6 @@
 # Origin-focused circular workload
 
-`benchmarks/duckvep_circular_origin.py` measures the lifted-interval execution of circular regions (issue #7)
+`benchmarks/duckvep_circular_origin.py` measures the lifted-interval execution of circular regions
 on a synthetic 100 kb circle with 400 transcripts (70% coding, one to five exons) and 120 regulation features packed
 within 15 kb of the origin, and 355,446 events, 70% of them within 4 kb of the origin (60% SNVs, deletions, insertions and
 replacements up to 12 bases). Every run is a fresh child process that loads an immutable, hashed copy of the extension

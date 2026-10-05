@@ -12,6 +12,32 @@ None of these rows was appended to the existing benchmark history, and
 its equality guard remains unchanged. Rendering this diagnostic report
 is not a passing benchmark-promotion verdict.
 
+## Timing and output identity
+
+Points show three-pass medians; ranges show the observed minima and
+maxima. Source labels distinguish the same-input baseline and diagnostic
+checkpoint. These are timing records, not paired speedup claims: the
+singleton SQL modes have unequal full-output fingerprints across
+revisions.
+
+<figure>
+<img src="figures/phase-indel-timing.png"
+alt="Same-input benchmark timings by source revision and mode; output identity is shown below." />
+<figcaption aria-hidden="true">Same-input benchmark timings by source
+revision and mode; output identity is shown below.</figcaption>
+</figure>
+
+<figure>
+<img src="figures/phase-indel-fingerprints.png"
+alt="Across-revision equality of literal-replay and complete-output fingerprints." />
+<figcaption aria-hidden="true">Across-revision equality of
+literal-replay and complete-output fingerprints.</figcaption>
+</figure>
+
+The equality grid compares recorded fingerprints within matching
+workloads. A matching literal-replay projection does not imply equality
+of the complete output contract.
+
 ## Workload and execution
 
 [The benchmark driver](duckvep_haplotypes.R) uses the same registered
@@ -40,25 +66,32 @@ warm-up, output and post-query checks.
 
 ## All measured configurations
 
-| transcripts | samples | overlap | mode                | baseline_median_s | current_median_s | current_max_rss_mib | full_output_equal | replay_equal |
-|:------------|:--------|:--------|:--------------------|------------------:|-----------------:|--------------------:|:------------------|:-------------|
-| 1024        | 256     | 1       | native              |            0.0475 |           0.0478 |             73.8516 | NA                | NA           |
-| 1024        | 256     | 1       | sql                 |            1.3070 |           1.3110 |            957.9570 | TRUE              | TRUE         |
-| 1024        | 4       | 1       | native              |            0.0032 |           0.0032 |             73.8516 | NA                | NA           |
-| 1024        | 4       | 1       | sql                 |            0.0500 |           0.0500 |            218.0352 | TRUE              | TRUE         |
-| 1024        | 64      | 1       | native              |            0.0138 |           0.0135 |             73.6953 | NA                | NA           |
-| 1024        | 64      | 1       | sql                 |            0.3370 |           0.3380 |            376.6367 | TRUE              | TRUE         |
-| 1024        | 64      | 16      | native              |            0.0177 |           0.0177 |             73.6992 | NA                | NA           |
-| 1024        | 64      | 16      | sql                 |            0.3430 |           0.3480 |            378.4023 | TRUE              | TRUE         |
-| 1024        | 64      | 16      | sql_records         |            0.7220 |           0.7300 |            611.9102 | TRUE              | TRUE         |
-| 1024        | 64      | 16      | sql_singletons      |            0.3390 |           0.3470 |            408.9727 | FALSE             | TRUE         |
-| 1024        | 64      | 16      | sql_singletons_hgvs |            0.3480 |           0.3490 |            409.5078 | FALSE             | TRUE         |
-| 1024        | 64      | 64      | native              |            0.0189 |           0.0186 |             73.8555 | NA                | NA           |
-| 1024        | 64      | 64      | sql                 |            0.3440 |           0.3450 |            377.8203 | TRUE              | TRUE         |
-| 10240       | 64      | 16      | native              |            0.1713 |           0.1705 |             73.6992 | NA                | NA           |
-| 10240       | 64      | 16      | sql                 |            4.0950 |           4.1620 |           2137.1797 | TRUE              | TRUE         |
-| 10240       | 64      | 16      | sql_singletons      |            4.1070 |           4.1820 |           2190.9141 | FALSE             | TRUE         |
-| 10240       | 64      | 16      | sql_singletons_hgvs |            4.1790 |           4.2270 |           2191.0586 | FALSE             | TRUE         |
+<details>
+<summary>
+All measured medians and process RSS values
+</summary>
+
+| transcripts | samples | overlap | mode                | baseline_median_s | baseline_min_s | baseline_max_s | current_median_s | current_min_s | current_max_s | current_max_rss_mib | full_output_equal | replay_equal |
+|:------------|:--------|:--------|:--------------------|------------------:|---------------:|---------------:|-----------------:|--------------:|--------------:|--------------------:|:------------------|:-------------|
+| 1024        | 256     | 1       | native              |            0.0475 |         0.0457 |         0.0475 |           0.0478 |        0.0467 |        0.0487 |             73.8516 | NA                | NA           |
+| 1024        | 256     | 1       | sql                 |            1.3070 |         1.3030 |         1.3070 |           1.3110 |        1.3110 |        1.3170 |            957.9570 | TRUE              | TRUE         |
+| 1024        | 4       | 1       | native              |            0.0032 |         0.0032 |         0.0032 |           0.0032 |        0.0032 |        0.0034 |             73.8516 | NA                | NA           |
+| 1024        | 4       | 1       | sql                 |            0.0500 |         0.0490 |         0.0520 |           0.0500 |        0.0500 |        0.0510 |            218.0352 | TRUE              | TRUE         |
+| 1024        | 64      | 1       | native              |            0.0138 |         0.0138 |         0.0143 |           0.0135 |        0.0132 |        0.0136 |             73.6953 | NA                | NA           |
+| 1024        | 64      | 1       | sql                 |            0.3370 |         0.3360 |         0.3410 |           0.3380 |        0.3380 |        0.3500 |            376.6367 | TRUE              | TRUE         |
+| 1024        | 64      | 16      | native              |            0.0177 |         0.0177 |         0.0178 |           0.0177 |        0.0171 |        0.0221 |             73.6992 | NA                | NA           |
+| 1024        | 64      | 16      | sql                 |            0.3430 |         0.3400 |         0.3440 |           0.3480 |        0.3470 |        0.3510 |            378.4023 | TRUE              | TRUE         |
+| 1024        | 64      | 16      | sql_records         |            0.7220 |         0.7200 |         0.7260 |           0.7300 |        0.7290 |        0.7370 |            611.9102 | TRUE              | TRUE         |
+| 1024        | 64      | 16      | sql_singletons      |            0.3390 |         0.3360 |         0.3420 |           0.3470 |        0.3430 |        0.3570 |            408.9727 | FALSE             | TRUE         |
+| 1024        | 64      | 16      | sql_singletons_hgvs |            0.3480 |         0.3460 |         0.3480 |           0.3490 |        0.3460 |        0.3620 |            409.5078 | FALSE             | TRUE         |
+| 1024        | 64      | 64      | native              |            0.0189 |         0.0183 |         0.0190 |           0.0186 |        0.0182 |        0.0190 |             73.8555 | NA                | NA           |
+| 1024        | 64      | 64      | sql                 |            0.3440 |         0.3430 |         0.3460 |           0.3450 |        0.3440 |        0.3470 |            377.8203 | TRUE              | TRUE         |
+| 10240       | 64      | 16      | native              |            0.1713 |         0.1687 |         0.1732 |           0.1705 |        0.1693 |        0.1719 |             73.6992 | NA                | NA           |
+| 10240       | 64      | 16      | sql                 |            4.0950 |         4.0660 |         4.1270 |           4.1620 |        4.1350 |        4.1630 |           2137.1797 | TRUE              | TRUE         |
+| 10240       | 64      | 16      | sql_singletons      |            4.1070 |         4.1070 |         4.1100 |           4.1820 |        4.1650 |        4.1860 |           2190.9141 | FALSE             | TRUE         |
+| 10240       | 64      | 16      | sql_singletons_hgvs |            4.1790 |         4.1700 |         4.1870 |           4.2270 |        4.2160 |        4.2290 |           2191.0586 | FALSE             | TRUE         |
+
+</details>
 
 `NA` marks the native count sink, which has no serialized SQL-row
 fingerprint. Counts, input identities, output contracts, sequence bytes
@@ -66,6 +99,11 @@ and JSON byte lengths match between revisions. The unequal singleton
 fingerprints mean those timings are **same-input, different-output
 measurements**, not identical-output work. Matching byte lengths do not
 establish matching values.
+
+<details>
+<summary>
+Input and output denominators by measured configuration
+</summary>
 
 | transcripts | samples | overlap | mode                | input_records | projected_events | input_calls | input_physical_records | input_record_sample_calls | input_candidate_sample_rows | output_leaves | output_carriers | cds_bytes | protein_bytes | json_bytes |
 |:------------|:--------|:--------|:--------------------|:--------------|:-----------------|:------------|:-----------------------|:--------------------------|:----------------------------|:--------------|:----------------|:----------|:--------------|:-----------|
@@ -87,6 +125,8 @@ establish matching values.
 | 10240       | 64      | 16      | sql_singletons      | NA            | NA               | NA          | 2560                   | 163840                    | 2621440                     | 40960         | 655360          | 7372800   | 2447360       | 90229832   |
 | 10240       | 64      | 16      | sql_singletons_hgvs | NA            | NA               | NA          | 2560                   | 163840                    | 2621440                     | 40960         | 655360          | 7372800   | 2447360       | 90311752   |
 
+</details>
+
 ## Retained output differences
 
 All three measured passes agree within each mode. Across revisions, 12
@@ -94,6 +134,11 @@ of 51 timed rows have unequal fingerprints: the two singleton modes at
 both transcript counts, with three passes each. Literal replay
 fingerprints agree. The complete observations below retain the unequal
 hash values; no field was normalized away to obtain a match.
+
+<details>
+<summary>
+Unequal fingerprint values by configuration
+</summary>
 
 | transcripts | samples | overlap | mode                | pass | field             | baseline_value           | current_value            |
 |:------------|:--------|:--------|:--------------------|:-----|:------------------|:-------------------------|:-------------------------|
@@ -129,6 +174,8 @@ hash values; no field was normalized away to obtain a match.
 | 1024        | 64      | 16      | sql_singletons_hgvs | 1    | non_hgvs_sum_hash | 37933509573515682488189  | 38315864159327482580440  |
 | 10240       | 64      | 16      | sql_singletons      | 1    | non_hgvs_sum_hash | 377195884730473591625225 | 378704497758867019612841 |
 | 10240       | 64      | 16      | sql_singletons_hgvs | 1    | non_hgvs_sum_hash | 377195884730473591625225 | 378704497758867019612841 |
+
+</details>
 
 A [retained four-event, one-transcript
 reproduction](data/duckvep_haplotypes_indel_witness.jsonl.gz) isolates
@@ -174,12 +221,19 @@ controls reject missing, malformed or altered job hashes and
 self-consistently rehashed jobs with changed events or configuration.
 Rendering then reruns the complete typed, exact-key comparison.
 
+<details>
+<summary>
+Complete-output keyed audit counts
+</summary>
+
 | transcripts | mode                | joined_rows | missing_keys | changed_rows | changed_other_events | unexplained_rows |
 |------------:|:--------------------|------------:|-------------:|-------------:|---------------------:|-----------------:|
 |        1024 | sql_singletons      |        4096 |            0 |         1024 |                    0 |                0 |
 |        1024 | sql_singletons_hgvs |        4096 |            0 |         1024 |                    0 |                0 |
 |       10240 | sql_singletons      |       40960 |            0 |        10240 |                    0 |                0 |
 |       10240 | sql_singletons_hgvs |       40960 |            0 |        10240 |                    0 |                0 |
+
+</details>
 
 Across 90112 keyed row pairs, 22528 differ only in the declared deletion
 mask above. There are no missing keys, changes to other events or
@@ -205,6 +259,11 @@ Use the clean extension-receipt procedure in the baseline report, then
 run `benchmarks/duckvep_haplotypes.R` with `--passes 3 --cpu 2` and
 these six workloads:
 
+<details>
+<summary>
+Workload arguments for reproducing each configuration
+</summary>
+
 | transcripts | samples | overlap | modes                                                     |
 |:------------|:--------|:--------|:----------------------------------------------------------|
 | 1024        | 256     | 1       | native,sql                                                |
@@ -213,6 +272,8 @@ these six workloads:
 | 1024        | 64      | 16      | native,sql,sql_records,sql_singletons,sql_singletons_hgvs |
 | 1024        | 64      | 64      | native,sql                                                |
 | 10240       | 64      | 16      | native,sql,sql_singletons,sql_singletons_hgvs             |
+
+</details>
 
 Pass `--extension-receipt PATH` and the listed `--transcripts`,
 `--samples`, `--overlap` and `--modes` to each invocation. Preserve
@@ -237,15 +298,19 @@ conformance jobs ran concurrently with the `52ce785` timers. No DuckHTS
 build, test, conformance or diagnostic jobs overlapped the `d6d188d`
 timers. The same isolation applies to `a4ab9f5`, measured from 02:53:38
 to 02:54:19 +0200 on September 11, 2026. The `de3d008` campaign ran from
-00:59:19 to 00:59:59 +0200 on September 11, 2026; a previously launched
-small read-only classification/oracle diagnostic completed at 01:00:01,
-so concurrent diagnostic activity cannot be excluded. This measured run
-is retained without replacement. Other shared-host activity was not
-controlled. The `6e1a1de` driver ran from 21:28:02 to 21:28:42 +0200 on
-September 12, 2026, after the build, test and conformance jobs finished.
-No other local DuckHTS builds, tests, conformance, benchmarks or
-diagnostic computations overlapped its timers; read-only GitHub status
-and clock checks continued.
+00:59:19 to 00:59:59 +0200 on September 11, 2026; a small read-only
+classification/oracle diagnostic completed at 01:00:01, so concurrent
+diagnostic activity cannot be excluded. Other shared-host activity was
+not controlled. The `6e1a1de` driver ran from 21:28:02 to 21:28:42 +0200
+on September 12, 2026, after the build, test and conformance jobs
+finished. No other local DuckHTS builds, tests, conformance, benchmarks
+or diagnostic computations overlapped its timers; read-only GitHub
+status and clock checks continued.
+
+<details>
+<summary>
+Per-revision translation checkpoint timings
+</summary>
 
 | revision | baseline_revision | mode                | input_candidate_sample_rows | output_leaves | output_carriers | baseline_median_s | checkpoint_median_s | checkpoint_max_rss_mib |
 |:---------|:------------------|:--------------------|----------------------------:|:--------------|:----------------|------------------:|--------------------:|-----------------------:|
@@ -274,6 +339,8 @@ and clock checks continued.
 | 6e1a1de  | a4ab9f5           | sql_records         |                      262144 | 4096          | 131072          |          0.728000 |            0.734000 |              612.30859 |
 | 6e1a1de  | a4ab9f5           | sql_singletons      |                      262144 | 4096          | 65536           |          0.344000 |            0.340000 |              409.71094 |
 | 6e1a1de  | a4ab9f5           | sql_singletons_hgvs |                      262144 | 4096          | 65536           |          0.348000 |            0.348000 |              409.24219 |
+
+</details>
 
 Each checkpoint’s 15 matched rows have identical non-timing result
 fields, including every SQL full-output fingerprint, output denominator
