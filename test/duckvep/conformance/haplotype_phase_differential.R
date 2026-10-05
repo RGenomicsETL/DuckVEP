@@ -429,7 +429,7 @@ phase_history_rows <- function(directory) {
       function(calls) sum(lengths(calls$alleles)), 0)),
     candidate_alt_calls = nrow(native$calls), native_leaves = nrow(native$actual))
   for (field in names(totals)) stopifnot(identical(as.numeric(receipt[[field]]), totals[[field]]))
-  extension_hash <- hashes[endsWith(names(hashes), "/duckhts.duckdb_extension")]
+  extension_hash <- hashes[basename(names(hashes)) %in% c("duckvep.duckdb_extension", "duckhts.duckdb_extension")]
   stopifnot(length(extension_hash) == 1L, grepl("^[0-9a-f]{64}$", extension_hash),
     all(grepl("^[0-9a-f]{40}$", unlist(receipt$oracle_revisions))))
   strata <- aggregate(values, summary[c("ploidy", "prefix", "missing", "mixed")], sum)
@@ -468,6 +468,7 @@ main <- function() {
     optparse::make_option("--max-ploidy", dest = "max_ploidy", type = "integer", default = 4L),
     optparse::make_option("--vep-prefix", dest = "vep_prefix",
       default = Sys.getenv("VEP_PREFIX", "/root/miniconda3/envs/vep")),
+    optparse::make_option("--extension", default = Sys.getenv("DUCKVEP_EXT", "build/release/duckvep.duckdb_extension")),
     optparse::make_option("--extension-receipt", dest = "extension_receipt", default = NULL),
     optparse::make_option("--publish-artifact", dest = "publish_artifact", default = NULL),
     optparse::make_option("--history", default = "test/duckvep/conformance/data/haplotype_phase_history.csv")
@@ -477,7 +478,7 @@ main <- function() {
   source("scripts/duckvep_evidence.R", local = TRUE)
   root <- normalizePath(".")
   revision <- duckvep_evidence_revision(root)
-  extension <- normalizePath("build/release/duckhts.duckdb_extension")
+  extension <- normalizePath(opt$extension, mustWork = TRUE)
   binding <- "diagnostic_unbound"
   if (!is.null(opt$extension_receipt)) {
     duckvep_evidence_assert_checkout(root, revision)
@@ -569,13 +570,13 @@ main <- function() {
   expected_phase <- phase_parser_expected(cases, phase)
   raw_gt <- as.vector(rbind(cases$GT, vapply(cases$ploidy,
     function(n) paste(rep("1", n), collapse = "|"), "")))
-  probe_sources <- c("test/duckvep/conformance/phase_probe.c", paste0("src/duckvep/kernel/src/duckvep_",
+  probe_sources <- c("test/duckvep/conformance/phase_probe.c", paste0("src/kernel/src/duckvep_",
     c("phase", "haplotype", "carriers", "haplotype_stream", "classify", "codon", "coding", "projection", "delta"), ".c"))
   probe <- file.path(out, paste0("phase_probe", .Platform$dynlib.ext))
   compiler <- Sys.getenv("CC", "cc")
   run(compiler, c("-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-Wpedantic",
     "-pedantic-errors", "-fPIC", "-shared",
-    "-Isrc/duckvep/kernel/src", "-Isrc/duckvep/kernel/include", probe_sources, "-o", probe), "phase_compile")
+    "-Isrc/kernel/src", "-Isrc/kernel/include", probe_sources, "-o", probe), "phase_compile")
   writeLines(duckvep_evidence_command(compiler, "--version", "phase compiler"),
     file.path(out, "phase_compiler.txt"))
   dll <- dyn.load(probe)
@@ -642,6 +643,12 @@ main <- function() {
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
   q <- function(x) as.character(DBI::dbQuoteString(con, x))
   DBI::dbExecute(con, paste("LOAD", q(extension)))
+  reader_extension <- Sys.getenv("DUCKVEP_READER_EXT", "")
+  if (nzchar(reader_extension)) {
+    DBI::dbExecute(con, paste("LOAD", q(normalizePath(reader_extension, mustWork = TRUE))))
+  } else if (nrow(DBI::dbGetQuery(con, "SELECT 1 FROM duckdb_functions() WHERE function_name = 'read_geno' LIMIT 1")) == 0L) {
+    DBI::dbExecute(con, "LOAD duckhts")
+  }
   DBI::dbExecute(con, "SET threads=4")
   DBI::dbWriteTable(con, "models", cases)
   queries <- c("SELECT seq_region::UINTEGER seq_region FROM models ORDER BY seq_region",
@@ -723,7 +730,7 @@ main <- function() {
   collisions <- collisions[vapply(collisions, function(x) length(unique(x$oracle_signature)) > 1L, TRUE)]
   saveRDS(collisions, file.path(out, "decoded_collisions.rds"))
   inputs <- c(paths, extension, probe_sources,
-    list.files("src/duckvep/kernel", pattern = "\\.(h|inc|def)$", recursive = TRUE, full.names = TRUE),
+    list.files("src/kernel", pattern = "\\.(h|inc|def)$", recursive = TRUE, full.names = TRUE),
     "test/duckvep/conformance/haplotype_phase_differential.R",
     "test/duckvep/conformance/haplotype_observations.R",
     "test/duckvep/conformance/haplotype_oracle.pl", file.path(prefix,

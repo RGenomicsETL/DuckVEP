@@ -12,7 +12,7 @@ public functions.
 | Extension API | stable C API v1.2.0 | stable C API v2.0.0, footer `C_STRUCT` |
 | Build | `make release` (the root `CMakeLists.txt`) | `make release_v2` (`host_v2/CMakeLists.txt`) |
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
-| Ships | yes: CRAN and the community repository | no: preview, waits for DuckDB 2.0.0 |
+| Distribution | source builds; community submission blocked on #11, #48 and #50 | preview; default switch waits for DuckDB 2.0.0 and R `duckdb` 2.0 on CRAN |
 | Functions | all 29 public functions | all 29 (slices 1 to 6, and the snapshot pair `duckvep_model_save` and `duckvep_model_restore`): `duckvep_so_terms`, `duckvep_allele_geometry`, `duckvep_breakend_geometry`, `duckvep_repeat_alleles`, `duckvep_phase_call`, the thirteen `duckvep_*_sql` builders, `duckvep_model_load` / `duckvep_model_drop` (as the COPY sink below), and the internal `_duckvep_annotate_*` natives with `__duckvep_projection_code`, and the internal `_duckvep_revcomp`, `_duckvep_raw_gt`, `_duckvep_record_order`; slice 5: `duckvep_haplotypes` (as `duckvep_haplotype_load_sql`, the COPY job sink and `duckvep_haplotype_scan`), `duckvep_coding_transcripts`, `duckvep_coding_calls` |
 
 The v2 host is a separate CMake project, so a v1 build does not compile or link
@@ -167,9 +167,8 @@ The shared pieces of the v2 adapter, in `host_v2/host_v2_common.h` and
 string read and arena write, struct output, `register_scalar` (overloads are
 repeated registrations of one name; `ANY` parameters), typed columns with
 logical-type inspection (DECIMAL storage kind and scale), nested column opening,
-cell reading, option-STRUCT reading and LIST<STRUCT> output. Still to grow: scalar
-user data and init data, table-function named parameters and local state, COPY
-callbacks, column-data-collection capture.
+cell reading, option-STRUCT reading and LIST<STRUCT> output. It also supplies scalar user data, callback state, named parameters, COPY callbacks
+and column-data-collection capture.
 
 ## The model sink on v2 (slice 4a)
 
@@ -216,8 +215,8 @@ regulatory features, complete coverage) and a model with a reference FASTA on bo
 fingerprints. `test/sql_v2/v2_model.sql` covers what only v2 has: TEMP and uncommitted visibility, a failed COPY,
 invalid staged rows, a wrong column type, discard by drop, and option errors.
 
-v2 does not yet have `duckvep_native_budget_set` (slice 6), so the budget refusal of a model load is tested on v1
-(`make test_fault_injection` fails every allocation of a load in turn) and shared by v2 through the same loaders.
+Both hosts enforce the native budget. `v2_budget.sql` exercises capacity refusals;
+`make test_fault_injection` additionally fails each v1 allocation in turn.
 
 ## The annotation natives on both hosts (slice 4b)
 
@@ -283,20 +282,18 @@ SELECT duckvep_haplotype_drop('job1');   -- releases a job that will not be scan
   memory limit; the COPY validates the options and the staged column types, and a failed COPY stages nothing.
 - A staged job is consumed by its scan (released at its end, on error and on cancellation) so a job is scanned once;
   staging the same job again replaces it.
-- The scan emits full chunks, as v1 does. A v2 list child is sized by `vector_set_size`, so the host layer
-  (`host_v2/duckvep_host.h`) opens each child once per call and grows it, doubling, as later rows of the chunk extend
-  the list; the shared core is unchanged. `duckvep_coding_calls` writes full chunks the same way. Measured on HG002
-  (157,986 rows, `taskset` one core, same machine, release builds, stage timers): v2 load 2.3 s, capture 3.4 s, scan
-  2.3 s, 8.0 s in total, against v1's 7.95 s (load 2.35 s, fused prediction 5.6 s). With one row per chunk the scan
-  took 12.2 to 12.8 s and the whole process 19.6 to 20.8 s. Peak RSS is 4.45 GiB on v2 against 3.96 GiB on v1: the
-  capture COPY stages the calls, which v1's inline path does not.
-- Equality with v1 (`test/sql_v2/equality_cases.sql`): the vertical, same-codon, frame, start/stop and NMD suites
-  (schema, full-row hash, nested columns, LIMIT), 47 policy, limit and error cases of `duckvep_haplotypes.test` on its
-  `hap` model (including `source_records`), discovery (10,500 events and the named cases), `duckvep_coding_calls` on the
-  VCF, gzip and BCF fixtures and the haplotypes over them. Error messages are identical.
-- HG002 (full GRCh38, MANE model, `hg002.ens.vcf.gz`) through `duckvep_coding_calls` into a job and the scan: 157,986
-  rows, full-output checksum `1461886391518123247249166` over 158,137 rows on the v1 host at this revision (the v2 host was last compared on HG002 before the incomplete-CDS, read-through and NMD-exception changes; the equality suite covers them). Whole process 8.5 s on
-  one core (model load 2.3 s of it), peak RSS 4.45 GiB (v1 fused: 7.95 s of stages, 3.96 GiB). Its v2 memory comparison is unbudgeted (same default 4 GiB budget, see slice 6).
+- The scan emits full chunks. The host layer (`host_v2/duckvep_host.h`) opens each list child once per call
+  and grows it geometrically as rows extend it. `duckvep_coding_calls` uses the same writer.
+- `test/sql_v2/equality_cases.sql` checks schema, full rows, nested fields, limits and error behavior across
+  vertical, same-codon, frame, start/stop and NMD fixtures, discovery, VCF/gzip/BCF input and source-record policies.
+- The full HG002 check at `bbe2ec4` gives **158,137 exactly equal rows** on v1 and v2, equal model fingerprints,
+  and exact agreement with the saved head output. Both native budgets remain below 4 GiB with no refusals.
+  Peak RSS is **3.84 GiB on v1 and 4.45 GiB on v2**: the capture collections are DuckDB-managed memory,
+  outside the native ceiling. [Receipts and measurement scope](../benchmarks/data/v2_hg002/bbe2ec4/README.md).
+
+`scripts/check_v2_hg002.sh` runs both hosts with explicit input paths, captures stage timings,
+RSS and native budgets, and checks schema plus bidirectional `EXCEPT ALL` over every nested row.
+The optional saved reference is checked against the fresh v1 execution, not substituted for it.
 
 ## What the v2 SDK lacks, for later slices
 
@@ -366,7 +363,7 @@ Every one of the 29 public v1 functions runs on v2; equality with v1 is recorded
 | `duckvep_repeat_alleles`, `duckvep_phase_call` | same name | row for row, beyond 2,048 elements |
 | the thirteen `duckvep_*_sql` builders (incl. `duckvep_lof_sql`) | same names | byte-identical text; executed on the README, rich and reference-FASTA models |
 | `duckvep_model_load` | `duckvep_model_load_sql` + COPY `duckvep_stage` + `duckvep_model_publish`; `duckvep_model_drop` same | equal model fingerprints and receipts |
-| `duckvep_haplotypes` | `duckvep_haplotype_load_sql` + COPY `duckvep_stage` (`JOB`) + `duckvep_haplotype_scan` (`duckvep_haplotype_drop`) | full-row hashes on the vertical, same-codon, frame, start/stop, NMD suites and 47 policy cases; HG002 checksum `1456007180270799092358516` |
+| `duckvep_haplotypes` | `duckvep_haplotype_load_sql` + COPY `duckvep_stage` (`JOB`) + `duckvep_haplotype_scan` (`duckvep_haplotype_drop`) | full-row hashes on the vertical, same-codon, frame, start/stop, NMD suites and 47 policy cases; exact whole-HG002 multiset equality ([receipt](../benchmarks/data/v2_hg002/bbe2ec4/README.md)) |
 | `duckvep_coding_transcripts`, `duckvep_coding_calls` | same names | discovery over 10,500 events, VCF/gzip/BCF fixtures, error cases |
 | `duckvep_native_budget`, `duckvep_native_budget_set`, `duckvep_native_budget_reset_high_water`, `duckvep_worker_limits_set` | same names | owners, limits, argument errors, NULLs; capacity behavior in `v2_budget.sql` |
 

@@ -2,7 +2,7 @@
 # Independent source-record HGVSp across stop codons, downstream codons and anchors.
 suppressPackageStartupMessages({ library(DBI); library(duckdb); library(optparse) })
 op <- OptionParser()
-op <- add_option(op, '--extension', default = 'build/release/duckhts.duckdb_extension')
+op <- add_option(op, '--extension', default = Sys.getenv('DUCKVEP_EXT', 'build/release/duckvep.duckdb_extension'))
 op <- add_option(op, '--vep-prefix', default = Sys.getenv('VEP_PREFIX'))
 op <- add_option(op, '--tail-codons', type = 'integer', default = 64L)
 op <- add_option(op, '--out', default = '')
@@ -29,17 +29,16 @@ run <- function() {
   out <- normalizePath(out)
   sha <- function(p) digest::digest(file = p, algo = 'sha256', serialize = FALSE)
   source_files <- c('test/duckvep/conformance/hgvs_anchor_differential.R',
-    'src/duckvep/kernel/src/duckvep_hgvs.c','src/duckvep/kernel/src/duckvep_delta.c',
-    'src/duckvep/kernel/src/duckvep_delta.h',
-    'src/duckvep/kernel/src/duckvep_hgvs.h','src/duckvep/duckvep_annotate.c',
-    'src/duckvep/duckvep_haplotype_sql.c', 'src/duckvep/duckvep_reference.c',
-    'src/duckvep/duckvep_reference.h', 'src/duckvep/kernel/src/duckvep_kernel.c',
-    'src/duckvep/kernel/src/duckvep_annotation_internal.h',
-    'src/duckvep/kernel/src/duckvep_event.h',
-    'src/duckvep/kernel/src/duckvep_haplotype_stream.c',
-    'src/duckvep/kernel/src/duckvep_haplotype_stream.h',
-    'third_party/patches/htslib/0003-add-caller-buffer-faidx-fetch.patch',
-    'third_party/patches/htslib/0004-check-faidx-coordinate-and-seek-arithmetic.patch',
+    'src/kernel/src/duckvep_hgvs.c','src/kernel/src/duckvep_delta.c',
+    'src/kernel/src/duckvep_delta.h',
+    'src/kernel/src/duckvep_hgvs.h','src/duckvep_annotate.c',
+    'src/duckvep_haplotype_sql.c', 'src/duckvep_reference.c',
+    'src/duckvep_reference.h', 'src/kernel/src/duckvep_kernel.c',
+    'src/kernel/src/duckvep_annotation_internal.h',
+    'src/kernel/src/duckvep_event.h',
+    'src/kernel/src/duckvep_haplotype_stream.c',
+    'src/kernel/src/duckvep_haplotype_stream.h',
+    'CMakeLists.txt', 'duckvep-package.json',
     'third_party/htslib/faidx.c', 'third_party/htslib/htslib/faidx.h')
   source_hashes <- vapply(source_files,sha,'')
   extension_hash <- sha(extension)

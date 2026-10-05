@@ -20,7 +20,7 @@ readme_evidence <- function(root = ".") {
   latest <- function(rows) {
     mapped <- translate(rows$source_revision)
     tested <- ancestry[ancestry %in% mapped]
-    if (length(tested)) {
+    if (length(tested) > 0L) {
       return(rows[!is.na(mapped) & mapped == tested[[1L]], , drop = FALSE])
     }
     rows[rows$source_revision == rows$source_revision[[nrow(rows)]], , drop = FALSE]
@@ -91,6 +91,15 @@ readme_evidence <- function(root = ".") {
   public <- public[when == max(when), ]
   public <- public[nrow(public), ]
 
+  haplotype_runs <- read.delim(path("benchmarks", "data", "haplotype_scale", "perf34_slice1", "process.tsv"))
+  successful <- haplotype_runs$exit == 0L
+  csq_s <- median(haplotype_runs$wall_s[successful & grepl("^csq_", haplotype_runs$label)])
+  cli_s <- median(haplotype_runs$wall_s[successful & grepl("^duckvep_F_", haplotype_runs$label)])
+  r_s <- median(haplotype_runs$wall_s[successful & grepl("^duckvep_R_F_", haplotype_runs$label)])
+  haplotype <- list(csq_s = csq_s, cli_s = cli_s, cli_speedup = csq_s / cli_s,
+    r_s = r_s, r_speedup = csq_s / r_s)
+
   list(conformance = conformance, hgvs = hgvs_summary,
-    throughput = throughput, public = public, giab_alt_alleles = 4096123L)
+    throughput = throughput, haplotype = haplotype, public = public,
+    giab_alt_alleles = 4096123L)
 }

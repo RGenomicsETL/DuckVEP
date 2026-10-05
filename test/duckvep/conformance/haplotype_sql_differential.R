@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
-# Additional public-SQL lane over unchanged, receipted Haplosaurus artifacts.
-# No generation, sampling, oracle modification or replacement of prior results.
+# Public-SQL haplotype checks over the complete receipted Haplosaurus cohort.
 frame_stop_from_base_positions <- function(case, path) {
   edits <- case$edits[match(path$contributors, case$edits$id), , drop = FALSE]
   stopifnot(!anyNA(edits))
@@ -33,7 +32,7 @@ frame_stop_from_base_positions <- function(case, path) {
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--artifacts", type = "character"),
-    optparse::make_option("--extension", default = "build/release/duckhts.duckdb_extension"),
+    optparse::make_option("--extension", default = Sys.getenv("DUCKVEP_EXT", "build/release/duckvep.duckdb_extension")),
     optparse::make_option("--extension-receipt", dest = "extension_receipt", default = NULL),
     optparse::make_option("--noncoding-contributors", dest = "noncoding_contributors",
       action = "store_true", default = FALSE)
@@ -71,6 +70,13 @@ main <- function() {
   con <- DBI::dbConnect(duckdb::duckdb(config = list(allow_unsigned_extensions = "true")))
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
   DBI::dbExecute(con, paste("LOAD", DBI::dbQuoteString(con, extension)))
+  reader_extension <- Sys.getenv("DUCKVEP_READER_EXT", "")
+  if (nzchar(reader_extension)) {
+    DBI::dbExecute(con, paste("LOAD", DBI::dbQuoteString(con,
+      normalizePath(reader_extension, mustWork = TRUE))))
+  } else if (nrow(DBI::dbGetQuery(con, "SELECT 1 FROM duckdb_functions() WHERE function_name = 'read_geno' LIMIT 1")) == 0L) {
+    DBI::dbExecute(con, "LOAD duckhts")
+  }
   DBI::dbExecute(con, "SET threads=4")
   regions <- data.frame(seq_region = seq_along(cases) - 1L, chrom = vapply(cases, `[[`, "", "chrom"))
   transcripts <- data.frame(transcript_index = seq_along(cases) - 1L, seq_region = regions$seq_region,

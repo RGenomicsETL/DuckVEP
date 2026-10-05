@@ -1,7 +1,5 @@
-# Small derived models for the SQL presentation differential and benchmark.
-# Raw bytes belong to duckhtsbench's duckvep-projection registry workload:
-# projection_reference, projection_reference_fai and projection_model_gff.
-# These transformations are test fixtures, not a second general GFF importer.
+# Derived models use the committed minimal GFF/FASTA in test/data/duckvep.
+# These transformations are test fixtures, not a general GFF importer.
 duckvep_projection_cases <- c("forward", "reverse", "three_exon_phase2",
   "partial_cds_end", "noncoding_first_exon", "noncoding",
   "noncoding_first_exon_phase1", "noncoding_first_exon_phase2")

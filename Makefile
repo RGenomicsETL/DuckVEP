@@ -86,6 +86,15 @@ PROPERTY_SANITIZE := -fsanitize=address,undefined -fno-sanitize-recover=all -fno
 PROPERTY_FLAGS ?= -std=gnu11 -O1 -g
 PROPERTY_SOURCES := $(wildcard $(PROJ_DIR)test/duckvep/property/*.c) \
 	$(wildcard $(PROJ_DIR)test/duckvep/vendor/theft/src/*.c) $(wildcard $(PROJ_DIR)src/kernel/src/*.c)
+.PHONY: test_runner_contracts test_compound_hgvs_oracle
+test_runner_contracts:
+	shellcheck scripts/check_v2_hg002.sh scripts/check_v2_hg002_selftest.sh benchmarks/benchmark_duckvep_vep_rs.sh benchmarks/benchmark_duckvep_vep_rs_selftest.sh
+	bash scripts/check_v2_hg002_selftest.sh
+	bash benchmarks/benchmark_duckvep_vep_rs_selftest.sh
+
+test_compound_hgvs_oracle:
+	Rscript test/duckvep/conformance/compound_hgvs_oracle.R
+
 # Host-neutral C properties over the kernel views (theft + greatest, no DuckDB),
 # always under ASan and UBSan. DUCKVEP_PROP_TRIALS and DUCKVEP_PROP_SEED make a
 # run larger or reproducible; read_sources.pl checks every test is registered.

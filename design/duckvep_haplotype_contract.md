@@ -1,8 +1,8 @@
 # Haplotype prediction contract: `duckvep-coding`
 
-Status: **signed by the maintainer on 2026-09-28 and amended the same day.** (1) **`bcftools csq` replaces Haplosaurus** as the executable authority for whole-haplotype consequences. (2) The scale gate is **2× faster than `bcftools csq`** on identical input, model and cores (section 4). The NMD rule is `ejc50`. Deferred work is tracked in #11 (compound HGVS), #12 (extended domains), #13 (extended consequences and NMD models) and #28 (phased structural composition). **Amended by the maintainer on 2026-09-30:** #2 closes on this correctness contract. The throughput gate in section 4 was measured at slice 7 and **not met** (1.56× faster than csq end to end, against the required 2×). It moves unchanged to #34 and is not a #2 closure condition.
+Status: **signed; issue #2 is closed on this coding-only correctness contract.** `bcftools csq` is the executable authority for whole-haplotype consequences, and NMD uses `ejc50`. The separate 2× throughput gate was met by the fused native reader in [#34](https://github.com/RGenomicsETL/DuckVEP/issues/34), closing the issue; see the [qualification and receipts](../benchmarks/data/haplotype_scale/README.md). Deferred work: #11 (compound HGVS), #12 (extended domains), #13 (extended consequences and NMD models), and #28 (phased structural composition).
 
-**Scope:** close #2 on a coding-only vertical, not “general haplotype prediction.” Maintainer approval is required before classifiers change. (The original ordering, #8 and #3 first, was superseded: #8's v1 half and #3's native budget landed before slices 5–7, and the #8 v2 host is separate.) Keep independent-event and haplotype classifiers separate, sharing projection/edit/translation facts only where their semantics agree. A framework rewrite is unnecessary. `bcftools csq` is the pinned test oracle, not a runtime dependency; DuckVEP extends its existing native path.
+**Scope:** coding-only whole-haplotype prediction, not general haplotype prediction. Maintainer approval is required before classifiers change. Keep independent-event and haplotype classifiers separate, sharing projection/edit/translation facts only where their semantics agree. `bcftools csq` is the pinned test oracle, not a runtime dependency; DuckVEP extends its existing native path.
 
 ## 1. Authority per output
 
@@ -40,30 +40,29 @@ Reference-only lanes have an empty SO set and NULL IMPACT. Other mixed frame-pre
 
 ## 2a. Parts of the domain outside the csq comparison
 
-csq is the authority on its comparable domain (diploid calls, the standard genetic code). Three parts of the supported domain lie outside it. The classifier is the same there; these are the reasons it applies and the checks that stand in for csq:
+csq is the authority on its comparable domain (diploid calls, the standard genetic code). Four parts of the supported domain lie outside it. The classifier is the same there; these are the reasons it applies and the checks that stand in for csq:
 
 | Part of the domain | Why the classifier applies | Check |
 |---|---|---|
 | Calls that are not diploid | A lane is one chromosome copy; its prediction depends on its edits only. | Each lane of haploid, triploid and tetraploid calls equals the diploid lane carrying the same edits (`duckvep_haplotype_eligibility.test`; the property suite for ploidies 1 to 4). |
 | Alleles over 50 bases | The classifier reads the edited CDS at any edit length. Earlier revisions capped alleles at 50 bases as a scoping choice, with no recorded rationale. | A 51-base insertion with a hand-derived protein. The independent-event path is compared with executable VEP on random alleles up to 100 bases. There is no csq comparison at these lengths. |
 | Genetic codes other than the standard one | Translation, start and stop tests follow the transcript's code. The first residue is the initiator, so a change between two start codons is not a peptide change. | Four edits read under NCBI table 2 and under the standard code on the same CDS, with outcomes derived by hand from the published tables (TGA Trp, AGA stop, ATA Met and start). |
-
 | Transcripts with an unannotated CDS start or end | With no annotated end nothing can be lost or retained: a stop is new, a frame still displaced where the annotation ends is a frameshift, an edit confined to the trailing partial codon is an `incomplete_terminal_codon_variant`, and NMD is unknown for a new stop. With no annotated start there is no start test, and an unchanged peptide with an edit in the unknown first codon is a `coding_sequence_variant`. | Hand-derived cases (`duckvep_haplotype_incomplete.test`). On HG002, single-edit haplotypes are compared with the per-variant annotation, which is exact against VEP: 91,212 of 91,708 are identical and the rest fall in named policy differences (for example the whole-haplotype view adds `stop_gained` to a frameshift). |
 
-**Read-through and NMD exceptions (#13).** The extended protein of a lost stop is checked against the per-variant protein HGVS, which is exact against VEP: on HG002 all 363 single-edit paths with a numbered new stop (`extTer N` or `fsTer N`) have exactly that length, and the 19 that run off the stored flank are the ones VEP writes as `Ter?`. The exceptions are checked by hand-derived cases, including the 100-base boundary (`duckvep_haplotype_nmd_exceptions.test`).
+**Read-through and NMD exceptions (#13).** The extended protein of a lost stop is checked against the per-variant protein HGVS, which is exact against VEP: on HG002 all 376 single-edit paths with a numbered new stop (`extTer N` or `fsTer N`) have exactly that length, and the 20 that run off the stored flank are the ones VEP writes as `Ter?`. The exceptions are checked by hand-derived cases, including the 100-base boundary (`duckvep_haplotype_nmd_exceptions.test`).
 
 **Single heterozygous site (#12).** On HG002 the rule resolves 782 of the 1,110 unphased-heterozygous paths. It is checked against its phased twin and against the two unresolved neighbours, two unphased sites and an unphased site beside a phased one (`duckvep_haplotype_eligibility.test`).
 
 Still refused, and tracked in #12: unphased heterozygous calls at two or more sites of a transcript (enumerating the phase alternatives), curated transcripts (selenocysteine, readthrough, RNA and peptide edits), transcripts whose stored CDS has an internal stop or lacks a start or stop without the matching flag, non-strict phase policy and raw source records, and general overlaps.
 
-## 3. Named follow-ups, not closure blockers
+## 3. Deferred work
 
-- **#11, “Compound haplotype HGVS and overlap nomenclature”**: move checklist item 3 and its compound shifted-HGVS work from item 6 here. Sequence equality cannot validate nomenclature. Existing supported protein HGVS remains a regression gate.
-- **#28 — “Phased structural composition”**: move item 4 there; typed SV/BND/STR composition requires its own event/topology contract.
-- **#12, “Extended haplotype domains”**: defer item 5’s arbitrary ploidy, uncertain-phase enumeration, general overlaps/raw-parser contexts, nonstandard/partial transcripts, larger alleles. Retain current replay tests and disagreement ledgers.
-- **#13, “Extended haplotype consequences and translation”**: defer splice-changing/regulatory/UTR composition, alternative initiation, downstream stop-loss extension, richer SO sets and additional NMD models.
+- **#11, “Compound haplotype HGVS and overlap nomenclature”**: define compound shifted-HGVS semantics; sequence equality cannot validate nomenclature. Existing supported protein HGVS remains a regression gate.
+- **#28 — “Phased structural composition”**: typed SV/BND/STR composition requires its own event and topology contract.
+- **#12, “Extended haplotype domains”**: remaining refused inputs are listed in section 2a; retain their explicit statuses and reasons.
+- **#13, “Extended haplotype consequences and translation”**: defer splice-changing, regulatory and UTR composition, alternative initiation, richer SO sets and additional NMD models.
 
-Items 1–2, supported-domain validation, original-operand ownership and item 6’s reuse/scale measurements remain required.
+Supported-domain validation, original-operand ownership, and reuse and scale measurements remain regression requirements.
 
 ## 4. Scale contract
 
@@ -71,17 +70,20 @@ Qualify a **5M-physical-variant, single-sample GRCh38/MANE-selected-model** job,
 
 Enforce **16 GiB per-job process memory, including R**, and **4 GiB aggregate DuckVEP-native memory**, including resident models, indexes and all workers—not merely `workspace_limit`. Use native admission/accounting, bounded windows, spillable DuckDB staging, a temporary-disk quota and an external job limit. Table-backed/chunked output is the scale interface; eager R collection is not the throughput benchmark. Exercise capacity failure, cleanup and connection reuse.
 
-**Acceptance gate: at least 2× faster than pinned `bcftools csq` on identical input, transcript model and allocated cores, under the same caps.** Baseline measured on 2026-09-28 on an i5-13500 with one pinned core: csq annotated the complete phased HG002 GRCh38 v4.2.1 genome (4,023,088 records, 3,993,933 phased; the MHC records with malformed FORMAT fields dropped) against all Ensembl 116 transcripts in **22.2 s wall** (≈181k records/s), at a 0.79 GiB peak RSS. csq skipped the 28.6% of records outside transcripts, while DuckVEP also annotates those (intergenic and flanks), so gating on identical whole-genome input is conservative. Report time spent inside and outside the csq domain separately. The single-core gate is therefore **≤11.1 s for that input** (≈362k records/s, about 14 s for 5M variants), with multi-core scaling reported separately. Re-measure csq on the qualification host and use that baseline. This gate supersedes the originally proposed 15/30-minute targets, which were about 30× slower than csq on one core.
+**Acceptance gate: at least 2× faster than pinned `bcftools csq` on identical input, transcript model and allocated cores, under the same caps.** Compare medians of three fresh processes on one host. The initial 2026-09-28 baseline was **22.2 s** for the phased HG002 GRCh38 v4.2.1 genome (4,023,088 records; malformed MHC records dropped); it set an 11.1 s target for that round. The final gate uses the same-round csq median, since timings vary by host and load. csq skips records outside transcripts; DuckVEP's fused reader scans the same full input and decodes calls only for coding records.
 
 Measure separately: (A) preordered input through prediction and complete output materialization; (B) identical unsorted input including decoding, discovery, staging and sorting. Include unavoidable internal sorts in A. Report cold model-load and warm execution separately; all phases obey memory caps. Record physical sources/ALTs, projections, calls, carrier states, unique paths, translated bases, output rows/bytes, peak active window, model/native/DuckDB/RSS peaks, spill bytes and full-output checksums. Use real phased input plus dense/long-transcript and low-sharing stress controls. Run three fresh processes per mode: median-time gates, caps on every run, complete failures reported.
 
-### Slice 7 qualification record (2026-09-30)
+### Throughput gate: met in #34 slice 1
 
-Measured at the closure revision by `benchmarks/haplotype_scale/run_qualification.sh`; receipts, method, pins and every table are in `benchmarks/data/haplotype_scale/README.md`. The classification rules above are unchanged. The throughput gate was moved to #34 by the 2026-09-30 amendment.
+On the pinned full-HG002 workload with one core, the Ensembl 116 model and the qualification caps, fresh-process medians were **17.25 s** for csq and **8.21 s** for the fused-reader CLI path (**2.10×**, DuckVEP model load included); the R path took **8.60 s** (**2.01×**). This met the 2× gate. The [qualification report and receipts](../benchmarks/data/haplotype_scale/README.md) record the shared model, caps, pins and run conditions.
 
-- **Throughput gate: not met.** Pinned `bcftools csq -p a -Ou -o /dev/null` re-measured on the qualification host (core 6, fresh processes, median of three): **19.66 s**, so the target is 9.83 s. DuckVEP mode B, cold process, model load included, whole-process wall clock: **12.58 s** (ratio 0.640, 1.56x faster, 2.75 s short). Warm execution of mode B is 8.44 s (0.429, met), mode A cold is 6.63 s (0.337), and mode B cold against csq writing a BCF file (32.48 s) is 0.387. The recorded baseline of 22.2 s (target 11.1 s) was measured on another core. The remainder is load-and-decode floor shared with csq: DuckDB's bundled miniz inflate of the VCF (feeding it with `bgzip -dc` gives 11.03 s, ratio 0.561) and the 2.5 s model load.
+### Earlier mode-B comparison
+
+The DuckDB CSV-reader path took 12.58 s against csq's 19.66 s (1.56×), missing the gate. The [scale report](../benchmarks/data/haplotype_scale/README.md) records its full method and measurements.
+
 - **Scale and caps: qualified.** The 5,000,000-record single-sample MANE job (HG002 plus 976,912 seeded gnomAD exome records) runs in 16.4 s cold (mode B) and 10.5 s (mode A) under a 16 GiB process cap (peak 3.1 GiB), a 4 GiB native budget (peak 407 MiB) and DuckDB's 8 GB limit, without spilling; the output checksum is identical across modes and runs. Dense (4,000 edits on one 108 kb coding sequence) and low-sharing controls pass. Capacity failures (native budget at load and at the builder, alignment capacity) raise explicit capacity errors, publish nothing and leave the connection usable.
-- **Changes made to reach it, output unchanged:** alignment work bounded by the optimum and capacity checked against the band an alignment needs (the 5M job was not runnable before: a 108 kb coding sequence asked for 11.7 billion trace cells), table-driven sequence validation and translation, no second copy of the sequence pools at model load, and `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)` for discovery: it returns exactly the (event, transcript) pairs of the annotation builder (whole HG002: 247,374 pairs, 0 missing, 0 extra; the same output checksum through either route), is documented with an R wrapper, and stays separate from `duckvep_haplotypes`, whose input is a caller-staged relation of calls. The maintainer decides the unmet gate.
+- **Discovery:** `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)` returns exactly the annotation builder's event/transcript pairs (247,374 on HG002; 0 missing, 0 extra). The fused `duckvep_coding_calls` reader uses the same discovery before decoding genotypes; `duckvep_haplotypes` consumes the resulting calls relation.
 
 ## 5. Builder-sized slices and gates
 
@@ -93,8 +95,8 @@ Each slice is one focused builder run; split again if it changes more than its n
 4. **Frame/restoration classifier:** gate open/restored intervals and early-stop-before-restoration counterexamples; preserve every contributor.
 5. **Start/stop classifier:** gate created, abolished, retained and rescued start/termination combinations, including post-stop edits.
 6. **NMD attribution:** gate edited-transcript junction geometry, threshold boundaries and unknown/not-applicable distinctions; no per-allele NMD union.
-7. **Scale qualification:** stage 5M-source workload, then measure both execution modes. Gate caps, complete fingerprints and explicit failures at the closure revision. Measure and record throughput against the signed target: not met, and moved to #34 by the 2026-09-30 amendment.
+7. **Scale qualification:** stage 5M-source workload, then measure both execution modes. Gate caps, complete fingerprints and explicit failures at the closure revision. Measure and record throughput against the signed target.
 
-## 6. “Done when” (as amended on 2026-09-30)
+## 6. Closure criteria
 
-> The maintainer has signed `duckvep-coding`, the pinned csq authority and csq→SO mapping, the EJC50 heuristic, supported/excluded domains and resource gates. Slices 1–7 pass at the closure revision with zero unexplained missing, extra or discordant supported outputs; expected unsupported cases retain statuses and all contributor identities. Independent-event and existing replay contracts remain regression-clean. Public SQL/R documentation states these limits, and deferred checklist work is linked to the named follow-ups. The throughput gate is tracked in #34. It is not a closure condition for #2, and its slice 7 measurement (not met) is recorded in section 4. Passing these gates closes #2; it does not assert general haplotype, compound-HGVS or structural-composition compatibility.
+> The maintainer has signed `duckvep-coding`, the pinned csq authority and csq→SO mapping, the EJC50 heuristic, supported/excluded domains and resource gates. Slices 1–7 pass at the closure revision with zero unexplained missing, extra or discordant supported outputs; expected unsupported cases retain statuses and all contributor identities. Independent-event and existing replay contracts remain regression-clean. Public SQL/R documentation states these limits, and deferred work is linked to the named follow-ups. Passing these gates closes #2; it does not assert general haplotype, compound-HGVS or structural-composition compatibility.

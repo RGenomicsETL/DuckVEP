@@ -1,0 +1,9 @@
+62d7731dd8722dd521e899fa470886626e254c1b118c17747473110a04152119  /root/.local/bin/duckdb
+cc449920df344bcd56a8d71227ff9cf4debc9cad03c3003fb064a313840e8c6c  /root/ducksassy/.deps/duckdb-build/duckdb
+b68e86f6170fb93f34f9b4f16964c79eb74c2d095077f193746134ca370e8bed  /root/duckvep/DuckVEP/build/release/duckvep.duckdb_extension
+f7c5eb83f1b1edc33b2149cbeee80a9db1277f32c7cf2827eb0491c33beb2033  /root/duckvep/DuckVEP/build/release_v2/duckvep.duckdb_extension
+0301905915b038b6b1f5db04d7dda1041ac5e30a7732ec700dd82b1616402c1b  /root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb
+54e5d09d3d6524a5daeaba8bfa911a8c760d1f50c81b51830404281c7b9ebf9e  /root/duckvep/data/hg002-csq/hg002.ens.vcf.gz
+67d8fd4b5f805810cec1bd9c63a8518547892b0cd64b1a56b5c31d764d2e9ccf  /root/duckvep/DuckVEP/scripts/check_v2_hg002.sh
+f020eecda4f51ad75abac9f9ae79441a553e50e488b6ac531d8cce1ab1459446  /root/duckvep/DuckVEP/duckvep-package.json
+f0ff7ba751d59142fa4a85de988e891f4ff3e1c497b41ab37989666514f9ec1c  /root/duckvep/data/hg002-haplotypes/hg002_bbe2ec4.parquet

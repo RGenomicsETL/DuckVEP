@@ -28,7 +28,7 @@ op <- add_option(
 op <- add_option(
   op,
   "--extension",
-  default = file.path(root, "build", "release", "duckhts.duckdb_extension")
+  default = Sys.getenv("DUCKVEP_EXT", file.path(root, "build", "release", "duckvep.duckdb_extension"))
 )
 op <- add_option(op, "--release", default = "116")
 op <- add_option(op, "--assembly", default = "GRCh38")
@@ -154,6 +154,12 @@ on.exit(
 
 sql_q <- function(x) as.character(dbQuoteString(con, x))
 dbExecute(con, glue("LOAD {sql_q(extension)}"))
+reader_extension <- Sys.getenv("DUCKVEP_READER_EXT", "")
+if (nzchar(reader_extension)) {
+  dbExecute(con, glue("LOAD {sql_q(normalizePath(reader_extension, mustWork = TRUE))}"))
+} else if (nrow(dbGetQuery(con, "SELECT 1 FROM duckdb_functions() WHERE function_name = 'read_bcf' LIMIT 1")) == 0L) {
+  dbExecute(con, "LOAD duckhts")
+}
 dbExecute(con, glue("SET threads = {opt$threads}"))
 
 required_relations <- c(

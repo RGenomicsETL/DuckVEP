@@ -1,0 +1,11 @@
+##gff-version 3
+##sequence-region compound_plus 1 104
+##sequence-region compound_minus 1 104
+compound_plus	fixture	gene	17	104	.	+	.	ID=gene:G_COMPOUND_PLUS;gene_id=G_COMPOUND_PLUS;Name=G_COMPOUND_PLUS;biotype=protein_coding
+compound_plus	fixture	mRNA	17	104	.	+	.	ID=transcript:T_COMPOUND_PLUS;transcript_id=T_COMPOUND_PLUS;Parent=gene:G_COMPOUND_PLUS;biotype=protein_coding
+compound_plus	fixture	exon	17	104	.	+	.	ID=exon:T_COMPOUND_PLUS.1;exon_id=T_COMPOUND_PLUS.e1;Parent=transcript:T_COMPOUND_PLUS
+compound_plus	fixture	CDS	17	88	.	+	0	ID=CDS:P_T_COMPOUND_PLUS;protein_id=P_T_COMPOUND_PLUS;Parent=transcript:T_COMPOUND_PLUS
+compound_minus	fixture	gene	17	104	.	-	.	ID=gene:G_COMPOUND_MINUS;gene_id=G_COMPOUND_MINUS;Name=G_COMPOUND_MINUS;biotype=protein_coding
+compound_minus	fixture	mRNA	17	104	.	-	.	ID=transcript:T_COMPOUND_MINUS;transcript_id=T_COMPOUND_MINUS;Parent=gene:G_COMPOUND_MINUS;biotype=protein_coding
+compound_minus	fixture	exon	17	104	.	-	.	ID=exon:T_COMPOUND_MINUS.1;exon_id=T_COMPOUND_MINUS.e1;Parent=transcript:T_COMPOUND_MINUS
+compound_minus	fixture	CDS	17	88	.	-	0	ID=CDS:P_T_COMPOUND_MINUS;protein_id=P_T_COMPOUND_MINUS;Parent=transcript:T_COMPOUND_MINUS

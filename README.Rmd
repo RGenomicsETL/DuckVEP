@@ -37,6 +37,7 @@ n <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
 conf <- evidence$conformance
 hgvs <- evidence$hgvs
 tp <- evidence$throughput
+haplotype <- evidence$haplotype
 pub <- evidence$public
 ```
 
@@ -45,25 +46,11 @@ pub <- evidence$public
 [![Extension CI](https://github.com/RGenomicsETL/DuckVEP/actions/workflows/MainDistributionPipeline.yml/badge.svg)](https://github.com/RGenomicsETL/DuckVEP/actions/workflows/MainDistributionPipeline.yml)
 [![Site](https://github.com/RGenomicsETL/DuckVEP/actions/workflows/pages.yml/badge.svg)](https://rgenomicsetl.github.io/DuckVEP/)
 
-**Variant effect prediction as a SQL relation: load an Ensembl release into DuckDB once, then ask your variants questions interactively.**
+**Variant effect prediction as a SQL relation.** Load an Ensembl transcript model into DuckDB once, then query `duckvep_annotate_sql(...)` as a relation to filter, join and aggregate alongside VCF, ClinVar or population-frequency data. A new question is a new query, not another pipeline run.
 
-> Variant annotation take time, too much time, variant_myth try to solve this problem using modern and parallel tools.
->
-> — [variant_myth](https://github.com/natir/variant_myth)
+DuckVEP returns typed Sequence Ontology consequences and impact, cDNA/CDS/protein positions and amino acids, NMD predictions, and HGVS. Phased calls also support coding whole-haplotype consequences.
 
-That sentence is where this project began. variant_myth answers it with a fast, parallel annotator: it reads GFF3, FASTA and VCF and writes Parquet, one row per variant and transcript. DuckVEP takes the idea one step further. If annotation ends up as a table anyway, it can be a table you query directly.
-
-Load a transcript model into DuckDB once. Annotation then becomes a relational operator, `FROM query(duckvep_annotate_sql(...))`, that you filter, join and aggregate in the same statement as everything else. When the question changes, you change the query and run it again in seconds; you don't rerun a pipeline. Variant effect prediction stops being a batch job you wait for, and becomes something you explore.
-
-What comes back are typed rows, not a text file to parse:
-- Sequence Ontology consequences and impact;
-- cDNA, CDS and protein positions and amino acids;
-- NMD prediction;
-- HGVS.
-
-Those rows join with anything DuckDB reads: a VCF through [DuckHTS](https://github.com/RGenomicsETL/duckhts), Parquet, DuckLake, ClinVar, population frequencies. There is no plugin system and no new file format.
-
-Speed is only useful if the answers are right. So DuckVEP's reference is executable Ensembl VEP itself, pinned to one release (today VEP `r sub("^VEP ", "", conf$oracle[[1L]])` with its matching core and variation databases). Every claim below is measured against it. Every result that differs stays in the count, and every deliberate difference is written down. Moving to a new VEP release means re-running that ledger, not re-arguing the rules.
+Independent-event consequences and HGVS are compared with executable Ensembl VEP `r sub("^VEP ", "", conf$oracle[[1L]])` and its matching core and variation databases. Discordant and unresolved pairs stay in the counts, deliberate differences are documented, and unavailable results carry a status and reason.
 
 ## Try it
 
@@ -121,7 +108,7 @@ SELECT carrier_count, length(contributors) AS contributors, prediction_status,
 FROM duckvep_haplotypes('SELECT * FROM demo_calls', 'demo');
 ```
 
-To build that calls relation from a whole-genome VCF, `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)` looks each record up in the model's interval index. It returns the transcripts whose coding sequence the record touches, using the same normalization as the annotation builder, so an indel's anchor base alone never counts. Records outside coding sequence return an empty list, so an `unnest()` over it reduces a genome to its few coding records before any per-record work. In R it is `Rduckvep::rduckvep_coding_transcripts()`.
+For VCF or BCF input, [`duckvep_coding_calls(model, path)`](docs/functions.md#duckvep_coding_calls) builds the calls relation directly; its model's `seq_region_name` values must match VCF `CHROM`. It discovers coding transcripts before decoding GT and PS, then feeds `duckvep_haplotypes`. If you stage calls yourself, `duckvep_coding_transcripts(model, seq_region, position, reference, alternate)` returns the transcripts touched by the normalized coding event, so a shared indel anchor alone does not count. R wrappers are `Rduckvep::rduckvep_coding_calls()` and `Rduckvep::rduckvep_coding_transcripts()`.
 
 ## How close to VEP
 
@@ -154,6 +141,12 @@ The [conformance report](benchmarks/duckvep_conformance.md) has:
 
 Ledger revisions from before the extraction from DuckHTS resolve through the [commit map](design/duckhts-commit-map.txt).
 
+## Whole haplotypes
+
+VEP 116 does not define whole-haplotype consequences. The coding-only [`duckvep-coding` contract](design/duckvep_haplotype_contract.md) uses pinned `bcftools csq` where transcript models and phase semantics are comparable. Independent base-R goldens and hand-derived checks cover supported cases outside csq's domain: non-diploid calls, alleles over 50 bases, nonstandard genetic codes, and incomplete CDS starts or ends. Unsupported inputs retain explicit statuses and reasons.
+
+The 2× throughput gate was met in slice 1 of [#34](https://github.com/RGenomicsETL/DuckVEP/issues/34), closing the issue. On the pinned full-HG002 input, one-core cold-process medians against the Ensembl 116 model were `r sprintf("%.2f", haplotype$csq_s)` s for csq and `r sprintf("%.2f", haplotype$cli_s)` s for the fused-reader CLI path (`r sprintf("%.2f", haplotype$cli_speedup)`×; DuckVEP model load included); the R path took `r sprintf("%.2f", haplotype$r_s)` s (`r sprintf("%.2f", haplotype$r_speedup)`×). See the [qualification method and receipts](benchmarks/data/haplotype_scale/README.md).
+
 ## Where it differs, and why
 
 Compatibility is claimed only where it has been measured, and differences are kept, not hidden. The [compatibility and errata record](ERRATA.md) separates three verdicts, each with its witness:
@@ -167,14 +160,8 @@ The main cases:
 - **Breakends are evaluated one event at a time.** VEP 116's buffered breakend path uses a chromosome-blind interval tree and can drop valid transcript pairs in multi-chromosome batches. The oracle runs with `--buffer_size 1` to isolate that; DuckVEP has no such batching effect ([paired-breakend differential](benchmarks/duckvep_conformance.md#paired-breakend-differential)).
 - **Imprecise structural variants use the nominal span**, as VEP's registered predicates do. `CIPOS` and `CIEND` stay on the row as metadata rather than being dropped.
 - **No silent size limits.** VEP skips structural events above `--max_sv_size` (5 kb by default). DuckVEP annotates every exact span, and the oracle runs with a 10 Mb limit so the comparison covers them.
-- **Circular regions run on lifted intervals.**
-  - A circular sequence region with an object that crosses its origin runs on a lifted linear copy of the model. Such an object can be a transcript, exon, regulatory or motif feature. On the lifted copy, flanks, splice sites, CDS positions, HGVS shifts and regulatory overlaps all cross the origin consistently.
-  - This is separate from the mitochondrial codon table, which only chooses a translation rule. Human MT has no wrapped object, so it keeps VEP's linear behaviour byte for byte.
-  - VEP models origin-crossing transcripts as reversed intervals, so it can't be the oracle for them. Those are checked instead by rotation equivariance and against a linear model ([design](design/duckvep.md), [survey and differential](benchmarks/data/circular_source_survey.md)).
+- **Circular regions use lifted intervals.** Origin-crossing transcripts, exons and regulatory or motif features preserve overlap and HGVS behavior across the origin. This is separate from mitochondrial translation; human MT has no wrapped object. VEP cannot oracle origin-crossing models, so they are checked by rotation equivariance and linear-model differential ([design](design/duckvep.md), [survey](benchmarks/data/circular_source_survey.md)).
 - **Unknown is a value.** When a result can't be computed, the row carries `duckvep_status` and a reason instead of a guess. Examples are a missing reference sequence, a reference mismatch, or an unsupported symbolic allele.
-- **Whole-haplotype consequences are checked against `bcftools csq`, not VEP.**
-  - VEP 116 does not define them. The coding-only contract is [`duckvep-coding`](design/duckvep_haplotype_contract.md), with independent base-R goldens and a declared list of every divergence from csq.
-  - DuckVEP is 1.56× faster than csq end to end on HG002 (the 2× goal is tracked in [#34](https://github.com/RGenomicsETL/DuckVEP/issues/34)).
 - **Outside the claim:**
   - species and releases that haven't been tested;
   - compound (cis) HGVS presentation, where the errata record the disagreements that remain;
@@ -186,13 +173,13 @@ The main cases:
 
 Interactive only works if the engine keeps up.
 - **The public SQL builder** annotates **`r n(round(pub$variants_per_second))` alleles per second on one core** in compact output. That is every model-addressable allele of GIAB HG002 (`r n(pub$variants)`), with all `r n(pub$regulation_features)` regulatory and motif features resident, straight through `FROM query(duckvep_annotate_sql(...))` ([throughput report](benchmarks/duckvep_throughput.md)).
-- **End to end against vep-rs**, the fastest VEP reimplementation we know of, VCF in and table out on all of GIAB HG002 (4,070,522 alleles, Ensembl 116): DuckVEP finished in **6.8 s** on 16 threads against 9.4 s, on two thirds of the CPU time. On a single core the two are level (33.5 s against 34.4 s), and two thirds of DuckVEP's time there is writing Parquet, not annotating. The two agree on 99.995% of 34 million consequence tuples; executable VEP sides with DuckVEP on 1,689 of the 1,691 that differ. Details and caveats are in the [vep-rs benchmark](benchmarks/benchmark_duckvep_vep_rs.md).
+- **End to end against vep-rs**, VCF in and table out on GIAB HG002 (4,070,522 alleles, Ensembl 116): the 16-thread measurement was **6.8 s** for DuckVEP against 9.4 s, on two thirds of the CPU time. Single-core figures came from separate runs, not a paired campaign. The tools agree on 99.995% of 34 million consequence tuples; executable VEP sides with DuckVEP on 1,689 of the 1,691 disagreements. See the [comparison and reproducible runner](benchmarks/benchmark_duckvep_vep_rs.md).
 - **Loading a model again is a file mapping.** `duckvep_model_save` writes a loaded model as a snapshot, and `duckvep_model_restore` maps it back in about half a second for the full human model, with one copy in memory shared by every process that restores it.
 - **Memory** is bounded, not hoped for. Each job's native memory is charged against an enforced budget, and exceeding it is an explicit capacity error, never a truncated result. Three concurrent 5-million-allele gnomAD jobs are certified on one 20-thread host ([scale runner](docs/scale-runner.md)).
 
 ## From R
 
-`Rduckvep` runs the same native builders on your DuckDB connection. Builder functions return SQL, and `rduckvep_annotate()` executes an annotation and returns a data frame. The relations you pass stay visible in that connection, including TEMP tables and uncommitted rows.
+`Rduckvep` runs the same native annotation builders on your DuckDB connection. Builder functions return SQL, and `rduckvep_annotate()` executes it and returns a data frame. Annotation queries can read relations on that connection, including TEMP tables and uncommitted rows.
 
 ```r
 con <- Rduckvep::rduckvep_connect()
@@ -255,7 +242,7 @@ The extension uses the stable DuckDB C API (tested on DuckDB 1.5 and the 2.0 pre
 - Reports: [conformance](benchmarks/duckvep_conformance.md), [throughput](benchmarks/duckvep_throughput.md), [vep-rs comparison](benchmarks/benchmark_duckvep_vep_rs.md), [haplotypes](benchmarks/duckvep_haplotypes.md), [scale runner](docs/scale-runner.md)
 - [Corpus workflow](design/duckvep_corpus_workflow.md) and [conformance harness](test/duckvep/conformance/README.md)
 
-DuckVEP grew up inside [DuckHTS](https://github.com/RGenomicsETL/duckhts) and was extracted with its history.
+DuckVEP was developed within [DuckHTS](https://github.com/RGenomicsETL/duckhts) and extracted with its Git history.
 
 ## License
 

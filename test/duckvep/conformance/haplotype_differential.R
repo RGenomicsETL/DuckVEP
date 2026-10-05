@@ -11,7 +11,7 @@ main <- function() {
     option_list = list(
       optparse::make_option("--cases", type = "integer", default = 128L),
       optparse::make_option("--seed", type = "integer", default = 173L),
-      optparse::make_option("--extension", default = "build/release/duckhts.duckdb_extension"),
+      optparse::make_option("--extension", default = Sys.getenv("DUCKVEP_EXT", "build/release/duckvep.duckdb_extension")),
       optparse::make_option("--extension-receipt", dest = "extension_receipt", default = NULL),
       optparse::make_option(
         "--vep-prefix",
@@ -114,15 +114,15 @@ main <- function() {
     root,
     c(
       "test/duckvep/conformance/haplotype_probe.c",
-      "src/duckvep/kernel/src/duckvep_haplotype.c",
-      "src/duckvep/kernel/src/duckvep_carriers.c",
-      "src/duckvep/kernel/src/duckvep_phase.c",
-      "src/duckvep/kernel/src/duckvep_haplotype_stream.c",
-      "src/duckvep/kernel/src/duckvep_classify.c",
-      "src/duckvep/kernel/src/duckvep_codon.c",
-      "src/duckvep/kernel/src/duckvep_coding.c",
-      "src/duckvep/kernel/src/duckvep_projection.c",
-      "src/duckvep/kernel/src/duckvep_delta.c"
+      "src/kernel/src/duckvep_haplotype.c",
+      "src/kernel/src/duckvep_carriers.c",
+      "src/kernel/src/duckvep_phase.c",
+      "src/kernel/src/duckvep_haplotype_stream.c",
+      "src/kernel/src/duckvep_classify.c",
+      "src/kernel/src/duckvep_codon.c",
+      "src/kernel/src/duckvep_coding.c",
+      "src/kernel/src/duckvep_projection.c",
+      "src/kernel/src/duckvep_delta.c"
     )
   )
   compiler <- Sys.getenv("CC", "cc")
@@ -138,9 +138,9 @@ main <- function() {
         "-fPIC",
         "-shared",
         "-I",
-        shQuote(file.path(root, "src/duckvep/kernel/src")),
+        shQuote(file.path(root, "src/kernel/src")),
         "-I",
-        shQuote(file.path(root, "src/duckvep/kernel/include")),
+        shQuote(file.path(root, "src/kernel/include")),
         shQuote(sources),
         "-o",
         shQuote(shared)
@@ -371,6 +371,13 @@ main <- function() {
   con <- DBI::dbConnect(duckdb::duckdb(config = list(allow_unsigned_extensions = "true")))
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
   DBI::dbExecute(con, paste("LOAD", DBI::dbQuoteString(con, extension)))
+  reader_extension <- Sys.getenv("DUCKVEP_READER_EXT", "")
+  if (nzchar(reader_extension)) {
+    DBI::dbExecute(con, paste("LOAD", DBI::dbQuoteString(con,
+      normalizePath(reader_extension, mustWork = TRUE))))
+  } else if (nrow(DBI::dbGetQuery(con, "SELECT 1 FROM duckdb_functions() WHERE function_name = 'read_geno' LIMIT 1")) == 0L) {
+    DBI::dbExecute(con, "LOAD duckhts")
+  }
   DBI::dbExecute(con, "SET threads=1")
   input_path <- DBI::dbQuoteString(con, file.path(out, "carriers.vcf"))
   catalog <- DBI::dbGetQuery(con, paste0(
@@ -813,18 +820,18 @@ main <- function() {
       root,
       c(
         "scripts/duckvep_evidence.R",
-        "src/duckvep/kernel/src/duckvep_haplotype.h",
-        "src/duckvep/kernel/src/duckvep_carriers.h",
-        "src/duckvep/kernel/src/duckvep_phase.h",
-        "src/duckvep/kernel/src/duckvep_haplotype_stream.h",
-        "src/duckvep/kernel/src/duckvep_coding.h",
-        "src/duckvep/kernel/src/duckvep_projection.h",
-        "src/duckvep/kernel/src/duckvep_delta.h",
-        "src/duckvep/kernel/src/duckvep_event.h",
-        "src/duckvep/kernel/src/duckvep_compat.h",
-        "src/duckvep/kernel/include/duckvep_kernel.h",
-        "src/duckvep/kernel/src/duckvep_codon.h",
-        "src/duckvep/kernel/src/duckvep_dna.h"
+        "src/kernel/src/duckvep_haplotype.h",
+        "src/kernel/src/duckvep_carriers.h",
+        "src/kernel/src/duckvep_phase.h",
+        "src/kernel/src/duckvep_haplotype_stream.h",
+        "src/kernel/src/duckvep_coding.h",
+        "src/kernel/src/duckvep_projection.h",
+        "src/kernel/src/duckvep_delta.h",
+        "src/kernel/src/duckvep_event.h",
+        "src/kernel/src/duckvep_compat.h",
+        "src/kernel/include/duckvep_kernel.h",
+        "src/kernel/src/duckvep_codon.h",
+        "src/kernel/src/duckvep_dna.h"
       )
     ),
     lock,

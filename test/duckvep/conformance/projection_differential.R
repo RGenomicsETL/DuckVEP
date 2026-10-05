@@ -94,7 +94,7 @@ main <- function() {
     optparse::make_option("--seed", type = "integer", default = 173L),
     optparse::make_option("--consequences", action = "store_true", default = FALSE,
       help = "also require native SO/status agreement on every retained record/transcript pair"),
-    optparse::make_option("--extension", default = "build/release/duckhts.duckdb_extension"),
+    optparse::make_option("--extension", default = Sys.getenv("DUCKVEP_EXT", "build/release/duckvep.duckdb_extension")),
     optparse::make_option("--extension-receipt", dest = "extension_receipt", default = NULL),
     optparse::make_option("--summary-output", dest = "summary_output", default = NULL),
     optparse::make_option("--vep-prefix", dest = "vep_prefix", default = Sys.getenv("VEP_PREFIX")),
@@ -123,7 +123,10 @@ main <- function() {
   directory <- tempfile(paste0("projection_seed", opt$seed, "_"), tmpdir = results)
   dir.create(directory)
   message("Artifacts: ", directory)
-  inputs <- duckhtsbench::duckhts_bench_stage_repository_fixtures(root, "duckvep-projection")
+  fixture_names <- c("minimal.fa", "minimal.fa.fai", "minimal.gff3")
+  inputs <- setNames(file.path(directory, fixture_names),
+    c("projection_reference", "projection_reference_fai", "projection_model_gff"))
+  stopifnot(file.copy(file.path(root, "test/data/duckvep", fixture_names), inputs))
   mirrors <- c(vep = normalizePath(opt$vep_git, mustWork = TRUE),
     variation = normalizePath(opt$variation_git, mustWork = TRUE))
   revisions <- c(vep = "57ea5c52340acc1f156267f810ad162e26597082",
@@ -149,6 +152,17 @@ main <- function() {
   con <- DBI::dbConnect(duckdb::duckdb(config = list(allow_unsigned_extensions = "true")))
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
   DBI::dbExecute(con, paste("LOAD", DBI::dbQuoteString(con, extension)))
+  reader_extension <- Sys.getenv("DUCKVEP_READER_EXT", "")
+  if (nzchar(reader_extension)) {
+    reader_extension <- normalizePath(reader_extension, mustWork = TRUE)
+    DBI::dbExecute(con, paste("LOAD", DBI::dbQuoteString(con, reader_extension)))
+    generator_extension <- reader_extension
+  } else if (nrow(DBI::dbGetQuery(con, "SELECT 1 FROM duckdb_functions() WHERE function_name = 'read_bcf' LIMIT 1")) == 0L) {
+    DBI::dbExecute(con, "LOAD duckhts")
+    generator_extension <- "duckhts"
+  } else {
+    generator_extension <- extension
+  }
   DBI::dbExecute(con, "SET threads=1")
   summaries <- controls <- consequence_summaries <- list()
   for (case in duckvep_projection_cases) {
@@ -157,7 +171,7 @@ main <- function() {
     generated <- file.path(directory, paste0(case, ".generated.vcf"))
     json <- file.path(directory, paste0(case, ".json"))
     command("Rscript", c(file.path(root, "test/duckvep/conformance/generate_witnesses.R"),
-      "--gff", gff, "--fasta", inputs[["projection_reference"]], "--ext", extension,
+      "--gff", gff, "--fasta", inputs[["projection_reference"]], "--ext", generator_extension,
       "--out", generated, "--random-cases", opt$random_cases, "--seed", opt$seed,
       "--max-random-length", opt$max_random_length))
     duckvep_projection_label_records(generated, vcf)

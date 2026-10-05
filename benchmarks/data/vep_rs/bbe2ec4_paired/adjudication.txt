@@ -1,0 +1,54 @@
+[W::bcf_hdr_check_sanity] PS should be declared as Type=Integer
+┌─────────┐
+│ loaded  │
+│ boolean │
+├─────────┤
+│ true    │
+└─────────┘
+┌─────────────────────────────────────────┐
+│ duckvep_model_save('g', 'model.dvsnap') │
+│                 boolean                 │
+├─────────────────────────────────────────┤
+│ true                                    │
+└─────────────────────────────────────────┘
+End-to-end benchmark timings:
+kind	tool	threads	cpu_affinity	run	wall_s	user_s	sys_s	maxrss_kib
+benchmark	vep-rs	1	19	1	69.71	58.01	11.51	2887656
+benchmark	duckvep	1	19	1	56.96	56.04	0.81	2779732
+benchmark	vep-rs	1	19	2	73.26	57.76	13.07	2896592
+benchmark	duckvep	1	19	2	58.09	57.12	0.86	2774924
+benchmark	vep-rs	1	19	3	75.41	58.24	13.57	2904748
+benchmark	duckvep	1	19	3	58.38	57.48	0.81	2778116
+DuckVEP query-only stage timings (not included above):
+kind	tool	threads	cpu_affinity	stage	seconds
+stage	duckvep	1	19	compact_count	5.788
+stage	duckvep	1	19	rich_count	12.991
+stage	duckvep	1	19	rich_touch	18.684
+stage	duckvep	1	19	rich_joined_parquet	50.436
+stage	duckvep	1	19	compact_parquet	28.054
+┌──────────────┬────────────┬─────────────────────┬───────────────────┬────────────────────┐
+│ duckvep_rows │ veprs_rows │ duckvep_transcripts │ veprs_transcripts │ shared_transcripts │
+│    int64     │   int64    │        int64        │       int64       │       int64        │
+├──────────────┼────────────┼─────────────────────┼───────────────────┼────────────────────┤
+│     47278065 │   36258238 │              598993 │            421878 │             420436 │
+└──────────────┴────────────┴─────────────────────┴───────────────────┴────────────────────┘
+┌────────────────┬──────────────┬──────────┬──────────────┬────────────┐
+│ duckvep_tuples │ veprs_tuples │ matching │ only_duckvep │ only_veprs │
+│     int64      │    int64     │  int64   │    int64     │   int64    │
+├────────────────┼──────────────┼──────────┼──────────────┼────────────┤
+│       34148222 │     34148222 │ 34146531 │         1691 │       1691 │
+└────────────────┴──────────────┴──────────┴──────────────┴────────────┘
+┌─────────────────────────┬───────┐
+│         verdict         │   n   │
+│         varchar         │ int64 │
+├─────────────────────────┼───────┤
+│ VEP agrees with DuckVEP │  1689 │
+│ VEP agrees with vep-rs  │     1 │
+│ VEP differs from both   │     1 │
+└─────────────────────────┴───────┘
+┌────────────┬─────────────────┬───────────────┬──────────────────────────────┬────────────────────────────┬──────────────────────────────┬────────────────────────────┐
+│ vep_tuples │ duckvep_matches │ veprs_matches │ vep_rows_absent_from_duckvep │ vep_rows_absent_from_veprs │ duckvep_rows_absent_from_vep │ veprs_rows_absent_from_vep │
+│   int64    │      int64      │     int64     │            int64             │           int64            │            int64             │           int64            │
+├────────────┼─────────────────┼───────────────┼──────────────────────────────┼────────────────────────────┼──────────────────────────────┼────────────────────────────┤
+│      41249 │           41085 │         38109 │                          162 │                       1443 │                            0 │                          0 │
+└────────────┴─────────────────┴───────────────┴──────────────────────────────┴────────────────────────────┴──────────────────────────────┴────────────────────────────┘

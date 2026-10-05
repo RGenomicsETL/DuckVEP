@@ -10,6 +10,8 @@ on:
       - 'test/sql/**'
       - 'Makefile'
       - 'test/scripts/test_fault_injection.py'
+      - 'scripts/check_v2_hg002*.sh'
+      - 'benchmarks/benchmark_duckvep_vep_rs*.sh'
       - '.github/workflows/asan.yml'
   pull_request:
     paths:
@@ -19,6 +21,8 @@ on:
       - 'test/sql/**'
       - 'Makefile'
       - 'test/scripts/test_fault_injection.py'
+      - 'scripts/check_v2_hg002*.sh'
+      - 'benchmarks/benchmark_duckvep_vep_rs*.sh'
       - '.github/workflows/asan.yml'
 
 permissions:
@@ -51,12 +55,14 @@ jobs:
           submodules: true
           persist-credentials: false
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake zlib1g-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake zlib1g-dev shellcheck jq
       - name: Install the pinned DuckDB CLI
         run: |
           curl -sSfL -o duckdb_cli.zip "https://github.com/duckdb/duckdb/releases/download/${DUCKDB_CLI_VERSION}/duckdb_cli-linux-amd64.zip"
           echo "${DUCKDB_CLI_SHA256}  duckdb_cli.zip" | sha256sum -c -
           unzip -q duckdb_cli.zip -d "$RUNNER_TEMP/duckdb-cli"
           echo "$RUNNER_TEMP/duckdb-cli" >> "$GITHUB_PATH"
+      - name: Check benchmark and scale runner contracts
+        run: make test_runner_contracts
       - name: Fail every load and annotation allocation in turn (each must be a clean, leak-free error)
         run: make test_fault_injection

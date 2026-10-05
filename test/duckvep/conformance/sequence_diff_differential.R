@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
-# Additional alignment lane over every complete sequence pair in an existing
-# Haplosaurus receipt. No generator, selection rule or prior oracle is changed.
+# Compare native alignment operations with VEP over every complete sequence pair
+# in the supplied Haplosaurus and public-SQL receipts.
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--artifacts", type = "character"),
@@ -35,8 +35,8 @@ main <- function() {
   dir.create(out)
   message("Sequence-difference artifacts: ", out)
   sources <- c("test/duckvep/conformance/sequence_diff_probe.c",
-    "src/duckvep/kernel/src/duckvep_sequence_diff.c")
-  code <- c(sources, "src/duckvep/kernel/src/duckvep_sequence_diff.h",
+    "src/kernel/src/duckvep_sequence_diff.c")
+  code <- c(sources, "src/kernel/src/duckvep_sequence_diff.h",
     "test/duckvep/conformance/sequence_diff_oracle.pl", "test/duckvep/conformance/sequence_diff_differential.R")
   code_hashes <- vapply(code, duckvep_evidence_sha256, "")
   binding <- if (length(duckvep_evidence_tracked_changes(root)) ||
@@ -83,7 +83,7 @@ main <- function() {
   stopifnot(identical(vapply(oracle, `[[`, "", "id"), pair_ids), !anyDuplicated(pair_ids))
   shared <- file.path(out, paste0("sequence_diff_probe", .Platform$dynlib.ext))
   stopifnot(system2(Sys.getenv("CC", "cc"), shQuote(c("-std=c99", "-O1", "-g", "-Wall", "-Wextra",
-    "-fPIC", "-shared", "-I", "src/duckvep/kernel/src", sources, "-o", shared)),
+    "-fPIC", "-shared", "-I", "src/kernel/src", sources, "-o", shared)),
     stdout = file.path(out, "compiler.log"), stderr = file.path(out, "compiler.log")) == 0L)
   dll <- dyn.load(shared)
   on.exit(dyn.unload(shared), add = TRUE)

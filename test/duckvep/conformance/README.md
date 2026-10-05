@@ -278,6 +278,44 @@ diagnostic runs fail on any HGVSp disagreement, including cases where VEP emits 
 string. A passing terminal-anchor matrix does not certify compound or complete phased
 HGVS, and these diagnostic runs do not enter release history.
 
+The bounded offline Mutalyzer slice is a separate HGVS oracle, not a VEP differential
+or evidence that complete compound HGVS is implemented:
+
+```bash
+Rscript test/duckvep/conformance/compound_hgvs_oracle.R
+```
+
+It runs Mutalyzer 3.1.1 with Mutalyzer Retriever 0.6.0 and CPython 3.13.12. The exact
+Python distribution set is pinned in `mutalyzer_oracle/requirements.lock`; the runner
+fails on missing, changed, or additional distributions. `MUTALYZER_PYTHON` and
+`MUTALYZER_RETRIEVER` can select another already-provisioned matching environment.
+There is no install step or checked-in package/cache copy. The two 104-nt FASTA
+references and GFF3 model are synthetic, have no assembly accession, and contain the
+same 72-nt CDS on opposite genomic strands. The pinned Retriever builds per-reference
+models from those checked-in files in the run directory. The receipt records SHA-256
+for the fixture, adapter, lock, and generated reference-model files.
+
+`cases.jsonl` stores each compound allele as two `{position, reference, alternate}`
+records. The R runner serializes both source edits inside one `c.[edit1;edit2]`
+description and calls the Mutalyzer normalizer once; it never joins independently
+normalized HGVS names. The adapter input JSONL contains
+`case_id` and `description`. Each output JSONL record contains the input and normalized
+description, `protein.description`, `protein.reference`, `protein.predicted`, Mutalyzer
+error codes, and the pinned runtime versions. Compare `normalized_description` only for
+the same accession, selector, and coordinate system. These protein fields come from the
+Mutalyzer 3.1.1 API result; `protein.reference` and `protein.predicted` are sequence
+context, not additional HGVS descriptions, and may be absent when no protein prediction
+is returned. Compare the protein description only when the transcript/protein selector
+and coding model match. These pinned outputs are regression expectations for this
+Mutalyzer version; they do not establish cross-tool equivalence or complete HGVS
+conformance.
+
+The adapter requires file-cache reads only, disables file-cache writes and the API
+cache, and blocks Python socket resolution and connections. A network attempt, API
+error, output-schema change, or mismatch exits nonzero. Runs and receipts are written
+under `test/duckvep/conformance/results/mutalyzer` by default; set
+`DUCKVEP_ARTIFACTS_DIR` to another task-local artifact directory.
+
 The internal-codon matrix separately tests an exact source MNV and its sequence-
 equivalent set of two or three cis SNVs. It exhausts 61 non-stop reference codons,
 64 alternate codons and both strands, retaining every pair with two or three changed

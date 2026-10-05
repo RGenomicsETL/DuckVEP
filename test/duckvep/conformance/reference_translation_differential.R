@@ -30,9 +30,9 @@ main <- function() {
       duckvep_evidence_explicit_packages(readLines(
         "test/duckvep/upstream/receipts/vep116_2026-07-22.conda-explicit.txt"))))
   sources <- c("test/duckvep/conformance/reference_translation_probe.c",
-    "src/duckvep/kernel/src/duckvep_codon.c", "src/duckvep/kernel/src/duckvep_haplotype.c")
-  code <- c(sources, "src/duckvep/kernel/src/duckvep_codon.h",
-    "src/duckvep/kernel/src/duckvep_dna.h", "src/duckvep/kernel/src/duckvep_haplotype.h",
+    "src/kernel/src/duckvep_codon.c", "src/kernel/src/duckvep_haplotype.c")
+  code <- c(sources, "src/kernel/src/duckvep_codon.h",
+    "src/kernel/src/duckvep_dna.h", "src/kernel/src/duckvep_haplotype.h",
     "test/duckvep/conformance/reference_translation_oracle.pl",
     "test/duckvep/conformance/reference_translation_differential.R", "scripts/duckvep_evidence.R")
   code_hashes <- vapply(code, duckvep_evidence_sha256, "")
@@ -41,7 +41,7 @@ main <- function() {
   binding <- if (length(changed)) "diagnostic_unbound" else "clean_checkout"
   shared <- file.path(out, paste0("reference_translation_probe", .Platform$dynlib.ext))
   stopifnot(system2(Sys.getenv("CC", "cc"), shQuote(c("-std=c99", "-O1", "-g", "-Wall", "-Wextra",
-    "-fPIC", "-shared", "-I", "src/duckvep/kernel/src", sources, "-o", shared)),
+    "-fPIC", "-shared", "-I", "src/kernel/src", sources, "-o", shared)),
     stdout = file.path(out, "compiler.log"), stderr = file.path(out, "compiler.log")) == 0L)
   dll <- dyn.load(shared)
   on.exit(dyn.unload(shared), add = TRUE)

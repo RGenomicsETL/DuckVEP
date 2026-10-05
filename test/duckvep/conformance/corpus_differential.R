@@ -266,8 +266,8 @@ op <- add_option(
   op,
   "--extension",
   default = Sys.getenv(
-    "DUCKHTS_EXT",
-    file.path(root, "build", "release", "duckhts.duckdb_extension")
+    "DUCKVEP_EXT",
+    file.path(root, "build", "release", "duckvep.duckdb_extension")
   )
 )
 op <- add_option(
@@ -817,9 +817,11 @@ invisible(dbExecute(con, glue("LOAD {sql_q(normalizePath(opt$extension))}")))
 # so a DuckHTS build is loaded next to it (DUCKVEP_READER_EXT, or an installed duckhts).
 reader_extension <- Sys.getenv("DUCKVEP_READER_EXT", "")
 if (nzchar(reader_extension)) {
-  invisible(dbExecute(con, glue("LOAD {sql_q(normalizePath(reader_extension))}")))
+  reader_extension <- normalizePath(reader_extension, mustWork = TRUE)
+  invisible(dbExecute(con, glue("LOAD {sql_q(reader_extension)}")))
 } else if (nrow(dbGetQuery(con, "SELECT 1 FROM duckdb_functions() WHERE function_name = 'read_bcf' LIMIT 1")) == 0L) {
   invisible(dbExecute(con, "LOAD duckhts"))
+  reader_extension <- "duckhts"
 }
 invisible(tryCatch(
   dbExecute(con, "LOAD json"),
@@ -1141,7 +1143,7 @@ if (!nzchar(source_vcf) && !generate_structural && !generate_breakend) {
       "--out",
       source_vcf,
       "--ext",
-      opt$extension
+      if (nzchar(reader_extension)) reader_extension else opt$extension
     ))
   )
   if (rc != 0L || !file.exists(source_vcf)) die("witness generation failed")
