@@ -1,36 +1,84 @@
 :root {
-  --site-blue: #276dc3;
-  --site-blue-dark: #174a8b;
-  --site-line: #d7dee7;
-  --site-surface: #f6f8fa;
+  --site-ink: #1c2430;
+  --site-muted: #4f5b6b;
+  --site-blue: #1f5fa8;
+  --site-blue-dark: #153f73;
+  --site-line: #d5dce5;
+  --site-surface: #f5f7fa;
+  --site-focus: #b35c00;
 }
 
 body {
-  max-width: 1120px;
+  color: var(--site-ink);
+  line-height: 1.6;
+  max-width: 1080px;
 }
 
-nav > p {
-  align-items: center;
+/* Project navigation: one wrapping row, no script required. */
+nav.site-nav {
+  border-bottom: 1px solid var(--site-line);
+  margin-bottom: 0.5rem;
+}
+
+nav.site-nav > p {
+  align-items: baseline;
   display: flex;
-  gap: 0.35rem;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.1rem;
+  margin: 0;
+  padding: 0.6rem 0;
 }
 
-nav .project-home {
+nav.site-nav a {
+  color: var(--site-muted);
+  font-size: 0.95rem;
+  padding: 0.2rem 0;
+  text-decoration: none;
+}
+
+nav.site-nav a:hover {
   color: var(--site-blue-dark);
+  text-decoration: underline;
+}
+
+nav.site-nav .project-home {
+  color: var(--site-ink);
   font-size: 1.1rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
   margin-right: auto;
 }
 
 .frontmatter .title h1 {
-  color: var(--site-blue-dark);
-  font-size: clamp(2.5rem, 7vw, 4.5rem);
-  letter-spacing: -0.04em;
-  margin: 0.35em 0;
+  color: var(--site-ink);
+  font-size: clamp(2rem, 5vw, 2.9rem);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0.6em 0 0.3em;
 }
 
 .body {
-  padding: clamp(1rem, 3vw, 2.5rem);
+  padding: clamp(0.5rem, 2.5vw, 2rem) 0;
+}
+
+/* Prose keeps a readable measure; code, tables and figures may use the full width. */
+.body > p,
+.body > ul,
+.body > ol,
+.body > blockquote {
+  max-width: 46rem;
+}
+
+h2 {
+  border-bottom: 1px solid var(--site-line);
+  color: var(--site-ink);
+  margin-top: 2.2em;
+  padding-bottom: 0.2em;
+}
+
+h3 {
+  color: var(--site-ink);
+  margin-top: 1.8em;
 }
 
 a,
@@ -38,55 +86,118 @@ a:visited {
   color: var(--site-blue);
 }
 
+a:hover {
+  color: var(--site-blue-dark);
+}
+
+:focus-visible {
+  border-radius: 2px;
+  outline: 3px solid var(--site-focus);
+  outline-offset: 2px;
+}
+
+blockquote {
+  border-left: 3px solid var(--site-blue);
+  color: var(--site-muted);
+  font-style: italic;
+  margin: 1.4rem 0;
+  padding: 0.1rem 1rem;
+}
+
+blockquote p:last-child {
+  font-size: 0.92rem;
+  font-style: normal;
+}
+
+details {
+  border: 1px solid var(--site-line);
+  border-radius: 0.35rem;
+  margin: 1rem 0;
+  padding: 0.4rem 0.9rem;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 pre > code {
   background: var(--site-surface);
   border: 1px solid var(--site-line);
   border-radius: 0.35rem;
+  display: block;
+  font-size: 0.88rem;
+  overflow-x: auto;
   white-space: pre;
 }
 
+/* Wide tables scroll inside their own box instead of widening the page. */
 table {
+  border-collapse: collapse;
   border-color: var(--site-line);
-  width: 100%;
+  display: block;
+  font-size: 0.92rem;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 thead th {
+  background: var(--site-surface);
   text-align: left;
 }
 
+th,
+td {
+  border-bottom: 1px solid var(--site-line);
+  padding: 0.35rem 0.7rem;
+  vertical-align: top;
+}
+
+td {
+  font-variant-numeric: tabular-nums;
+}
+
 tbody td:first-child strong {
-  color: var(--site-blue);
+  color: var(--site-blue-dark);
   font-family: "DejaVu Sans Mono", "Droid Sans Mono", Consolas, monospace;
   white-space: nowrap;
 }
 
+img {
+  height: auto;
+  max-width: 100%;
+}
+
 @media (max-width: 720px) {
-  body {
-    padding: 0.75rem;
+  body:not(.pagesjs) > .body {
+    padding-inline: 1rem;
   }
 
-  nav > p {
-    flex-wrap: wrap;
+  nav.site-nav > p {
+    gap: 0.15rem 0.9rem;
+    padding-inline: 1rem;
   }
 
-  table {
-    display: block;
-    max-width: 100%;
-    overflow-x: auto;
+  nav.site-nav .project-home {
+    flex-basis: 100%;
   }
 
-  th:first-child,
-  td:first-child {
-    min-width: 9rem;
+  nav.site-nav a {
+    padding: 0.35rem 0;
   }
 
-  th:nth-child(2),
-  td:nth-child(2) {
-    min-width: 28rem;
+  pre > code {
+    font-size: 0.82rem;
   }
 
-  th:nth-child(3),
-  td:nth-child(3) {
-    min-width: 10rem;
+  /* Enough room per column to stay legible; the table scrolls beyond that. */
+  th,
+  td {
+    min-width: 7rem;
   }
 }

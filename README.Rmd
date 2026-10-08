@@ -47,9 +47,34 @@ pub <- evidence$public
 
 **Variant effect prediction as a SQL relation.** Load an Ensembl transcript model into DuckDB once, then query `duckvep_annotate_sql(...)` as a relation to filter, join and aggregate alongside VCF, ClinVar or population-frequency data. A new question is a new query, not another pipeline run.
 
+> Variant annotation take time, too much time, variant_myth try to solve this problem using modern and parallel tools.
+>
+> — rationale of [variant_myth](https://github.com/natir/variant_myth)
+
+DuckVEP began with that sentence. variant_myth answers it with a parallel Rust annotator built on interval sets and hash tables; DuckVEP pursues the same question inside the database, where annotation is a relation you can query.
+
 DuckVEP returns typed Sequence Ontology consequences and impact, cDNA/CDS/protein positions and amino acids, NMD predictions, and HGVS. Phased calls also support coding whole-haplotype consequences.
 
 Independent-event consequences and HGVS are compared with executable Ensembl VEP `r sub("^VEP ", "", conf$oracle[[1L]])` and its matching core and variation databases. Discordant and unresolved pairs stay in the counts, deliberate differences are documented, and unavailable results carry a status and reason.
+
+[Install](#install) · [Try it](#try-it) · [Function reference](docs/functions.md) · [Conformance](benchmarks/duckvep_conformance.md) · [Errata](ERRATA.md) · [Design](design/duckvep.md) · [R package](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/)
+
+## Install
+
+DuckVEP is written in C against the stable DuckDB C API v1, which is the default build. That build is qualified on released DuckDB 1.5.x: all 35 SQL test files pass on DuckDB 1.5.6 (source `069cc9f9b5`), and earlier runs cover the DuckDB 1.5.1 CLI and R `duckdb` 1.5.5. A DuckDB community-extensions entry for this build is in preparation; it is not published, so `INSTALL duckvep FROM community` does not work yet. Build from source and load the unsigned extension:
+
+```sh
+git clone --recurse-submodules https://github.com/RGenomicsETL/DuckVEP
+cd DuckVEP
+make configure release test_release
+duckdb -unsigned -c "LOAD 'build/release/duckvep.duckdb_extension'"
+```
+
+The extension links its own htslib (for indexed reference FASTA) and cgranges. `LOAD` registers functions and fetches nothing; transcript models are built from Ensembl data you supply, or restored from snapshot files you saved. From R, [Rduckvep](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/) builds the same sources offline and adds connection, model and haplotype helpers.
+
+A separate [C API v2 host](docs/v2-host.md) is an optional preview, validated against a pinned DuckDB 2.0 development snapshot. It is neither the default build nor the community artifact; changing the default waits for released DuckDB 2.0.0 ([#48](https://github.com/RGenomicsETL/DuckVEP/issues/48)).
+
+DuckHTS releases through 1.5.2 register legacy DuckVEP functions under the same SQL names. Loading one alongside DuckVEP can split model loading and annotation across separate model registries, producing `unknown model name`. Use DuckHTS newer than 1.5.2 with DuckVEP.
 
 ## Try it
 
@@ -133,7 +158,7 @@ knitr::kable(shown, col.names = c("Corpus", "Assembly", "Oracle", "Pairs", "Exac
 
 VEP 116 does not define whole-haplotype consequences. The [`duckvep-coding` contract](design/duckvep_haplotype_contract.md) uses pinned `bcftools csq` where transcript models and phase semantics are comparable. Independent base-R goldens and hand-derived checks cover supported cases outside csq's domain: non-diploid calls, alleles over 50 bases, nonstandard genetic codes, and incomplete CDS starts or ends. Unsupported inputs retain explicit statuses and reasons.
 
-Bounded extensions cover compound literal DNA HGVS with observed-cis evidence, explicit diploid phase alternatives, and equal-length exonic noncoding/UTR replay against the final transcript allele. Typed curated translations expose separate, explicitly conditional reference/alternate peptides; they do not assert preserved biological recoding competence or replace raw compatibility proteins. See the [function reference](docs/functions.md#duckvep_haplotype_arrangements) for inputs and limits.
+Bounded extensions cover compound literal DNA HGVS for non-overlapping edits with observed-cis evidence, explicit diploid phase alternatives, and equal-length exonic noncoding/UTR replay against the final transcript allele. The arrangement relation enumerates admitted unphased calls as labelled hypotheses, separate from strict observed-cis replay. Typed curated translations expose separate, explicitly conditional reference/alternate peptides; they do not assert preserved biological recoding competence or replace raw compatibility proteins. Overlapping edits, general splice and alternative-start biology, and untyped or RNA edits remain unresolved and carry statuses. See the [function reference](docs/functions.md#duckvep_haplotype_arrangements) for inputs and limits.
 
 The pinned full-HG002 qualification for [issue #34](https://github.com/RGenomicsETL/DuckVEP/issues/34) recorded one-core, cold-process medians against the Ensembl 116 model: `r sprintf("%.2f", haplotype$csq_s)` s for csq, `r sprintf("%.2f", haplotype$cli_s)` s for the fused-reader CLI path (`r sprintf("%.2f", haplotype$cli_speedup)`×, including DuckVEP model load), and `r sprintf("%.2f", haplotype$r_s)` s for the R path (`r sprintf("%.2f", haplotype$r_speedup)`×). The [qualification method and receipts](benchmarks/data/haplotype_scale/README.md) identify the input and run contract.
 
@@ -154,8 +179,8 @@ The main cases:
 - **Unknown is a value.** When a result can't be computed, the row carries `duckvep_status` and a reason instead of a guess. Examples are a missing reference sequence, a reference mismatch, or an unsupported symbolic allele.
 - **Outside the claim:**
   - species and releases that haven't been tested;
-  - compound (cis) HGVS presentation, where the errata record the disagreements that remain;
-  - genomic (`g.`) and structural HGVS.
+  - compound HGVS beyond the bounded non-overlapping, observed-cis profile above, where the errata record the disagreements that remain;
+  - genomic and structural HGVS beyond the [exact-span, unshifted structural preparation profile](docs/structural-identity-hgvs.md).
 
   See the [design contract](design/duckvep.md) and the [roadmap](https://github.com/RGenomicsETL/DuckVEP/issues).
 
@@ -210,28 +235,18 @@ LEFT JOIN clinvar_policy_allele_decisions d USING (allele_id)
 WHERE a.impact = 'HIGH';
 ```
 
-## Install and build
-
-```sh
-git clone --recurse-submodules https://github.com/RGenomicsETL/DuckVEP
-cd DuckVEP
-make configure release test_release
-duckdb -unsigned -c "LOAD 'build/release/duckvep.duckdb_extension'"
-```
-
-DuckHTS releases through 1.5.2 register legacy DuckVEP functions under the same SQL names. Loading one alongside DuckVEP can split model loading and annotation across separate model registries, producing `unknown model name`. Use DuckHTS newer than 1.5.2 with DuckVEP.
-
-The extension uses the stable DuckDB C API (tested on DuckDB 1.5 and the 2.0 pre-release) and links its own htslib (for indexed reference FASTA) and cgranges. From R, [Rduckvep](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/) builds the same sources offline and adds connection, model and haplotype helpers.
-
 ## Documentation
 
-- [Function reference](docs/functions.md): every public SQL function, its signature, options, columns and a checked example
-- [Site](https://rgenomicsetl.github.io/DuckVEP/) and [R package reference](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/)
-- [Compatibility and errata](ERRATA.md): every known difference from VEP, classified, with witnesses
-- [Design and implementation contract](design/duckvep.md): model build, the sweep, NMD, phased edits, structural events, HGVS, supplementary annotation
-- [Haplotype contract `duckvep-coding`](design/duckvep_haplotype_contract.md) and its [scale qualification](benchmarks/data/haplotype_scale/README.md)
-- Reports: [conformance](benchmarks/duckvep_conformance.md), [throughput](benchmarks/duckvep_throughput.md), [vep-rs comparison](benchmarks/benchmark_duckvep_vep_rs.md), [haplotypes](benchmarks/duckvep_haplotypes.md), [scale runner](docs/scale-runner.md)
-- [Corpus workflow](design/duckvep_corpus_workflow.md) and [conformance harness](test/duckvep/conformance/README.md)
+- **Reference:** [SQL functions](docs/functions.md), with signatures, options, columns and checked examples; [R package](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/); [host and release profiles](docs/v2-host.md)
+- **Contracts:** [design and implementation](design/duckvep.md) (model build, the sweep, NMD, phased edits, structural events, HGVS, supplementary annotation); [haplotype contract `duckvep-coding`](design/duckvep_haplotype_contract.md); [structural identity and HGVS](docs/structural-identity-hgvs.md); [corpus workflow](design/duckvep_corpus_workflow.md)
+- **Evidence:** [conformance](benchmarks/duckvep_conformance.md) and its [harness](test/duckvep/conformance/README.md); [compatibility and errata](ERRATA.md), every known difference from VEP classified with witnesses; [haplotypes](benchmarks/duckvep_haplotypes.md) and their [scale qualification](benchmarks/data/haplotype_scale/README.md)
+- **Performance:** [throughput](benchmarks/duckvep_throughput.md), [vep-rs comparison](benchmarks/benchmark_duckvep_vep_rs.md), [scale runner](docs/scale-runner.md)
+
+The [project site](https://rgenomicsetl.github.io/DuckVEP/) publishes these pages.
+
+## Origins
+
+The question DuckVEP set out to answer is the one [variant_myth](https://github.com/natir/variant_myth) asks, quoted at the top of this page; thank you to its author for asking it. Correctness here rests on two other projects, executable [Ensembl VEP](https://github.com/Ensembl/ensembl-vep) and, for whole haplotypes, pinned [`bcftools csq`](https://github.com/samtools/bcftools); both make a runnable oracle possible.
 
 DuckVEP was developed within [DuckHTS](https://github.com/RGenomicsETL/duckhts) and extracted with its Git history.
 
