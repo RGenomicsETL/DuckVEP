@@ -137,7 +137,7 @@ typedef struct lift_plan {
 /* Allocate (or, when the arena has no block yet, size) every lifted array. */
 static int lift_layout(lift_arena_t *arena, duckvep_lift_t *lift,
                        const lift_plan_t *plan, int have_mirna, int have_edits,
-                       int have_cdna, int have_phase) {
+                       int have_cdna, int have_phase, int have_full_cdna) {
     size_t t = plan->transcripts;
     size_t e = plan->exons;
     size_t f = plan->features;
@@ -147,56 +147,60 @@ static int lift_layout(lift_arena_t *arena, duckvep_lift_t *lift,
     duckvep_interval_feature_model_t *ft = &lift->interval_features;
     int ok = 1;
 
-#define TAKE(target, cast, count, type) \
+#define TAKE(target, count) \
     do { \
-        void *p_ = lift_take(arena, (count), sizeof(type)); \
+        void *p_ = lift_take(arena, (count), sizeof(*(target))); \
         if (p_ == NULL) ok = 0; \
-        else if (arena->block != NULL) (target) = (cast)p_; \
+        else if (arena->block != NULL) (target) = p_; \
     } while (0)
-    TAKE(tx->chrom_id, const uint16_t *, t, uint16_t);
-    TAKE(tx->start1, const uint32_t *, t, uint32_t);
-    TAKE(tx->end1, const uint32_t *, t, uint32_t);
-    TAKE(tx->strand, const int8_t *, t, int8_t);
-    TAKE(tx->flags, const uint64_t *, t, uint64_t);
-    TAKE(tx->exon_offset, const uint32_t *, t, uint32_t);
-    TAKE(tx->exon_count, const uint16_t *, t, uint16_t);
-    TAKE(tx->cds_start1, const uint32_t *, t, uint32_t);
-    TAKE(tx->cds_end1, const uint32_t *, t, uint32_t);
-    TAKE(ex->start1, const uint32_t *, e, uint32_t);
-    TAKE(ex->end1, const uint32_t *, e, uint32_t);
+    TAKE(tx->chrom_id, t);
+    TAKE(tx->start1, t);
+    TAKE(tx->end1, t);
+    TAKE(tx->strand, t);
+    TAKE(tx->flags, t);
+    TAKE(tx->exon_offset, t);
+    TAKE(tx->exon_count, t);
+    TAKE(tx->cds_start1, t);
+    TAKE(tx->cds_end1, t);
+    TAKE(ex->start1, e);
+    TAKE(ex->end1, e);
     if (have_cdna) {
-        TAKE(ex->cdna_start1, const uint32_t *, e, uint32_t);
-        TAKE(ex->cdna_end1, const uint32_t *, e, uint32_t);
+        TAKE(ex->cdna_start1, e);
+        TAKE(ex->cdna_end1, e);
     }
     if (have_phase) {
-        TAKE(ex->phase, const int8_t *, e, int8_t);
-        TAKE(ex->end_phase, const int8_t *, e, int8_t);
+        TAKE(ex->phase, e);
+        TAKE(ex->end_phase, e);
     }
     if (have_mirna) {
-        TAKE(tx->mature_mirna_offset, const uint32_t *, t + 1u, uint32_t);
-        TAKE(tx->mature_mirna_start1, const uint32_t *, plan->mirna, uint32_t);
-        TAKE(tx->mature_mirna_end1, const uint32_t *, plan->mirna, uint32_t);
+        TAKE(tx->mature_mirna_offset, t + 1u);
+        TAKE(tx->mature_mirna_start1, plan->mirna);
+        TAKE(tx->mature_mirna_end1, plan->mirna);
     }
-    TAKE(sq->cds_offset, const uint64_t *, t, uint64_t);
-    TAKE(sq->cds_length, const uint32_t *, t, uint32_t);
-    TAKE(sq->codon_table, const uint8_t *, t, uint8_t);
-    TAKE(sq->pre_cds_offset, const uint64_t *, t, uint64_t);
-    TAKE(sq->pre_cds_length, const uint32_t *, t, uint32_t);
-    TAKE(sq->post_cds_offset, const uint64_t *, t, uint64_t);
-    TAKE(sq->post_cds_length, const uint32_t *, t, uint32_t);
+    TAKE(sq->cds_offset, t);
+    TAKE(sq->cds_length, t);
+    if (have_full_cdna) {
+        TAKE(sq->cdna_offset, t);
+        TAKE(sq->cdna_length, t);
+    }
+    TAKE(sq->codon_table, t);
+    TAKE(sq->pre_cds_offset, t);
+    TAKE(sq->pre_cds_length, t);
+    TAKE(sq->post_cds_offset, t);
+    TAKE(sq->post_cds_length, t);
     if (have_edits) {
-        TAKE(sq->peptide_edit_offset, const uint32_t *, t + 1u, uint32_t);
-        TAKE(sq->peptide_edit_position1, const uint32_t *, plan->edits, uint32_t);
-        TAKE(sq->peptide_edit_alt, const uint8_t *, plan->edits, uint8_t);
+        TAKE(sq->peptide_edit_offset, t + 1u);
+        TAKE(sq->peptide_edit_position1, plan->edits);
+        TAKE(sq->peptide_edit_alt, plan->edits);
     }
-    TAKE(ft->chrom_id, const uint16_t *, f, uint16_t);
-    TAKE(ft->start1, const uint32_t *, f, uint32_t);
-    TAKE(ft->end1, const uint32_t *, f, uint32_t);
-    TAKE(ft->kind, const uint8_t *, f, uint8_t);
-    TAKE(lift->transcript_source, uint32_t *, t, uint32_t);
-    TAKE(lift->transcript_image, int8_t *, t, int8_t);
-    TAKE(lift->feature_source, uint32_t *, f, uint32_t);
-    TAKE(lift->feature_image, int8_t *, f, int8_t);
+    TAKE(ft->chrom_id, f);
+    TAKE(ft->start1, f);
+    TAKE(ft->end1, f);
+    TAKE(ft->kind, f);
+    TAKE(lift->transcript_source, t);
+    TAKE(lift->transcript_image, t);
+    TAKE(lift->feature_source, f);
+    TAKE(lift->feature_image, f);
 #undef TAKE
     return ok;
 }
@@ -217,6 +221,7 @@ duckvep_status_t duckvep_lift_open(
     size_t region_count, transcript_count, feature_count;
     size_t index, total, feature_total, out_exon, out_mirna, out_edit;
     int lifted_any, have_mirna, have_edits, have_cdna, have_phase;
+    int have_full_cdna;
     const duckvep_lift_t *view;
     uint64_t *bases = NULL;
     duckvep_status_t status = DUCKVEP_ERR_INTERNAL;
@@ -407,6 +412,8 @@ duckvep_status_t duckvep_lift_open(
     have_edits = seq != NULL && seq->peptide_edit_offset != NULL;
     have_cdna = exons->cdna_start1 != NULL;
     have_phase = exons->phase != NULL;
+    have_full_cdna = seq != NULL && seq->cdna_provided != 0 &&
+        seq->cdna_offset != NULL && seq->cdna_length != NULL;
     for (index = 0u; index < total; index++) {
         uint32_t t = plan.entries[index].source;
 
@@ -428,7 +435,7 @@ duckvep_status_t duckvep_lift_open(
 
     memset(&arena, 0, sizeof arena);
     (void)lift_layout(&arena, lift, &plan, have_mirna, have_edits, have_cdna,
-                      have_phase);
+                      have_phase, have_full_cdna);
     arena.capacity = arena.used;
     arena.used = 0u;
     arena.block = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, 1u, arena.capacity != 0u ? arena.capacity : 16u);
@@ -439,7 +446,7 @@ duckvep_status_t duckvep_lift_open(
     }
     lift->storage = arena.block;
     if (!lift_layout(&arena, lift, &plan, have_mirna, have_edits, have_cdna,
-                     have_phase)) {
+                     have_phase, have_full_cdna)) {
         status = lift_fail(error, DUCKVEP_ERR_INTERNAL, DVW_LIFT_OOM,
                            "lifted arena layout failed");
         goto plan_done;
@@ -468,6 +475,8 @@ duckvep_status_t duckvep_lift_open(
         uint32_t *mirna_end = (uint32_t *)lift->transcripts.mature_mirna_end1;
         uint64_t *cds_offset = (uint64_t *)lift->sequences.cds_offset;
         uint32_t *cds_length = (uint32_t *)lift->sequences.cds_length;
+        uint64_t *full_cdna_offset = (uint64_t *)lift->sequences.cdna_offset;
+        uint32_t *full_cdna_length = (uint32_t *)lift->sequences.cdna_length;
         uint8_t *codon_table = (uint8_t *)lift->sequences.codon_table;
         uint64_t *pre_offset = (uint64_t *)lift->sequences.pre_cds_offset;
         uint32_t *pre_length = (uint32_t *)lift->sequences.pre_cds_length;
@@ -545,6 +554,10 @@ duckvep_status_t duckvep_lift_open(
             }
             cds_offset[index] = seq->cds_offset[t];
             cds_length[index] = seq->cds_length[t];
+            if (have_full_cdna) {
+                full_cdna_offset[index] = seq->cdna_offset[t];
+                full_cdna_length[index] = seq->cdna_length[t];
+            }
             codon_table[index] = seq->codon_table[t];
             if (have_flanks) {
                 pre_offset[index] = seq->pre_cds_offset[t];
@@ -592,6 +605,9 @@ duckvep_status_t duckvep_lift_open(
     lift->sequences.transcript_count = total;
     lift->sequences.cds_bytes = seq->cds_bytes;
     lift->sequences.cds_bytes_len = seq->cds_bytes_len;
+    lift->sequences.cdna_bytes = seq->cdna_bytes;
+    lift->sequences.cdna_bytes_len = seq->cdna_bytes_len;
+    lift->sequences.cdna_provided = (uint8_t)have_full_cdna;
     lift->sequences.peptide_edit_count = plan.edits;
     lift->sequences.flank_bytes = seq->flank_bytes;
     lift->sequences.flank_bytes_len = seq->flank_bytes_len;

@@ -46,7 +46,7 @@ def parse_cases():
     (as TEMP tables) before the cases; it is returned by parse_fixtures()."""
     cases, name, lines, kind = [], None, [], None
     for line in CASES.read_text().splitlines():
-        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2|job):", line)
+        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2|job|arrangement-job):", line)
         if marker:
             if kind == "case" and name:
                 cases.append((name, " ".join(lines).strip()))
@@ -60,26 +60,25 @@ def parse_cases():
 
 
 def parse_fixtures(host):
-    """Statements run before the cases: "-- fixture:" on every host, "-- fixture-v1:" and
-    "-- fixture-v2:" on one (the model is loaded differently on each). A "-- job: <name> <model>
-    [key=value ...]" block is a haplotype input: its lines are the calls query, and the item is a dict
-    (see haplotype_job_v1 and V2Host.job_statements)."""
+    """Statements run before cases. A ``-- job`` block stages haplotypes and an
+    ``-- arrangement-job`` block stages strict diploid arrangement input."""
     fixtures, wanted, lines, job = [], False, [], None
 
     def flush():
         if job is not None:
-            fixtures.append({"name": job[0], "model": job[1], "options": job[2], "query": "\n".join(lines).strip()})
+            fixtures.append({"kind": job[0], "name": job[1], "model": job[2], "options": job[3],
+                             "query": "\n".join(lines).strip()})
         elif wanted:
             fixtures.append("\n".join(lines).strip())
 
     for line in CASES.read_text().splitlines():
-        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2|job):(.*)", line)
+        marker = re.match(r"-- (case|fixture|fixture-v1|fixture-v2|job|arrangement-job):(.*)", line)
         if marker:
             flush()
             job = None
-            if marker.group(1) == "job":
+            if marker.group(1) in ("job", "arrangement-job"):
                 fields = marker.group(2).split()
-                job = (fields[0], fields[1], fields[2:])
+                job = (marker.group(1), fields[0], fields[1], fields[2:])
             wanted = marker.group(1) in ("fixture", "fixture-" + host)
             lines = []
         elif (wanted or job is not None) and not line.startswith("--") and line.strip():
@@ -93,9 +92,10 @@ def sql_text(text):
 
 
 def haplotype_job_v1(job):
-    """v1 reads the calls query itself: a table macro over duckvep_haplotypes with the options as named parameters."""
+    """A common fixture macro delegates to each host's native relation."""
     named = "".join(", " + option.replace("=", " := ", 1) for option in job["options"])
-    return (f"CREATE MACRO {job['name']}() AS TABLE SELECT * FROM duckvep_haplotypes("
+    relation = "duckvep_haplotype_arrangements" if job["kind"] == "arrangement-job" else "duckvep_haplotypes"
+    return (f"CREATE MACRO {job['name']}() AS TABLE SELECT * FROM {relation}("
             f"{sql_text(job['query'])}, {sql_text(job['model'])}{named})")
 
 
@@ -151,13 +151,16 @@ class V2Host:
         return f"LOAD '{quote(self.extension)}';\n"
 
     def job_statements(self, job):
-        """The caller-side statements of a job (duckvep_haplotype_load_sql), then a macro over the scan."""
+        """Caller-executed staging followed by the corresponding native relation."""
         if job["name"] not in self.jobs:
-            call = (f"SELECT CAST(to_json(duckvep_haplotype_load_sql({sql_text(job['query'])}, {sql_text(job['model'])}, "
+            arrangement = job["kind"] == "arrangement-job"
+            loader = "duckvep_haplotype_arrangements_load_sql" if arrangement else "duckvep_haplotype_load_sql"
+            scan = "duckvep_haplotype_arrangements" if arrangement else "duckvep_haplotype_scan"
+            call = (f"SELECT CAST(to_json({loader}({sql_text(job['query'])}, {sql_text(job['model'])}, "
                     f"{sql_text(job['name'])}{job_options_struct(job)})) AS VARCHAR)")
             result = self.run(self.load() + call + ";", check=True)
             statements = json.loads(result.stdout.strip())
-            statements.append(f"CREATE MACRO {job['name']}() AS TABLE SELECT * FROM duckvep_haplotype_scan({sql_text(job['name'])})")
+            statements.append(f"CREATE MACRO {job['name']}() AS TABLE SELECT * FROM {scan}({sql_text(job['name'])})")
             self.jobs[job["name"]] = statements
         return self.jobs[job["name"]]
 

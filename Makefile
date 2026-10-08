@@ -86,14 +86,25 @@ PROPERTY_SANITIZE := -fsanitize=address,undefined -fno-sanitize-recover=all -fno
 PROPERTY_FLAGS ?= -std=gnu11 -O1 -g
 PROPERTY_SOURCES := $(wildcard $(PROJ_DIR)test/duckvep/property/*.c) \
 	$(wildcard $(PROJ_DIR)test/duckvep/vendor/theft/src/*.c) $(wildcard $(PROJ_DIR)src/kernel/src/*.c)
-.PHONY: test_runner_contracts test_compound_hgvs_oracle
+.PHONY: test_runner_contracts test_compound_hgvs_oracle test_phase_arrangements_oracle
 test_runner_contracts:
 	shellcheck scripts/check_v2_hg002.sh scripts/check_v2_hg002_selftest.sh benchmarks/benchmark_duckvep_vep_rs.sh benchmarks/benchmark_duckvep_vep_rs_selftest.sh
 	bash scripts/check_v2_hg002_selftest.sh
 	bash benchmarks/benchmark_duckvep_vep_rs_selftest.sh
 
+.PHONY: test_compound_hgvs_runtime test_noncoding_haplotype_runtime test_phase_arrangements_runtime
+test_compound_hgvs_runtime: release
+	Rscript --vanilla test/duckvep/conformance/compound_hgvs_runtime.R $(PROJ_DIR)
+test_noncoding_haplotype_runtime: release
+	Rscript --vanilla test/duckvep/conformance/noncoding_haplotype_runtime.R $(PROJ_DIR)
+test_phase_arrangements_runtime: release
+	Rscript --vanilla test/duckvep/conformance/phase_arrangements_runtime.R $(PROJ_DIR)
+
 test_compound_hgvs_oracle:
 	Rscript test/duckvep/conformance/compound_hgvs_oracle.R
+
+test_phase_arrangements_oracle:
+	Rscript --vanilla test/duckvep/conformance/phase_arrangements_oracle.R $(PROJ_DIR)
 
 # Host-neutral C properties over the kernel views (theft + greatest, no DuckDB),
 # always under ASan and UBSan. DUCKVEP_PROP_TRIALS and DUCKVEP_PROP_SEED make a
@@ -181,6 +192,13 @@ test_v2_asan: check-v2-sdk
 test_v2: release_v2 test-extension-symbols-v2 check-v2-footer
 	python3 test/scripts/check_v2_host.py static
 	python3 test/scripts/run_v2_tests.py
+
+.PHONY: check-v2-release-selftest check-v2-release-preflight
+check-v2-release-selftest:
+	Rscript --vanilla test/scripts/check_v2_release_preflight.R --selftest
+check-v2-release-preflight:
+	@test -n "$(V2_RELEASE_PREFLIGHT_ARGS)" || { echo 'Set V2_RELEASE_PREFLIGHT_ARGS with concrete release inputs; see test/sql_v2/release-readiness.md' >&2; exit 2; }
+	Rscript --vanilla test/scripts/check_v2_release_preflight.R $(V2_RELEASE_PREFLIGHT_ARGS)
 readme: release
 	Rscript scripts/render-readme.R
 

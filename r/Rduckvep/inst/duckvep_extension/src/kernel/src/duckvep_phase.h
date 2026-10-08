@@ -106,4 +106,48 @@ duckvep_phase_status_t duckvep_phase_assign(
     int32_t allele, uint8_t phase_before, duckvep_phase_policy_t policy,
     duckvep_phase_assignment_t *out);
 
+/* Bounded diploid arrangement enumeration for source records that each carry
+ * one biallelic heterozygous call. A row in alt_lanes has one 1-based ALT lane
+ * per input site, in input order; source_id stays attached through that column.
+ * The first independent phase unit is fixed to its observed orientation, so a
+ * whole-pair lane swap is represented once. A phased PS block is one unit and
+ * retains every record's observed 0|1 or 1|0 relation; each unphased site is
+ * its own unit. Calls with a PS but no phasing separator are accepted as
+ * unphased: their PS does not assert a relation. There is no allocation. */
+enum { DUCKVEP_PHASE_ARRANGEMENT_MAX_SITES = 64u };
+
+typedef struct {
+    uint64_t source_id;       /* Unique nonzero source-record identity. */
+    int32_t allele[2];        /* Decoded diploid alleles; only 0/1 is supported. */
+    uint32_t sample_index;    /* Every site in one call must have this value. */
+    int64_t phase_set;        /* Valid only when phase_set_present is nonzero. */
+    uint32_t source_alt_count;
+    uint8_t phase_before[2];  /* Decoded separators: {0, 0} or {0, 1}. */
+    uint8_t phase_set_present;
+} duckvep_phase_arrangement_site_t;
+
+typedef enum {
+    DUCKVEP_PHASE_ARRANGEMENT_OK,
+    DUCKVEP_PHASE_ARRANGEMENT_INVALID_ARG,
+    DUCKVEP_PHASE_ARRANGEMENT_MISSING,
+    DUCKVEP_PHASE_ARRANGEMENT_HOMOZYGOUS,
+    DUCKVEP_PHASE_ARRANGEMENT_MULTIALLELIC,
+    DUCKVEP_PHASE_ARRANGEMENT_MIXED_SAMPLE,
+    DUCKVEP_PHASE_ARRANGEMENT_DUPLICATE_SOURCE_ID,
+    DUCKVEP_PHASE_ARRANGEMENT_CAPACITY,
+    DUCKVEP_PHASE_ARRANGEMENT_EXPLOSION,
+    DUCKVEP_PHASE_ARRANGEMENT_OVERFLOW
+} duckvep_phase_arrangement_status_t;
+
+/* Enumerate every compatible global diploid lane assignment. alternative_limit
+ * is a required policy bound on alternatives, not an output-buffer bound.
+ * out == NULL and out_capacity == 0 is a count query. Otherwise out_capacity
+ * counts uint16_t entries and must hold alternative_count * site_count. On OK
+ * and CAPACITY, required_alternatives reports the exact count; no error or
+ * short buffer writes output. */
+duckvep_phase_arrangement_status_t duckvep_phase_arrange_diploid(
+    const duckvep_phase_arrangement_site_t *sites, size_t site_count,
+    size_t alternative_limit, uint16_t *alt_lanes, size_t out_capacity,
+    size_t *required_alternatives);
+
 #endif

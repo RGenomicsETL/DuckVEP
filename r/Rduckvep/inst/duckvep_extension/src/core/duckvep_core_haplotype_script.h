@@ -28,6 +28,12 @@
 
 #define DUCKVEP_HAPLOTYPE_SCRIPT_MAX 6
 
+/* The strict diploid call normalization consumed by the arrangement engine. Both
+ * hosts execute this same query: v1 on its private query connection and v2 in
+ * the caller connection before staging the normalized rows. */
+int duckvep_core_arrangement_input_sql(const char *query, duckvep_sql_text *out,
+    char *error, size_t error_size);
+
 typedef struct {
     const char *phase_policy;   /* "strict" (default) or "vep_compat" */
     const char *input_mode;     /* "alt_events" (default) or "source_records" */

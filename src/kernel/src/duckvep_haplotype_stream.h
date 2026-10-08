@@ -89,7 +89,9 @@ typedef enum {
     DUCKVEP_PREDICTION_EDIT_CONFLICT,
     DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP,
     DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT,
-    DUCKVEP_PREDICTION_PREDICTED
+    DUCKVEP_PREDICTION_PREDICTED,
+    /* Complete substitution-only CDS interpreted under typed reference recoding. */
+    DUCKVEP_PREDICTION_CONDITIONAL_RECODING
 } duckvep_prediction_status_t;
 
 typedef enum {
@@ -110,6 +112,9 @@ typedef enum {
     DUCKVEP_REASON_TRANSCRIPT_NOT_CODING,
     DUCKVEP_REASON_NON_STANDARD_CODON_TABLE,
     DUCKVEP_REASON_CURATED_TRANSCRIPT,
+    DUCKVEP_REASON_UNTYPED_CURATED_METADATA,
+    DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT,
+    DUCKVEP_REASON_ASSUMED_RECODING_PROGRAMME,
     DUCKVEP_REASON_INCOMPLETE_CDS,
     DUCKVEP_REASON_NONCANONICAL_START,
     DUCKVEP_REASON_NONCANONICAL_STOP,
@@ -197,6 +202,7 @@ typedef struct {
     uint16_t ploidy;
     duckvep_haplotype_phase_set_t phase_set;
     duckvep_phase_policy_t policy;
+    uint8_t hypothetical;
 } duckvep_haplotype_call_t;
 
 typedef struct {
@@ -214,7 +220,14 @@ typedef struct {
     duckvep_haplotype_block_t *blocks; /* At most edit_capacity interaction blocks. */
     size_t leaf_capacity, edit_capacity;
     uint8_t *cds, *protein, *reference_protein, *reference_coding_protein;
-    size_t cds_capacity, protein_capacity, reference_protein_capacity;
+    uint8_t *prediction_protein;
+    size_t cds_capacity, protein_capacity, reference_protein_capacity,
+        prediction_protein_capacity;
+    /* Optional caller-owned scratch for complete transcript-flank predictions.
+     * The stream borrows it only while producing one leaf; it never aliases or
+     * changes the raw CDS/protein output buffers. */
+    uint8_t *noncoding;
+    size_t noncoding_capacity;
 } duckvep_haplotype_stream_buffers_t;
 
 typedef struct {
@@ -239,6 +252,9 @@ typedef struct {
     duckvep_translation_t reference_coding_translation;
     duckvep_translation_t translation; /* Full raw translation remains in buffers.protein. */
     size_t cds_length, protein_length;
+    const uint8_t *prediction_reference_protein;
+    const uint8_t *prediction_protein;
+    size_t prediction_reference_protein_length, prediction_protein_length;
     /* Sum of replayed ALT lengths minus nominal REF spans, before clipping or
      * equality checks. Valid when cds is present, including conditional replay. */
     int64_t nominal_length_diff;
@@ -388,6 +404,11 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
 
 duckvep_haplotype_stream_status_t duckvep_haplotype_stream_finish(
     duckvep_haplotype_stream_t *stream);
+
+/* Materialize the cached reference CDS and translation without a source event. */
+duckvep_haplotype_stream_status_t duckvep_haplotype_stream_reference(
+    duckvep_haplotype_stream_t *stream, uint32_t transcript_index,
+    duckvep_haplotype_leaf_t *leaf);
 
 /* Each occupied edit prefix is rebuilt/translated once. DONE releases the
  * completed transcript; retry begin/finish to accept input or close the next.

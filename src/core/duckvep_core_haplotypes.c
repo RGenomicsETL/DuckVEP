@@ -19,18 +19,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The last existing column stays last: nominal_length_diff is documented and tested as the
- * final field, so slice-2 columns are inserted before it. */
+/* nominal_length_diff is the documented final result field. */
 enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
-    HAPLOTYPE_HGVSP_COLUMN = 15, HAPLOTYPE_HGVSP_STATUS_COLUMN = 16,
-    HAPLOTYPE_POLICY_COLUMN = 17, HAPLOTYPE_STATUS_COLUMN = 18, HAPLOTYPE_REASON_COLUMN = 19,
-    HAPLOTYPE_PROVENANCE_COLUMN = 20, HAPLOTYPE_EDITS_COLUMN = 21,
-    HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 22, HAPLOTYPE_CONSEQUENCES_COLUMN = 23,
-    HAPLOTYPE_IMPACT_COLUMN = 24,
-    HAPLOTYPE_NMD_RULE_COLUMN = 25, HAPLOTYPE_NMD_COLUMN = 26, HAPLOTYPE_NMD_STOP_COLUMN = 27,
-    HAPLOTYPE_NMD_JUNCTION_COLUMN = 28, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN = 29,
-    HAPLOTYPE_NMD_EXCEPTIONS_COLUMN = 30,
-    HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 31, HAPLOTYPE_OUTPUT_COLUMNS = 32 };
+    HAPLOTYPE_HGVSC_COLUMN = 15, HAPLOTYPE_HGVSC_STATUS_COLUMN = 16,
+    HAPLOTYPE_HGVSP_COLUMN = 17, HAPLOTYPE_HGVSP_STATUS_COLUMN = 18,
+    HAPLOTYPE_POLICY_COLUMN = 19, HAPLOTYPE_STATUS_COLUMN = 20, HAPLOTYPE_REASON_COLUMN = 21,
+    HAPLOTYPE_PROVENANCE_COLUMN = 22, HAPLOTYPE_EDITS_COLUMN = 23,
+    HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 24, HAPLOTYPE_CONSEQUENCES_COLUMN = 25,
+    HAPLOTYPE_IMPACT_COLUMN = 26,
+    HAPLOTYPE_NMD_RULE_COLUMN = 27, HAPLOTYPE_NMD_COLUMN = 28, HAPLOTYPE_NMD_STOP_COLUMN = 29,
+    HAPLOTYPE_NMD_JUNCTION_COLUMN = 30, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN = 31,
+    HAPLOTYPE_NMD_EXCEPTIONS_COLUMN = 32,
+    HAPLOTYPE_PREDICTION_REFERENCE_PROTEIN_COLUMN = 33,
+    HAPLOTYPE_PREDICTION_PROTEIN_COLUMN = 34,
+    HAPLOTYPE_NOMINAL_LENGTH_COLUMN = 35, HAPLOTYPE_OUTPUT_COLUMNS = DUCKVEP_HAP_OUTPUT_COLUMNS };
 enum { HAPLOTYPE_PROVENANCE_FIELDS = 10, HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 10 };
 #define HAPLOTYPE_POLICY_VERSION "duckvep-coding"
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10 };
@@ -93,10 +95,11 @@ int duckvep_hap_config_check(const duckvep_hap_config_t *config, char *error, si
 static const char *const column_names[HAPLOTYPE_OUTPUT_COLUMNS] = {"transcript_index", "cds", "protein",
     "sequence_flags", "evidence_flags", "projection_status", "sequence_status", "edit_count", "carrier_count",
     "carriers", "contributors", "coding_blocks", "cds_differences", "protein_differences",
-    "stop_in_displaced_frame", "hgvsp", "hgvsp_status", "prediction_policy", "prediction_status",
+    "stop_in_displaced_frame", "hgvsc", "hgvsc_status", "hgvsp", "hgvsp_status", "prediction_policy", "prediction_status",
     "prediction_reason", "contributor_provenance", "normalized_edits", "carrier_predictions",
     "haplotype_consequences", "haplotype_impact", "nmd_rule", "nmd_prediction", "nmd_stop_position",
-    "nmd_junction_position", "nmd_contributors", "nmd_exceptions", "nominal_length_diff"};
+    "nmd_junction_position", "nmd_contributors", "nmd_exceptions", "prediction_reference_protein",
+    "prediction_protein", "nominal_length_diff"};
 static const char *const column_types[HAPLOTYPE_OUTPUT_COLUMNS] = {"UINTEGER", "VARCHAR", "VARCHAR",
     "UINTEGER", "UTINYINT", "VARCHAR", "VARCHAR", "UBIGINT", "UINTEGER",
     HAP_CARRIER, NULL,
@@ -104,7 +107,7 @@ static const char *const column_types[HAPLOTYPE_OUTPUT_COLUMNS] = {"UINTEGER", "
     "sequence_flags UINTEGER, coding_status VARCHAR, local_consequence_mask UBIGINT, after_first_stop BOOLEAN, "
     "event_indices UBIGINT[])[]",
     HAP_DIFFERENCE, HAP_DIFFERENCE,
-    "BOOLEAN", "VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR",
+    "BOOLEAN", "VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR",
     "STRUCT(event_index UBIGINT, alt_index UINTEGER, seq_region UINTEGER, position UBIGINT, reference VARCHAR, "
     "alternate VARCHAR, evidence_flags UTINYINT, projection_status VARCHAR, role VARCHAR, edit_count UINTEGER)[]",
     "STRUCT(edit_index UBIGINT, event_index UBIGINT, block_index UBIGINT, cds_start UINTEGER, reference VARCHAR, "
@@ -112,7 +115,8 @@ static const char *const column_types[HAPLOTYPE_OUTPUT_COLUMNS] = {"UINTEGER", "
     "STRUCT(sample_index UINTEGER, phase_set BIGINT, haplotype_lane USMALLINT, prediction_status VARCHAR, "
     "prediction_reason VARCHAR, haplotype_impact VARCHAR, haplotype_consequences VARCHAR[], nmd_prediction VARCHAR, "
     "nmd_stop_position UBIGINT, nmd_junction_position UBIGINT)[]",
-    "VARCHAR[]", "VARCHAR", "VARCHAR", "VARCHAR", "UBIGINT", "UBIGINT", "UBIGINT[]", "VARCHAR", "BIGINT"};
+    "VARCHAR[]", "VARCHAR", "VARCHAR", "VARCHAR", "UBIGINT", "UBIGINT", "UBIGINT[]", "VARCHAR",
+    "VARCHAR", "VARCHAR", "BIGINT"};
 
 const char *duckvep_hap_column_name(unsigned index) {
     return index < HAPLOTYPE_OUTPUT_COLUMNS ? column_names[index] : NULL;
@@ -148,6 +152,9 @@ struct duckvep_hap_state {
     uint8_t *hgvs_shifted_allele;
     size_t hgvs_shifted_capacity;
     char *hgvsp;
+    char *hgvsc;
+    duckvep_hgvs_dna_fact_t *hgvsc_facts;
+    uint8_t *hgvsc_alleles;
     size_t workspace_bytes;
 };
 
@@ -163,11 +170,13 @@ void duckvep_hap_close(duckvep_hap_state_t *s) {
     duckvep_budget_free(b->carriers.call_index); duckvep_budget_free(b->carriers.prefix_index);
     duckvep_budget_free(b->events); duckvep_budget_free(b->projections); duckvep_budget_free(b->alleles); duckvep_budget_free(b->leaf_events);
     duckvep_budget_free(b->contributors); duckvep_budget_free(b->edits); duckvep_budget_free(b->blocks); duckvep_budget_free(b->cds); duckvep_budget_free(b->protein);
+    duckvep_budget_free(b->noncoding);
     duckvep_budget_free(b->edit_event_ids);
     duckvep_budget_free(s->difference_scratch.scores); duckvep_budget_free(s->difference_scratch.trace); duckvep_budget_free(s->differences);
     duckvep_budget_free(s->difference_reference); duckvep_budget_free(b->reference_protein);
-    duckvep_budget_free(b->reference_coding_protein);
-    duckvep_budget_free(s->protein_operations); duckvep_budget_free(s->hgvsp);
+    duckvep_budget_free(b->reference_coding_protein); duckvep_budget_free(b->prediction_protein);
+    duckvep_budget_free(s->protein_operations); duckvep_budget_free(s->hgvsp); duckvep_budget_free(s->hgvsc);
+    duckvep_budget_free(s->hgvsc_facts); duckvep_budget_free(s->hgvsc_alleles);
     duckvep_reference_reader_close(&s->reference);
     duckvep_budget_free(s->reference.bases);
     duckvep_budget_free(s->hgvs_scratch.edits); duckvep_budget_free(s->hgvs_scratch.alt_cds);
@@ -182,7 +191,7 @@ static uint32_t bucket_count(uint32_t capacity) {
     return n;
 }
 
-static int workspace_allocate(duckvep_hap_state_t *s, const duckvep_hap_config_t *bind) {
+static int workspace_prepare(duckvep_hap_state_t *s, const duckvep_hap_config_t *bind, int allocate) {
     const size_t *n = bind->limits;
     duckvep_haplotype_stream_buffers_t *b = &s->buffers;
     b->carriers.transcript_capacity = (uint32_t)n[DUCKVEP_HAP_LIMIT_TRANSCRIPTS];
@@ -194,13 +203,18 @@ static int workspace_allocate(duckvep_hap_state_t *s, const duckvep_hap_config_t
     b->event_capacity = (uint32_t)n[DUCKVEP_HAP_LIMIT_EVENTS]; b->projection_capacity = (uint32_t)n[DUCKVEP_HAP_LIMIT_PROJECTIONS];
     b->allele_capacity = n[DUCKVEP_HAP_LIMIT_ALLELES]; b->leaf_capacity = n[DUCKVEP_HAP_LIMIT_LEAF_EVENTS];
     b->edit_capacity = n[DUCKVEP_HAP_LIMIT_LEAF_EDITS];
-    if (n[DUCKVEP_HAP_LIMIT_SEQUENCE] == SIZE_MAX || (bind->hgvs && n[DUCKVEP_HAP_LIMIT_HGVS_BYTES] == SIZE_MAX)) return 0;
+    if (n[DUCKVEP_HAP_LIMIT_SEQUENCE] == SIZE_MAX ||
+        (bind->hgvs && (n[DUCKVEP_HAP_LIMIT_HGVS_BYTES] == SIZE_MAX ||
+                         n[DUCKVEP_HAP_LIMIT_ALLELES] > SIZE_MAX -
+                             n[DUCKVEP_HAP_LIMIT_SEQUENCE]))) return 0;
     b->cds_capacity = n[DUCKVEP_HAP_LIMIT_SEQUENCE];
     b->protein_capacity = n[DUCKVEP_HAP_LIMIT_SEQUENCE] + 1u;
     if (b->protein_capacity > SIZE_MAX / 2u) return 0;
     s->difference_scratch.score_capacity = b->protein_capacity * 2u;
+    b->noncoding_capacity = n[DUCKVEP_HAP_LIMIT_SEQUENCE] * 2u;
     s->difference_scratch.trace_capacity = n[DUCKVEP_HAP_LIMIT_ALIGNMENT];
     b->reference_protein_capacity = n[DUCKVEP_HAP_LIMIT_SEQUENCE] / 3u + 2u;
+    b->prediction_protein_capacity = b->reference_protein_capacity;
     if (bind->hgvs) {
         s->reference.capacity = bind->model->reference_fasta_path ? n[DUCKVEP_HAP_LIMIT_HGVS_REFERENCE] : 0u;
         /* Alternating differing/retained bases maximize one uint16-length MNV's islands. */
@@ -224,15 +238,19 @@ static int workspace_allocate(duckvep_hap_state_t *s, const duckvep_hap_config_t
     X(b->alleles, b->allele_capacity) X(b->leaf_events, b->leaf_capacity) \
     X(b->contributors, b->leaf_capacity) X(b->edits, b->edit_capacity) \
     X(b->blocks, b->edit_capacity) X(b->edit_event_ids, b->edit_capacity) \
-    X(b->cds, b->cds_capacity) X(b->protein, b->protein_capacity) \
+    X(b->cds, b->cds_capacity) X(b->protein, b->protein_capacity) X(b->noncoding, b->noncoding_capacity) \
     X(s->difference_scratch.scores, s->difference_scratch.score_capacity) \
     X(s->difference_scratch.trace, s->difference_scratch.trace_capacity) \
     X(s->differences, n[DUCKVEP_HAP_LIMIT_DIFFERENCES]) \
     X(s->difference_reference, n[DUCKVEP_HAP_LIMIT_SEQUENCE]) \
     X(b->reference_protein, b->reference_protein_capacity) \
     X(b->reference_coding_protein, b->reference_protein_capacity) \
+    X(b->prediction_protein, b->prediction_protein_capacity) \
     X(s->protein_operations, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_HGVS_OPERATIONS] : 0u) \
     X(s->hgvsp, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_HGVS_BYTES] + 1u : 0u) \
+    X(s->hgvsc, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_HGVS_BYTES] + 1u : 0u) \
+    X(s->hgvsc_facts, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_LEAF_EDITS] : 0u) \
+    X(s->hgvsc_alleles, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_ALLELES] + n[DUCKVEP_HAP_LIMIT_SEQUENCE] : 0u) \
     X(s->reference.bases, s->reference.capacity) \
     X(s->hgvs_scratch.edits, s->hgvs_scratch.edits_cap) \
     X(s->hgvs_scratch.alt_cds, s->hgvs_scratch.alt_cds_cap) \
@@ -247,10 +265,11 @@ static int workspace_allocate(duckvep_hap_state_t *s, const duckvep_hap_config_t
     s->workspace_bytes += (count) * sizeof(*(p));
     s->workspace_bytes = sizeof(*s);
     if (s->workspace_bytes > n[DUCKVEP_HAP_LIMIT_WORKSPACE]) return 0;
-    ARRAYS(COUNT)
+    ARRAYS(COUNT);
 #undef COUNT
+    if (!allocate) return 1;
 #define ALLOCATE(p, count) if ((count) && !((p) = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, (count) * sizeof(*(p))))) return 0;
-    ARRAYS(ALLOCATE)
+    ARRAYS(ALLOCATE);
 #undef ALLOCATE
 #undef ARRAYS
     return 1;
@@ -500,11 +519,99 @@ static int append_single_event_hgvsp(duckvep_h_vector text, duckvep_h_vector sta
     return 1;
 }
 
+static int hgvsc_has_proven_cis(const duckvep_haplotype_leaf_t *leaf) {
+    size_t left;
+    size_t right;
+
+    if (leaf == NULL || leaf->contributor_count < 2u ||
+        leaf->sequence_status != DUCKVEP_HAPLOTYPE_OK) return 0;
+    for (left = 0u; left < leaf->contributor_count; left++) {
+        const duckvep_haplotype_contributor_t *contributor = &leaf->contributors[left];
+        uint8_t evidence = contributor->evidence_flags;
+        if (contributor->projection_status != DUCKVEP_CDS_EDIT_OK ||
+            (evidence & DUCKVEP_CARRIER_CALLED) == 0u ||
+            (evidence & (DUCKVEP_CARRIER_MISSING | DUCKVEP_CARRIER_UNPHASED |
+                         DUCKVEP_CARRIER_CONDITIONAL | DUCKVEP_CARRIER_REFERENCE_REPLAY)) != 0u) {
+            return 0;
+        }
+        for (right = 0u; right < left; right++) {
+            if (leaf->contributors[right].source.event_id == contributor->source.event_id &&
+                leaf->contributors[right].source.allele_index == contributor->source.allele_index) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+static int append_hgvsc(duckvep_h_vector text, duckvep_h_vector status_vector, size_t row,
+    duckvep_hap_state_t *s, const duckvep_hap_config_t *bind, const duckvep_haplotype_leaf_t *leaf,
+    char *error, size_t error_size) {
+    const char *status;
+    duckvep_hgvs_status_t hgvs_status;
+    size_t fact_count = 0u;
+    size_t required = 0u;
+    int8_t strand;
+
+    null_cell(text, row);
+    status = !bind->hgvs ? "not_requested" :
+        leaf->sequence_status != DUCKVEP_HAPLOTYPE_OK ? "incomplete_input" :
+        !leaf->reference_cds ? "missing_reference_cds" :
+        (bind->model->transcripts.flags && bind->model->transcripts.cds_phase_offset &&
+         (bind->model->transcripts.flags[leaf->carriers.transcript_index] &
+          (uint64_t)DUCKVEP_TX_CDS_START_NF) != 0u &&
+         bind->model->transcripts.cds_phase_offset[leaf->carriers.transcript_index] != 0u)
+            ? "unsupported_padded_cds_start" :
+        leaf->edit_count < 2u ? "not_compound" :
+        leaf->contributor_count < 2u ? "single_source_replay" :
+        bind->policy != DUCKVEP_PHASE_STRICT || !hgvsc_has_proven_cis(leaf) ? "unproven_cis" : NULL;
+    if (!status && leaf->edit_count > bind->limits[DUCKVEP_HAP_LIMIT_HGVS_OPERATIONS]) {
+        snprintf(error, error_size, "duckvep_haplotypes: max_hgvs_operations=%zu exhausted for HGVSc",
+            bind->limits[DUCKVEP_HAP_LIMIT_HGVS_OPERATIONS]);
+        return 0;
+    }
+    if (!status) {
+        strand = bind->model->transcripts.strand[leaf->carriers.transcript_index];
+        hgvs_status = duckvep_hgvs_dna_haplotype_fact_build(
+            leaf->reference_cds, leaf->cds_length, strand, s->buffers.edits,
+            leaf->edit_count, s->hgvsc_facts,
+            bind->limits[DUCKVEP_HAP_LIMIT_LEAF_EDITS], s->hgvsc_alleles,
+            bind->limits[DUCKVEP_HAP_LIMIT_ALLELES] +
+                bind->limits[DUCKVEP_HAP_LIMIT_SEQUENCE], &fact_count);
+        if (hgvs_status == DUCKVEP_HGVS_OK) {
+            hgvs_status = duckvep_hgvs_dna_haplotype_render(
+                s->hgvsc_facts, fact_count, s->hgvsc,
+                bind->limits[DUCKVEP_HAP_LIMIT_HGVS_BYTES] + 1u, &required);
+        }
+        if (hgvs_status == DUCKVEP_HGVS_OK) {
+            duckvep_h_set_valid(text, row);
+            duckvep_h_assign_string(text, row, s->hgvsc, required);
+            status = "ok";
+        } else if (hgvs_status == DUCKVEP_HGVS_REFERENCE_MISMATCH) {
+            status = "reference_mismatch";
+        } else if (hgvs_status == DUCKVEP_HGVS_BUFFER_TOO_SMALL) {
+            snprintf(error, error_size, "duckvep_haplotypes: max_hgvs_bytes=%zu exhausted for HGVSc",
+                bind->limits[DUCKVEP_HAP_LIMIT_HGVS_BYTES]);
+            return 0;
+        } else if (hgvs_status == DUCKVEP_HGVS_INVALID_PROJECTION) {
+            status = "invalid_projection";
+        } else if (hgvs_status == DUCKVEP_HGVS_INVALID_ALLELE) {
+            status = "invalid_allele";
+        } else {
+            status = "unsupported_operation";
+        }
+    }
+    assign_text(status_vector, row, status);
+    return 1;
+}
+
 static int append_hgvsp(duckvep_h_vector text, duckvep_h_vector status_vector, size_t row,
     duckvep_hap_state_t *s, const duckvep_hap_config_t *bind, const duckvep_haplotype_leaf_t *leaf,
     const duckvep_coding_context_t *coding, char *error, size_t error_size) {
     null_cell(text, row);
     const char *name = !bind->hgvs ? "not_requested" :
+        leaf->path_status == DUCKVEP_PREDICTION_CONDITIONAL_RECODING
+            ? "conditional_assumed_recoding" :
         !leaf->cds || !leaf->protein ? "unavailable_sequence" :
         leaf->sequence_status != DUCKVEP_HAPLOTYPE_OK ? "incomplete_input" :
         !leaf->reference_protein || !leaf->reference_protein_length ? "missing_reference_protein" :
@@ -569,6 +676,7 @@ static const char *status_name(duckvep_prediction_status_t status) {
     switch (status) {
     case DUCKVEP_PREDICTION_ELIGIBLE: return "eligible_classifier_pending";
     case DUCKVEP_PREDICTION_PREDICTED: return "predicted";
+    case DUCKVEP_PREDICTION_CONDITIONAL_RECODING: return "conditional_assumed_recoding";
     case DUCKVEP_PREDICTION_INCOMPLETE_INPUT: return "incomplete_input";
     case DUCKVEP_PREDICTION_EDIT_CONFLICT: return "edit_conflict";
     case DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP: return "unsupported_overlap";
@@ -594,6 +702,9 @@ static const char *reason_name(duckvep_prediction_reason_t reason, duckvep_cds_e
     case DUCKVEP_REASON_TRANSCRIPT_NOT_CODING: return "transcript_not_coding";
     case DUCKVEP_REASON_NON_STANDARD_CODON_TABLE: return "non_standard_codon_table";
     case DUCKVEP_REASON_CURATED_TRANSCRIPT: return "curated_transcript";
+    case DUCKVEP_REASON_UNTYPED_CURATED_METADATA: return "untyped_curated_metadata";
+    case DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT: return "unsupported_curated_edit";
+    case DUCKVEP_REASON_ASSUMED_RECODING_PROGRAMME: return "assumed_recoding_programme";
     case DUCKVEP_REASON_INCOMPLETE_CDS: return "incomplete_cds";
     case DUCKVEP_REASON_NONCANONICAL_START: return "noncanonical_start";
     case DUCKVEP_REASON_NONCANONICAL_STOP: return "noncanonical_stop";
@@ -855,6 +966,15 @@ static int append_leaf(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *
     if (leaf->protein) duckvep_h_assign_string(v[2], row, (const char *)leaf->protein, leaf->protein_length);
     else null_cell(v[2], row);
     ((uint32_t *)duckvep_h_data(v[3]))[row] = leaf->flags;
+    if (leaf->prediction_reference_protein)
+        duckvep_h_assign_string(v[HAPLOTYPE_PREDICTION_REFERENCE_PROTEIN_COLUMN], row,
+            (const char *)leaf->prediction_reference_protein,
+            leaf->prediction_reference_protein_length);
+    else null_cell(v[HAPLOTYPE_PREDICTION_REFERENCE_PROTEIN_COLUMN], row);
+    if (leaf->prediction_protein)
+        duckvep_h_assign_string(v[HAPLOTYPE_PREDICTION_PROTEIN_COLUMN], row,
+            (const char *)leaf->prediction_protein, leaf->prediction_protein_length);
+    else null_cell(v[HAPLOTYPE_PREDICTION_PROTEIN_COLUMN], row);
     if (leaf->cds)
         ((int64_t *)duckvep_h_data(v[HAPLOTYPE_NOMINAL_LENGTH_COLUMN]))[row] =
             leaf->nominal_length_diff;
@@ -961,6 +1081,8 @@ static int append_leaf(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *
     if (!append_prediction(output, row, s, bind, leaf)) return 0;
     return append_sequence_differences(v[12], row, s, bind, leaf, 0, error, error_size) &&
         append_sequence_differences(v[13], row, s, bind, leaf, 1, error, error_size) &&
+        append_hgvsc(v[HAPLOTYPE_HGVSC_COLUMN], v[HAPLOTYPE_HGVSC_STATUS_COLUMN], row,
+            s, bind, leaf, error, error_size) &&
         append_hgvsp(v[HAPLOTYPE_HGVSP_COLUMN], v[HAPLOTYPE_HGVSP_STATUS_COLUMN], row,
             s, bind, leaf, &coding, error, error_size);
 }
@@ -1007,6 +1129,25 @@ static duckvep_haplotype_stream_status_t consume_call(duckvep_hap_state_t *s, ch
         status = duckvep_haplotype_stream_project(&s->stream, tx);
         if (status != DUCKVEP_HAPLOTYPE_STREAM_OK) return status;
     }
+    if (r->replay) {
+        const duckvep_hap_replay_context_t *replay = r->replay;
+        if (bind->source_records || replay->kind != DUCKVEP_HAP_REPLAY_HYPOTHETICAL_ALT ||
+            !r->allele_index || r->allele_index > INT32_MAX) {
+            duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: invalid hypothetical replay context");
+            return DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG;
+        }
+        s->gt[0] = (int32_t)r->allele_index;
+        s->phase[0] = 0u;
+        s->sets[0].present = 1u;
+        s->sets[0].value = (int64_t)replay->partition;
+        duckvep_haplotype_call_t call = {s->gt, s->phase, replay->partition, r->allele_index,
+            1u, {replay->partition, 1u}, bind->policy, 1u};
+        status = duckvep_haplotype_stream_push_call(&s->stream, tx, &call, s->sets, 1u);
+        if (status == DUCKVEP_HAPLOTYPE_STREAM_OK) {
+            s->have_call = 1; s->last_tx = tx; s->have_row = 0;
+        }
+        return status;
+    }
     if (bind->source_records) {
         duckvep_raw_gt_status_t parsed = (duckvep_raw_gt_status_t)r->raw[0];
         duckvep_raw_gt_t call = {{r->raw[1], r->raw[2]}, r->raw[3], (uint16_t)r->raw[4],
@@ -1047,7 +1188,7 @@ static duckvep_haplotype_stream_status_t consume_call(duckvep_hap_state_t *s, ch
         s->sets[i].value = s->sets[i].present ? r->sets[r->sets_offset + i] : 0;
     }
     duckvep_haplotype_call_t call = {s->gt, s->phase, r->sample, r->allele_index,
-        (uint16_t)gt_length, {0, 0u}, bind->policy};
+        (uint16_t)gt_length, {0, 0u}, bind->policy, 0u};
     call.phase_set.present = r->phase_set_present;
     if (call.phase_set.present) call.phase_set.value = r->phase_set;
     status = duckvep_haplotype_stream_push_call(&s->stream, tx, &call, s->sets, r->sets_length);
@@ -1062,13 +1203,45 @@ size_t duckvep_hap_workspace_bytes(const duckvep_hap_state_t *state) {
     return state->workspace_bytes;
 }
 
+int duckvep_hap_workspace_estimate(const duckvep_hap_config_t *config, size_t *bytes) {
+    duckvep_hap_state_t state = {0};
+    if (!config || !bytes || !workspace_prepare(&state, config, 0)) return 0;
+    *bytes = state.workspace_bytes;
+    return 1;
+}
+
+int duckvep_hap_reference(duckvep_hap_state_t *s, uint32_t transcript,
+    duckvep_hap_prediction_t *prediction, char *error, size_t error_size) {
+    duckvep_haplotype_leaf_t leaf;
+    duckvep_haplotype_stream_status_t status;
+    if (error_size) error[0] = '\0';
+    if (!s || !prediction) {
+        duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: invalid reference replay");
+        return 0;
+    }
+    status = duckvep_haplotype_stream_reference(&s->stream, transcript, &leaf);
+    if (status != DUCKVEP_HAPLOTYPE_STREAM_OK) {
+        snprintf(error, error_size, "duckvep_haplotypes: reference replay failed with native status %u", (unsigned)status);
+        return 0;
+    }
+    memset(prediction, 0, sizeof(*prediction));
+    prediction->transcript = transcript;
+    prediction->cds = leaf.cds; prediction->cds_length = leaf.cds_length;
+    prediction->protein = leaf.protein; prediction->protein_length = leaf.protein_length;
+    prediction->nominal_length_diff = 0;
+    prediction->prediction_status = leaf.prediction_status;
+    prediction->prediction_reason = leaf.prediction_reason;
+    prediction->consequence_mask = leaf.haplotype_so_mask;
+    return 1;
+}
+
 duckvep_hap_state_t *duckvep_hap_open(const duckvep_hap_config_t *config, char *error, size_t error_size) {
     duckvep_hap_state_t *s = duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, 1u, sizeof(*s));
     duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: workspace allocation or configured limit exceeded");
     duckvep_budget_clear_failure();
     if (!s) return NULL;
     s->bind = *config;
-    if (!workspace_allocate(s, &s->bind)) goto failed;
+    if (!workspace_prepare(s, &s->bind, 1)) goto failed;
     const duckvep_owned_model_t *m = s->bind.model;
     if (s->bind.hgvs && !duckvep_reference_reader_init(&s->reference, m,
             s->reference.bases, s->reference.capacity, error, error_size)) goto failed;
@@ -1131,4 +1304,75 @@ int duckvep_hap_scan(duckvep_hap_state_t *s, const duckvep_hap_input_t *input, v
     }
     *rows_out = rows;
     return 1;
+}
+
+static int hap_reset(duckvep_hap_state_t *s, char *error, size_t error_size) {
+    const duckvep_owned_model_t *m = s->bind.model;
+    s->have_row = 0;
+    s->eof = 0;
+    s->have_call = 0;
+    s->last_tx = 0u;
+    memset(&s->row, 0, sizeof(s->row));
+    if (duckvep_haplotype_stream_init(&s->stream, &m->transcripts, &m->exons, &m->sequences,
+            &s->buffers) != DUCKVEP_HAPLOTYPE_STREAM_OK) {
+        duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: invalid native model/workspace");
+        return 0;
+    }
+    return 1;
+}
+
+int duckvep_hap_replay(duckvep_hap_state_t *s, const duckvep_hap_input_t *input,
+    duckvep_hap_prediction_sink_t sink, void *sink_context, char *error, size_t error_size) {
+    const duckvep_hap_config_t *bind = &s->bind;
+    error[0] = '\0';
+    if (!sink) {
+        duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: replay requires a prediction sink");
+        return 0;
+    }
+    if (!hap_reset(s, error, error_size)) return 0;
+    for (;;) {
+        duckvep_haplotype_stream_status_t status;
+        if (s->stream.closing) {
+            duckvep_haplotype_leaf_t leaf;
+            status = duckvep_haplotype_stream_next(&s->stream, &leaf);
+            if (status == DUCKVEP_HAPLOTYPE_STREAM_DONE) continue;
+            if (status == DUCKVEP_HAPLOTYPE_STREAM_OK) {
+                duckvep_hap_prediction_t prediction = {leaf.carriers.transcript_index, leaf.cds, leaf.protein,
+                    leaf.cds_length, leaf.protein_length, leaf.nominal_length_diff,
+                    leaf.prediction_status, leaf.prediction_reason, leaf.haplotype_so_mask,
+                    (uint8_t)((leaf.evidence_flags & DUCKVEP_CARRIER_HYPOTHETICAL) != 0u)};
+                if (!sink(sink_context, &prediction, error, error_size)) {
+                    if (!error[0]) duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: prediction sink failed");
+                    return 0;
+                }
+                continue;
+            }
+        } else {
+            if (!s->eof && !s->have_row) {
+                int fetched = input->next(input->context, &s->row, error, error_size);
+                if (fetched < 0) {
+                    if (!error[0]) duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: could not read the input");
+                    return 0;
+                }
+                if (fetched == 0) s->eof = 1; else s->have_row = 1;
+            }
+            status = s->eof ? duckvep_haplotype_stream_finish(&s->stream) : consume_call(s, error, error_size);
+            if (status == DUCKVEP_HAPLOTYPE_STREAM_DONE) return 1;
+            if (status == DUCKVEP_HAPLOTYPE_STREAM_OK || status == DUCKVEP_HAPLOTYPE_STREAM_TRANSCRIPT_READY) continue;
+        }
+        if (!error[0]) {
+            uint64_t event = s->stream.last_event_id, position = s->stream.last_pos1;
+            if (!s->eof && s->have_row) { event = s->row.event_id; position = s->row.pos; }
+            int limit = exhausted_limit(status, s->stream.carrier_error);
+            if (limit >= 0) snprintf(error, error_size,
+                "duckvep_haplotypes: %s=%zu exhausted at event %llu, position %llu",
+                duckvep_hap_limit_names[limit], bind->limits[limit], (unsigned long long)event,
+                (unsigned long long)position);
+            else snprintf(error, error_size,
+                "duckvep_haplotypes: native status %u, carrier status %u at event %llu, position %llu; invalid input or candidate",
+                (unsigned)status, (unsigned)s->stream.carrier_error, (unsigned long long)event,
+                (unsigned long long)position);
+        }
+        return 0;
+    }
 }

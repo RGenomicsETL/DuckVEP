@@ -342,11 +342,11 @@ SELECT count(*),count(hgvsp) FROM duckvep_haplotypes('SELECT * FROM hap_anchor_c
 4	0
 
 statement ok
-CREATE TEMP TABLE hap_anchor_without_hgvs AS SELECT * EXCLUDE(hgvsp,hgvsp_status)
+CREATE TEMP TABLE hap_anchor_without_hgvs AS SELECT * EXCLUDE(hgvsc,hgvsc_status,hgvsp,hgvsp_status)
  FROM duckvep_haplotypes('SELECT * FROM hap_anchor_calls','hap_anchor');
 
 statement ok
-CREATE TEMP TABLE hap_anchor_with_hgvs AS SELECT * EXCLUDE(hgvsp,hgvsp_status)
+CREATE TEMP TABLE hap_anchor_with_hgvs AS SELECT * EXCLUDE(hgvsc,hgvsc_status,hgvsp,hgvsp_status)
  FROM duckvep_haplotypes('SELECT * FROM hap_anchor_calls','hap_anchor',
  hgvs:=true,max_hgvs_reference_bytes:=57);
 
@@ -1098,12 +1098,12 @@ p.(Met1Leu)	ok	0	0
 # HGVS consumes a prepared protein operand without changing CDS, local SO,
 # carriers, physical blocks or contributing source identities.
 statement ok
-CREATE TEMP TABLE hap_protein_without_hgvs AS SELECT * EXCLUDE(hgvsp,hgvsp_status)
+CREATE TEMP TABLE hap_protein_without_hgvs AS SELECT * EXCLUDE(hgvsc,hgvsc_status,hgvsp,hgvsp_status)
  FROM duckvep_haplotypes('SELECT * FROM hap_protein_calls','hap_proteins');
 
 query I
 SELECT count(*) FROM (
- SELECT * EXCLUDE(hgvsp,hgvsp_status) FROM duckvep_haplotypes(
+ SELECT * EXCLUDE(hgvsc,hgvsc_status,hgvsp,hgvsp_status) FROM duckvep_haplotypes(
   'SELECT * FROM hap_protein_calls','hap_proteins',hgvs:=true)
  EXCEPT ALL
  SELECT * FROM hap_protein_without_hgvs);
@@ -2117,6 +2117,87 @@ FROM duckvep_haplotypes('SELECT event_index,0 seq_region,position,reference,alte
  v(event_index,position,reference,alternate)','hap_stops');
 ----
 ATGGAATAAACC	ME*	8	2	[1, 2]
+
+query TTT
+SELECT hgvsc,hgvsc_status,cds FROM duckvep_haplotypes(
+ 'SELECT event_index,0 seq_region,position,reference,alternate,1 alt_index,
+  0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+  FROM (VALUES (1,103,''A'',''G''),(2,109,''C'',''A''))
+  v(event_index,position,reference,alternate)','hap_stops',hgvs:=true);
+----
+c.[4A>G;10C>A]	ok	ATGGAATAAACC
+
+# Two cis substitutions in one codon use one HGVS DNA delins span, including
+# its unchanged middle base (HGVS DNA delins recommendation).
+query TTT
+SELECT hgvsc,hgvsc_status,cds FROM duckvep_haplotypes(
+ 'SELECT event_index,0 seq_region,position,reference,alternate,1 alt_index,
+  0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+  FROM (VALUES (1,103,''A'',''G''),(2,105,''A'',''C''))
+  v(event_index,position,reference,alternate)','hap_stops',hgvs:=true);
+----
+c.4_6delinsGAC	ok	ATGGACTAACCC
+
+query I
+SELECT loaded FROM duckvep_model_load('hap_joint_hgvs','SELECT 0::UINTEGER seq_region',
+ 'SELECT * REPLACE(''ATGGCTGAATAA''::BLOB AS cds_sequence) FROM hap_tx',
+ 'SELECT * FROM hap_exons');
+----
+1
+
+# Adjacent nucleotide changes remain one delins across a codon boundary.
+query TTT
+SELECT hgvsc,hgvsc_status,cds FROM duckvep_haplotypes(
+ 'SELECT event_index,0 seq_region,position,reference,alternate,1 alt_index,
+  0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+  FROM (VALUES (1,105,''T'',''C''),(2,106,''G'',''A''))
+  v(event_index,position,reference,alternate)','hap_joint_hgvs',hgvs:=true);
+----
+c.6_7delinsCA	ok	ATGGCCAAATAA
+
+# An unchanged nucleotide between different affected codons keeps the DNA changes separate.
+query TTT
+SELECT hgvsc,hgvsc_status,cds FROM duckvep_haplotypes(
+ 'SELECT event_index,0 seq_region,position,reference,alternate,1 alt_index,
+  0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+  FROM (VALUES (1,104,''C'',''T''),(2,106,''G'',''A''))
+  v(event_index,position,reference,alternate)','hap_joint_hgvs',hgvs:=true);
+----
+c.[5C>T;7G>A]	ok	ATGGTTAAATAA
+
+query TTT
+SELECT hgvsc,hgvsc_status,cds FROM duckvep_haplotypes(
+ 'SELECT event_index,0 seq_region,position,reference,alternate,1 alt_index,
+  0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,NULL::BIGINT phase_set
+  FROM (VALUES (1,103,''G'',''A''),(2,105,''T'',''C''),(3,106,''G'',''A''))
+  v(event_index,position,reference,alternate)','hap_joint_hgvs',hgvs:=true);
+----
+c.4_7delinsACCA	ok	ATGACCAAATAA
+
+query I
+SELECT duckvep_model_drop('hap_joint_hgvs');
+----
+1
+
+# A conditional compatibility replay does not assert a multi-source cis allele.
+query TT
+SELECT hgvsc,hgvsc_status FROM duckvep_haplotypes(
+ 'SELECT event_index,0 seq_region,position,reference,[alternate] alternates,
+  0 transcript_index,0 sample_index,''1/1'' gt
+  FROM (VALUES (1,103,''A'',''G''),(2,109,''C'',''A''))
+  v(event_index,position,reference,alternate)','hap_stops',input_mode:='source_records',
+ phase_policy:='vep_compat',hgvs:=true);
+----
+NULL	unproven_cis
+
+# One physical MNV source remains a singleton replay, not a compound allele.
+query TT
+SELECT hgvsc,hgvsc_status FROM duckvep_haplotypes(
+ 'SELECT 1 event_index,0 seq_region,103 AS position,''AAATAAC'' reference,''GAATAAA'' alternate,
+  1 alt_index,0 transcript_index,0 sample_index,[1] alleles,[true] phase_before,
+  NULL::BIGINT phase_set','hap_stops',hgvs:=true);
+----
+NULL	single_source_replay
 
 query TIT rowsort
 SELECT b.coding_status,b.after_first_stop,t.consequence FROM (

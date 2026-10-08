@@ -2451,3 +2451,205 @@ SELECT count(*) AS n, bool_and(duckvep_worker_limits_set(1 + i % 6, 1000, 1000, 
 
 -- case: reset high water
 SELECT duckvep_native_budget_reset_high_water() AS r
+
+-- fixture: final allele UTR transcripts
+CREATE TABLE nc_tx AS SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,
+  100::UBIGINT transcript_start,119::UBIGINT transcript_end,s::TINYINT strand,
+  i::UINTEGER gene_index,3::UBIGINT transcript_flags,c::UBIGINT cds_start,
+  (c+8)::UBIGINT cds_end,'ATGAAATAA'::BLOB cds_sequence,1::UTINYINT codon_table,
+  'AAAAAA'::BLOB pre_cds_sequence,'CCCCC'::BLOB post_cds_sequence
+FROM (VALUES (0,1,106),(1,-1,105)) t(i,s,c)
+
+-- fixture: final allele UTR exons
+CREATE TABLE nc_exons AS SELECT i::UINTEGER transcript_index,100::UBIGINT exon_start,
+  119::UBIGINT exon_end,1::UBIGINT exon_cdna_start,20::UBIGINT exon_cdna_end,
+  0::TINYINT phase,0::TINYINT end_phase FROM range(2) t(i)
+
+-- fixture-v1: final allele UTR model
+SELECT loaded FROM duckvep_model_load('nc','SELECT i::UINTEGER seq_region FROM range(2) t(i)',
+  'SELECT * FROM nc_tx ORDER BY transcript_index','SELECT * FROM nc_exons ORDER BY transcript_index')
+
+-- fixture-v2: final allele UTR stage regions
+COPY (SELECT i::UINTEGER seq_region FROM range(2) t(i)) TO 'duckvep_stage'
+  (FORMAT duckvep_stage, MODEL 'nc', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: final allele UTR stage transcripts
+COPY (SELECT * FROM nc_tx ORDER BY transcript_index) TO 'duckvep_stage'
+  (FORMAT duckvep_stage, MODEL 'nc', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: final allele UTR stage exons
+COPY (SELECT * FROM nc_exons ORDER BY transcript_index) TO 'duckvep_stage'
+  (FORMAT duckvep_stage, MODEL 'nc', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: final allele UTR publish
+SELECT duckvep_model_publish('nc')
+
+-- fixture: final allele UTR calls
+CREATE TABLE nc_calls AS SELECT feature,i::UINTEGER transcript_index,i::UINTEGER seq_region,
+  e::UBIGINT event_index,p::UBIGINT AS position,r::VARCHAR reference,a::VARCHAR alternate,
+  1::UINTEGER alt_index,0::UINTEGER sample_index,[1,1]::INTEGER[] alleles,
+  [false,true]::BOOLEAN[] phase_before,12::BIGINT phase_set
+FROM (VALUES ('utr5',0,1,101,'A','C'),('utr5',0,2,103,'A','C'),
+  ('utr3',0,1,116,'C','T'),('utr3',0,2,118,'C','T'),
+  ('utr5',1,1,118,'T','G'),('utr5',1,2,116,'T','G'),
+  ('utr3',1,1,103,'G','A'),('utr3',1,2,101,'G','A')) t(feature,i,e,p,r,a)
+
+-- job: hap_nc_5plus nc
+SELECT * EXCLUDE(feature) FROM nc_calls WHERE feature='utr5' AND transcript_index=0 ORDER BY position
+
+-- job: hap_nc_3plus nc
+SELECT * EXCLUDE(feature) FROM nc_calls WHERE feature='utr3' AND transcript_index=0 ORDER BY position
+
+-- job: hap_nc_5minus nc
+SELECT * EXCLUDE(feature) FROM nc_calls WHERE feature='utr5' AND transcript_index=1 ORDER BY position
+
+-- job: hap_nc_3minus nc
+SELECT * EXCLUDE(feature) FROM nc_calls WHERE feature='utr3' AND transcript_index=1 ORDER BY position
+
+-- job: hap_nc_capacity nc max_sequence_bases=19
+SELECT * EXCLUDE(feature) FROM nc_calls WHERE feature='utr5' AND transcript_index=0 ORDER BY position
+
+-- job: hap_nc_mixed nc
+SELECT * EXCLUDE(feature) REPLACE(CASE WHEN event_index=2 THEN 116 ELSE position END AS position,
+  CASE WHEN event_index=2 THEN 'C' ELSE reference END AS reference,
+  CASE WHEN event_index=2 THEN 'T' ELSE alternate END AS alternate)
+FROM nc_calls WHERE feature='utr5' AND transcript_index=0 ORDER BY position
+
+-- case: final allele UTR 5 plus
+SELECT * FROM hap_nc_5plus()
+
+-- case: final allele UTR 3 plus
+SELECT * FROM hap_nc_3plus()
+
+-- case: final allele UTR 5 minus
+SELECT * FROM hap_nc_5minus()
+
+-- case: final allele UTR 3 minus
+SELECT * FROM hap_nc_3minus()
+
+-- case: final allele UTR capacity
+SELECT * FROM hap_nc_capacity()
+
+-- case: final allele UTR mixed feature
+SELECT * FROM hap_nc_mixed()
+
+-- fixture: prediction programme regions
+CREATE TABLE programme_regions AS SELECT 0::UINTEGER seq_region,31::UBIGINT sequence_length,'programme'::VARCHAR seq_region_name
+
+-- fixture: prediction programme transcripts
+CREATE TABLE programme_transcripts AS SELECT * FROM (VALUES
+  (0::UINTEGER,0::UINTEGER,1::UBIGINT,12::UBIGINT,1::TINYINT,0::UINTEGER,3::UBIGINT,1::UBIGINT,12::UBIGINT,'ATGTGAGCTTAA'::BLOB,1::UTINYINT,''::BLOB,''::BLOB,'ATGTGAGCTTAA'::BLOB),
+  (1::UINTEGER,0::UINTEGER,20::UBIGINT,31::UBIGINT,1::TINYINT,1::UINTEGER,0::UBIGINT,NULL::UBIGINT,NULL::UBIGINT,NULL::BLOB,NULL::UTINYINT,NULL::BLOB,NULL::BLOB,'AAAACCCCGGGG'::BLOB)
+) t(transcript_index,seq_region,transcript_start,transcript_end,strand,gene_index,transcript_flags,cds_start,cds_end,cds_sequence,codon_table,pre_cds_sequence,post_cds_sequence,cdna_sequence)
+
+-- fixture: prediction programme exons
+CREATE TABLE programme_exons AS SELECT * FROM (VALUES
+  (0::UINTEGER,1::UBIGINT,12::UBIGINT,1::UBIGINT,12::UBIGINT,0::TINYINT,0::TINYINT),
+  (1::UINTEGER,20::UBIGINT,31::UBIGINT,1::UBIGINT,12::UBIGINT,-1::TINYINT,-1::TINYINT)
+) t(transcript_index,exon_start,exon_end,exon_cdna_start,exon_cdna_end,phase,end_phase)
+
+-- fixture: prediction programme typed peptide edits
+CREATE TABLE programme_peptides AS SELECT 0::UINTEGER transcript_index,2::UINTEGER protein_position,'U'::VARCHAR alternate_amino_acid,'_selenocysteine'::VARCHAR edit_code
+
+-- fixture-v1: prediction programme model
+SELECT loaded FROM duckvep_model_load('programme','SELECT * FROM programme_regions','SELECT * FROM programme_transcripts ORDER BY transcript_index','SELECT * FROM programme_exons ORDER BY transcript_index',peptide_edit_query:='SELECT * FROM programme_peptides')
+
+-- fixture-v2: prediction programme regions
+COPY (SELECT * FROM programme_regions) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'programme',RELATION 'regions',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: prediction programme transcripts
+COPY (SELECT * FROM programme_transcripts ORDER BY transcript_index) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'programme',RELATION 'transcripts',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: prediction programme exons
+COPY (SELECT * FROM programme_exons ORDER BY transcript_index) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'programme',RELATION 'exons',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: prediction programme peptide edits
+COPY (SELECT * FROM programme_peptides) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'programme',RELATION 'peptide_edits',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: prediction programme publish
+SELECT duckvep_model_publish('programme')
+
+-- fixture-v1: RNA-edited typed programme model
+SELECT loaded FROM duckvep_model_load('programme_rna','SELECT * FROM programme_regions','SELECT * REPLACE(CASE WHEN transcript_index=0 THEN 323::UBIGINT ELSE transcript_flags END AS transcript_flags) FROM programme_transcripts ORDER BY transcript_index','SELECT * FROM programme_exons ORDER BY transcript_index',peptide_edit_query:='SELECT * FROM programme_peptides')
+
+-- fixture-v2: RNA-edited typed programme regions
+COPY (SELECT * FROM programme_regions) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'programme_rna',RELATION 'regions',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: RNA-edited typed programme transcripts
+COPY (SELECT * REPLACE(CASE WHEN transcript_index=0 THEN 323::UBIGINT ELSE transcript_flags END AS transcript_flags) FROM programme_transcripts ORDER BY transcript_index) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'programme_rna',RELATION 'transcripts',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: RNA-edited typed programme exons
+COPY (SELECT * FROM programme_exons ORDER BY transcript_index) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'programme_rna',RELATION 'exons',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: RNA-edited typed programme edits
+COPY (SELECT * FROM programme_peptides) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'programme_rna',RELATION 'peptide_edits',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: RNA-edited typed programme publish
+SELECT duckvep_model_publish('programme_rna')
+
+-- fixture: prediction programme calls
+CREATE TABLE programme_calls AS SELECT kind,e::UBIGINT event_index,0::UINTEGER seq_region,p::UBIGINT AS position,r::VARCHAR reference,a::VARCHAR alternate,1::UINTEGER alt_index,t::UINTEGER transcript_index,7::UINTEGER sample_index,[1,1]::INTEGER[] alleles,[false,true]::BOOLEAN[] phase_before,12::BIGINT phase_set
+FROM (VALUES ('curated',1,8,'C','T',0),('codon',1,4,'T','A',0),('noncoding',1,22,'A','T',1),('noncoding',2,24,'C','A',1)) v(kind,e,p,r,a,t)
+
+-- fixture: unphased arrangement calls
+CREATE TABLE programme_unphased AS SELECT * FROM (VALUES
+  (1::UBIGINT,0::UINTEGER,4::UBIGINT,'T','A',1::UINTEGER,0::UINTEGER,7::UINTEGER,[0,1]::INTEGER[],NULL::BOOLEAN[],NULL::BIGINT),
+  (2::UBIGINT,0::UINTEGER,8::UBIGINT,'C','T',1::UINTEGER,0::UINTEGER,7::UINTEGER,[0,1]::INTEGER[],NULL::BOOLEAN[],NULL::BIGINT)
+) v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index,alleles,phase_before,phase_set)
+
+-- job: hap_programme_curated programme
+SELECT * EXCLUDE(kind) FROM programme_calls WHERE kind='curated'
+
+-- job: hap_programme_rna programme_rna
+SELECT * EXCLUDE(kind) FROM programme_calls WHERE kind='curated'
+
+-- job: hap_programme_codon programme
+SELECT * EXCLUDE(kind) FROM programme_calls WHERE kind='codon'
+
+-- job: hap_programme_noncoding programme
+SELECT * EXCLUDE(kind) FROM programme_calls WHERE kind='noncoding' ORDER BY position
+
+-- job: hap_programme_noncoding_capacity programme max_sequence_bases=5
+SELECT * EXCLUDE(kind) FROM programme_calls WHERE kind='noncoding' ORDER BY position
+
+-- arrangement-job: arrangement_unphased programme
+SELECT * FROM programme_unphased
+
+-- arrangement-job: arrangement_observed programme
+SELECT * REPLACE([false,true]::BOOLEAN[] AS phase_before,12::BIGINT AS phase_set) FROM programme_unphased
+
+-- arrangement-job: arrangement_capacity programme max_arrangements=1 max_replays=4
+SELECT * FROM programme_unphased
+
+-- arrangement-job: arrangement_homozygous programme
+SELECT * REPLACE([1,1]::INTEGER[] AS alleles) FROM programme_unphased
+
+-- case: conditional curated peptide pairs
+SELECT * FROM hap_programme_curated()
+
+-- case: RNA-edited typed programme refuses prediction
+SELECT count(*)=1 AND bool_and(prediction_status='unsupported_context' AND prediction_reason='unsupported_curated_edit' AND prediction_reference_protein IS NULL AND prediction_protein IS NULL AND protein='M*') AS refused FROM hap_programme_rna()
+
+-- case: changed annotated codon uses genetic code
+SELECT * FROM hap_programme_codon()
+
+-- case: full noncoding final RNA prediction
+SELECT * FROM hap_programme_noncoding()
+
+-- case: full noncoding capacity refusal
+SELECT * FROM hap_programme_noncoding_capacity()
+
+-- case: unphased public arrangement replay
+SELECT * FROM arrangement_unphased()
+
+-- case: observed phase block constrains arrangements
+SELECT * FROM arrangement_observed()
+
+-- case: arrangement capacity refusal error
+SELECT * FROM arrangement_capacity()
+
+-- case: arrangement homozygous input refusal error
+SELECT * FROM arrangement_homozygous()
+
+-- case: arrangement replay after refusals
+SELECT * FROM arrangement_unphased()

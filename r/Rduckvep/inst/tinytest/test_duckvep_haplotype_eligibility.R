@@ -53,13 +53,15 @@ local({
     "g.phase_before,g.phase_set FROM elig_events e JOIN elig_gt g USING(event_index)"))
 
   result <- rduckvep_haplotypes(con, "SELECT * FROM elig_calls", "elig")
-  # Existing columns keep their names and order; nominal_length_diff stays last.
-  expect_identical(tail(names(result), 1L), "nominal_length_diff")
-  expect_identical(names(result)[18:29], c("prediction_policy", "prediction_status",
+  # The public relation keeps raw and conditional prediction operands separate.
+  expect_identical(ncol(result), 36L)
+  expect_identical(names(result)[16:19], c("hgvsc", "hgvsc_status", "hgvsp", "hgvsp_status"))
+  expect_identical(names(result)[20:31], c("prediction_policy", "prediction_status",
     "prediction_reason", "contributor_provenance", "normalized_edits", "carrier_predictions",
     "haplotype_consequences", "haplotype_impact", "nmd_rule", "nmd_prediction", "nmd_stop_position",
     "nmd_junction_position"))
-  expect_identical(names(result)[30:32], c("nmd_contributors", "nmd_exceptions", "nominal_length_diff"))
+  expect_identical(names(result)[32:36], c("nmd_contributors", "nmd_exceptions",
+    "prediction_reference_protein", "prediction_protein", "nominal_length_diff"))
   expect_true(all(result$prediction_policy == "duckvep-coding"))
 
   keyed <- do.call(rbind, lapply(result$carrier_predictions, function(x) x))
@@ -79,7 +81,7 @@ local({
       "supported_domain", "missing_call", "supported_domain",
       "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "overlapping_edits",
       "contradictory_edits", "outside_cds", "supported_domain", "supported_domain",
-      "noncanonical_start", "internal_stop", "noncanonical_stop", "curated_transcript",
+      "noncanonical_start", "internal_stop", "noncanonical_stop", "untyped_curated_metadata",
       "supported_domain", "supported_domain", "supported_domain", "supported_domain",
       "supported_domain"),
     stringsAsFactors = FALSE)

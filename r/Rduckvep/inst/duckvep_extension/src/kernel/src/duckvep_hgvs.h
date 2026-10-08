@@ -365,6 +365,36 @@ DUCKVEP_INTERNAL_API duckvep_hgvs_status_t duckvep_hgvs_dna_render_basic(
     size_t                          capacity,
     size_t                         *required_out);
 
+/* Build and render a compound coding-DNA suffix from the haplotype stream's
+ * descending CDS replay order or the stream's final ascending interaction order.
+ * Only non-overlapping single-base substitutions with literal reference assertions
+ * are admitted. Substitutions in one CDS codon are one replacement fact: its
+ * reference borrows `reference_cds` and its alternate borrows caller-owned
+ * `allele_scratch`; other facts borrow one alternate byte there. The result is
+ * ascending transcript coordinates and retains every accepted edit. Insufficient
+ * fact or scratch capacity leaves both output buffers untouched. It does not infer
+ * cis support from sequence facts. */
+DUCKVEP_INTERNAL_API duckvep_hgvs_status_t
+ duckvep_hgvs_dna_haplotype_fact_build(
+    const uint8_t                 *reference_cds,
+    size_t                         reference_cds_length,
+    int8_t                         transcript_strand,
+    const duckvep_haplotype_edit_t *edits_descending,
+    size_t                         edit_count,
+    duckvep_hgvs_dna_fact_t       *facts,
+    size_t                         facts_capacity,
+    uint8_t                        *allele_scratch,
+    size_t                         allele_scratch_capacity,
+    size_t                         *fact_count_out);
+
+DUCKVEP_INTERNAL_API duckvep_hgvs_status_t
+ duckvep_hgvs_dna_haplotype_render(
+    const duckvep_hgvs_dna_fact_t *facts,
+    size_t                         fact_count,
+    char                           *buffer,
+    size_t                         capacity,
+    size_t                         *required_out);
+
 /* Build an independent-event HGVSp fact from the same coding context and
  * predicate facts used by consequence classification. No SO term is used as
  * an input. Materialized multi-edit contexts are accepted; virtual and materialized single-edit

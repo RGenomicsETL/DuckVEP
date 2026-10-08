@@ -4,6 +4,7 @@
  */
 #include "duckvep_haplotype.h"
 #include "duckvep_dna.h"
+#include "duckvep_kernel.h"
 
 #include <limits.h>
 #include <string.h>
@@ -219,6 +220,112 @@ duckvep_haplotype_status_t duckvep_haplotype_compose_replacements(
                                                      : DUCKVEP_HAPLOTYPE_FLAG_RESOLVED_FRAMESHIFT;
     *component_count = groups;
     *result = (duckvep_haplotype_result_t){final_length, nominal_difference, flags, changed_count};
+    return DUCKVEP_HAPLOTYPE_OK;
+}
+
+static int
+haplo_peptide_alt_valid(uint8_t amino_acid)
+{
+    return amino_acid == (uint8_t)'*' ||
+        (amino_acid >= (uint8_t)'A' && amino_acid <= (uint8_t)'Z');
+}
+
+static int
+haplo_reference_is_tga(const uint8_t *codon)
+{
+    return haplo_norm_cds_base(codon[0]) == 'T' &&
+        haplo_norm_cds_base(codon[1]) == 'G' &&
+        haplo_norm_cds_base(codon[2]) == 'A';
+}
+
+duckvep_haplotype_status_t
+duckvep_haplotype_conditional_peptide(const uint8_t *reference_cds,
+    const uint8_t *alternate_cds, size_t cds_length,
+    duckvep_codon_table_t table, const uint32_t *edit_positions1,
+    const uint8_t *edit_alternates, const uint8_t *edit_codes,
+    size_t edit_count, int complete_start, uint8_t *peptide,
+    size_t capacity, size_t *length, size_t *first_stop_position1)
+{
+    duckvep_translation_t translation;
+    size_t required, i, first_stop;
+
+    if (length != NULL)
+        *length = 0u;
+    if (first_stop_position1 != NULL)
+        *first_stop_position1 = 0u;
+    if (reference_cds == NULL || alternate_cds == NULL || peptide == NULL ||
+        length == NULL || first_stop_position1 == NULL ||
+        (edit_count != 0u && (edit_positions1 == NULL || edit_alternates == NULL ||
+        edit_codes == NULL)) || !duckvep_codon_table_supported(table) ||
+        (complete_start != 0 && complete_start != 1) ||
+        haplo_overlaps_output(reference_cds, cds_length, peptide, capacity) ||
+        haplo_overlaps_output(alternate_cds, cds_length, peptide, capacity))
+        return DUCKVEP_HAPLOTYPE_INVALID_ARG;
+    if (cds_length == 0u || cds_length % 3u != 0u)
+        return DUCKVEP_HAPLOTYPE_INPUT_INCOMPLETE;
+    required = cds_length / 3u + 1u;
+    if (capacity < required)
+        return DUCKVEP_HAPLOTYPE_BUFFER_TOO_SMALL;
+    for (i = 0u; i < edit_count; i++) {
+        uint32_t position = edit_positions1[i];
+        size_t offset;
+        uint8_t codon_peptide[2];
+        duckvep_translation_t codon_translation;
+
+        if (position == 0u || position > cds_length / 3u ||
+            (i != 0u && position <= edit_positions1[i - 1u]) ||
+            !haplo_peptide_alt_valid(edit_alternates[i]))
+            return DUCKVEP_HAPLOTYPE_INVALID_ARG;
+        offset = ((size_t)position - 1u) * 3u;
+        if (duckvep_translate_cds(reference_cds + offset, 3u, table,
+            codon_peptide, sizeof(codon_peptide), &codon_translation) !=
+            DUCKVEP_TRANSLATION_OK)
+            return DUCKVEP_HAPLOTYPE_INVALID_BASE;
+        switch (edit_codes[i]) {
+        case DUCKVEP_PEPTIDE_EDIT_SELENOCYSTEINE:
+            if (!haplo_reference_is_tga(reference_cds + offset) ||
+                edit_alternates[i] != (uint8_t)'U')
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+            break;
+        case DUCKVEP_PEPTIDE_EDIT_STOP_CODON_RT:
+            if (codon_peptide[0] != (uint8_t)'*' ||
+                edit_alternates[i] == (uint8_t)'*')
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+            break;
+        case DUCKVEP_PEPTIDE_EDIT_INITIAL_MET:
+            if (!complete_start || position != 1u ||
+                edit_alternates[i] != (uint8_t)'M')
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+            break;
+        case DUCKVEP_PEPTIDE_EDIT_AMINO_ACID_SUB:
+            if (position == 1u && edit_alternates[i] == (uint8_t)'M' &&
+                !duckvep_codon_is_start(reference_cds, table))
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+            break;
+        case DUCKVEP_PEPTIDE_EDIT_UNTYPED:
+        case DUCKVEP_PEPTIDE_EDIT_RNA_EDIT:
+        default:
+            return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+        }
+    }
+    if (duckvep_translate_cds(alternate_cds, cds_length, table, peptide,
+        capacity, &translation) != DUCKVEP_TRANSLATION_OK)
+        return DUCKVEP_HAPLOTYPE_INVALID_BASE;
+    for (i = 0u; i < edit_count; i++) {
+        size_t offset = ((size_t)edit_positions1[i] - 1u) * 3u;
+
+        if (memcmp(reference_cds + offset, alternate_cds + offset, 3u) == 0)
+            peptide[edit_positions1[i] - 1u] = edit_alternates[i];
+    }
+    first_stop = 0u;
+    for (i = 0u; i < translation.length; i++) {
+        if (peptide[i] == (uint8_t)'*') {
+            first_stop = i + 1u;
+            break;
+        }
+    }
+    *first_stop_position1 = first_stop;
+    *length = first_stop == 0u ? translation.length : first_stop;
     return DUCKVEP_HAPLOTYPE_OK;
 }
 

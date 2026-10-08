@@ -17,28 +17,32 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef DUCKVEP_SNAPSHOT_MMAP
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #define DUCKVEP_SNAPSHOT_MMAP 1
 #else
 #define DUCKVEP_SNAPSHOT_MMAP 0
 #endif
+#endif
+#if DUCKVEP_SNAPSHOT_MMAP
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 #define SNAP_MAGIC "DVEPSNAP"
-#define SNAP_VERSION UINT64_C(1)
+#define SNAP_VERSION UINT64_C(2)
 #define SNAP_ENDIAN UINT64_C(0x0102030405060708)
 #define SNAP_ALIGN ((uint64_t)64)
-#define SNAP_ARRAYS 38u
+#define SNAP_ARRAYS 42u
 #define SNAP_NAMES SNAP_ARRAYS
 #define SNAP_REFERENCE (SNAP_ARRAYS + 1u)
 #define SNAP_SECTIONS (SNAP_ARRAYS + 2u)
 
-enum { SNAP_REGIONS, SNAP_TRANSCRIPTS, SNAP_EXONS, SNAP_MIRNA, SNAP_PEPTIDE, SNAP_CDS, SNAP_FLANK,
-       SNAP_FEATURES, SNAP_COUNTS };
-enum { SNAP_FLAG_COVERAGE = 1u, SNAP_FLAG_FLANKS = 2u };
+enum { SNAP_REGIONS, SNAP_TRANSCRIPTS, SNAP_EXONS, SNAP_MIRNA, SNAP_PEPTIDE, SNAP_CDS, SNAP_CDNA,
+       SNAP_FLANK, SNAP_FEATURES, SNAP_COUNTS };
+enum { SNAP_FLAG_COVERAGE = 1u, SNAP_FLAG_FLANKS = 2u, SNAP_FLAG_CDNA = 4u };
 
 /* Every field is a uint64_t, so the layout has no padding. */
 typedef struct {
@@ -56,6 +60,26 @@ typedef struct {
 	uint64_t offset[SNAP_SECTIONS];
 	uint64_t bytes[SNAP_SECTIONS];
 } snap_header_t;
+
+#define SNAP_V1_ARRAYS 38u
+#define SNAP_V1_SECTIONS (SNAP_V1_ARRAYS + 2u)
+/* Published v1 wire layout: no cDNA count, cDNA arrays or typed peptide codes. */
+typedef struct {
+	char magic[8];
+	uint64_t version, endian, header_bytes, file_bytes, checksum, fingerprint;
+	uint64_t counts[8];
+	uint64_t flags, present;
+	uint64_t width[SNAP_V1_SECTIONS];
+	uint64_t offset[SNAP_V1_SECTIONS];
+	uint64_t bytes[SNAP_V1_SECTIONS];
+} snap_v1_header_t;
+
+/* Wire array ordinal -> current model array ordinal. */
+static const unsigned char snap_v1_slots[SNAP_V1_ARRAYS] = {
+	0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+	17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+	35, 37, 38, 39, 40, 41
+};
 
 typedef struct {
 	void **slot;
@@ -77,13 +101,16 @@ snap_arrays(duckvep_owned_model_t *m, const uint64_t counts[SNAP_COUNTS], snap_a
 	A(seq_regions, t); A(transcript_starts, t); A(transcript_ends, t); A(strands, t);
 	A(transcript_flags, t); A(gene_indices, t); A(exon_offsets, t); A(exon_counts, t);
 	A(cds_starts, t); A(cds_ends, t); A(cds_sequence_offsets, t); A(cds_sequence_lengths, t);
+	A(cdna_sequence_offsets, t); A(cdna_sequence_lengths, t);
 	A(codon_tables, t); A(pre_cds_sequence_offsets, t); A(pre_cds_sequence_lengths, t);
 	A(post_cds_sequence_offsets, t); A(post_cds_sequence_lengths, t);
 	A(exon_starts, e); A(exon_ends, e); A(exon_cdna_starts, e); A(exon_cdna_ends, e);
 	A(exon_phases, e); A(exon_end_phases, e);
 	A(mature_mirna_offsets, t + 1u); A(mature_mirna_starts, mi); A(mature_mirna_ends, mi);
 	A(peptide_edit_offsets, t + 1u); A(peptide_edit_positions, p); A(peptide_edit_alts, p);
-	A(cds_sequence_bytes, counts[SNAP_CDS]); A(flank_sequence_bytes, counts[SNAP_FLANK]);
+	A(peptide_edit_codes, p);
+	A(cds_sequence_bytes, counts[SNAP_CDS]); A(cdna_sequence_bytes, counts[SNAP_CDNA]);
+	A(flank_sequence_bytes, counts[SNAP_FLANK]);
 	A(interval_feature_seq_regions, f); A(interval_feature_starts, f); A(interval_feature_ends, f);
 	A(interval_feature_kinds, f);
 #undef A
@@ -98,6 +125,7 @@ snap_counts(const duckvep_owned_model_t *m, uint64_t counts[SNAP_COUNTS])
 	counts[SNAP_MIRNA] = m->mature_mirna_count;
 	counts[SNAP_PEPTIDE] = m->peptide_edit_count;
 	counts[SNAP_CDS] = m->cds_sequence_length;
+	counts[SNAP_CDNA] = m->cdna_sequence_length;
 	counts[SNAP_FLANK] = m->flank_sequence_length;
 	counts[SNAP_FEATURES] = m->interval_feature_count;
 }
@@ -203,7 +231,8 @@ duckvep_core_model_snapshot_save(const duckvep_owned_model_t *model, const char 
 	header.fingerprint = duckvep_core_model_fingerprint(model);
 	snap_counts(model, header.counts);
 	header.flags = (model->transcript_coverage_complete ? SNAP_FLAG_COVERAGE : 0u) |
-	    (model->transcript_flanks_complete ? SNAP_FLAG_FLANKS : 0u);
+	    (model->transcript_flanks_complete ? SNAP_FLAG_FLANKS : 0u) |
+	    (model->transcript_cdna_provided ? SNAP_FLAG_CDNA : 0u);
 	snap_arrays(&view, header.counts, arrays);
 	for (section = 0; section < SNAP_ARRAYS; section++) {
 		data[section] = *arrays[section].slot;
@@ -314,7 +343,7 @@ snap_open(const char *path, size_t *bytes, int *mapped, const char *label, char 
 		int descriptor = open(path, O_RDONLY);
 
 		if (descriptor < 0 || fstat(descriptor, &status) != 0 || !S_ISREG(status.st_mode) ||
-		    status.st_size < (off_t)sizeof(snap_header_t)) {
+		    status.st_size < (off_t)sizeof(snap_v1_header_t) || (uint64_t)status.st_size > SIZE_MAX) {
 			if (descriptor >= 0)
 				(void)close(descriptor);
 			snap_error(error, error_size, label, "cannot open the snapshot file", path);
@@ -343,7 +372,7 @@ snap_open(const char *path, size_t *bytes, int *mapped, const char *label, char 
 
 		if (file != NULL && fseek(file, 0, SEEK_END) == 0)
 			size = ftell(file);
-		if (file == NULL || size < (long)sizeof(snap_header_t) || fseek(file, 0, SEEK_SET) != 0) {
+		if (file == NULL || size < (long)sizeof(snap_v1_header_t) || (uint64_t)size > SIZE_MAX || fseek(file, 0, SEEK_SET) != 0) {
 			if (file != NULL)
 				(void)fclose(file);
 			snap_error(error, error_size, label, "cannot open the snapshot file", path);
@@ -480,7 +509,9 @@ snap_validate(duckvep_owned_model_t *m)
 	    !snap_slices(m->pre_cds_sequence_offsets, m->pre_cds_sequence_lengths, transcripts,
 	    m->flank_sequence_bytes, m->flank_sequence_length) ||
 	    !snap_slices(m->post_cds_sequence_offsets, m->post_cds_sequence_lengths, transcripts,
-	    m->flank_sequence_bytes, m->flank_sequence_length))
+	    m->flank_sequence_bytes, m->flank_sequence_length) ||
+	    !snap_slices(m->cdna_sequence_offsets, m->cdna_sequence_lengths, transcripts,
+	    m->cdna_sequence_bytes, m->cdna_sequence_length))
 		return "a transcript sequence slice is outside its pool";
 	m->has_wrapped_coordinates = wrapped;
 	return NULL;
@@ -517,13 +548,14 @@ snap_restore_names(duckvep_owned_model_t *m, const char *blob, size_t bytes)
 static int
 snap_load(duckvep_owned_model_t *model, const char *path, const char *label, char *error, size_t error_size)
 {
-	const snap_header_t *header;
+	const snap_v1_header_t *prefix;
 	snap_array_t arrays[SNAP_ARRAYS];
 	const unsigned char *base;
 	const char *problem = NULL, *reference = NULL;
-	uint64_t at, checksum;
-	snap_header_t zeroed;
-	size_t bytes = 0, section;
+	const uint64_t *width, *offset, *length;
+	uint64_t at, checksum, counts[SNAP_COUNTS] = {0}, flags, present;
+	union { snap_header_t v2; snap_v1_header_t v1; } zeroed;
+	size_t bytes = 0, section, wire_arrays, header_bytes;
 	int mapped = 0;
 
 	memset(model, 0, sizeof(*model));
@@ -533,82 +565,124 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 	model->snapshot_base = (void *)base;
 	model->snapshot_bytes = bytes;
 	model->snapshot_mapped = mapped;
-	header = (const snap_header_t *)base;
-	if (memcmp(header->magic, SNAP_MAGIC, sizeof(header->magic)) != 0)
+	prefix = (const snap_v1_header_t *)base;
+	if (memcmp(prefix->magic, SNAP_MAGIC, sizeof(prefix->magic)) != 0) {
 		problem = "not a DuckVEP model snapshot";
-	else if (header->version != SNAP_VERSION || header->endian != SNAP_ENDIAN ||
-	    header->header_bytes != sizeof(*header))
+		goto fail;
+	}
+	if (prefix->endian != SNAP_ENDIAN ||
+	    !((prefix->version == 1u && prefix->header_bytes == sizeof(snap_v1_header_t)) ||
+	    (prefix->version == SNAP_VERSION && prefix->header_bytes == sizeof(snap_header_t))) ||
+	    prefix->header_bytes > bytes) {
 		problem = "the snapshot was written by an incompatible DuckVEP build";
-	else if (header->file_bytes != bytes)
+		goto fail;
+	}
+	header_bytes = (size_t)prefix->header_bytes;
+	if (prefix->version == 1u) {
+		memcpy(counts, prefix->counts, 6u * sizeof(*counts));
+		counts[SNAP_FLANK] = prefix->counts[6];
+		counts[SNAP_FEATURES] = prefix->counts[7];
+		flags = prefix->flags;
+		present = prefix->present;
+		width = prefix->width; offset = prefix->offset; length = prefix->bytes;
+		wire_arrays = SNAP_V1_ARRAYS;
+	} else {
+		const snap_header_t *header = (const snap_header_t *)base;
+
+		memcpy(counts, header->counts, sizeof(counts));
+		flags = header->flags;
+		present = header->present;
+		width = header->width; offset = header->offset; length = header->bytes;
+		wire_arrays = SNAP_ARRAYS;
+	}
+	if (prefix->file_bytes != bytes)
 		problem = "the snapshot is truncated or has trailing bytes";
-	else if (header->counts[SNAP_TRANSCRIPTS] > UINT32_MAX || header->counts[SNAP_REGIONS] > UINT16_MAX + 1u ||
-	    header->counts[SNAP_EXONS] > UINT32_MAX || header->counts[SNAP_MIRNA] > UINT32_MAX ||
-	    header->counts[SNAP_PEPTIDE] > UINT32_MAX || header->counts[SNAP_FEATURES] > UINT32_MAX ||
-	    header->counts[SNAP_CDS] > bytes || header->counts[SNAP_FLANK] > bytes)
+	else if ((present >> wire_arrays) != 0 ||
+	    (flags & ~(uint64_t)(SNAP_FLAG_COVERAGE | SNAP_FLAG_FLANKS |
+	    (prefix->version == SNAP_VERSION ? SNAP_FLAG_CDNA : 0u))) != 0)
+		problem = "the snapshot header has unknown presence bits or flags";
+	else if (counts[SNAP_TRANSCRIPTS] > UINT32_MAX || counts[SNAP_REGIONS] > UINT16_MAX + 1u ||
+	    counts[SNAP_EXONS] > UINT32_MAX || counts[SNAP_MIRNA] > UINT32_MAX ||
+	    counts[SNAP_PEPTIDE] > UINT32_MAX || counts[SNAP_FEATURES] > UINT32_MAX ||
+	    counts[SNAP_CDS] > bytes || counts[SNAP_CDNA] > bytes || counts[SNAP_FLANK] > bytes)
 		problem = "the snapshot header has counts out of range";
 	if (problem != NULL)
 		goto fail;
-	snap_arrays(model, header->counts, arrays);
-	at = (sizeof(*header) + SNAP_ALIGN - 1u) / SNAP_ALIGN * SNAP_ALIGN;
+	snap_arrays(model, counts, arrays);
+	at = (header_bytes + SNAP_ALIGN - 1u) / SNAP_ALIGN * SNAP_ALIGN;
 	if (at > bytes) {
 		problem = "the snapshot is truncated or has trailing bytes";
 		goto fail;
 	}
-	for (section = 0; section < SNAP_SECTIONS; section++) {
-		uint64_t expected = header->bytes[section];
-		int present = section >= SNAP_ARRAYS || ((header->present >> section) & 1u) != 0;
+	for (section = 0; section < wire_arrays + 2u; section++) {
+		uint64_t expected = length[section], padded;
 
-		if (section < SNAP_ARRAYS) {
-			if (header->width[section] != arrays[section].width)
+		if (section < wire_arrays) {
+			size_t slot = prefix->version == 1u ? snap_v1_slots[section] : section;
+
+			if (width[section] != arrays[slot].width)
 				problem = "the snapshot was written by an incompatible DuckVEP build";
-			expected = present ? arrays[section].count * arrays[section].width : 0u;
-		} else if (header->width[section] != 1u) {
+			expected = ((present >> section) & 1u) != 0 ? arrays[slot].count * arrays[slot].width : 0u;
+		} else if (width[section] != 1u) {
 			problem = "the snapshot was written by an incompatible DuckVEP build";
 		}
-		if (problem == NULL && (header->bytes[section] != expected || header->offset[section] != at ||
-		    header->bytes[section] > bytes - at))
+		if (problem == NULL && (length[section] != expected || offset[section] != at ||
+		    length[section] > bytes - at || length[section] > UINT64_MAX - (SNAP_ALIGN - 1u)))
 			problem = "the snapshot sections do not match its header";
 		if (problem != NULL)
 			goto fail;
-		at += (header->bytes[section] + SNAP_ALIGN - 1u) / SNAP_ALIGN * SNAP_ALIGN;
-		if (at > bytes) {
+		padded = (length[section] + SNAP_ALIGN - 1u) / SNAP_ALIGN * SNAP_ALIGN;
+		if (padded > bytes - at) {
 			problem = "the snapshot sections do not match its header";
 			goto fail;
 		}
+		at += padded;
 	}
-	zeroed = *header;
-	zeroed.checksum = 0;
-	checksum = snap_hash(SNAP_VERSION, &zeroed, sizeof(zeroed));
-	for (section = 0; section < SNAP_SECTIONS; section++)
-		checksum = snap_hash(checksum, base + header->offset[section], (size_t)header->bytes[section]);
-	if (checksum != header->checksum) {
+	if (at != bytes) {
+		problem = "the snapshot sections do not match its header";
+		goto fail;
+	}
+	/* Authenticate the original wire header and original section order, before slot mapping. */
+	memcpy(&zeroed, base, header_bytes);
+	zeroed.v1.checksum = 0;
+	checksum = snap_hash(prefix->version, &zeroed, header_bytes);
+	for (section = 0; section < wire_arrays + 2u; section++)
+		checksum = snap_hash(checksum, base + offset[section], (size_t)length[section]);
+	if (checksum != prefix->checksum) {
 		problem = "the snapshot checksum does not match its contents";
 		goto fail;
 	}
-	for (section = 0; section < SNAP_ARRAYS; section++) {
-		if ((header->present >> section) & 1u)
-			*arrays[section].slot = (void *)(base + header->offset[section]);
-	}
-	/* The relation loaders allocate every region, transcript and exon array; the optional miRNA,
-	 * peptide-edit, sequence-byte and feature arrays are checked by the kernel against their counts. */
-	for (section = 0; section < 26u; section++) {
-		uint64_t rows = header->counts[section < 3u ? SNAP_REGIONS : section < 20u ? SNAP_TRANSCRIPTS : SNAP_EXONS];
+	for (section = 0; section < wire_arrays; section++) {
+		size_t slot = prefix->version == 1u ? snap_v1_slots[section] : section;
 
-		if (rows != 0 && *arrays[section].slot == NULL) {
+		if ((present >> section) & 1u)
+			*arrays[slot].slot = (void *)(base + offset[section]);
+	}
+	/* Region, transcript and exon arrays are required for nonempty relations. cDNA is optional. */
+	for (section = 0; section < 28u; section++) {
+		if (section != 15u && section != 16u && arrays[section].count != 0 && *arrays[section].slot == NULL) {
 			problem = "the snapshot lacks a required array";
 			goto fail;
 		}
 	}
-	model->known_seq_region_count = (size_t)header->counts[SNAP_REGIONS];
-	model->transcripts.transcript_count = (size_t)header->counts[SNAP_TRANSCRIPTS];
-	model->exons.exon_count = (size_t)header->counts[SNAP_EXONS];
-	model->mature_mirna_count = (size_t)header->counts[SNAP_MIRNA];
-	model->peptide_edit_count = (size_t)header->counts[SNAP_PEPTIDE];
-	model->cds_sequence_length = (size_t)header->counts[SNAP_CDS];
-	model->flank_sequence_length = (size_t)header->counts[SNAP_FLANK];
-	model->interval_feature_count = (size_t)header->counts[SNAP_FEATURES];
-	model->transcript_coverage_complete = (header->flags & SNAP_FLAG_COVERAGE) != 0;
-	model->transcript_flanks_complete = (header->flags & SNAP_FLAG_FLANKS) != 0;
+	model->known_seq_region_count = (size_t)counts[SNAP_REGIONS];
+	model->transcripts.transcript_count = (size_t)counts[SNAP_TRANSCRIPTS];
+	model->exons.exon_count = (size_t)counts[SNAP_EXONS];
+	model->mature_mirna_count = (size_t)counts[SNAP_MIRNA];
+	model->peptide_edit_count = (size_t)counts[SNAP_PEPTIDE];
+	model->cds_sequence_length = (size_t)counts[SNAP_CDS];
+	model->cdna_sequence_length = (size_t)counts[SNAP_CDNA];
+	model->flank_sequence_length = (size_t)counts[SNAP_FLANK];
+	model->interval_feature_count = (size_t)counts[SNAP_FEATURES];
+	model->transcript_coverage_complete = (flags & SNAP_FLAG_COVERAGE) != 0;
+	model->transcript_flanks_complete = (flags & SNAP_FLAG_FLANKS) != 0;
+	model->transcript_cdna_provided = (flags & SNAP_FLAG_CDNA) != 0;
+	if ((!model->transcript_cdna_provided && model->cdna_sequence_length != 0) ||
+	    (model->transcript_cdna_provided &&
+	    (model->cdna_sequence_offsets == NULL || model->cdna_sequence_lengths == NULL))) {
+		problem = "the snapshot cDNA flag does not match its arrays";
+		goto fail;
+	}
 	if ((model->interval_feature_count != 0 && (model->interval_feature_seq_regions == NULL ||
 	    model->interval_feature_starts == NULL || model->interval_feature_ends == NULL)) ||
 	    (problem = snap_validate(model)) != NULL) {
@@ -616,14 +690,14 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 			problem = "the snapshot lacks a required array";
 		goto fail;
 	}
-	if (header->bytes[SNAP_NAMES] != 0 &&
-	    (problem = snap_restore_names(model, (const char *)base + header->offset[SNAP_NAMES],
-	    (size_t)header->bytes[SNAP_NAMES])) != NULL)
+	if (length[wire_arrays] != 0 &&
+	    (problem = snap_restore_names(model, (const char *)base + offset[wire_arrays],
+	    (size_t)length[wire_arrays])) != NULL)
 		goto fail;
-	if (header->bytes[SNAP_REFERENCE] != 0) {
-		reference = (const char *)base + header->offset[SNAP_REFERENCE];
-		if (reference[header->bytes[SNAP_REFERENCE] - 1u] != '\0' ||
-		    strlen(reference) + 1u != header->bytes[SNAP_REFERENCE]) {
+	if (length[wire_arrays + 1u] != 0) {
+		reference = (const char *)base + offset[wire_arrays + 1u];
+		if (reference[length[wire_arrays + 1u] - 1u] != '\0' ||
+		    strlen(reference) + 1u != length[wire_arrays + 1u]) {
 			problem = "the snapshot reference path is malformed";
 			goto fail;
 		}

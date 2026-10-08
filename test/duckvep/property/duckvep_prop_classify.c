@@ -1327,6 +1327,54 @@ TEST effect_rule_table_known_pre_bits(void) {
     PASS();
 }
 
+TEST haplotype_noncoding_uses_final_transcript_sequence(void) {
+    static const uint8_t reference[] = "AACCGGTTAA";
+    static const uint8_t utr5[] = "ATCCGGTTAA";
+    static const uint8_t utr3[] = "AACCGGTTCA";
+    static const uint8_t noncoding[] = "AATCGGTTAA";
+    static const uint8_t mixed[] = "ATCCGGTTCA";
+    uint64_t mask = UINT64_MAX;
+
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_OK,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u, utr5, 10u,
+                                                       4u, 7u, &mask));
+    ASSERT_EQ(DUCKVEP_SO(DUCKVEP_SO_5_PRIME_UTR), mask);
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_OK,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u, utr3, 10u,
+                                                       4u, 7u, &mask));
+    ASSERT_EQ(DUCKVEP_SO(DUCKVEP_SO_3_PRIME_UTR), mask);
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_OK,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u, noncoding, 10u,
+                                                       0u, 0u, &mask));
+    ASSERT_EQ(DUCKVEP_SO(DUCKVEP_SO_NON_CODING_TRANSCRIPT_EXON), mask);
+
+    /* A restored reference has no biological prediction even when upstream
+     * geometry retains every contributor. Mixed or coding final differences
+     * stay explicit rather than being combined as independent UTR calls. */
+    mask = UINT64_MAX;
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_NO_CHANGE,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u, reference, 10u,
+                                                       4u, 7u, &mask));
+    ASSERT_EQ(UINT64_C(0), mask);
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_MIXED_FEATURE,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u, mixed, 10u,
+                                                       4u, 7u, &mask));
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_MIXED_FEATURE,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u,
+                                                       (const uint8_t *)"AACAGGTTAA", 10u,
+                                                       4u, 7u, &mask));
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_LENGTH_CHANGE,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u, utr5, 9u,
+                                                       4u, 7u, &mask));
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT,
+              duckvep_effect_eval_haplotype_noncoding(NULL, 10u, utr5, 10u,
+                                                       4u, 7u, &mask));
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u, utr5, 10u,
+                                                       4u, 11u, &mask));
+    PASS();
+}
+
 TEST consequence_predicate_flags_survive_so_mask_omission(void) {
     duckvep_sequence_delta_t source;
     duckvep_sequence_delta_t restored;

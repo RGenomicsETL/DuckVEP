@@ -184,6 +184,31 @@ void duckvep_effect_ctx_apply_delta(
  * local coding SO, not contributor topology or whole-haplotype expression. */
 uint64_t duckvep_effect_eval_coding_delta(const duckvep_sequence_delta_t *delta);
 
+/* Whole-haplotype consequences for one already-spliced transcript sequence.
+ * `reference` and `alternate` are caller-owned, transcript-oriented byte strings.
+ * This bounded lane accepts only net substitution haplotypes: equal nonzero
+ * lengths, every changed base confined to exactly one simple feature. Coding
+ * coordinates are one-based inclusive; pass both as zero for a non-coding
+ * transcript. It deliberately does not infer splice remodeling, indels, or a
+ * mixed coding/UTR consequence. The returned SO mask says nothing about source
+ * contributor provenance, which remains owned by the composition caller. */
+typedef enum duckvep_haplotype_noncoding_status {
+    DUCKVEP_HAPLOTYPE_NONCODING_OK = 0,
+    DUCKVEP_HAPLOTYPE_NONCODING_NO_CHANGE,
+    DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT,
+    DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_LENGTH_CHANGE,
+    DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_MIXED_FEATURE
+} duckvep_haplotype_noncoding_status_t;
+
+duckvep_haplotype_noncoding_status_t duckvep_effect_eval_haplotype_noncoding(
+    const uint8_t *reference,
+    size_t         reference_len,
+    const uint8_t *alternate,
+    size_t         alternate_len,
+    uint32_t       coding_start1,
+    uint32_t       coding_end1,
+    uint64_t      *out_so_mask);
+
 void duckvep_effect_ctx_apply_sv(
     duckvep_effect_ctx_t      *ctx,
     const duckvep_sv_effect_t *sv);

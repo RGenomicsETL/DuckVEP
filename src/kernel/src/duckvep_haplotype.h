@@ -30,7 +30,8 @@ typedef enum duckvep_haplotype_status {
     DUCKVEP_HAPLOTYPE_REF_MISMATCH,
     DUCKVEP_HAPLOTYPE_EDIT_ORDER,
     DUCKVEP_HAPLOTYPE_INPUT_INCOMPLETE,
-    DUCKVEP_HAPLOTYPE_CONDITIONAL /* Rebuilt sequence exists, but depends on interpreted input. */
+    DUCKVEP_HAPLOTYPE_CONDITIONAL, /* Rebuilt sequence exists, but depends on interpreted input. */
+    DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED
 } duckvep_haplotype_status_t;
 
 enum {
@@ -98,6 +99,19 @@ duckvep_haplotype_status_t duckvep_haplotype_reference_proteins(
     const uint32_t *edit_positions1, const uint8_t *edit_alternates, size_t edit_count,
     uint8_t *peptide, uint8_t *coding_peptide, size_t capacity, size_t *length,
     duckvep_translation_t *coding_translation);
+
+/* Translate an equal-length, substitution-only alternate CDS under the typed
+ * programme that curated its paired reference. Every record is validated before
+ * alternate bytes are exposed. A typed record applies only when its original
+ * three reference CDS bases are unchanged at the same codon in alternate_cds.
+ * RNA edits and untyped or unknown records return UNSUPPORTED_CURATED; this is
+ * a conditional operand builder, not alternate-peptide compatibility. */
+duckvep_haplotype_status_t duckvep_haplotype_conditional_peptide(
+    const uint8_t *reference_cds, const uint8_t *alternate_cds, size_t cds_length,
+    duckvep_codon_table_t table, const uint32_t *edit_positions1,
+    const uint8_t *edit_alternates, const uint8_t *edit_codes, size_t edit_count,
+    int complete_start, uint8_t *peptide, size_t capacity, size_t *length,
+    size_t *first_stop_position1);
 
 /* Partition edits sorted by ascending original CDS coordinate. The caller has
  * already grouped them by model, transcript, sample, phase set, and haplotype.

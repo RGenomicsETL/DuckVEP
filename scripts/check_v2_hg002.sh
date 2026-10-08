@@ -282,6 +282,8 @@ fi
     printf 'v1_duckdb_source\t%s\n' "$V1_SOURCE"
     printf 'v2_duckdb_source\t%s\n' "$V2_SOURCE"
     printf 'v2_pinned_revision\t%s\n' "$V2_PIN"
+    printf 'v1_duckdb\t%s\n' "$V1_CLI"
+    printf 'v2_duckdb\t%s\n' "$V2_CLI"
     printf 'v1_extension\t%s\n' "$V1_EXTENSION"
     printf 'v2_extension\t%s\n' "$V2_EXTENSION"
     printf 'vcf\t%s\nmodel\t%s\n' "$VCF" "$MODEL"
@@ -290,7 +292,11 @@ fi
     printf 'v1_model_fingerprint\t%s\nv2_model_fingerprint\t%s\n' "$v1_fingerprint" "$v2_fingerprint"
     printf 'v1_v2_exact_multiset\t%s\n' "$([[ $exact_ok == 1 ]] && printf PASS || printf FAIL)"
     printf 'v1_reference\t%s\n' "${V1_REFERENCE:-not supplied}"
-    printf 'v1_reference_exact_multiset\t%s\n' "$([[ $reference_ok == 1 ]] && printf PASS || printf FAIL)"
+    printf 'v1_reference_exact_multiset\t'
+    if [[ -z $V1_REFERENCE ]]; then printf 'NOT_RUN\n'
+    elif [[ $reference_ok == 1 ]]; then printf 'PASS\n'
+    else printf 'FAIL\n'
+    fi
     printf 'v1_max_rss_kib\t%s\nv2_max_rss_kib\t%s\n' \
         "$(awk -F= '$1 == "max_rss_kib" {print $2}' "$OUT_DIR/v1.resources.txt")" \
         "$(awk -F= '$1 == "max_rss_kib" {print $2}' "$OUT_DIR/v2.resources.txt")"

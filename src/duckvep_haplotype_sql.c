@@ -3,11 +3,12 @@
  * host-neutral src/core/duckvep_core_haplotypes.c. */
 #include "duckdb_extension.h"
 #include "kernel/src/duckvep_budget.h"
-DUCKDB_EXTENSION_EXTERN
+extern duckdb_ext_api_v1 duckdb_ext_api;
 #include "duckvep_list.h"
 
 #include "duckvep_model.h"
 #include "core/duckvep_core_haplotypes.h"
+#include "core/duckvep_core_arrangements.h"
 #include "core/duckvep_core_haplotype_script.h"
 #include "core/duckvep_core_phase.h"
 #include "core/duckvep_core_discovery.h"
@@ -24,9 +25,9 @@ DUCKDB_EXTENSION_EXTERN
 #define limit_names duckvep_hap_limit_names
 #define limit_defaults duckvep_hap_limit_defaults
 enum { HAPLOTYPE_LIST_COLUMN = 9, HAPLOTYPE_STOP_COLUMN = 14,
-    HAPLOTYPE_PROVENANCE_COLUMN = 20, HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 22,
-    HAPLOTYPE_CONSEQUENCES_COLUMN = 23, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN = 29,
-    HAPLOTYPE_OUTPUT_COLUMNS = 32 };
+    HAPLOTYPE_PROVENANCE_COLUMN = 22, HAPLOTYPE_CARRIER_PREDICTION_COLUMN = 24,
+    HAPLOTYPE_CONSEQUENCES_COLUMN = 25, HAPLOTYPE_NMD_CONTRIBUTORS_COLUMN = 31,
+    HAPLOTYPE_OUTPUT_COLUMNS = DUCKVEP_HAP_OUTPUT_COLUMNS };
 enum { HAPLOTYPE_BLOCK_EVENT_FIELD = 9, HAPLOTYPE_BLOCK_FIELDS = 10, HAPLOTYPE_PROVENANCE_FIELDS = 10,
     HAPLOTYPE_EDIT_FIELDS = 7, HAPLOTYPE_CARRIER_PREDICTION_FIELDS = 10 };
 
@@ -171,6 +172,8 @@ static void haplotype_bind(duckdb_bind_info info) {
     duckdb_bind_add_result_column(info, "stop_in_displaced_frame", stop_in_frame_type);
     duckdb_destroy_logical_type(&stop_in_frame_type);
     duckdb_logical_type string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
+    duckdb_bind_add_result_column(info, "hgvsc", string_type);
+    duckdb_bind_add_result_column(info, "hgvsc_status", string_type);
     duckdb_bind_add_result_column(info, "hgvsp", string_type);
     duckdb_bind_add_result_column(info, "hgvsp_status", string_type);
     duckdb_destroy_logical_type(&string_type);
@@ -225,6 +228,8 @@ static void haplotype_bind(duckdb_bind_info info) {
     duckdb_destroy_logical_type(&length_type);
     string_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
     duckdb_bind_add_result_column(info, "nmd_exceptions", string_type);
+    duckdb_bind_add_result_column(info, "prediction_reference_protein", string_type);
+    duckdb_bind_add_result_column(info, "prediction_protein", string_type);
     duckdb_destroy_logical_type(&string_type);
     length_type = duckdb_create_logical_type(DUCKDB_TYPE_BIGINT);
     duckdb_bind_add_result_column(info, "nominal_length_diff", length_type);
@@ -687,6 +692,225 @@ static void register_coding_transcripts(duckdb_connection connection, duckvep_re
     duckdb_destroy_logical_type(&string);
 }
 
+typedef struct {
+    duckvep_registry_t *registry;
+    duckvep_model_entry_t *entry;
+    char *query;
+    duckvep_arrangement_config_t config;
+} arrangement_bind_t;
+
+typedef struct {
+    haplotype_state_t input;
+    duckvep_arrangement_state_t *core;
+} arrangement_state_t;
+
+static void arrangement_bind_destroy(void *pointer) {
+    arrangement_bind_t *bind = pointer;
+    if (!bind) return;
+    duckvep_registry_unpin(bind->registry, bind->entry);
+    duckvep_registry_release(bind->registry);
+    duckdb_free(bind->query);
+    duckvep_budget_free(bind);
+}
+
+static void arrangement_state_destroy(void *pointer) {
+    arrangement_state_t *state = pointer;
+    if (!state) return;
+    if (state->input.chunk) duckdb_destroy_data_chunk(&state->input.chunk);
+    if (state->input.have_result) duckdb_destroy_result(&state->input.input);
+    duckvep_arrangement_close(state->core);
+    duckvep_budget_free(state);
+}
+
+static int arrangement_limit(duckdb_bind_info info, const char *name, size_t fallback, size_t *value) {
+    duckdb_value raw = duckdb_bind_get_named_parameter(info, name);
+    uint64_t number = raw && !duckdb_is_null_value(raw) ? duckdb_get_uint64(raw) : fallback;
+    int ok = (!raw || !duckdb_is_null_value(raw)) && number && number <= SIZE_MAX;
+    duckdb_destroy_value(&raw);
+    if (ok) *value = (size_t)number;
+    return ok;
+}
+
+static void arrangement_bind(duckdb_bind_info info) {
+    arrangement_bind_t *bind = duckvep_budget_calloc(DUCKVEP_OWNER_CONTROL, 1u, sizeof(*bind));
+    duckdb_value value;
+    char *name;
+    if (!bind) { duckdb_bind_set_error(info, "duckvep_haplotype_arrangements: bind allocation failed"); return; }
+    bind->registry = duckdb_bind_get_extra_info(info);
+    duckvep_registry_retain(bind->registry);
+    value = duckdb_bind_get_parameter(info, 0u);
+    if (value && !duckdb_is_null_value(value)) bind->query = duckdb_get_varchar(value);
+    duckdb_destroy_value(&value);
+    value = duckdb_bind_get_parameter(info, 1u);
+    name = value && !duckdb_is_null_value(value) ? duckdb_get_varchar(value) : NULL;
+    duckdb_destroy_value(&value);
+    if (name) bind->entry = duckvep_registry_pin(bind->registry, name);
+    duckdb_free(name);
+    if (!bind->entry || !bind->query || !bind->query[0]) {
+        duckdb_bind_set_error(info, "duckvep_haplotype_arrangements: require a nonempty alt_events query and loaded model name");
+        arrangement_bind_destroy(bind); return;
+    }
+    if (bind->entry->model.lifted) {
+        duckdb_bind_set_error(info, "duckvep_haplotype_arrangements: replay is not supported for models with wrapped circular objects");
+        arrangement_bind_destroy(bind); return;
+    }
+    duckvep_arrangement_config_defaults(&bind->config, &bind->entry->model);
+    if (!arrangement_limit(info, "max_sites", bind->config.max_sites, &bind->config.max_sites) ||
+        !arrangement_limit(info, "max_calls", bind->config.max_calls, &bind->config.max_calls) ||
+        !arrangement_limit(info, "max_arrangements", bind->config.max_arrangements, &bind->config.max_arrangements) ||
+        !arrangement_limit(info, "max_replays", bind->config.max_replays, &bind->config.max_replays) ||
+        bind->config.max_sites > DUCKVEP_PHASE_ARRANGEMENT_MAX_SITES) {
+        duckdb_bind_set_error(info, "duckvep_haplotype_arrangements: invalid bounded limit");
+        arrangement_bind_destroy(bind); return;
+    }
+    const char *const names[] = {"hypothesis_id", "hypothesis_lane", "hypothesis_reference_lane",
+        "event_index", "seq_region", "position", "reference", "alternate", "alt_index", "transcript_index",
+        "sample_index", "original_allele0", "original_allele1", "original_phase_before0",
+        "original_phase_before1", "original_phase_before_present", "original_phase_set_present",
+        "original_phase_set", "assigned_allele", "contributes", "cds", "protein", "nominal_length_diff",
+        "prediction_status", "consequence_mask", "prediction_semantics"};
+    const duckdb_type types[] = {DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_USMALLINT, DUCKDB_TYPE_BOOLEAN,
+        DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR,
+        DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_UINTEGER, DUCKDB_TYPE_INTEGER, DUCKDB_TYPE_INTEGER,
+        DUCKDB_TYPE_BOOLEAN, DUCKDB_TYPE_BOOLEAN, DUCKDB_TYPE_BOOLEAN, DUCKDB_TYPE_BOOLEAN, DUCKDB_TYPE_BIGINT,
+        DUCKDB_TYPE_INTEGER, DUCKDB_TYPE_BOOLEAN, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_BIGINT,
+        DUCKDB_TYPE_VARCHAR, DUCKDB_TYPE_UBIGINT, DUCKDB_TYPE_VARCHAR};
+    if (sizeof(types) / sizeof(types[0]) != DUCKVEP_ARRANGEMENT_COLUMN_COUNT) {
+        duckdb_bind_set_error(info, "duckvep_haplotype_arrangements: shared output schema mismatch");
+        arrangement_bind_destroy(bind); return;
+    }
+    for (unsigned i = 0u; i < DUCKVEP_ARRANGEMENT_COLUMN_COUNT; i++) {
+        duckdb_logical_type type = duckdb_create_logical_type(types[i]);
+        duckdb_bind_add_result_column(info, names[i], type);
+        duckdb_destroy_logical_type(&type);
+    }
+    duckdb_bind_set_bind_data(info, bind, arrangement_bind_destroy);
+}
+
+static int arrangement_input_open(arrangement_state_t *state, const arrangement_bind_t *bind,
+    char *error, size_t error_size) {
+    duckvep_sql_text sql = {0};
+    duckdb_prepared_statement statement = NULL;
+    duckdb_extracted_statements extracted = NULL;
+    char *query_sql;
+    int ok;
+    if (duckvep_core_arrangement_input_sql(bind->query, &sql, error, error_size) != 0) {
+        return 0;
+    }
+    query_sql = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, sql.length + 1u);
+    if (!query_sql) { duckvep_sql_free(&sql); return 0; }
+    memcpy(query_sql, sql.data, sql.length + 1u);
+    duckvep_sql_free(&sql);
+    if (!duckvep_registry_query_acquire(bind->registry, error, error_size)) { duckvep_budget_free(query_sql); return 0; }
+    idx_t statements = duckdb_extract_statements(bind->registry->query_connection, query_sql, &extracted);
+    duckvep_budget_free(query_sql);
+    ok = statements == 1u && duckdb_prepare_extracted_statement(bind->registry->query_connection, extracted, 0u, &statement) == DuckDBSuccess;
+    if (!ok) {
+        const char *message = statement ? duckdb_prepare_error(statement) :
+            extracted ? duckdb_extract_statements_error(extracted) : NULL;
+        duckvep_sql_set_error(error, error_size, message ? message : "calls query must be one SELECT statement");
+    } else if (duckdb_prepared_statement_type(statement) != DUCKDB_STATEMENT_TYPE_SELECT) {
+        duckvep_sql_set_error(error, error_size, "duckvep_haplotype_arrangements: calls query must be one SELECT statement");
+        ok = 0;
+    } else {
+        state->input.have_result = 1;
+        state->input.source_records = 0;
+        ok = duckdb_execute_prepared(statement, &state->input.input) == DuckDBSuccess;
+        if (!ok) duckvep_sql_set_error(error, error_size, duckdb_result_error(&state->input.input));
+    }
+    if (statement) duckdb_destroy_prepare(&statement);
+    if (extracted) duckdb_destroy_extracted(&extracted);
+    pthread_mutex_unlock(&bind->registry->query_mutex);
+    return ok;
+}
+
+static void arrangement_init(duckdb_init_info info) {
+    const arrangement_bind_t *bind = duckdb_init_get_bind_data(info);
+    arrangement_state_t *state = duckvep_budget_calloc(DUCKVEP_OWNER_WORKSPACE, 1u, sizeof(*state));
+    char error[DUCKVEP_SQL_ERROR_SIZE] = "duckvep_haplotype_arrangements: bounded workspace allocation failed";
+    duckvep_hap_input_t input;
+    duckdb_init_set_max_threads(info, 1u);
+    duckvep_budget_clear_failure();
+    if (!state) goto failed;
+    state->core = duckvep_arrangement_open(&bind->config, error, sizeof(error));
+    if (!state->core || !arrangement_input_open(state, bind, error, sizeof(error))) goto failed;
+    input.context = &state->input; input.next = input_next;
+    if (!duckvep_arrangement_load(state->core, &input, error, sizeof(error))) goto failed;
+    if (state->input.chunk) duckdb_destroy_data_chunk(&state->input.chunk);
+    if (state->input.have_result) { duckdb_destroy_result(&state->input.input); state->input.have_result = 0; }
+    duckdb_init_set_init_data(info, state, arrangement_state_destroy);
+    return;
+failed:
+    { char final_error[DUCKVEP_SQL_ERROR_SIZE + 256];
+      duckdb_init_set_error(info, duckvep_sql_final_error(final_error, sizeof final_error, error, error)); }
+    arrangement_state_destroy(state);
+}
+
+static void arrangement_scan(duckdb_function_info info, duckdb_data_chunk output) {
+    arrangement_state_t *state = duckdb_function_get_init_data(info);
+    duckdb_vector vectors[DUCKVEP_ARRANGEMENT_COLUMN_COUNT];
+    idx_t rows = 0u;
+    for (unsigned i = 0u; i < DUCKVEP_ARRANGEMENT_COLUMN_COUNT; i++) {
+        vectors[i] = duckdb_data_chunk_get_vector(output, i);
+        duckdb_vector_ensure_validity_writable(vectors[i]);
+    }
+    while (rows < duckdb_vector_size()) {
+        duckvep_arrangement_row_t row;
+        if (!duckvep_arrangement_next(state->core, &row)) break;
+        ((uint64_t *)duckdb_vector_get_data(vectors[0]))[rows] = row.hypothesis_id;
+        ((uint16_t *)duckdb_vector_get_data(vectors[1]))[rows] = row.lane;
+        ((bool *)duckdb_vector_get_data(vectors[2]))[rows] = row.reference_lane != 0;
+        ((uint64_t *)duckdb_vector_get_data(vectors[3]))[rows] = row.event_id;
+        ((uint32_t *)duckdb_vector_get_data(vectors[4]))[rows] = row.chrom;
+        ((uint64_t *)duckdb_vector_get_data(vectors[5]))[rows] = row.position;
+        duckdb_vector_assign_string_element_len(vectors[6], rows, (const char *)row.reference, row.reference_length);
+        duckdb_vector_assign_string_element_len(vectors[7], rows, (const char *)row.alternate, row.alternate_length);
+        ((uint32_t *)duckdb_vector_get_data(vectors[8]))[rows] = row.allele_index;
+        ((uint32_t *)duckdb_vector_get_data(vectors[9]))[rows] = row.transcript;
+        ((uint32_t *)duckdb_vector_get_data(vectors[10]))[rows] = row.sample;
+        ((int32_t *)duckdb_vector_get_data(vectors[11]))[rows] = row.allele0;
+        ((int32_t *)duckdb_vector_get_data(vectors[12]))[rows] = row.allele1;
+        ((bool *)duckdb_vector_get_data(vectors[13]))[rows] = row.phase0 != 0;
+        ((bool *)duckdb_vector_get_data(vectors[14]))[rows] = row.phase1 != 0;
+        ((bool *)duckdb_vector_get_data(vectors[15]))[rows] = row.phase_present != 0;
+        ((bool *)duckdb_vector_get_data(vectors[16]))[rows] = row.phase_set_present != 0;
+        if (row.phase_set_present) ((int64_t *)duckdb_vector_get_data(vectors[17]))[rows] = row.phase_set;
+        else duckdb_validity_set_row_invalid(duckdb_vector_get_validity(vectors[17]), rows);
+        ((int32_t *)duckdb_vector_get_data(vectors[18]))[rows] = row.assigned_allele;
+        ((bool *)duckdb_vector_get_data(vectors[19]))[rows] = row.contributes != 0;
+        duckdb_vector_assign_string_element_len(vectors[20], rows, (const char *)row.cds, row.cds_length);
+        duckdb_vector_assign_string_element_len(vectors[21], rows, (const char *)row.protein, row.protein_length);
+        ((int64_t *)duckdb_vector_get_data(vectors[22]))[rows] = row.nominal_length_diff;
+        duckdb_vector_assign_string_element(vectors[23], rows, duckvep_arrangement_prediction_status(row.prediction_status));
+        ((uint64_t *)duckdb_vector_get_data(vectors[24]))[rows] = row.consequence_mask;
+        duckdb_vector_assign_string_element(vectors[25], rows,
+            row.hypothetical ? "hypothetical_assignment" : "reference_replay");
+        rows++;
+    }
+    duckdb_data_chunk_set_size(output, rows);
+}
+
+static void register_arrangements(duckdb_connection connection, duckvep_registry_t *registry) {
+    duckdb_table_function function = duckdb_create_table_function();
+    duckdb_logical_type string = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
+    duckdb_logical_type integer = duckdb_create_logical_type(DUCKDB_TYPE_UBIGINT);
+    duckdb_table_function_set_name(function, "duckvep_haplotype_arrangements");
+    duckdb_table_function_add_parameter(function, string);
+    duckdb_table_function_add_parameter(function, string);
+    duckdb_table_function_add_named_parameter(function, "max_sites", integer);
+    duckdb_table_function_add_named_parameter(function, "max_calls", integer);
+    duckdb_table_function_add_named_parameter(function, "max_arrangements", integer);
+    duckdb_table_function_add_named_parameter(function, "max_replays", integer);
+    duckvep_registry_retain(registry);
+    duckdb_table_function_set_extra_info(function, registry, duckvep_registry_release);
+    duckdb_table_function_set_bind(function, arrangement_bind);
+    duckdb_table_function_set_init(function, arrangement_init);
+    duckdb_table_function_set_function(function, arrangement_scan);
+    (void)duckdb_register_table_function(connection, function);
+    duckdb_destroy_table_function(&function);
+    duckdb_destroy_logical_type(&integer); duckdb_destroy_logical_type(&string);
+}
+
 void duckvep_register_haplotypes(duckdb_connection connection, duckvep_registry_t *registry) {
     duckdb_table_function function = duckdb_create_table_function();
     duckdb_logical_type string = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
@@ -709,6 +933,7 @@ void duckvep_register_haplotypes(duckdb_connection connection, duckvep_registry_
     duckdb_destroy_table_function(&function);
     duckdb_destroy_logical_type(&string); duckdb_destroy_logical_type(&integer);
     duckdb_destroy_logical_type(&boolean);
+    register_arrangements(connection, registry);
     register_coding_transcripts(connection, registry);
     duckvep_register_coding_calls(connection, registry);
 }

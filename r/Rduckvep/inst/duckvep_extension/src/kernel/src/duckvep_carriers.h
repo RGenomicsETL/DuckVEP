@@ -51,7 +51,9 @@ enum {
     /* Private replay tag: a retained source call consumes REF at this slot.
      * Distinguishes executable REF from an omitted missing-call observation.
      * Removed before public contributor/leaf evidence is emitted. */
-    DUCKVEP_CARRIER_REFERENCE_REPLAY = 16u
+    DUCKVEP_CARRIER_REFERENCE_REPLAY = 16u,
+    /* Explicit hypothetical assignment; never observed genotype/phase evidence. */
+    DUCKVEP_CARRIER_HYPOTHETICAL = 32u
 };
 
 typedef struct {

@@ -58,6 +58,33 @@ COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UI
 SELECT CASE WHEN duckvep_haplotype_drop('dropped') AND NOT duckvep_haplotype_drop('dropped') THEN true ELSE error('drop of a staged job') END;
 -- expect error: is not staged
 SELECT count(*) FROM duckvep_haplotype_scan('dropped');
+-- Dropping an arrangement job releases its staged calls and permits reuse of the job name.
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'arrangement-dropped', MODEL 'temp-model', STAGE 'arrangements', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN duckvep_haplotype_drop('arrangement-dropped') AND NOT duckvep_haplotype_drop('arrangement-dropped') THEN true ELSE error('drop of an arrangement job') END;
+-- expect error: is not staged
+SELECT count(*) FROM duckvep_haplotype_arrangements('arrangement-dropped');
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'arrangement-dropped', MODEL 'temp-model', STAGE 'arrangements', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN (SELECT count(*) FROM duckvep_haplotype_arrangements('arrangement-dropped')) = 2 THEN true ELSE error('reuse of a dropped arrangement job') END;
+-- expect error: is not staged
+SELECT count(*) FROM duckvep_haplotype_arrangements('arrangement-dropped');
+-- Arrangement limits are checked before staging, and a failed replay consumes its job without publishing rows.
+-- expect error: invalid bounded limits
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'arrangement-invalid', MODEL 'temp-model', STAGE 'arrangements', MAX_CALLS 0, USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+-- expect error: bounded workspace overflows size_t or capacity
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'arrangement-invalid', MODEL 'temp-model', STAGE 'arrangements', MAX_REPLAYS 1073741824, USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+-- expect error: bounded workspace overflows size_t or capacity
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'arrangement-invalid', MODEL 'temp-model', STAGE 'arrangements', MAX_REPLAYS 9223372036854775807, USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+-- expect error: is not staged
+SELECT count(*) FROM duckvep_haplotype_arrangements('arrangement-invalid');
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'arrangement-capacity', MODEL 'temp-model', STAGE 'arrangements', MAX_REPLAYS 1, USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+-- expect error: alternative/replay capacity exceeded before publication
+SELECT count(*) FROM duckvep_haplotype_arrangements('arrangement-capacity');
+-- expect error: is not staged
+SELECT count(*) FROM duckvep_haplotype_arrangements('arrangement-capacity');
+-- Vectorized arrangement builders preserve each row's integer option.
+SET threads=4;
+SELECT CASE WHEN count(*) = 65536 AND bool_and(contains(duckvep_haplotype_arrangements_load_sql('SELECT 1', 'temp-model', 'builder', {'max_calls': (i % 8 + 1)::UBIGINT})[1], 'max_calls ' || (i % 8 + 1)::VARCHAR)) THEN true ELSE error('vectorized arrangement builder options') END FROM range(65536) r(i);
+SET threads=1;
 -- A failed COPY stages nothing.
 -- expect error: boom
 COPY (SELECT error('boom')::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'failed', MODEL 'temp-model', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
@@ -120,9 +147,17 @@ SELECT duckvep_model_publish('');
 -- expect error: reference_fasta must be a non-empty string
 SELECT duckvep_model_publish('temp-model', {'reference_fasta': ''});
 
+-- A prepared arrangement scan rejects a released model and consumes its job on failure.
+COPY (SELECT 1::UBIGINT, 1::UINTEGER, 120::UBIGINT, 'A', 'C', 1::UINTEGER, 0::UINTEGER, 0::UINTEGER, [0, 1]::INTEGER[], [false, true]::BOOLEAN[], NULL::BIGINT, [NULL]::BIGINT[], 1::BIGINT, 1::BIGINT, 1::BIGINT) TO 'x' (FORMAT duckvep_stage, JOB 'arrangement-released-model', MODEL 'temp-model', STAGE 'arrangements', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+PREPARE released_arrangement AS SELECT count(*) FROM duckvep_haplotype_arrangements('arrangement-released-model');
 -- Restaging a relation replaces its rows; the drop releases the model.
 SELECT CASE WHEN duckvep_model_drop('temp-model') AND duckvep_model_drop('uncommitted') THEN true ELSE error('drop of published models') END;
 SELECT CASE WHEN _duckvep_model_fingerprint('temp-model') IS NULL THEN true ELSE error('dropped model is gone') END;
+-- expect error: unknown model name
+EXECUTE released_arrangement;
+-- expect error: is not staged
+EXECUTE released_arrangement;
+DEALLOCATE released_arrangement;
 
 -- The statements duckvep_model_load_sql returns load a model.
 SELECT CASE WHEN len(duckvep_model_load_sql('m1', 'SELECT 1', 'SELECT 2', 'SELECT 3')) = 4 AND len(duckvep_model_load_sql('m1', 'SELECT 1', 'SELECT 2', 'SELECT 3', {'mature_mirna_query': 'SELECT 4', 'reference_fasta': '/x', 'transcript_coverage_complete': true})) = 5 THEN true ELSE error('statement counts') END;
