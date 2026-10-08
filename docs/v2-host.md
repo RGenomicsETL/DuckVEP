@@ -1,6 +1,16 @@
-# DuckDB C API v2 host (preview)
+# DuckDB hosts and release profile
 
-DuckVEP has two independently built DuckDB C API hosts. The v1 host is the default source build. The v2 host targets DuckDB's C API v2 through a pinned preview SDK; its ABI is not frozen across DuckDB snapshots.
+DuckVEP has two independently built DuckDB C API hosts. **Stable C API v1 is the default native build and the community-submission target.** It works on released DuckDB 1.5.x. The v2 host is a separate preview workflow with a pinned SDK; its ABI is not frozen across DuckDB snapshots.
+
+## Stable-v1 submission profile
+
+The merged implementation passes the complete 35-file SQL suite on released DuckDB 1.5.6 (`069cc9f9b5`), alongside the existing DuckDB 1.5.1 CLI and R `duckdb` 1.5.5 qualification. Native distribution CI covers Linux and macOS x86_64/ARM64, Windows MinGW x86_64, and wasm. R package Windows ARM checks are separate from native MSVC extension qualification.
+
+The profile includes documented independent-event annotation and the bounded haplotype domains: observed-phase coding replay, nonoverlapping compound literal HGVS, explicit diploid phase alternatives, equal-length exonic noncoding/UTR replay, and conditional typed-curation peptide pairs. The [function reference](functions.md) and [haplotype contract](../design/duckvep_haplotype_contract.md) define the admission rules, fields and exclusions. Hypotheses are not observed cis; conditional recoding is not an unconditional biological prediction.
+
+Community submission requires the native, stable-v1 SQL, memory/lifecycle, package/platform and generated-source checks to pass for the pinned source revision, together with executable documentation and accurate scope. Broader work in [#11](https://github.com/RGenomicsETL/DuckVEP/issues/11) and [#50](https://github.com/RGenomicsETL/DuckVEP/issues/50) stays open. A defect within the declared profile remains a blocker; completing every future domain or qualifying an unreleased v2 runtime does not gate this stable-v1 submission.
+
+The community entry is being prepared, not yet published. Use the [source-build instructions](../README.md#install) for local evaluation. Signed publication is coordinated with CRAN: a community PR is not a signed release or a CRAN submission.
 
 ## Host and distribution boundaries
 
@@ -11,7 +21,7 @@ DuckVEP has two independently built DuckDB C API hosts. The v1 host is the defau
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
 | Headers | `duckdb_capi/` | pinned `duckdb_capi_v2/` |
 
-The R package builds and loads the v1 host. Community repository submission remains gated on open issues #11, #48 and #50; #48 awaits DuckDB 2.0 and R `duckdb` 2.0 on CRAN. Switching the default host also waits for DuckDB 2.0.0 and R `duckdb` 2.0 on CRAN.
+The R package builds and loads the v1 host. Its `v1.2.0` extension API marker is a C API compatibility version, not a claim that every SQL workflow was tested on DuckDB 1.2. [#48](https://github.com/RGenomicsETL/DuckVEP/issues/48) governs released-v2 qualification and the default-host switch; it requires released DuckDB 2.0.0 and R `duckdb` 2.0 on CRAN. Preview parity does not satisfy that gate, and that future switch is separate from the stable-v1 community submission.
 
 `host_v2/` is a separate CMake project. A v1 build does not compile or link its sources. Both hosts compile the host-neutral implementation in `src/kernel/` and `src/core/`; the v1 adapter is in `src/`, and the v2 adapter is in `host_v2/`. The adapters translate DuckDB vectors and callbacks to the shared row logic and write host-specific results.
 
@@ -33,7 +43,7 @@ DUCKVEP_V2_DUCKDB=.deps-v2/duckdb-build/duckdb make test_v2
 
 `make test_v2` checks the SDK pin, builds the separate host, verifies that the binary exports only `duckvep_init_c_api_v2` and imports no `duckdb_*` symbols, checks the `C_STRUCT` / `v2.0.0` footer, and runs `test/scripts/check_v2_host.py static`. The static gate confirms that v2 calls are stable functions from the pinned header and that `src/core/` and `src/kernel/` contain no DuckDB API calls.
 
-The runtime suite tests repeated `LOAD` on writable and read-only databases, with no catalog DDL or database-file changes; v2-only SQL assertions; model and budget behavior; and the 585 cases in `test/sql_v2/equality_golden.json`. The golden records v1 results. When `build/release/duckvep.duckdb_extension` exists, the runner also checks those results against the live v1 extension. `test/sql_v2/README.md` documents the SQL and the separate whole-HG002 check.
+The runtime suite tests repeated `LOAD` on writable and read-only databases, with no catalog DDL or database-file changes; v2-only SQL assertions; model and budget behavior; and the 601 cases in `test/sql_v2/equality_golden.json`. The golden records v1 results. When `build/release/duckvep.duckdb_extension` exists, the runner also checks those results against the live v1 extension. `test/sql_v2/README.md` documents the SQL and the separate whole-HG002 check.
 
 ## Release preflight
 

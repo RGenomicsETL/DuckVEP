@@ -1,8 +1,16 @@
 # Function reference
 
-DuckVEP registers 29 public SQL functions: 24 scalar functions and 5 table functions. This page lists all of them, grouped by purpose. Internal helpers whose names start with `_duckvep_` or `__duckvep_` are implementation details and are not documented. `scripts/check-function-docs.py` (`make check-function-docs`) fails when this page misses or adds a public function relative to `duckdb_functions()`, and it runs every example below.
+The public SQL API for the **stable C API v1 build on released DuckDB 1.5.x**, grouped by task. This is the default build and the community-submission profile. The optional [v2 preview host](v2-host.md) has different model and haplotype staging workflows; its release/default-switch gate is separate.
 
-Every `sql` example on this page runs against the fixture model in `test/data/duckvep/readme.sql`, in the order it appears on the page: later examples use tables created by earlier ones. Blocks marked `sql no-run` are illustrative fragments or need external data.
+Start with the question you want to ask:
+
+- **What does each allele change?** Load a [transcript model](#model-build-and-load), then use the [annotation builders](#annotation-sql-builders). Filter and join their results as ordinary relations.
+- **What do variants do together?** Use [haplotype replay](#duckvep_haplotypes) for observed phase, or [bounded arrangements](#duckvep_haplotype_arrangements) for explicitly labelled diploid hypotheses.
+- **How much memory can this job use?** Set the [native budget and worker limits](#resource-control) before loading models and running queries.
+
+`scripts/check-function-docs.py` (`make check-function-docs`) checks this catalogue against `duckdb_functions()` and executes its examples. Internal `_duckvep_` and `__duckvep_` helpers are not public interfaces.
+
+The `sql` examples use the fixture in [`test/data/duckvep/readme.sql`](../test/data/duckvep/readme.sql), in page order: later examples use tables created by earlier ones. Blocks marked `sql no-run` are illustrative fragments or need external data.
 
 ## Conventions
 
@@ -16,7 +24,7 @@ FROM query(duckvep_annotate_sql('demo_events', 'demo', {hgvs: true}))
 
 **Options go in a trailing STRUCT.** Optional settings are the fields of one final STRUCT argument (`{hgvs: true}` or `struct_pack(hgvs := true)`), never named function parameters: the stable DuckDB C API used by this extension has no named scalar arguments, so `hgvs := true` written as a bare argument does not bind. An unknown field, or a field with the wrong type, is an error that names the option. A field set to NULL keeps the default. A builder that takes no options rejects any field.
 
-**Table functions take named parameters.** `duckvep_model_load` and `duckvep_haplotypes` are table functions and use ordinary `name := value` parameters (`duckvep_coding_calls` takes two positional arguments).
+**Table functions take named parameters.** `duckvep_model_load` and `duckvep_haplotypes` use ordinary `name := value` parameters (`duckvep_coding_calls` takes two positional arguments). On v1, query-taking model and haplotype functions read through a private connection to the same database: their inputs must be committed permanent relations. Caller TEMP tables and uncommitted rows remain usable by the SQL builders executed in the caller's connection, but not by these private-query functions.
 
 **Unknown is a value.** When a result cannot be computed (a missing reference sequence, a reference mismatch, an unsupported allele) the row carries a status and a reason instead of a guess.
 
