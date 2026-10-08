@@ -468,6 +468,65 @@ uint64_t duckvep_effect_eval_coding_delta(const duckvep_sequence_delta_t *delta)
     return pre ? duckvep_effect_eval(pre) : 0u;
 }
 
+duckvep_haplotype_noncoding_status_t duckvep_effect_eval_haplotype_noncoding(
+    const uint8_t *reference,
+    size_t         reference_len,
+    const uint8_t *alternate,
+    size_t         alternate_len,
+    uint32_t       coding_start1,
+    uint32_t       coding_end1,
+    uint64_t      *out_so_mask) {
+    size_t i;
+    uint8_t changed_utr5 = 0u;
+    uint8_t changed_coding_or_noncoding = 0u;
+    uint8_t changed_utr3 = 0u;
+
+    if (out_so_mask == NULL) return DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT;
+    *out_so_mask = 0u;
+    if (reference == NULL || alternate == NULL || reference_len == 0u ||
+        reference_len > UINT32_MAX)
+        return DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT;
+    if (reference_len != alternate_len)
+        return DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_LENGTH_CHANGE;
+    if ((coding_start1 == 0u) != (coding_end1 == 0u) ||
+        coding_start1 > coding_end1 || coding_end1 > reference_len)
+        return DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT;
+
+    for (i = 0u; i < reference_len; i++) {
+        uint32_t position1;
+        if (reference[i] == alternate[i]) continue;
+        if (coding_start1 == 0u) {
+            changed_coding_or_noncoding = 1u;
+            continue;
+        }
+        position1 = (uint32_t)(i + 1u);
+        if (position1 < coding_start1)
+            changed_utr5 = 1u;
+        else if (position1 > coding_end1)
+            changed_utr3 = 1u;
+        else
+            changed_coding_or_noncoding = 1u;
+    }
+
+    if (!changed_utr5 && !changed_coding_or_noncoding && !changed_utr3)
+        return DUCKVEP_HAPLOTYPE_NONCODING_NO_CHANGE;
+    if ((changed_utr5 + changed_coding_or_noncoding + changed_utr3) != 1u)
+        return DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_MIXED_FEATURE;
+    if (coding_start1 == 0u) {
+        *out_so_mask = duckvep_effect_eval(
+            DUCKVEP_PRE(DUCKVEP_PRE_EXON) |
+            DUCKVEP_PRE(DUCKVEP_PRE_NONCODING) |
+            DUCKVEP_PRE(DUCKVEP_PRE_NONCODING_EXON));
+    } else if (changed_utr5) {
+        *out_so_mask = duckvep_effect_eval(DUCKVEP_PRE(DUCKVEP_PRE_UTR5));
+    } else if (changed_utr3) {
+        *out_so_mask = duckvep_effect_eval(DUCKVEP_PRE(DUCKVEP_PRE_UTR3));
+    } else {
+        return DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_MIXED_FEATURE;
+    }
+    return DUCKVEP_HAPLOTYPE_NONCODING_OK;
+}
+
 void duckvep_effect_ctx_apply_delta(
     duckvep_effect_ctx_t           *ctx,
     const duckvep_sequence_delta_t *delta) {

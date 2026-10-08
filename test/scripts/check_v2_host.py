@@ -12,13 +12,14 @@
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-BINARY = ROOT / "build/release_v2/duckvep.duckdb_extension"
+BINARY = Path(os.environ.get("DUCKVEP_V2_EXTENSION", ROOT / "build/release_v2/duckvep.duckdb_extension"))
 PIN = json.loads((ROOT / "duckvep-package.json").read_text())["v2_host"]
 
 

@@ -1738,7 +1738,7 @@ SELECT loaded FROM duckvep_model_load(
   'SELECT * FROM duckvep_test_exons ORDER BY transcript_index, exon_start'
 );
 ----
-transcript query must return 11 CDS-only columns or 13 with complete pre_cds_sequence and post_cds_sequence
+transcript query must return 11 CDS-only columns, 13 with complete pre_cds_sequence and post_cds_sequence, or 14 with optional cdna_sequence
 
 # Missing-flank diagnostics are retained on the CDS-only model.
 query TTT

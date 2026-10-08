@@ -7,6 +7,7 @@
 
 #include "host_v2_common.h"
 #include "core/duckvep_core_model.h"
+#include "core/duckvep_core_haplotypes.h"
 
 #define V2_VEC_KIDS 16
 
@@ -25,6 +26,8 @@ typedef struct v2_vec {
 } v2_vec;
 
 #define V2_CALL_INPUTS 32
+/* Flat wrappers serve scalar arguments or table-function result columns. */
+#define V2_CALL_COLUMNS ((V2_CALL_INPUTS > DUCKVEP_HAP_OUTPUT_COLUMNS) ? V2_CALL_INPUTS : DUCKVEP_HAP_OUTPUT_COLUMNS)
 #define V2_CALL_POOL 192
 
 typedef struct v2_call {
@@ -33,7 +36,7 @@ typedef struct v2_call {
     void *user_data;
     size_t rows;
     size_t argc;
-    v2_vec inputs[V2_CALL_INPUTS];
+    v2_vec inputs[V2_CALL_COLUMNS];
     v2_vec output;
     v2_vec pool[V2_CALL_POOL];
     size_t pool_used;

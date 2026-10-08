@@ -23,8 +23,8 @@ extern const uint64_t duckvep_hap_limit_defaults[DUCKVEP_HAP_LIMIT_COUNT];
 /* Whether `value` is an acceptable setting of limit `index` (a named option of the function). */
 int duckvep_hap_limit_valid(unsigned index, uint64_t value);
 
-#define DUCKVEP_HAP_OUTPUT_COLUMNS 32u
-/* The output column `index` (0..30): its name and its type as SQL text; `source_records` selects the eight-field
+#define DUCKVEP_HAP_OUTPUT_COLUMNS 36u
+/* The output column `index`: its name and its type as SQL text; `source_records` selects the eight-field
  * contributors record. */
 const char *duckvep_hap_column_name(unsigned index);
 const char *duckvep_hap_column_type(unsigned index, int source_records);
@@ -62,6 +62,7 @@ typedef struct {
     /* source_records: the parsed raw GT struct (seven UINTEGER fields) and the selection flag. */
     uint32_t raw[7];
     int source_selected;
+    const struct duckvep_hap_replay_context *replay;
 } duckvep_hap_row_t;
 
 typedef struct {
@@ -72,16 +73,52 @@ typedef struct {
 
 typedef struct duckvep_hap_state duckvep_hap_state_t;
 
+typedef enum {
+    DUCKVEP_HAP_REPLAY_OBSERVED = 0,
+    DUCKVEP_HAP_REPLAY_HYPOTHETICAL_ALT = 1
+} duckvep_hap_replay_kind_t;
+
+/* A caller-owned hypothetical partition. This is interpretation metadata,
+ * never observed genotype or phase-set evidence. */
+typedef struct duckvep_hap_replay_context {
+    duckvep_hap_replay_kind_t kind;
+    uint32_t partition;
+    uint16_t lane;
+} duckvep_hap_replay_context_t;
+
+typedef struct {
+    uint32_t transcript;
+    const uint8_t *cds, *protein;
+    size_t cds_length, protein_length;
+    int64_t nominal_length_diff;
+    duckvep_prediction_status_t prediction_status;
+    duckvep_prediction_reason_t prediction_reason;
+    uint64_t consequence_mask;
+    uint8_t hypothetical;
+} duckvep_hap_prediction_t;
+
+typedef int (*duckvep_hap_prediction_sink_t)(void *context, const duckvep_hap_prediction_t *prediction,
+    char *error, size_t error_size);
+
 /* Allocates the bounded workspace and initializes the stream; NULL with `error` set (config limits exceeded, invalid
  * model). The state keeps a copy of the config; the model must outlive it. */
 duckvep_hap_state_t *duckvep_hap_open(const duckvep_hap_config_t *config, char *error, size_t error_size);
 void duckvep_hap_close(duckvep_hap_state_t *state);
 /* Bytes of the bounded workspace in use (the calls query text is charged against the same limit). */
 size_t duckvep_hap_workspace_bytes(const duckvep_hap_state_t *state);
+/* Computes the same bounded allocation charge as open without allocating it. */
+int duckvep_hap_workspace_estimate(const duckvep_hap_config_t *config, size_t *bytes);
 
 /* Writes up to `capacity` result rows to the host chunk `output` (opaque here: duckvep_h_chunk), pulling input as it
  * needs it. Returns 1 with *rows the number written (0 at the end of the stream), 0 with `error` set. */
 int duckvep_hap_scan(duckvep_hap_state_t *state, const duckvep_hap_input_t *input, void *output, size_t capacity,
     size_t *rows, char *error, size_t error_size);
+/* Replays a complete input through the same preallocated stream without publishing
+ * default-haplotype evidence. Prediction bytes are borrowed until the next replay. */
+int duckvep_hap_replay(duckvep_hap_state_t *state, const duckvep_hap_input_t *input,
+    duckvep_hap_prediction_sink_t sink, void *sink_context, char *error, size_t error_size);
+/* Replays the cached reference CDS and shared translation without a source variant. */
+int duckvep_hap_reference(duckvep_hap_state_t *state, uint32_t transcript,
+    duckvep_hap_prediction_t *prediction, char *error, size_t error_size);
 
 #endif

@@ -130,7 +130,9 @@ Per-corpus consequence counts
 
 ## Whole haplotypes
 
-VEP 116 does not define whole-haplotype consequences. The coding-only [`duckvep-coding` contract](design/duckvep_haplotype_contract.md) uses pinned `bcftools csq` where transcript models and phase semantics are comparable. Independent base-R goldens and hand-derived checks cover supported cases outside csq’s domain: non-diploid calls, alleles over 50 bases, nonstandard genetic codes, and incomplete CDS starts or ends. Unsupported inputs retain explicit statuses and reasons.
+VEP 116 does not define whole-haplotype consequences. The [`duckvep-coding` contract](design/duckvep_haplotype_contract.md) uses pinned `bcftools csq` where transcript models and phase semantics are comparable. Independent base-R goldens and hand-derived checks cover supported cases outside csq’s domain: non-diploid calls, alleles over 50 bases, nonstandard genetic codes, and incomplete CDS starts or ends. Unsupported inputs retain explicit statuses and reasons.
+
+Bounded extensions cover compound literal DNA HGVS with observed-cis evidence, explicit diploid phase alternatives, and equal-length exonic noncoding/UTR replay against the final transcript allele. Typed curated translations expose separate, explicitly conditional reference/alternate peptides; they do not assert preserved biological recoding competence or replace raw compatibility proteins. See the [function reference](docs/functions.md#duckvep_haplotype_arrangements) for inputs and limits.
 
 The pinned full-HG002 qualification for [issue \#34](https://github.com/RGenomicsETL/DuckVEP/issues/34) recorded one-core, cold-process medians against the Ensembl 116 model: 17.25 s for csq, 8.21 s for the fused-reader CLI path (2.10×, including DuckVEP model load), and 8.60 s for the R path (2.01×). The [qualification method and receipts](benchmarks/data/haplotype_scale/README.md) identify the input and run contract.
 

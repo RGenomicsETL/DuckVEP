@@ -12,6 +12,7 @@
 #include "host_v2_columns.h"
 #include "host_v2_stage.h"
 
+#include "core/duckvep_core_arrangements.h"
 #include "core/duckvep_core_discovery.h"
 #include "core/duckvep_core_haplotype_script.h"
 #include "core/duckvep_core_haplotypes.h"
@@ -31,6 +32,8 @@ struct hap_bind {
     bool has_hgvs, hgvs;
     bool has_limit[DUCKVEP_HAP_LIMIT_COUNT];
     uint64_t limit[DUCKVEP_HAP_LIMIT_COUNT];
+    bool has_arrangement_limit[DUCKVEP_ARRANGEMENT_LIMIT_COUNT];
+    uint64_t arrangement_limit[DUCKVEP_ARRANGEMENT_LIMIT_COUNT];
 };
 
 static bool same_name(const duckdb_v2_identifier_t *name, const char *text) {
@@ -209,6 +212,21 @@ bool host_v2_hap_bind_option(hap_bind *bind, const duckdb_v2_identifier_t *name,
             goto cleanup;
         }
     }
+    for (unsigned i = 0; i < DUCKVEP_ARRANGEMENT_LIMIT_COUNT; ++i) {
+        if (same_name(name, duckvep_arrangement_limit_names[i])) {
+            uint64_t number = 0;
+            *consumed = true;
+            if (duckdb_v2_value_is_null(value, &is_null, &detail) || is_null || !value_to_u64(value, &number, &detail)) {
+                (void)snprintf(message, sizeof message, "duckvep_haplotype_arrangements: invalid %s",
+                               duckvep_arrangement_limit_names[i]);
+                INPUT_ERROR(message);
+            }
+            bind->has_arrangement_limit[i] = true;
+            bind->arrangement_limit[i] = number;
+            ok = true;
+            goto cleanup;
+        }
+    }
     ok = true; /* not a job option */
 cleanup:
     (void)duckdb_v2_error_info_destroy(&detail);
@@ -237,21 +255,86 @@ bool host_v2_hap_bind_finish(hap_bind *bind, model_state *state, duckdb_v2_conte
     char message[DUCKVEP_SQL_ERROR_SIZE + 128];
     duckvep_model_entry_t *entry = NULL;
     duckvep_hap_config_t config;
-    bool plan = false, ok = false, policy_valid = true;
+    duckvep_arrangement_config_t arrangement_config;
+    bool plan = false, arrangements = false, ok = false, policy_valid = true;
     if (!*bind->job || !model || !*model) {
         set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID,
                   "duckvep_haplotypes: the JOB and MODEL options are required and must be non-empty");
         return false;
     }
-    if (bind->stage && strcmp(bind->stage, "plan_input") != 0 && strcmp(bind->stage, "calls") != 0) {
-        set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, "duckvep_haplotypes: STAGE must be 'calls' or 'plan_input'");
+    if (bind->stage && strcmp(bind->stage, "plan_input") != 0 && strcmp(bind->stage, "calls") != 0 &&
+        strcmp(bind->stage, "arrangements") != 0) {
+        set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID,
+                  "duckvep_haplotypes: STAGE must be 'calls', 'plan_input' or 'arrangements'");
         return false;
     }
     plan = bind->stage && strcmp(bind->stage, "plan_input") == 0;
+    arrangements = bind->stage && strcmp(bind->stage, "arrangements") == 0;
     entry = duckvep_registry_pin(state->registry, model);
     if (!entry) {
         set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, "duckvep_haplotypes: unknown model name");
         return false;
+    }
+    if (arrangements) {
+        size_t *limits[DUCKVEP_ARRANGEMENT_LIMIT_COUNT] = {
+            &arrangement_config.max_sites, &arrangement_config.max_calls,
+            &arrangement_config.max_arrangements, &arrangement_config.max_replays
+        };
+        if (bind->policy || bind->mode || bind->has_hgvs) {
+            set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID,
+                      "duckvep_haplotype_arrangements: phase_policy, input_mode and hgvs are not supported");
+            goto cleanup;
+        }
+        for (unsigned i = 0; i < DUCKVEP_HAP_LIMIT_COUNT; ++i) {
+            if (bind->has_limit[i]) {
+                set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID,
+                          "duckvep_haplotype_arrangements: haplotype replay limits are not supported");
+                goto cleanup;
+            }
+        }
+        duckvep_arrangement_config_defaults(&arrangement_config, &entry->model);
+        for (unsigned i = 0; i < DUCKVEP_ARRANGEMENT_LIMIT_COUNT; ++i) {
+            if (bind->has_arrangement_limit[i]) {
+                if (bind->arrangement_limit[i] > SIZE_MAX) {
+                    (void)snprintf(message, sizeof message, "duckvep_haplotype_arrangements: invalid %s",
+                                   duckvep_arrangement_limit_names[i]);
+                    set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, message);
+                    goto cleanup;
+                }
+                *limits[i] = (size_t)bind->arrangement_limit[i];
+            }
+        }
+        if (!duckvep_arrangement_config_check(&arrangement_config, message, sizeof message)) {
+            set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, message);
+            goto cleanup;
+        }
+        if (layout->columns != duckvep_hap_input_columns(0)) {
+            set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID,
+                      "duckvep_haplotype_arrangements: the staged query must return 15 columns (run the statements of "
+                      "duckvep_haplotype_arrangements_load_sql)");
+            goto cleanup;
+        }
+        for (unsigned i = 0; i < layout->columns; ++i) {
+            const char *expected = duckvep_hap_input_type(0, i);
+            if (!type_matches(layout->types[i], expected)) {
+                (void)snprintf(message, sizeof message,
+                               "duckvep_haplotype_arrangements: staged column %u must be %s (run the statements of "
+                               "duckvep_haplotype_arrangements_load_sql)", i + 1, expected);
+                set_error(*error, DUCKDB_V2_ERROR_INPUT_INVALID, message);
+                goto cleanup;
+            }
+        }
+        layout->model = text_copy(bind->job, strlen(bind->job));
+        layout->relation = text_copy(HAP_RELATION_ARRANGEMENTS, strlen(HAP_RELATION_ARRANGEMENTS));
+        layout->hap_model = text_copy(model, strlen(model));
+        if (!layout->model || !layout->relation || !layout->hap_model) {
+            set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_stage: out of memory");
+            goto cleanup;
+        }
+        arrangement_config.model = NULL;
+        layout->arrangements = arrangement_config;
+        ok = true;
+        goto cleanup;
     }
     duckvep_hap_config_defaults(&config, &entry->model);
     config.policy = DUCKVEP_PHASE_STRICT;
@@ -733,6 +816,215 @@ cleanup:
 }
 
 /* ---------------------------------------------------------------------------
+ * duckvep_haplotype_arrangements(job): replay a strict staged diploid input
+ * ------------------------------------------------------------------------- */
+
+typedef struct {
+    scan_state input;
+    duckvep_arrangement_state_t *core;
+} arrangement_scan_state;
+
+static void arrangement_scan_state_destroy(void *pointer) {
+    arrangement_scan_state *s = pointer;
+    if (!s) return;
+    duckvep_arrangement_close(s->core);
+    job_scan_close(&s->input.scan);
+    host_v2_stage_destroy(s->input.scan.staged);
+    if (s->input.entry) duckvep_registry_unpin(s->input.state->registry, s->input.entry);
+    host_v2_state_release(s->input.state);
+    free(s);
+}
+
+static void arrangement_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckdb_v2_context_handle context,
+                                  duckdb_v2_error_info_handle *error) {
+    static const char *const names[DUCKVEP_ARRANGEMENT_COLUMN_COUNT] = {
+        "hypothesis_id", "hypothesis_lane", "hypothesis_reference_lane", "event_index", "seq_region", "position",
+        "reference", "alternate", "alt_index", "transcript_index", "sample_index", "original_allele0",
+        "original_allele1", "original_phase_before0", "original_phase_before1", "original_phase_before_present",
+        "original_phase_set_present", "original_phase_set", "assigned_allele", "contributes", "cds", "protein",
+        "nominal_length_diff", "prediction_status", "consequence_mask", "prediction_semantics"
+    };
+    static const char *const types[DUCKVEP_ARRANGEMENT_COLUMN_COUNT] = {
+        "UBIGINT", "USMALLINT", "BOOLEAN", "UBIGINT", "UINTEGER", "UBIGINT", "VARCHAR", "VARCHAR",
+        "UINTEGER", "UINTEGER", "UINTEGER", "INTEGER", "INTEGER", "BOOLEAN", "BOOLEAN", "BOOLEAN",
+        "BOOLEAN", "BIGINT", "INTEGER", "BOOLEAN", "VARCHAR", "VARCHAR", "BIGINT", "VARCHAR", "UBIGINT",
+        "VARCHAR"
+    };
+    duckdb_v2_error_info_handle detail = NULL;
+    duckdb_v2_logical_type_handle type = NULL;
+    model_state *state = NULL;
+    scan_bind *bind = calloc(1, sizeof(*bind));
+    stage *staged = NULL;
+    char message[256];
+    bool owned = false;
+    if (!bind) {
+        set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_haplotype_arrangements: out of memory");
+        return;
+    }
+    DUCKDB_CALL(duckdb_v2_table_function_bind_get_user_data(info, (void **)&state, &detail));
+    bind->job = bind_argument(info, 0, error);
+    if (!bind->job || !*bind->job) INPUT_ERROR("duckvep_haplotype_arrangements: job must be a non-empty string");
+    staged = host_v2_stage_acquire(state, bind->job, HAP_RELATION_ARRANGEMENTS);
+    if (!staged) {
+        (void)snprintf(message, sizeof message,
+                       "duckvep_haplotype_arrangements: job '%s' is not staged (run the statements of "
+                       "duckvep_haplotype_arrangements_load_sql first; a job is scanned once)", bind->job);
+        INPUT_ERROR(message);
+    }
+    host_v2_stage_destroy(staged);
+    staged = NULL;
+    for (unsigned i = 0; i < DUCKVEP_ARRANGEMENT_COLUMN_COUNT; ++i) {
+        DUCKDB_CALL(make_type(context, types[i], &type, &detail));
+        DUCKDB_CALL(duckdb_v2_table_function_bind_add_result_column(info, string_view(names[i]), type, &detail));
+        DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
+    }
+    {
+        duckdb_v2_opaque data = {bind, scan_bind_destroy, NULL};
+        DUCKDB_CALL(duckdb_v2_table_function_bind_set_bind_data(info, &data, &detail));
+        owned = true;
+    }
+cleanup:
+    if (staged) host_v2_stage_destroy(staged);
+    if (!owned) scan_bind_destroy(bind);
+    (void)duckdb_v2_logical_type_destroy(&type);
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+static void arrangement_init_exec(duckdb_v2_table_function_init_global_info_handle info, duckdb_v2_context_handle context,
+                                  duckdb_v2_error_info_handle *error) {
+    duckdb_v2_error_info_handle detail = NULL;
+    model_state *state = NULL;
+    scan_bind *bind = NULL;
+    arrangement_scan_state *s = calloc(1, sizeof(*s));
+    duckvep_hap_input_t input;
+    duckvep_arrangement_config_t config;
+    char message[DUCKVEP_SQL_ERROR_SIZE + 256];
+    bool owned = false;
+    if (!s) {
+        set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_haplotype_arrangements: out of memory");
+        return;
+    }
+    DUCKDB_CALL(duckdb_v2_table_function_init_global_get_user_data(info, (void **)&state, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_init_global_get_bind_data(info, (void **)&bind, &detail));
+    s->input.state = state;
+    host_v2_state_retain(state);
+    s->input.scan.staged = host_v2_stage_take(state, bind->job, HAP_RELATION_ARRANGEMENTS);
+    if (!s->input.scan.staged) {
+        (void)snprintf(message, sizeof message,
+                       "duckvep_haplotype_arrangements: job '%s' is not staged (a job is scanned once)", bind->job);
+        INPUT_ERROR(message);
+    }
+    s->input.entry = duckvep_registry_pin(state->registry, s->input.scan.staged->hap_model);
+    if (!s->input.entry) INPUT_ERROR("duckvep_haplotype_arrangements: unknown model name");
+    if (s->input.entry->model.lifted) {
+        INPUT_ERROR("duckvep_haplotype_arrangements: replay is not supported for models with wrapped circular objects");
+    }
+    config = s->input.scan.staged->arrangements;
+    config.model = &s->input.entry->model;
+    s->core = duckvep_arrangement_open(&config, message, sizeof message);
+    if (!s->core) {
+        char final_message[DUCKVEP_SQL_ERROR_SIZE + 256];
+        report(*error, duckvep_sql_final_error(final_message, sizeof final_message, message, message));
+        goto cleanup;
+    }
+    s->input.source_records = false;
+    if (!job_scan_open(&s->input.scan, context, message, sizeof message)) INPUT_ERROR(message);
+    input.context = &s->input;
+    input.next = scan_input_next;
+    if (!duckvep_arrangement_load(s->core, &input, message, sizeof message)) {
+        char final_message[DUCKVEP_SQL_ERROR_SIZE + 256];
+        report(*error, duckvep_sql_final_error(final_message, sizeof final_message, message, message));
+        goto cleanup;
+    }
+    job_scan_close(&s->input.scan);
+    host_v2_stage_destroy(s->input.scan.staged);
+    s->input.scan.staged = NULL;
+    /* The arrangement engine has fully validated its charged input before it yields a row. */
+    DUCKDB_CALL(duckdb_v2_table_function_init_global_set_max_threads(info, 1, &detail));
+    {
+        duckdb_v2_opaque data = {s, arrangement_scan_state_destroy, NULL};
+        DUCKDB_CALL(duckdb_v2_table_function_init_global_set_global_state(info, &data, &detail));
+        owned = true;
+    }
+cleanup:
+    if (!owned) arrangement_scan_state_destroy(s);
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+static void arrangement_exec(duckdb_v2_table_function_exec_info_handle info, duckdb_v2_context_handle context,
+                             duckdb_v2_error_info_handle *error) {
+    (void)context;
+    duckdb_v2_error_info_handle detail = NULL;
+    arrangement_scan_state *s = NULL;
+    duckdb_v2_data_chunk_handle chunk = NULL;
+    v2_call *call = calloc(1, sizeof(*call));
+    const size_t capacity = duckvep_h_vector_size();
+    size_t rows = 0;
+    if (!call) {
+        set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_haplotype_arrangements: out of memory");
+        return;
+    }
+    DUCKDB_CALL(duckdb_v2_table_function_exec_get_global_state(info, (void **)&s, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_exec_get_output_chunk(info, &chunk, &detail));
+    call->error = error;
+    call->rows = capacity;
+    call->argc = DUCKVEP_ARRANGEMENT_COLUMN_COUNT;
+    for (unsigned i = 0; i < DUCKVEP_ARRANGEMENT_COLUMN_COUNT; ++i) {
+        duckdb_v2_vector_handle vector = NULL;
+        DUCKDB_CALL(duckdb_v2_data_chunk_get_vector(chunk, i, &vector, &detail));
+        if (!v2_open_writable(call, &call->inputs[i], vector, capacity, true)) goto cleanup;
+    }
+    while (rows < capacity) {
+        duckvep_arrangement_row_t row;
+        v2_vec *v = call->inputs;
+        if (!duckvep_arrangement_next(s->core, &row)) break;
+        ((uint64_t *)v[0].data)[rows] = row.hypothesis_id;
+        ((uint16_t *)v[1].data)[rows] = row.lane;
+        ((bool *)v[2].data)[rows] = row.reference_lane != 0;
+        ((uint64_t *)v[3].data)[rows] = row.event_id;
+        ((uint32_t *)v[4].data)[rows] = row.chrom;
+        ((uint64_t *)v[5].data)[rows] = row.position;
+        duckvep_h_assign_string(&v[6], rows, (const char *)row.reference, row.reference_length);
+        duckvep_h_assign_string(&v[7], rows, (const char *)row.alternate, row.alternate_length);
+        ((uint32_t *)v[8].data)[rows] = row.allele_index;
+        ((uint32_t *)v[9].data)[rows] = row.transcript;
+        ((uint32_t *)v[10].data)[rows] = row.sample;
+        ((int32_t *)v[11].data)[rows] = row.allele0;
+        ((int32_t *)v[12].data)[rows] = row.allele1;
+        ((bool *)v[13].data)[rows] = row.phase0 != 0;
+        ((bool *)v[14].data)[rows] = row.phase1 != 0;
+        ((bool *)v[15].data)[rows] = row.phase_present != 0;
+        ((bool *)v[16].data)[rows] = row.phase_set_present != 0;
+        if (row.phase_set_present) ((int64_t *)v[17].data)[rows] = row.phase_set;
+        else mark_null(v[17].validity, rows);
+        ((int32_t *)v[18].data)[rows] = row.assigned_allele;
+        ((bool *)v[19].data)[rows] = row.contributes != 0;
+        duckvep_h_assign_string(&v[20], rows, (const char *)row.cds, row.cds_length);
+        duckvep_h_assign_string(&v[21], rows, (const char *)row.protein, row.protein_length);
+        ((int64_t *)v[22].data)[rows] = row.nominal_length_diff;
+        {
+            const char *status = duckvep_arrangement_prediction_status(row.prediction_status);
+            duckvep_h_assign_string(&v[23], rows, status, strlen(status));
+        }
+        ((uint64_t *)v[24].data)[rows] = row.consequence_mask;
+        {
+            const char *semantics = row.hypothetical ? "hypothetical_assignment" : "reference_replay";
+            duckvep_h_assign_string(&v[25], rows, semantics, strlen(semantics));
+        }
+        if (call->failed) goto cleanup;
+        ++rows;
+    }
+    if (rows != capacity) {
+        for (unsigned i = 0; i < DUCKVEP_ARRANGEMENT_COLUMN_COUNT; ++i) {
+            DUCKDB_CALL(duckdb_v2_vector_set_size(call->inputs[i].handle, rows, &detail));
+        }
+    }
+cleanup:
+    free(call);
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+/* ---------------------------------------------------------------------------
  * _duckvep_haplotype_plan(job): the record plan of a source_records job
  * ------------------------------------------------------------------------- */
 
@@ -1102,6 +1394,158 @@ cleanup:
 }
 
 /* ---------------------------------------------------------------------------
+ * duckvep_haplotype_arrangements_load_sql(calls_query, model, job [, options])
+ * ------------------------------------------------------------------------- */
+
+#define ARRANGEMENT_SCRIPT_OPTIONS DUCKVEP_ARRANGEMENT_LIMIT_COUNT
+
+typedef struct {
+    bool has_limit[DUCKVEP_ARRANGEMENT_LIMIT_COUNT];
+    uint64_t limit[DUCKVEP_ARRANGEMENT_LIMIT_COUNT];
+} arrangement_script_options;
+
+static int arrangement_script(const char *query, const char *model, const char *job,
+                              const arrangement_script_options *settings, duckvep_sql_text *out,
+                              char *message, size_t message_size) {
+    duckvep_sql_text input = {0};
+    char number[48];
+    bool ok;
+    int code = duckvep_core_arrangement_input_sql(query, &input, message, message_size);
+    if (code) return code;
+    ok = duckvep_sql_append(out, "COPY (\n") && duckvep_sql_append(out, input.data) &&
+        duckvep_sql_append(out, "\n) TO 'duckvep_stage' (FORMAT duckvep_stage, JOB ") &&
+        duckvep_sql_literal(out, job) && duckvep_sql_append(out, ", MODEL ") && duckvep_sql_literal(out, model) &&
+        duckvep_sql_append(out, ", STAGE 'arrangements'");
+    for (unsigned i = 0; ok && i < DUCKVEP_ARRANGEMENT_LIMIT_COUNT; ++i) {
+        if (!settings->has_limit[i]) continue;
+        (void)snprintf(number, sizeof number, " %llu", (unsigned long long)settings->limit[i]);
+        ok = duckvep_sql_append(out, ", ") && duckvep_sql_append(out, duckvep_arrangement_limit_names[i]) &&
+            duckvep_sql_append(out, number);
+    }
+    ok = ok && duckvep_sql_append(out, ", USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)");
+    duckvep_sql_free(&input);
+    if (!ok) {
+        duckvep_sql_free(out);
+        (void)snprintf(message, message_size, "%s", "duckvep_haplotype_arrangements_load_sql: out of memory");
+        return 1;
+    }
+    return 0;
+}
+
+static void arrangement_load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb_v2_context_handle context,
+                                      duckdb_v2_error_info_handle *error) {
+    const char *keys[ARRANGEMENT_SCRIPT_OPTIONS];
+    duckvep_core_option_kind_t kinds[ARRANGEMENT_SCRIPT_OPTIONS];
+    duckdb_v2_error_info_handle detail = NULL;
+    duckdb_v2_vector_handle arguments[4] = {0};
+    column strings[3];
+    options option;
+    duckdb_v2_vector_handle output = NULL, child = NULL;
+    void *list_data = NULL, *child_data = NULL;
+    uint64_t *list_validity = NULL;
+    duckdb_v2_arena_handle arena = NULL;
+    idx_t rows = 0;
+    uint32_t argc = 0;
+    hap_script *scripts = NULL;
+    (void)context;
+    for (unsigned i = 0; i < ARRANGEMENT_SCRIPT_OPTIONS; ++i) {
+        keys[i] = duckvep_arrangement_limit_names[i];
+        kinds[i] = DUCKVEP_CORE_OPTION_INTEGER;
+    }
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &rows, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, &detail));
+    for (uint32_t i = 0; i < argc; ++i) {
+        DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg(info, i, &arguments[i], &detail));
+    }
+    for (uint32_t i = 0; i < 3; ++i) {
+        if (!column_open(arguments[i], false, &strings[i], error)) goto cleanup;
+    }
+    if (!options_open(argc == 4 ? arguments[3] : NULL, keys, kinds, ARRANGEMENT_SCRIPT_OPTIONS, &option, error)) {
+        goto cleanup;
+    }
+    scripts = calloc(rows ? rows : 1, sizeof(*scripts));
+    if (!scripts) {
+        set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_haplotype_arrangements_load_sql: out of memory");
+        goto cleanup;
+    }
+    for (idx_t row = 0; row < rows; ++row) {
+        char *values[3] = {0};
+        arrangement_script_options settings = {0};
+        duckvep_cell_t cell;
+        char message[256];
+        const char *failure = NULL;
+        int built = 0;
+        if (!options_check(&option, row, error)) goto cleanup;
+        for (uint32_t i = 0; i < 3; ++i) {
+            if (column_valid(&strings[i], row)) {
+                duckdb_v2_str text = string_at(&strings[i].view, row);
+                values[i] = duckvep_core_string_copy(text.ptr, text.len);
+            }
+            if (!values[i] || !*values[i]) {
+                failure = "duckvep_haplotype_arrangements_load_sql: the calls query, model and job must be non-empty strings";
+            }
+        }
+        for (unsigned i = 0; !failure && i < DUCKVEP_ARRANGEMENT_LIMIT_COUNT; ++i) {
+            if (option_cell(&option, i, row, &cell)) {
+                bool negative = cell.kind == DUCKVEP_CELL_TINYINT || cell.kind == DUCKVEP_CELL_SMALLINT ||
+                                cell.kind == DUCKVEP_CELL_INTEGER || cell.kind == DUCKVEP_CELL_BIGINT
+                                    ? cell.i < 0 : false;
+                if (!cell.valid || negative ||
+                    ((cell.kind == DUCKVEP_CELL_TINYINT || cell.kind == DUCKVEP_CELL_SMALLINT ||
+                      cell.kind == DUCKVEP_CELL_INTEGER || cell.kind == DUCKVEP_CELL_BIGINT) && cell.i == 0) ||
+                    (!(cell.kind == DUCKVEP_CELL_TINYINT || cell.kind == DUCKVEP_CELL_SMALLINT ||
+                       cell.kind == DUCKVEP_CELL_INTEGER || cell.kind == DUCKVEP_CELL_BIGINT) && cell.u == 0)) {
+                    (void)snprintf(message, sizeof message, "duckvep_haplotype_arrangements_load_sql: invalid %s",
+                                   duckvep_arrangement_limit_names[i]);
+                    failure = message;
+                } else {
+                    settings.has_limit[i] = true;
+                    settings.limit[i] = cell.kind == DUCKVEP_CELL_TINYINT || cell.kind == DUCKVEP_CELL_SMALLINT ||
+                                        cell.kind == DUCKVEP_CELL_INTEGER || cell.kind == DUCKVEP_CELL_BIGINT
+                                            ? (uint64_t)cell.i : cell.u;
+                }
+            }
+        }
+        if (!failure) {
+            built = arrangement_script(values[0], values[1], values[2], &settings, &scripts[row].statements[0],
+                                       message, sizeof message);
+            scripts[row].count = built ? 0u : 1u;
+            if (built == 1) failure = "duckvep_haplotype_arrangements_load_sql: out of memory";
+            else if (built == 2) failure = message;
+        }
+        if (failure) report(*error, failure);
+        for (size_t i = 0; i < 3; ++i) duckvep_budget_free(values[i]);
+        if (failure) goto cleanup;
+    }
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_result(info, &output, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_flatten(output, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_set_size(output, rows, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(output, &list_data, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(output, &list_validity, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_get_child(output, 0, &child, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_set_size(child, rows, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_get_data_mutable(child, &child_data, &detail));
+    DUCKDB_CALL(duckdb_v2_vector_get_arena(child, &arena, &detail));
+    {
+        uint64_t *child_validity = NULL;
+        DUCKDB_CALL(duckdb_v2_vector_flat_get_validity_mutable(child, &child_validity, &detail));
+        for (idx_t row = 0; row < rows; ++row) mark_valid(child_validity, row);
+    }
+    for (idx_t row = 0; row < rows; ++row) {
+        ((duckdb_v2_list_entry *)list_data)[row] = (duckdb_v2_list_entry){row, 1};
+        mark_valid(list_validity, row);
+        DUCKDB_CALL(write_string(arena, &((duckdb_v2_bytes *)child_data)[row], scripts[row].statements[0].data,
+                                 scripts[row].statements[0].length, &detail));
+    }
+cleanup:
+    if (scripts) {
+        for (idx_t row = 0; row < rows; ++row) duckvep_sql_free(&scripts[row].statements[0]);
+        free(scripts);
+    }
+    (void)duckdb_v2_error_info_destroy(&detail);
+}
+
+/* ---------------------------------------------------------------------------
  * duckvep_haplotype_drop(job): releases a staged job that will not be scanned
  * ------------------------------------------------------------------------- */
 
@@ -1138,7 +1582,8 @@ static void drop_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb_v2
             INPUT_ERROR("duckvep_haplotype_drop: job must be a non-empty string");
         }
         while ((s = host_v2_stage_take(state, name, HAP_RELATION_CALLS)) != NULL ||
-               (s = host_v2_stage_take(state, name, HAP_RELATION_PLAN)) != NULL) {
+               (s = host_v2_stage_take(state, name, HAP_RELATION_PLAN)) != NULL ||
+               (s = host_v2_stage_take(state, name, HAP_RELATION_ARRANGEMENTS)) != NULL) {
             host_v2_stage_destroy(s);
             found = true;
         }
@@ -1391,12 +1836,18 @@ bool host_v2_register_haplotypes(duckdb_v2_extension_handle extension, duckdb_v2
                                       script_names, 3, "VARCHAR[]", load_sql_exec, error) &&
            register_scalar_with_state(extension, context, NULL, "duckvep_haplotype_load_sql", script_types,
                                       script_names, 4, "VARCHAR[]", load_sql_exec, error) &&
+           register_scalar_with_state(extension, context, NULL, "duckvep_haplotype_arrangements_load_sql",
+                                      script_types, script_names, 3, "VARCHAR[]", arrangement_load_sql_exec, error) &&
+           register_scalar_with_state(extension, context, NULL, "duckvep_haplotype_arrangements_load_sql",
+                                      script_types, script_names, 4, "VARCHAR[]", arrangement_load_sql_exec, error) &&
            register_scalar_with_state(extension, context, state, "duckvep_haplotype_drop", one_type, one_name, 1,
                                       "BOOLEAN", drop_exec, error) &&
            register_scalar_with_state(extension, context, state, "duckvep_coding_transcripts", discovery_types,
                                       discovery_names, 5, "UINTEGER[]", coding_transcripts_exec, error) &&
            register_job_table(extension, context, state, "duckvep_haplotype_scan", scan_bind_exec, scan_init_exec,
                               scan_exec, error) &&
+           register_job_table(extension, context, state, "duckvep_haplotype_arrangements", arrangement_bind_exec,
+                              arrangement_init_exec, arrangement_exec, error) &&
            register_job_table(extension, context, state, "_duckvep_haplotype_plan", plan_bind_exec, plan_init_exec,
                               plan_exec, error) &&
            host_v2_register_coding_calls(extension, context, state, error);

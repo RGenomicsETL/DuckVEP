@@ -48,6 +48,7 @@ FROM query(duckvep_annotate_sql('demo_events', 'demo', {hgvs: true}))
 | | [`duckvep_coding_transcripts`](#duckvep_coding_transcripts) | scalar | List the transcripts whose coding sequence a VCF record overlaps. |
 | | [`duckvep_coding_calls`](#duckvep_coding_calls) | table | Read a VCF or BCF into the calls of `duckvep_haplotypes`, decoding only records that touch coding sequence. |
 | | [`duckvep_haplotypes`](#duckvep_haplotypes) | table | Replay phased calls into whole-haplotype CDS, protein and consequence rows. |
+| | [`duckvep_haplotype_arrangements`](#duckvep_haplotype_arrangements) | table | Enumerate and replay bounded diploid phase hypotheses, retaining original call identity. |
 | [Geometry and helpers](#geometry-and-helpers) | [`duckvep_allele_geometry`](#duckvep_allele_geometry) | scalar | Normalized coordinates of one small allele. |
 | | [`duckvep_breakend_geometry`](#duckvep_breakend_geometry) | scalar | Parse a breakend ALT into its mate coordinate and replacement sequence. |
 | [Resource control](#resource-control) | [`duckvep_native_budget`](#duckvep_native_budget) | table | Report native memory use per owner. |
@@ -192,7 +193,7 @@ Parameters (positional):
 | --- | --- |
 | `name` | Non-empty model name. Loading an existing name is an error. |
 | `regions_query` | A SELECT returning `seq_region`, and optionally `sequence_length`, `seq_region_name` and `circular`. |
-| `transcripts_query` | A SELECT returning either the 11 CDS-only columns or the 13-column form ending in `pre_cds_sequence` and `post_cds_sequence`. Only the complete form can resolve length-changing edits that cross the CDS start or end; otherwise those return `missing_transcript_flank`. |
+| `transcripts_query` | A SELECT returning the 11 CDS-only columns, the 13-column form ending in `pre_cds_sequence` and `post_cds_sequence`, or 14 columns with a final `cdna_sequence`. Complete flanks resolve length-changing edits that cross the CDS start or end; otherwise those return `missing_transcript_flank`. Complete exon-spliced cDNA supports bounded noncoding RNA replay. |
 | `exons_query` | A SELECT returning `transcript_index`, `exon_start`, `exon_end`, `exon_cdna_start`, `exon_cdna_end`, `phase` and `end_phase`. |
 
 Named parameters:
@@ -201,7 +202,7 @@ Named parameters:
 | --- | --- | --- |
 | `transcript_coverage_complete` | BOOLEAN | Default false. Only a model loaded with true reports `intergenic_variant` where no loaded transcript lies; a partial model returns an unresolved result there. NULL is an error. |
 | `interval_feature_query` | VARCHAR | Regulatory and motif features: feature ordinal, region ordinal, inclusive start, inclusive end and kind (1 RegulatoryFeature, 2 MotifFeature), ordered by region, start and ordinal. |
-| `peptide_edit_query` | VARCHAR | Curated peptide edits: transcript ordinal, one-based protein position and an uppercase replacement amino acid, unique and ordered by transcript and position. |
+| `peptide_edit_query` | VARCHAR | Curated peptide edits: transcript ordinal, one-based protein position and an uppercase replacement amino acid, unique and ordered by transcript and position. An optional fourth `edit_code` column carries `_selenocysteine`, `_stop_codon_rt`, `initial_met` or `amino_acid_sub` for conditional prediction. Three-column metadata remains reference-peptide compatible but does not qualify for conditional prediction. |
 | `mature_mirna_query` | VARCHAR | Mature miRNA ranges: transcript ordinal, inclusive genomic start and end, ordered by transcript and start. |
 | `reference_fasta` | VARCHAR | Path to an indexed reference FASTA. Needed to shift and render HGVS notation. Requires `seq_region`, `sequence_length` and `seq_region_name` in the region query. |
 
@@ -840,7 +841,7 @@ Named parameters:
 | --- | --- | --- | --- |
 | `phase_policy` | VARCHAR | `'strict'` | `'strict'` interprets GT and PS strictly; `'vep_compat'` follows the called-slot order of the pinned executable VEP release (today 116). |
 | `input_mode` | VARCHAR | `'alt_events'` | `'alt_events'` for decoded per-ALT calls, or `'source_records'` for raw GT text, which requires `phase_policy := 'vep_compat'`. |
-| `hgvs` | BOOLEAN | false | Request bounded protein HGVS for supported completed paths (`hgvsp`, `hgvsp_status`). |
+| `hgvs` | BOOLEAN | false | Request bounded DNA and protein HGVS for supported completed paths (`hgvsc`, `hgvsc_status`, `hgvsp`, `hgvsp_status`). |
 
 Capacity limits are positive integers. A path that would exceed one is an error, never a truncated result. Defaults: `max_active_events` 16384, `max_active_transcripts` 4096, `max_active_carriers` 65536, `max_active_prefixes` 262144, `max_active_projections` 262144, `max_allele_bytes` 8388608, `max_leaf_events` 4096, `max_leaf_edits` 65536, `max_sequence_bases` 1048576, `max_ploidy` 64 (at most 65535), `max_phase_sets` 1024, `max_alignment_cells` 16777216, `max_leaf_differences` 65536, `max_hgvs_operations` 65536, `max_hgvs_bytes` 1048576, `max_hgvs_reference_bytes` 262144 and `workspace_limit` 268435456 bytes.
 
@@ -858,13 +859,19 @@ Returns:
 | `coding_blocks`, `normalized_edits` | STRUCT[] | Physical edits grouped by shared codon or displaced frame, and the differing CDS edit islands with their source event. |
 | `cds_differences`, `protein_differences` | STRUCT[] | Aligned differing runs (`ref_start0`, `alt_start0`, `reference`, `alternate`, `alignment_start0`). |
 | `stop_in_displaced_frame` | BOOLEAN | Whether the first stop codon overlaps a frame-displaced span. |
-| `hgvsp`, `hgvsp_status` | VARCHAR | Protein HGVS and its status (`not_requested` when `hgvs` is false). |
+| `hgvsc`, `hgvsc_status` | VARCHAR | Compound DNA HGVS for supported nonoverlapping literal edits with strict observed-cis evidence; other paths retain a refusal reason. |
+| `hgvsp`, `hgvsp_status` | VARCHAR | Protein HGVS and its status (`not_requested` when `hgvs` is false). Conditional curated predictions are explicitly labelled. |
 | `prediction_policy`, `prediction_status`, `prediction_reason` | VARCHAR | The versioned contract (`duckvep-coding`) and whether a path is in its supported domain: complete phased calls of any ploidy, literal alleles of any length, and CDSs in any supported genetic code, including those whose start or end is not annotated. |
 | `carrier_predictions` | STRUCT[] | The per-carrier keyed result, with impact, consequences and NMD. |
 | `haplotype_consequences`, `haplotype_impact` | VARCHAR[], VARCHAR | The whole-protein Sequence Ontology set and IMPACT of the edited sequence, NULL unless `prediction_status` is `predicted`. |
 | `nmd_rule`, `nmd_prediction`, `nmd_stop_position`, `nmd_junction_position`, `nmd_contributors` | VARCHAR, VARCHAR, UBIGINT, UBIGINT, UBIGINT[] | The whole-haplotype NMD prediction under rule `ejc50` and its evidence. |
 | `nmd_exceptions` | VARCHAR | Exceptions to the junction rule that apply to a premature stop, reported beside the prediction without changing it: `start_proximal` (the stop codon lies within the first 100 coding bases) and `long_exon` (the stop lies in an exon of the edited transcript longer than 407 bases), comma-separated; NULL when none applies. |
-| `nominal_length_diff` | BIGINT | Signed sum of projected replacement ALT-minus-REF lengths. |
+| `prediction_reference_protein`, `prediction_protein` | VARCHAR | Separate paired peptides for `conditional_assumed_recoding`; NULL outside that admitted profile. Raw `cds` and `protein` remain compatibility replay operands. |
+| `nominal_length_diff` | BIGINT | Final column of the 36-column relation: signed sum of projected replacement ALT-minus-REF lengths. |
+
+Complete exonic noncoding cDNA and coding-transcript UTR replay admits equal-length literal changes outside internal splice edges. It contrasts the reference with the final transcript allele rather than unioning independent-event consequences. Intronic, splice, regulatory and length-changing noncoding composition remain unsupported.
+
+Conditional curated prediction requires complete framed CDS and nonoverlapping CDS substitutions. A typed programme is inherited only at an unchanged reference codon; a changed codon uses ordinary translation. `conditional_assumed_recoding` asserts this programme, not preserved biological recoding competence. Its unconditional consequence fields remain NULL and NMD is unknown.
 
 `nmd_prediction` is an EJC-distance heuristic on the whole haplotype, not a union of single-allele results and not the VEP NMD plugin.
 
@@ -878,6 +885,30 @@ FROM demo_events WHERE position IN (124, 125);
 SELECT transcript_index, carrier_count, sequence_status, length(contributors) AS contributors,
        protein_differences
 FROM duckvep_haplotypes('SELECT * FROM demo_calls', 'demo', hgvs := true);
+```
+
+<a id="duckvep_haplotype_arrangements"></a>
+
+### duckvep_haplotype_arrangements
+
+Enumerates bounded biallelic heterozygous diploid phase hypotheses and replays each through the loaded model. Observed phase blocks constrain the alternatives; swapping both lanes globally does not create a second hypothesis. Original calls, GT and PS remain separate from the hypothetical assignment. This sibling relation does not change strict observed-cis admission in `duckvep_haplotypes`.
+
+```text
+duckvep_haplotype_arrangements(calls_query VARCHAR, model_name VARCHAR
+  [, max_sites := UBIGINT] [, max_calls := UBIGINT]
+  [, max_arrangements := UBIGINT] [, max_replays := UBIGINT]) -> TABLE
+```
+
+Input is the `alt_events` query shape above. Positive limits default to 16 sites, 64 calls, 128 arrangements and 256 replays. All inputs, capacities and replays are checked before publishing rows. Empty lanes replay the cached reference, not an invented REF=ALT source event.
+
+The 26 columns contain hypothesis identity and lane, original event/alleles/phase fields, the assigned allele and `contributes`, replayed `cds` and `protein`, `nominal_length_diff`, native `prediction_status`, `consequence_mask` and `prediction_semantics` (`hypothetical_assignment` or `reference_replay`). Curated conditional peptides are not exposed by this relation; that interaction reports unsupported. See the [haplotype contract](../design/duckvep_haplotype_contract.md) for field semantics and the [v2 host guide](v2-host.md) for its caller-executed staging workflow.
+
+```sql
+SELECT hypothesis_id, hypothesis_lane, event_index, original_allele0,
+       original_allele1, contributes, protein, prediction_semantics
+FROM duckvep_haplotype_arrangements(
+  'SELECT * REPLACE ([0,1]::INTEGER[] AS alleles,
+                    NULL::BOOLEAN[] AS phase_before) FROM demo_calls', 'demo');
 ```
 
 ---

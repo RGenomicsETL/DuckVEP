@@ -8,6 +8,7 @@
 #include "host_v2_model.h"
 
 #include "core/duckvep_core_cells.h"
+#include "core/duckvep_core_arrangements.h"
 #include "core/duckvep_core_haplotypes.h"
 
 #include <pthread.h>
@@ -17,6 +18,7 @@
 /* The relations of a haplotype job. */
 #define HAP_RELATION_CALLS "haplotype_calls"
 #define HAP_RELATION_PLAN "haplotype_plan_input"
+#define HAP_RELATION_ARRANGEMENTS "haplotype_arrangements"
 
 typedef struct stage {
     char *model;    /* the staging key: a model name, or a job name */
@@ -30,6 +32,7 @@ typedef struct stage {
     /* A haplotype job's settings (the options of its COPY). */
     char *hap_model;
     duckvep_hap_config_t hap;
+    duckvep_arrangement_config_t arrangements;
     int refs; /* the registry, plus each scan that shares the stage */
     struct stage *next;
 } stage;

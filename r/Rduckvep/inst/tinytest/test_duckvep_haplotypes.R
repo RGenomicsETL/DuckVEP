@@ -1228,7 +1228,7 @@ local({
     # from Haplosaurus's contrast against the curated reference protein.
     expect_equal(p_hgvs$hgvsp, c("p.(Ala2=)", "p.(Ala3=)", rep("p.(Ala2=)", 3L), NA_character_))
     expect_equal(p_hgvs$hgvsp_status, c(rep("ok", 5L), "missing_reference_protein"))
-    fields <- setdiff(names(p), c("hgvsp", "hgvsp_status"))
+    fields <- setdiff(names(p), c("hgvsc", "hgvsc_status", "hgvsp", "hgvsp_status"))
     expect_equal(p_hgvs[fields], p[fields])
   }
   p_equal <- rduckvep_haplotypes(con, paste("SELECT * REPLACE ('CTGG' AS alternate) FROM (",

@@ -113,7 +113,7 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 21	NULL	1	unsupported_context	noncanonical_start
 22	NULL	1	unsupported_context	internal_stop
 23	NULL	1	unsupported_context	noncanonical_stop
-24	NULL	1	unsupported_context	curated_transcript
+24	NULL	1	unsupported_context	untyped_curated_metadata
 25	NULL	1	predicted	supported_domain
 26	NULL	1	predicted	supported_domain
 30	NULL	1	predicted	supported_domain
@@ -266,13 +266,13 @@ GROUP BY ALL ORDER BY ALL
 ----
 edit_conflict	contradictory_edits	edit_conflict	1
 predicted	supported_domain	ok	10
-unsupported_context	curated_transcript	ok	1
 unsupported_context	internal_stop	ok	1
 unsupported_context	invalid_allele	unavailable_projection	1
 unsupported_context	noncanonical_start	ok	1
 unsupported_context	noncanonical_stop	ok	1
 unsupported_context	outside_cds	unavailable_projection	2
 unsupported_context	reference_mismatch	unavailable_projection	1
+unsupported_context	untyped_curated_metadata	ok	1
 unsupported_overlap	ambiguous_same_gap_insertions	edit_conflict	1
 unsupported_overlap	duplicate_edits	edit_conflict	1
 unsupported_overlap	overlapping_edits	edit_conflict	1

@@ -16,10 +16,11 @@ stopifnot(all(file.exists(c(reference_path, model_path, cases_path, adapter_path
 Sys.setenv(PYTHONDONTWRITEBYTECODE = "1")
 
 cases <- lapply(readLines(cases_path), jsonlite::fromJSON, simplifyVector = FALSE)
+cases <- Filter(function(case) !is.null(case$expected_normalized_description), cases)
 case_ids <- vapply(cases, `[[`, "", "case_id")
 reference_ids <- vapply(cases, `[[`, "", "reference_id")
 transcript_ids <- vapply(cases, `[[`, "", "transcript_id")
-stopifnot(length(cases) == 4L, !anyDuplicated(case_ids),
+stopifnot(length(cases) == 6L, !anyDuplicated(case_ids),
   all(vapply(cases, function(x) length(x$edits) == 2L, logical(1L))),
   all(vapply(cases, function(x) x$strand %in% c("+", "-"), logical(1L))))
 edits <- unlist(lapply(cases, `[[`, "edits"), recursive = FALSE)
@@ -29,10 +30,12 @@ positions <- vapply(edits, `[[`, numeric(1L), "position")
 references <- vapply(edits, `[[`, "", "reference")
 alternates <- vapply(edits, `[[`, "", "alternate")
 stopifnot(all(is.finite(positions)), all(positions > 0L),
-  all(positions == floor(positions)), all(nchar(references) == 1L),
-  all(nchar(alternates) == 1L))
+  all(positions == floor(positions)), all(nzchar(references)),
+  all(vapply(cases, function(x) all(vapply(x$edits, function(edit)
+    nzchar(edit$reference) || nzchar(edit$alternate), logical(1L))), logical(1L))))
 
 descriptions <- vapply(cases, function(x) {
+  if (!is.null(x$input_description)) return(x$input_description)
   edits <- vapply(x$edits, function(edit) paste0(edit$position, edit$reference,
     ">", edit$alternate), "")
   paste0(x$reference_id, "(", x$transcript_id, "):c.[", paste(edits, collapse = ";"), "]")
@@ -47,7 +50,7 @@ sequences <- vapply(seq_along(fasta_headers), function(i) {
 }, "")
 names(sequences) <- fasta_ids
 stopifnot(!anyDuplicated(fasta_ids), all(nchar(sequences) == 104L),
-  setequal(unique(reference_ids), fasta_ids))
+  all(unique(reference_ids) %in% fasta_ids))
 
 gff <- readLines(model_path)
 gff_rows <- gff[nzchar(gff) & !startsWith(gff, "#")]

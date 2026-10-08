@@ -286,6 +286,17 @@ typedef struct duckvep_exon_model {
  * string-, FASTA-, and allocation-free: it only ever sees A/C/G/T/N bytes. The
  * pool is OPTIONAL — a structural-only or fully non-coding model passes NULL, and
  * a non-coding transcript carries cds_length[t] == 0. */
+typedef enum duckvep_peptide_edit_code {
+    /* Zero denotes legacy or otherwise untyped metadata. It remains valid for
+     * reference-peptide compatibility but cannot support conditional prediction. */
+    DUCKVEP_PEPTIDE_EDIT_UNTYPED = 0,
+    DUCKVEP_PEPTIDE_EDIT_INITIAL_MET = 1,
+    DUCKVEP_PEPTIDE_EDIT_SELENOCYSTEINE = 2,
+    DUCKVEP_PEPTIDE_EDIT_STOP_CODON_RT = 3,
+    DUCKVEP_PEPTIDE_EDIT_AMINO_ACID_SUB = 4,
+    DUCKVEP_PEPTIDE_EDIT_RNA_EDIT = 5
+} duckvep_peptide_edit_code_t;
+
 typedef struct duckvep_sequence_pool {
     const uint8_t  *cds_bytes;     /* shared CDS byte pool, all transcripts concatenated */
     size_t          cds_bytes_len; /* total bytes in cds_bytes (bounds offset+length)    */
@@ -306,6 +317,9 @@ typedef struct duckvep_sequence_pool {
     const uint32_t *peptide_edit_offset;    /* [transcript_count + 1] */
     const uint32_t *peptide_edit_position1; /* [peptide_edit_count]   */
     const uint8_t  *peptide_edit_alt;       /* [peptide_edit_count]   */
+    /* NULL preserves legacy untyped metadata. Non-NULL is the source edit_code
+     * normalized to duckvep_peptide_edit_code_t for every edit. */
+    const uint8_t  *peptide_edit_code;      /* OPTIONAL [peptide_edit_count] */
     size_t          peptide_edit_count;
     /* Cold transcript-oriented sequence outside the CDS. Pre- and post-CDS
      * slices share one byte pool; offsets and lengths are per transcript. A
@@ -319,6 +333,13 @@ typedef struct duckvep_sequence_pool {
     const uint64_t *post_cds_offset;
     const uint32_t *post_cds_length;
     uint8_t         flanks_complete;
+    /* Optional immutable exon-spliced cDNA. Entries with a zero length have
+     * no complete transcript reference and cannot support RNA replay. */
+    const uint8_t  *cdna_bytes;
+    size_t          cdna_bytes_len;
+    const uint64_t *cdna_offset;
+    const uint32_t *cdna_length;
+    uint8_t         cdna_provided;
 } duckvep_sequence_pool_t;
 
 /* ----------------------------------------------------------- compact output

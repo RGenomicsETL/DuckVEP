@@ -848,6 +848,72 @@ TEST hgvs_haplotype_terminal_insertion_replays_complete_sequence(void) {
     PASS();
 }
 
+/* HGVS protein delins keeps changes separated by an unchanged residue individual. */
+TEST hgvs_haplotype_separated_substitutions_follow_protein_delins_rule(void) {
+    static const uint8_t reference[] =
+        "ATGGCTGAATTCCCTGGTTCTGACCAGACTAAGCGTCAAGGAAATGGCTCGCTTGAATATCCAGCTGGTTAA";
+    duckvep_haplotype_edit_t edits[2] = {
+        {4u, 1u, reference + 3u, 1u, (const uint8_t *)"A", 1},
+        {10u, 1u, reference + 9u, 1u, (const uint8_t *)"C", 1}
+    };
+    duckvep_haplotype_edit_t descending[2] = {edits[1], edits[0]};
+    duckvep_edit_set_t set = {descending, 2u};
+    uint8_t cds[96], rp[32], ap[32];
+    duckvep_coding_context_t context;
+    ASSERT_EQ(DUCKVEP_CODING_CONTEXT_OK, duckvep_coding_context_build(
+        reference, sizeof reference - 1u, &set, 1, DUCKVEP_CODON_TABLE_STANDARD,
+        cds, sizeof cds, rp, sizeof rp, ap, sizeof ap, &context));
+    ASSERT_MEM_EQ("MAEFPGSDQTKRQGNGSLEYPAG*", rp, context.ref_peptide_len);
+    ASSERT_MEM_EQ("MTELPGSDQTKRQGNGSLEYPAG*", ap, context.alt_peptide_len);
+    duckvep_haplotype_block_t blocks[2];
+    size_t block_count, count, required;
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK,
+        duckvep_haplotype_partition(edits, 2u, blocks, 2u, &block_count));
+    duckvep_hgvs_protein_reference_t protein_reference = {rp, context.ref_peptide_len};
+    duckvep_hgvs_protein_operation_t operations[2];
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_protein_haplotype_build(
+        &context, &protein_reference, edits, 2u, blocks, block_count, 0u,
+        operations, 2u, &count));
+    ASSERT_EQ(2u, count);
+    char rendered[96];
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_protein_haplotype_render(
+        operations, count, 1, rendered, sizeof rendered, &required));
+    ASSERT_STR_EQ("p.[(Ala2Thr;Phe4Leu)]", rendered);
+    PASS();
+}
+
+TEST hgvs_haplotype_distant_substitutions_use_whole_peptide_contrast(void) {
+    static const uint8_t reference[] =
+        "ATGGCTGAATTCCCTGGTTCTGACCAGACTAAGCGTCAAGGAAATGGCTCGCTTGAATATCCAGCTGGTTAA";
+    duckvep_haplotype_edit_t edits[2] = {
+        {4u, 1u, reference + 3u, 1u, (const uint8_t *)"A", 1},
+        {55u, 1u, reference + 54u, 1u, (const uint8_t *)"A", 1}
+    };
+    duckvep_haplotype_edit_t descending[2] = {edits[1], edits[0]};
+    duckvep_edit_set_t set = {descending, 2u};
+    uint8_t cds[96], rp[32], ap[32];
+    duckvep_coding_context_t context;
+    ASSERT_EQ(DUCKVEP_CODING_CONTEXT_OK, duckvep_coding_context_build(
+        reference, sizeof reference - 1u, &set, 1, DUCKVEP_CODON_TABLE_STANDARD,
+        cds, sizeof cds, rp, sizeof rp, ap, sizeof ap, &context));
+    ASSERT_MEM_EQ("MTEFPGSDQTKRQGNGSLKYPAG*", ap, context.alt_peptide_len);
+    duckvep_haplotype_block_t blocks[2];
+    size_t block_count, count, required;
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK,
+        duckvep_haplotype_partition(edits, 2u, blocks, 2u, &block_count));
+    duckvep_hgvs_protein_reference_t protein_reference = {rp, context.ref_peptide_len};
+    duckvep_hgvs_protein_operation_t operations[2];
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_protein_haplotype_build(
+        &context, &protein_reference, edits, 2u, blocks, block_count, 0u,
+        operations, 2u, &count));
+    ASSERT_EQ(2u, count);
+    ASSERT_EQ(DUCKVEP_HGVS_PROTEIN_SUBSTITUTION, operations[0].fact.shape);
+    ASSERT_EQ(2u, operations[0].fact.first_position1);
+    ASSERT_EQ(DUCKVEP_HGVS_PROTEIN_SUBSTITUTION, operations[1].fact.shape);
+    ASSERT_EQ(19u, operations[1].fact.first_position1);
+    PASS();
+}
+
 TEST hgvs_haplotype_normalization_combines_interacting_spans(void) {
     static const uint8_t reference[] = "ATGGCTGCTGCTGCTGCTGAATAA";
     duckvep_haplotype_edit_t ascending[2] = {
@@ -2666,6 +2732,331 @@ TEST haplotype_compound_indels_are_not_substitution_facts(void) {
             }
         }
     }
+    PASS();
+}
+
+TEST hgvsc_haplotype_facts_reverse_stream_order_and_validate_reference(void) {
+    static const uint8_t reference[] = "ACGTACGT";
+    static const uint8_t alternate_t[] = "T";
+    static const uint8_t alternate_a[] = "A";
+    duckvep_haplotype_edit_t descending[] = {
+        {7u, 1u, reference + 6u, 1u, alternate_a, 1},
+        {2u, 1u, reference + 1u, 1u, alternate_t, 1}
+    };
+    duckvep_hgvs_dna_fact_t facts[2];
+    uint8_t alleles[4];
+    char rendered[32];
+    size_t count = 0u;
+    size_t required = 0u;
+
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, 1, descending, 2u, facts, 2u,
+        alleles, sizeof alleles, &count));
+    ASSERT_EQ(2u, count);
+    ASSERT_EQ(2, facts[0].first.base);
+    ASSERT_EQ(7, facts[1].first.base);
+    ASSERT_EQ(DUCKVEP_HGVS_BUFFER_TOO_SMALL,
+        duckvep_hgvs_dna_haplotype_render(facts, count, NULL, 0u, &required));
+    ASSERT(required > 0u);
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+        duckvep_hgvs_dna_haplotype_render(facts, count, rendered, sizeof rendered, &required));
+    ASSERT_STR_EQ("c.[2C>T;7G>A]", rendered);
+
+    descending[1].ref = alternate_a;
+    ASSERT_EQ(DUCKVEP_HGVS_REFERENCE_MISMATCH,
+        duckvep_hgvs_dna_haplotype_fact_build(
+            reference, sizeof reference - 1u, 1, descending, 2u, facts, 2u,
+            alleles, sizeof alleles, &count));
+    descending[1].ref = reference + 1u;
+    ASSERT_EQ(DUCKVEP_HGVS_INVALID_ARG,
+        duckvep_hgvs_dna_haplotype_fact_build(
+            reference, sizeof reference - 1u, 1, descending + 1u, 1u, facts, 2u,
+            alleles, sizeof alleles, &count));
+    PASS();
+}
+
+TEST hgvsc_haplotype_facts_merge_same_codon_delins(void) {
+    static const uint8_t reference[] = "ATGGCTTTT";
+    static const uint8_t alternate_a[] = "A";
+    static const uint8_t alternate_c[] = "C";
+    duckvep_haplotype_edit_t descending[] = {
+        {6u, 1u, reference + 5u, 1u, alternate_c, 1},
+        {4u, 1u, reference + 3u, 1u, alternate_a, 1}
+    };
+    duckvep_hgvs_dna_fact_t facts[2];
+    uint8_t alleles[3] = {0u, 0u, 0u};
+    char rendered[32];
+    size_t count = 99u, required = 0u;
+
+    memset(facts, 0xa5, sizeof facts);
+    ASSERT_EQ(DUCKVEP_HGVS_BUFFER_TOO_SMALL, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, 1, descending, 2u, facts, 1u,
+        alleles, 2u, &count));
+    ASSERT_EQ(0u, count);
+    ASSERT_EQ((uint8_t)0xa5, ((const uint8_t *)facts)[0]);
+    ASSERT_EQ(0u, alleles[0]);
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, 1, descending, 2u, facts, 1u,
+        alleles, sizeof alleles, &count));
+    ASSERT_EQ(1u, count);
+    ASSERT_EQ(DUCKVEP_HGVS_DNA_REPLACEMENT, facts[0].shape);
+    ASSERT_EQ(DUCKVEP_HGVS_BUFFER_TOO_SMALL,
+        duckvep_hgvs_dna_haplotype_render(facts, count, rendered, 4u, &required));
+    ASSERT_STR_EQ("", rendered);
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+        duckvep_hgvs_dna_haplotype_render(facts, count, rendered, sizeof rendered, &required));
+    ASSERT_STR_EQ("c.4_6delinsACC", rendered);
+
+    descending[0].cds_start = 4u;
+    descending[0].ref = reference + 3u;
+    descending[0].alt = alternate_a;
+    descending[1].cds_start = 6u;
+    descending[1].ref = reference + 5u;
+    descending[1].alt = alternate_c;
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, 1, descending, 2u, facts, 1u,
+        alleles, sizeof alleles, &count));
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+        duckvep_hgvs_dna_haplotype_render(facts, count, rendered, sizeof rendered, &required));
+    ASSERT_STR_EQ("c.4_6delinsACC", rendered);
+    PASS();
+}
+
+TEST hgvsc_haplotype_facts_merge_adjacent_changes_across_codons(void) {
+    static const uint8_t reference[] = "ATGGCTGAATAA";
+    static const uint32_t positions[3][3] = {{6u, 7u, 0u}, {5u, 7u, 0u}, {4u, 6u, 7u}};
+    static const uint8_t alternates[3][3] = {{'C', 'A', 0}, {'T', 'A', 0}, {'A', 'C', 'A'}};
+    static const size_t edit_counts[3] = {2u, 2u, 3u};
+    static const char *expected[3] = {"c.6_7delinsCA", "c.[5C>T;7G>A]", "c.4_7delinsACCA"};
+    for (size_t test = 0u; test < 3u; test++) {
+        for (size_t reverse = 0u; reverse < 2u; reverse++) {
+            duckvep_haplotype_edit_t edits[3];
+            for (size_t i = 0u; i < edit_counts[test]; i++) {
+                size_t index = reverse ? edit_counts[test] - i - 1u : i;
+                edits[i] = (duckvep_haplotype_edit_t){positions[test][index], 1u,
+                    reference + positions[test][index] - 1u, 1u, alternates[test] + index, 1};
+            }
+            duckvep_hgvs_dna_fact_t facts[3];
+            uint8_t alleles[6];
+            char rendered[48];
+            size_t count = 0u, required = 0u;
+            ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+                reference, sizeof reference - 1u, 1, edits, edit_counts[test], facts, 3u,
+                alleles, sizeof alleles, &count));
+            ASSERT_EQ(test == 1u ? 2u : 1u, count);
+            ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_render(
+                facts, count, rendered, sizeof rendered, &required));
+            ASSERT_STR_EQ(expected[test], rendered);
+        }
+    }
+    PASS();
+}
+
+TEST hgvsc_haplotype_facts_orient_reverse_strand(void) {
+    static const uint8_t reference[] = "ACGTACGT";
+    static const uint8_t raw_g[] = "G";
+    static const uint8_t raw_a[] = "A";
+    static const uint8_t raw_c[] = "C";
+    duckvep_haplotype_edit_t descending[] = {
+        {6u, 1u, raw_g, 1u, raw_a, 1},
+        {3u, 1u, raw_c, 1u, raw_a, 1}
+    };
+    duckvep_hgvs_dna_fact_t facts[2];
+    uint8_t alleles[4];
+    char rendered[32];
+    size_t count = 0u;
+    size_t required = 0u;
+
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, -1, descending, 2u, facts, 2u,
+        alleles, sizeof alleles, &count));
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
+        duckvep_hgvs_dna_haplotype_render(facts, count, rendered, sizeof rendered, &required));
+    ASSERT_STR_EQ("c.[3G>T;6C>T]", rendered);
+    PASS();
+}
+
+TEST hgvsc_haplotype_facts_render_literal_indels_and_repeats(void) {
+    static const uint8_t reference[] = "ACGTACGTACGT";
+    static const uint8_t repeated[] = "ACAAAAACGT";
+    static const uint8_t deletion_ref[] = "G";
+    static const uint8_t reverse_deletion_ref[] = "C";
+    static const uint8_t substitution_ref[] = "T";
+    static const uint8_t substitution_alt[] = "A";
+    static const uint8_t insertion_alt[] = "A";
+    static const uint8_t replacement_ref[] = "GT";
+    static const uint8_t replacement_alt[] = "AA";
+    static const uint8_t reverse_substitution_ref[] = "A";
+    static const uint8_t reverse_substitution_alt[] = "T";
+    static const uint8_t reverse_insertion_alt[] = "T";
+    static const uint8_t reverse_replacement_ref[] = "AC";
+    static const uint8_t reverse_replacement_alt[] = "TT";
+    static const uint8_t repeat_deletion_ref[] = "A";
+    static const uint8_t reverse_repeat_deletion_ref[] = "T";
+    static const uint8_t repeat_substitution_ref[] = "G";
+    static const uint8_t repeat_substitution_alt[] = "T";
+    static const uint8_t reverse_repeat_substitution_ref[] = "C";
+    static const uint8_t reverse_repeat_substitution_alt[] = "A";
+    duckvep_hgvs_dna_fact_t facts[2];
+    uint8_t alleles[8];
+    char rendered[48];
+    size_t count, required;
+
+    for (size_t reverse = 0u; reverse < 2u; reverse++) {
+        int8_t strand = reverse ? -1 : 1;
+        duckvep_haplotype_edit_t deletion_and_substitution[] = {
+            {8u, 1u, reverse ? reverse_substitution_ref : substitution_ref, 1u,
+                reverse ? reverse_substitution_alt : substitution_alt, strand},
+            {3u, 1u, reverse ? reverse_deletion_ref : deletion_ref, 0u, NULL, strand}
+        };
+        duckvep_haplotype_edit_t insertion_and_substitution[] = {
+            {8u, 1u, reverse ? reverse_substitution_ref : substitution_ref, 1u,
+                reverse ? reverse_substitution_alt : substitution_alt, strand},
+            {4u, 0u, NULL, 1u, reverse ? reverse_insertion_alt : insertion_alt, strand}
+        };
+        duckvep_haplotype_edit_t replacement_and_substitution[] = {
+            {8u, 1u, reverse ? reverse_substitution_ref : substitution_ref, 1u,
+                reverse ? reverse_substitution_alt : substitution_alt, strand},
+            {3u, 2u, reverse ? reverse_replacement_ref : replacement_ref, 2u,
+                reverse ? reverse_replacement_alt : replacement_alt, strand}
+        };
+        duckvep_haplotype_edit_t repeat_and_substitution[] = {
+            {9u, 1u, reverse ? reverse_repeat_substitution_ref : repeat_substitution_ref, 1u,
+                reverse ? reverse_repeat_substitution_alt : repeat_substitution_alt, strand},
+            {3u, 1u, reverse ? reverse_repeat_deletion_ref : repeat_deletion_ref, 0u, NULL, strand}
+        };
+
+        ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+            reference, sizeof reference - 1u, 1, deletion_and_substitution, 2u, facts, 2u,
+            alleles, sizeof alleles, &count));
+        ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_render(
+            facts, count, rendered, sizeof rendered, &required));
+        ASSERT_STR_EQ("c.[3del;8T>A]", rendered);
+
+        ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+            reference, sizeof reference - 1u, 1, insertion_and_substitution, 2u, facts, 2u,
+            alleles, sizeof alleles, &count));
+        ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_render(
+            facts, count, rendered, sizeof rendered, &required));
+        ASSERT_STR_EQ("c.[3_4insA;8T>A]", rendered);
+
+        ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+            reference, sizeof reference - 1u, 1, replacement_and_substitution, 2u, facts, 2u,
+            alleles, sizeof alleles, &count));
+        ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_render(
+            facts, count, rendered, sizeof rendered, &required));
+        ASSERT_STR_EQ("c.[3_4delinsAA;8T>A]", rendered);
+
+        ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+            repeated, sizeof repeated - 1u, 1, repeat_and_substitution, 2u, facts, 2u,
+            alleles, sizeof alleles, &count));
+        ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_render(
+            facts, count, rendered, sizeof rendered, &required));
+        ASSERT_STR_EQ("c.[7del;9G>T]", rendered);
+    }
+    PASS();
+}
+
+TEST hgvsc_haplotype_normalization_preserves_joint_edit_context(void) {
+    static const uint8_t reference[] = "ATGAAAAAAAAATAA";
+    duckvep_haplotype_edit_t edits[2] = {
+        {4u, 1u, (const uint8_t *)"A", 0u, NULL, 1},
+        {10u, 1u, (const uint8_t *)"A", 1u, (const uint8_t *)"G", 1}
+    };
+    duckvep_hgvs_dna_fact_t facts[2];
+    uint8_t alleles[64];
+    char rendered[128];
+    size_t count, required;
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, 1, edits, 2u, facts, 2u,
+        alleles, sizeof alleles, &count));
+    ASSERT_EQ(2u, count);
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_render(
+        facts, count, rendered, sizeof rendered, &required));
+    ASSERT_EQ(0, strcmp("c.[9del;10A>G]", rendered));
+    edits[0] = (duckvep_haplotype_edit_t){7u, 1u, (const uint8_t *)"A",
+        1u, (const uint8_t *)"G", 1};
+    edits[1] = (duckvep_haplotype_edit_t){16u, 0u, NULL,
+        1u, (const uint8_t *)"C", 1};
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, 1, edits, 2u, facts, 2u,
+        alleles, sizeof alleles, &count));
+    ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_dna_haplotype_render(
+        facts, count, rendered, sizeof rendered, &required));
+    ASSERT_EQ(0, strcmp("c.[7A>G;15_*1insC]", rendered));
+    PASS();
+}
+
+TEST hgvsc_haplotype_facts_enforce_public_fact_length_width(void) {
+    static const uint8_t reference[] = "ATGAAAAAAAAATAA";
+    uint8_t alternate[65536], alleles[65537], saved_first;
+    duckvep_haplotype_edit_t edits[2] = {
+        {1u, 1u, reference, sizeof alternate, alternate, 1},
+        {7u, 1u, (const uint8_t *)"A", 1u, (const uint8_t *)"G", 1}
+    };
+    duckvep_hgvs_dna_fact_t facts[2], saved_facts[2];
+    size_t count;
+    memset(alternate, 'C', sizeof alternate);
+    memset(alleles, 0xa5, sizeof alleles);
+    saved_first = alleles[0];
+    memset(facts, 0x5a, sizeof facts);
+    memcpy(saved_facts, facts, sizeof facts);
+    ASSERT_EQ(DUCKVEP_HGVS_BUFFER_TOO_SMALL, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, 1, edits, 2u, facts, 2u,
+        alleles, sizeof alleles, &count));
+    ASSERT_EQ(0u, count);
+    ASSERT_MEM_EQ(facts, saved_facts, sizeof facts);
+    ASSERT_EQ(saved_first, alleles[0]);
+    PASS();
+}
+
+TEST hgvsc_haplotype_facts_reject_ambiguous_or_unbuffered_indels(void) {
+    static const uint8_t reference[] = "ACGTACGTACGT";
+    static const uint8_t replacement_ref[] = "GT";
+    static const uint8_t replacement_alt[] = "AA";
+    static const uint8_t substitution_ref[] = "T";
+    static const uint8_t substitution_alt[] = "A";
+    duckvep_haplotype_edit_t edits[] = {
+        {8u, 1u, substitution_ref, 1u, substitution_alt, 1},
+        {3u, 2u, replacement_ref, 2u, replacement_alt, 1}
+    };
+    duckvep_hgvs_dna_fact_t facts[2];
+    duckvep_hgvs_dna_fact_t saved_facts[2];
+    uint8_t alleles[8];
+    uint8_t saved_alleles[8];
+    uint8_t mismatch[] = "ACATACGTACGT";
+    size_t count = 99u;
+
+    memset(facts, 0xa5, sizeof facts);
+    memset(alleles, 0x5a, sizeof alleles);
+    memcpy(saved_facts, facts, sizeof facts);
+    memcpy(saved_alleles, alleles, sizeof alleles);
+    ASSERT_EQ(DUCKVEP_HGVS_BUFFER_TOO_SMALL, duckvep_hgvs_dna_haplotype_fact_build(
+        reference, sizeof reference - 1u, 1, edits, 2u, facts, 2u, alleles, 2u, &count));
+    ASSERT_EQ(0u, count);
+    ASSERT_EQ(0, memcmp(facts, saved_facts, sizeof facts));
+    ASSERT_EQ(0, memcmp(alleles, saved_alleles, sizeof alleles));
+
+    count = 99u;
+    ASSERT_EQ(DUCKVEP_HGVS_REFERENCE_MISMATCH, duckvep_hgvs_dna_haplotype_fact_build(
+        mismatch, sizeof mismatch - 1u, 1, edits, 2u, facts, 2u, alleles, sizeof alleles, &count));
+    ASSERT_EQ(0u, count);
+    ASSERT_EQ(0, memcmp(facts, saved_facts, sizeof facts));
+    ASSERT_EQ(0, memcmp(alleles, saved_alleles, sizeof alleles));
+
+    {
+        duckvep_haplotype_edit_t overlap[] = {
+            {4u, 1u, reference + 3u, 1u, substitution_alt, 1},
+            {3u, 2u, replacement_ref, 2u, replacement_alt, 1}
+        };
+        count = 99u;
+        ASSERT_EQ(DUCKVEP_HGVS_UNSUPPORTED_EDIT, duckvep_hgvs_dna_haplotype_fact_build(
+            reference, sizeof reference - 1u, 1, overlap, 2u, facts, 2u,
+            alleles, sizeof alleles, &count));
+    }
+    ASSERT_EQ(0u, count);
+    ASSERT_EQ(0, memcmp(facts, saved_facts, sizeof facts));
+    ASSERT_EQ(0, memcmp(alleles, saved_alleles, sizeof alleles));
     PASS();
 }
 

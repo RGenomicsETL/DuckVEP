@@ -201,6 +201,8 @@ duckvep_model_reserve_transcripts(duckvep_owned_model_t *model,
 	DUCKVEP_RESIZE_TRANSCRIPT(cds_ends);
 	DUCKVEP_RESIZE_TRANSCRIPT(cds_sequence_offsets);
 	DUCKVEP_RESIZE_TRANSCRIPT(cds_sequence_lengths);
+	DUCKVEP_RESIZE_TRANSCRIPT(cdna_sequence_offsets);
+	DUCKVEP_RESIZE_TRANSCRIPT(cdna_sequence_lengths);
 	DUCKVEP_RESIZE_TRANSCRIPT(codon_tables);
 	DUCKVEP_RESIZE_TRANSCRIPT(pre_cds_sequence_offsets);
 	DUCKVEP_RESIZE_TRANSCRIPT(pre_cds_sequence_lengths);
@@ -251,6 +253,22 @@ duckvep_model_reserve_sequence(duckvep_owned_model_t *model, size_t needed)
 }
 
 static int
+duckvep_model_reserve_cdna(duckvep_owned_model_t *model, size_t needed)
+{
+	size_t capacity;
+
+	if (needed <= model->cdna_sequence_capacity)
+		return 1;
+	capacity = duckvep_sql_next_capacity(model->cdna_sequence_capacity,
+	    needed);
+	if (!duckvep_sql_resize((void **)&model->cdna_sequence_bytes,
+	    sizeof(*model->cdna_sequence_bytes), capacity))
+		return 0;
+	model->cdna_sequence_capacity = capacity;
+	return 1;
+}
+
+static int
 duckvep_model_reserve_mature_mirna(duckvep_owned_model_t *model,
 	size_t needed)
 {
@@ -286,6 +304,16 @@ duckvep_model_reserve_peptide_edits(duckvep_owned_model_t *model,
 		return 0;
 	model->peptide_edit_capacity = capacity;
 	return 1;
+}
+
+static int
+duckvep_model_reserve_peptide_edit_codes(duckvep_owned_model_t *model,
+	size_t needed)
+{
+	if (needed <= model->peptide_edit_capacity && model->peptide_edit_codes != NULL)
+		return 1;
+	return duckvep_sql_resize((void **)&model->peptide_edit_codes,
+	    sizeof(*model->peptide_edit_codes), model->peptide_edit_capacity);
 }
 
 static int
@@ -385,6 +413,8 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 	duckvep_model_array_free(model, model->cds_ends);
 	duckvep_model_array_free(model, model->cds_sequence_offsets);
 	duckvep_model_array_free(model, model->cds_sequence_lengths);
+	duckvep_model_array_free(model, model->cdna_sequence_offsets);
+	duckvep_model_array_free(model, model->cdna_sequence_lengths);
 	duckvep_model_array_free(model, model->codon_tables);
 	duckvep_model_array_free(model, model->pre_cds_sequence_offsets);
 	duckvep_model_array_free(model, model->pre_cds_sequence_lengths);
@@ -402,7 +432,9 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 	duckvep_model_array_free(model, model->peptide_edit_offsets);
 	duckvep_model_array_free(model, model->peptide_edit_positions);
 	duckvep_model_array_free(model, model->peptide_edit_alts);
+	duckvep_model_array_free(model, model->peptide_edit_codes);
 	duckvep_model_array_free(model, model->cds_sequence_bytes);
+	duckvep_model_array_free(model, model->cdna_sequence_bytes);
 	duckvep_model_array_free(model, model->flank_sequence_bytes);
 	duckvep_model_array_free(model, model->interval_feature_seq_regions);
 	duckvep_model_array_free(model, model->interval_feature_starts);
@@ -450,11 +482,18 @@ duckvep_owned_model_publish(duckvep_owned_model_t *model)
 	model->sequences.cds_bytes_len = model->cds_sequence_length;
 	model->sequences.cds_offset = model->cds_sequence_offsets;
 	model->sequences.cds_length = model->cds_sequence_lengths;
+	model->sequences.cdna_bytes = model->cdna_sequence_bytes;
+	model->sequences.cdna_bytes_len = model->cdna_sequence_length;
+	model->sequences.cdna_offset = model->cdna_sequence_offsets;
+	model->sequences.cdna_length = model->cdna_sequence_lengths;
+	model->sequences.cdna_provided =
+	    (uint8_t)(model->transcript_cdna_provided != 0);
 	model->sequences.codon_table = model->codon_tables;
 	model->sequences.transcript_count = model->transcripts.transcript_count;
 	model->sequences.peptide_edit_offset = model->peptide_edit_offsets;
 	model->sequences.peptide_edit_position1 = model->peptide_edit_positions;
 	model->sequences.peptide_edit_alt = model->peptide_edit_alts;
+	model->sequences.peptide_edit_code = model->peptide_edit_codes;
 	model->sequences.peptide_edit_count = model->peptide_edit_count;
 	model->sequences.flank_bytes = model->flank_sequence_bytes;
 	model->sequences.flank_bytes_len = model->flank_sequence_length;
@@ -806,6 +845,7 @@ static int
 duckvep_reference_file_identity_read_descriptor(int descriptor,
 	duckvep_reference_file_identity_t *identity)
 {
+	int result;
 #if defined(_WIN32)
 	struct _stat64 status;
 #else
@@ -819,10 +859,11 @@ duckvep_reference_file_identity_read_descriptor(int descriptor,
 		return 1;
 	errno = 0;
 #if defined(_WIN32)
-	if (_fstat64(descriptor, &status) != 0)
+	result = _fstat64(descriptor, &status);
 #else
-	if (fstat(descriptor, &status) != 0)
+	result = fstat(descriptor, &status);
 #endif
+	if (result != 0)
 		return 0;
 	if (status.st_size < 0)
 		return 0;
@@ -1198,7 +1239,7 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		"transcript_index", "seq_region", "transcript_start",
 		"transcript_end", "strand", "gene_index", "transcript_flags",
 		"cds_start", "cds_end", "cds_sequence", "codon_table",
-		"pre_cds_sequence", "post_cds_sequence"
+		"pre_cds_sequence", "post_cds_sequence", "cdna_sequence"
 	};
 	static const duckvep_ctype_t types[] = {
 		DUCKVEP_CT_UINTEGER, DUCKVEP_CT_UINTEGER,
@@ -1207,7 +1248,7 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		DUCKVEP_CT_UBIGINT, DUCKVEP_CT_UBIGINT,
 		DUCKVEP_CT_UBIGINT, DUCKVEP_CT_BLOB,
 		DUCKVEP_CT_UTINYINT, DUCKVEP_CT_BLOB,
-		DUCKVEP_CT_BLOB
+		DUCKVEP_CT_BLOB, DUCKVEP_CT_BLOB
 	};
 		duckvep_batch_t *chunk;
 	size_t column_count;
@@ -1235,23 +1276,24 @@ duckvep_load_transcripts(duckvep_source_t *source,
 	received = 0;
 	ok = 0;
 	column_count = duckvep_source_columns(source);
-	if (column_count != 11 && column_count != 13) {
+	if (column_count != 11 && column_count != 13 && column_count != 14) {
 		duckvep_sql_set_error(error, error_size,
-		    "transcript query must return 11 CDS-only columns or 13 with complete pre_cds_sequence and post_cds_sequence");
+		    "transcript query must return 11 CDS-only columns, 13 with complete pre_cds_sequence and post_cds_sequence, or 14 with optional cdna_sequence");
 		goto done;
 	}
 	if (!duckvep_result_schema(source, names, types,
 	    (size_t)column_count, 9,
 	    error, error_size))
 		goto done;
-	model->transcript_flanks_complete = column_count == 13;
+	model->transcript_flanks_complete = column_count >= 13;
+	model->transcript_cdna_provided = column_count == 14;
 	while ((chunk = duckvep_source_next(source)) != NULL) {
-		const duckvep_col_t *vectors[13];
+		const duckvep_col_t *vectors[14];
 		uint32_t *transcript_indices, *seq_regions, *gene_indices;
 		uint64_t *starts, *ends, *flags, *cds_starts, *cds_ends;
 		int8_t *strands;
 		duckvep_string_t *sequences, *pre_flanks;
-		duckvep_string_t *post_flanks;
+		duckvep_string_t *post_flanks, *cdnas;
 		uint8_t *tables;
 		size_t row, rows;
 		size_t column;
@@ -1273,10 +1315,11 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		tables = duckvep_col_data(vectors[10]);
 		pre_flanks = column_count == 13
 		    ? duckvep_col_data(vectors[11]) : NULL;
-		post_flanks = column_count == 13
+		post_flanks = column_count >= 13
 		    ? duckvep_col_data(vectors[12]) : NULL;
+		cdnas = column_count == 14 ? duckvep_col_data(vectors[13]) : NULL;
 		for (row = 0; row < rows; row++) {
-			size_t flank_offset, index, post_length, pre_length;
+			size_t cdna_length, cdna_offset, flank_offset, index, post_length, pre_length;
 			size_t sequence_length, sequence_offset;
 			int cds_nulls, sequence_nulls, circular;
 			uint32_t region_length;
@@ -1336,7 +1379,7 @@ duckvep_load_transcripts(duckvep_source_t *source,
 				duckvep_batch_release(&chunk);
 				goto done;
 			}
-			if (column_count == 13) {
+			if (column_count >= 13) {
 				int pre_null = duckvep_col_is_null(vectors[11], row);
 				int post_null = duckvep_col_is_null(vectors[12], row);
 
@@ -1402,6 +1445,22 @@ duckvep_load_transcripts(duckvep_source_t *source,
 				    sequence_length);
 				model->codon_tables[index] = tables[row];
 			}
+			cdna_offset = model->cdna_sequence_length;
+			cdna_length = 0;
+			if (cdnas != NULL && !duckvep_col_is_null(vectors[13], row)) {
+				cdna_length = (size_t)duckvep_string_t_length(cdnas[row]);
+				if (cdna_length == 0 || cdna_length > UINT32_MAX ||
+				    cdna_length > SIZE_MAX - cdna_offset ||
+				    !duckvep_model_reserve_cdna(model,
+				    cdna_offset + cdna_length)) {
+					duckvep_sql_set_error(error, error_size,
+					    "full transcript cDNA is empty, exceeds the uint32 model limit, or cannot be allocated");
+					duckvep_batch_release(&chunk);
+					goto done;
+				}
+				memcpy(model->cdna_sequence_bytes + cdna_offset,
+				    duckvep_string_t_data(&cdnas[row]), cdna_length);
+			}
 			flank_offset = model->flank_sequence_length;
 			pre_length = 0;
 			post_length = 0;
@@ -1439,6 +1498,8 @@ duckvep_load_transcripts(duckvep_source_t *source,
 			    (uint64_t)sequence_offset;
 			model->cds_sequence_lengths[index] =
 			    (uint32_t)sequence_length;
+			model->cdna_sequence_offsets[index] = (uint64_t)cdna_offset;
+			model->cdna_sequence_lengths[index] = (uint32_t)cdna_length;
 			model->pre_cds_sequence_offsets[index] =
 			    (uint64_t)flank_offset;
 			model->pre_cds_sequence_lengths[index] =
@@ -1448,6 +1509,7 @@ duckvep_load_transcripts(duckvep_source_t *source,
 			model->post_cds_sequence_lengths[index] =
 			    (uint32_t)post_length;
 			model->cds_sequence_length += sequence_length;
+			model->cdna_sequence_length += cdna_length;
 			model->flank_sequence_length += pre_length + post_length;
 			model->transcripts.transcript_count++;
 		}
@@ -1459,8 +1521,8 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		goto done;
 	}
 	{
-		uint8_t *cds, *flanks;
-		size_t i, cds_offset = 0u, flank_offset = 0u;
+		uint8_t *cds, *cdnas, *flanks;
+		size_t i, cds_offset = 0u, cdna_offset = 0u, flank_offset = 0u;
 		int in_order = 1;
 
 		/* Rows normally arrive in transcript_index order, so the pools are already laid out in index order. Then
@@ -1468,44 +1530,57 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		 * and hold both copies at once (the load high-water mark). */
 		for (i = 0; i < expected && in_order; i++) {
 			in_order = model->cds_sequence_offsets[i] == cds_offset &&
+			    model->cdna_sequence_offsets[i] == cdna_offset &&
 			    model->pre_cds_sequence_offsets[i] == flank_offset &&
 			    model->post_cds_sequence_offsets[i] == flank_offset +
 			    model->pre_cds_sequence_lengths[i];
 			cds_offset += model->cds_sequence_lengths[i];
+			cdna_offset += model->cdna_sequence_lengths[i];
 			flank_offset += (size_t)model->pre_cds_sequence_lengths[i] +
 			    model->post_cds_sequence_lengths[i];
 		}
 		if (in_order && cds_offset == model->cds_sequence_length &&
+		    cdna_offset == model->cdna_sequence_length &&
 		    flank_offset == model->flank_sequence_length) {
 			size_t cds_exact = model->cds_sequence_length == 0 ? 1u : model->cds_sequence_length;
+			size_t cdna_exact = model->cdna_sequence_length == 0 ? 1u : model->cdna_sequence_length;
 			size_t flank_exact = model->flank_sequence_length == 0 ? 1u : model->flank_sequence_length;
 
 			cds = model->cds_sequence_capacity == cds_exact ? model->cds_sequence_bytes :
 			    duckvep_budget_realloc(DUCKVEP_OWNER_MODEL, model->cds_sequence_bytes, cds_exact);
 			if (cds != NULL)
 				model->cds_sequence_bytes = cds;
+			cdnas = model->cdna_sequence_capacity == cdna_exact ? model->cdna_sequence_bytes :
+			    duckvep_budget_realloc(DUCKVEP_OWNER_MODEL, model->cdna_sequence_bytes, cdna_exact);
+			if (cdnas != NULL)
+				model->cdna_sequence_bytes = cdnas;
 			flanks = model->flank_sequence_capacity == flank_exact ? model->flank_sequence_bytes :
 			    duckvep_budget_realloc(DUCKVEP_OWNER_MODEL, model->flank_sequence_bytes, flank_exact);
 			if (flanks != NULL)
 				model->flank_sequence_bytes = flanks;
-			if (cds == NULL || flanks == NULL) {
+			if (cds == NULL || cdnas == NULL || flanks == NULL) {
 				duckvep_sql_set_error(error, error_size,
 				    "out of memory ordering transcript sequences");
 				goto done;
 			}
 			model->cds_sequence_capacity = model->cds_sequence_length;
+			model->cdna_sequence_capacity = model->cdna_sequence_length;
 			model->flank_sequence_capacity = model->flank_sequence_length;
 			ok = 1;
 			goto done;
 		}
 		cds_offset = 0u;
+		cdna_offset = 0u;
 		flank_offset = 0u;
 		cds = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, model->cds_sequence_length == 0 ? 1u :
 		    model->cds_sequence_length);
+		cdnas = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, model->cdna_sequence_length == 0 ? 1u :
+		    model->cdna_sequence_length);
 		flanks = duckvep_budget_malloc(DUCKVEP_OWNER_MODEL, model->flank_sequence_length == 0 ? 1u :
 		    model->flank_sequence_length);
-		if (cds == NULL || flanks == NULL) {
+		if (cds == NULL || cdnas == NULL || flanks == NULL) {
 			duckvep_budget_free(cds);
+			duckvep_budget_free(cdnas);
 			duckvep_budget_free(flanks);
 			duckvep_sql_set_error(error, error_size,
 			    "out of memory ordering transcript sequences");
@@ -1519,21 +1594,29 @@ duckvep_load_transcripts(duckvep_source_t *source,
 			if (length != 0)
 				memcpy(cds + cds_offset, model->cds_sequence_bytes +
 				    model->cds_sequence_offsets[i], length);
+			if (model->cdna_sequence_lengths[i] != 0)
+				memcpy(cdnas + cdna_offset, model->cdna_sequence_bytes +
+				    model->cdna_sequence_offsets[i], model->cdna_sequence_lengths[i]);
 			if (pre + post != 0)
 				memcpy(flanks + flank_offset,
 				    model->flank_sequence_bytes +
 				    model->pre_cds_sequence_offsets[i], pre + post);
 			model->cds_sequence_offsets[i] = cds_offset;
+			model->cdna_sequence_offsets[i] = cdna_offset;
 			model->pre_cds_sequence_offsets[i] = flank_offset;
 			model->post_cds_sequence_offsets[i] = flank_offset + pre;
 			cds_offset += length;
+			cdna_offset += model->cdna_sequence_lengths[i];
 			flank_offset += pre + post;
 		}
 		duckvep_budget_free(model->cds_sequence_bytes);
+		duckvep_budget_free(model->cdna_sequence_bytes);
 		duckvep_budget_free(model->flank_sequence_bytes);
 		model->cds_sequence_bytes = cds;
+		model->cdna_sequence_bytes = cdnas;
 		model->flank_sequence_bytes = flanks;
 		model->cds_sequence_capacity = model->cds_sequence_length;
+		model->cdna_sequence_capacity = model->cdna_sequence_length;
 		model->flank_sequence_capacity = model->flank_sequence_length;
 	}
 	ok = 1;
@@ -2040,9 +2123,25 @@ duckvep_peptide_edit_alt_valid(uint8_t amino_acid)
 	    (amino_acid >= (uint8_t)'A' && amino_acid <= (uint8_t)'Z');
 }
 
+static uint8_t
+duckvep_peptide_edit_code(const char *code, uint32_t length)
+{
+	if (length == sizeof("initial_met") - 1u && !memcmp(code, "initial_met", length))
+		return DUCKVEP_PEPTIDE_EDIT_INITIAL_MET;
+	if (length == sizeof("_selenocysteine") - 1u && !memcmp(code, "_selenocysteine", length))
+		return DUCKVEP_PEPTIDE_EDIT_SELENOCYSTEINE;
+	if (length == sizeof("_stop_codon_rt") - 1u && !memcmp(code, "_stop_codon_rt", length))
+		return DUCKVEP_PEPTIDE_EDIT_STOP_CODON_RT;
+	if (length == sizeof("amino_acid_sub") - 1u && !memcmp(code, "amino_acid_sub", length))
+		return DUCKVEP_PEPTIDE_EDIT_AMINO_ACID_SUB;
+	if (length == sizeof("rna_edit") - 1u && !memcmp(code, "rna_edit", length))
+		return DUCKVEP_PEPTIDE_EDIT_RNA_EDIT;
+	return DUCKVEP_PEPTIDE_EDIT_UNTYPED;
+}
+
 typedef struct {
 	uint32_t transcript, position;
-	uint8_t amino_acid;
+	uint8_t amino_acid, code;
 } duckvep_peptide_row_t;
 
 static int
@@ -2058,15 +2157,16 @@ duckvep_load_peptide_edits(duckvep_source_t *source,
 	duckvep_owned_model_t *model, char *error, size_t error_size)
 {
 	static const char *const names[] = {
-		"transcript_index", "protein_position", "alternate_amino_acid"
+		"transcript_index", "protein_position", "alternate_amino_acid", "edit_code"
 	};
 	static const duckvep_ctype_t types[] = {
-		DUCKVEP_CT_UINTEGER, DUCKVEP_CT_UINTEGER, DUCKVEP_CT_VARCHAR
+		DUCKVEP_CT_UINTEGER, DUCKVEP_CT_UINTEGER, DUCKVEP_CT_VARCHAR,
+		DUCKVEP_CT_VARCHAR
 	};
-		duckvep_batch_t *chunk;
+	duckvep_batch_t *chunk;
 	duckvep_peptide_row_t *rows, *sorted;
 	size_t row_count, row_capacity, *offsets, transcript_count, i;
-	int ok;
+	int typed, ok;
 
 	transcript_count = model->transcripts.transcript_count;
 	if (transcript_count >
@@ -2091,23 +2191,29 @@ duckvep_load_peptide_edits(duckvep_source_t *source,
 		return 0;
 	}
 	ok = 0;
-	if (!duckvep_result_schema(source, names, types, 3,
+	typed = duckvep_source_columns(source) == 4u;
+	if (duckvep_source_columns(source) != 3u && !typed) {
+		duckvep_sql_set_error(error, error_size,
+		    "peptide-edit query must return three legacy columns or four typed columns");
+		goto done;
+	}
+	if (!duckvep_result_schema(source, names, types, typed ? 4u : 3u,
 	    SIZE_MAX, error, error_size))
 		goto done;
 	while ((chunk = duckvep_source_next(source)) != NULL) {
-		const duckvep_col_t *vectors[3];
+		const duckvep_col_t *vectors[4];
 		uint32_t *transcript_indices, *positions;
-		duckvep_string_t *alternates;
+		duckvep_string_t *alternates, *codes;
 		size_t row, count;
 		size_t column;
 
 		count = duckvep_batch_rows(chunk);
-		for (column = 0; column < 3; column++)
-			vectors[column] = duckvep_batch_column(chunk,
-			    (size_t)column);
+		for (column = 0; column < (typed ? 4u : 3u); column++)
+			vectors[column] = duckvep_batch_column(chunk, column);
 		transcript_indices = duckvep_col_data(vectors[0]);
 		positions = duckvep_col_data(vectors[1]);
 		alternates = duckvep_col_data(vectors[2]);
+		codes = typed ? duckvep_col_data(vectors[3]) : NULL;
 		for (row = 0; row < count; row++) {
 			duckvep_peptide_row_t record;
 			const char *alternate;
@@ -2115,7 +2221,7 @@ duckvep_load_peptide_edits(duckvep_source_t *source,
 			uint32_t alternate_length;
 			uint8_t amino_acid;
 
-			for (column = 0; column < 3; column++) {
+			for (column = 0; column < (typed ? 4u : 3u); column++) {
 				if (duckvep_col_is_null(vectors[column], row)) {
 					(void)snprintf(error, error_size,
 					    "peptide-edit query contains NULL in %s",
@@ -2148,6 +2254,9 @@ duckvep_load_peptide_edits(duckvep_source_t *source,
 			record.transcript = transcript_index;
 			record.position = position;
 			record.amino_acid = amino_acid;
+			record.code = typed ? duckvep_peptide_edit_code(
+			    duckvep_string_t_data(&codes[row]), duckvep_string_t_length(codes[row]))
+			    : DUCKVEP_PEPTIDE_EDIT_UNTYPED;
 			if (row_count == (size_t)UINT32_MAX ||
 			    !duckvep_rows_append((void **)&rows, &row_count,
 			    &row_capacity, sizeof(record), &record)) {
@@ -2165,7 +2274,8 @@ duckvep_load_peptide_edits(duckvep_source_t *source,
 	duckvep_budget_free(rows);
 	rows = NULL;
 	if (sorted == NULL ||
-	    !duckvep_model_reserve_peptide_edits(model, row_count)) {
+	    !duckvep_model_reserve_peptide_edits(model, row_count) ||
+	    (typed && row_count && !duckvep_model_reserve_peptide_edit_codes(model, row_count))) {
 		duckvep_sql_set_error(error, error_size,
 		    "out of memory ordering peptide edits");
 		goto done;
@@ -2184,6 +2294,8 @@ duckvep_load_peptide_edits(duckvep_source_t *source,
 			}
 			model->peptide_edit_positions[k] = sorted[k].position;
 			model->peptide_edit_alts[k] = sorted[k].amino_acid;
+			if (typed)
+				model->peptide_edit_codes[k] = sorted[k].code;
 		}
 	}
 	for (i = 0; i <= transcript_count; i++)
@@ -2420,6 +2532,7 @@ duckvep_lifted_build(duckvep_owned_model_t *src, char *error,
 	    lifted->lift->interval_features.feature_count;
 	lm->transcript_coverage_complete = src->transcript_coverage_complete;
 	lm->transcript_flanks_complete = src->transcript_flanks_complete;
+	lm->transcript_cdna_provided = src->transcript_cdna_provided;
 	lm->gene_indices = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, lm->transcripts.transcript_count + 1u,
 	    sizeof(*lm->gene_indices));
 	if (lm->gene_indices == NULL) {
@@ -2639,12 +2752,69 @@ duckvep_core_model_load_relations(duckvep_owned_model_t *model,
 	return ok;
 }
 
+static int
+duckvep_validate_cdna_sequences(const duckvep_owned_model_t *model,
+	char *error, size_t error_size)
+{
+	size_t transcript;
+
+	if (!model->transcript_cdna_provided)
+		return 1;
+	for (transcript = 0; transcript < model->transcripts.transcript_count;
+	    transcript++) {
+		size_t base, exon, expected = 0u;
+		size_t length = model->cdna_sequence_lengths[transcript];
+		uint64_t offset = model->cdna_sequence_offsets[transcript];
+
+		if (length == 0u)
+			continue;
+		if (offset > model->cdna_sequence_length ||
+		    length > model->cdna_sequence_length - (size_t)offset ||
+		    model->exon_counts[transcript] == 0u) {
+			duckvep_sql_set_error(error, error_size,
+			    "full transcript cDNA has an invalid byte range or no exons");
+			return 0;
+		}
+		for (exon = model->exon_offsets[transcript];
+		    exon < (size_t)model->exon_offsets[transcript] +
+		    model->exon_counts[transcript]; exon++) {
+			if (model->exon_cdna_starts[exon] != expected + 1u ||
+			    model->exon_cdna_ends[exon] < model->exon_cdna_starts[exon]) {
+				duckvep_sql_set_error(error, error_size,
+				    "full transcript cDNA requires contiguous exon cDNA coordinates");
+				return 0;
+			}
+			expected = model->exon_cdna_ends[exon];
+		}
+		if (length != expected) {
+			duckvep_sql_set_error(error, error_size,
+			    "full transcript cDNA length does not match the exon cDNA axis");
+			return 0;
+		}
+		for (base = 0u; base < length; base++) {
+			uint8_t value = model->cdna_sequence_bytes[offset + base];
+
+			if (value != 'A' && value != 'C' && value != 'G' &&
+			    value != 'T' && value != 'N') {
+				duckvep_sql_set_error(error, error_size,
+				    "full transcript cDNA contains a non-ACGTN byte");
+				return 0;
+			}
+		}
+	}
+	return 1;
+}
+
 int
 duckvep_core_model_finish(duckvep_owned_model_t *model, char *error, size_t error_size)
 {
 	duckvep_error_t kernel_error;
 	size_t transcript;
 
+	if (!duckvep_validate_cdna_sequences(model, error, error_size)) {
+		duckvep_owned_model_destroy(model);
+		return 0;
+	}
 	duckvep_owned_model_publish(model);
 	for (transcript = 0;
 	    transcript < model->transcripts.transcript_count; transcript++) {
@@ -2820,6 +2990,12 @@ duckvep_core_model_fingerprint(const duckvep_owned_model_t *model)
 	FP(hash, model->cds_ends, transcripts);
 	FP(hash, model->cds_sequence_offsets, transcripts);
 	FP(hash, model->cds_sequence_lengths, transcripts);
+	if (model->transcript_cdna_provided) {
+		FP(hash, &model->transcript_cdna_provided, 1);
+		FP(hash, model->cdna_sequence_offsets, transcripts);
+		FP(hash, model->cdna_sequence_lengths, transcripts);
+		FP(hash, model->cdna_sequence_bytes, model->cdna_sequence_length);
+	}
 	FP(hash, model->codon_tables, transcripts);
 	FP(hash, model->pre_cds_sequence_offsets, transcripts);
 	FP(hash, model->pre_cds_sequence_lengths, transcripts);
@@ -2844,6 +3020,8 @@ duckvep_core_model_fingerprint(const duckvep_owned_model_t *model)
 		FP(hash, model->peptide_edit_offsets, transcripts + 1);
 		FP(hash, model->peptide_edit_positions, model->peptide_edit_count);
 		FP(hash, model->peptide_edit_alts, model->peptide_edit_count);
+		if (model->peptide_edit_codes != NULL)
+			FP(hash, model->peptide_edit_codes, model->peptide_edit_count);
 	}
 	FP(hash, &model->interval_feature_count, 1);
 	FP(hash, model->interval_feature_seq_regions, model->interval_feature_count);

@@ -68,6 +68,8 @@ typedef struct duckvep_owned_model {
 	uint32_t *cds_ends;
 	uint64_t *cds_sequence_offsets;
 	uint32_t *cds_sequence_lengths;
+	uint64_t *cdna_sequence_offsets;
+	uint32_t *cdna_sequence_lengths;
 	uint8_t *codon_tables;
 	uint64_t *pre_cds_sequence_offsets;
 	uint32_t *pre_cds_sequence_lengths;
@@ -86,9 +88,12 @@ typedef struct duckvep_owned_model {
 	uint32_t *peptide_edit_offsets;
 	uint32_t *peptide_edit_positions;
 	uint8_t *peptide_edit_alts;
+	uint8_t *peptide_edit_codes;
 	size_t peptide_edit_count;
 	uint8_t *cds_sequence_bytes;
 	size_t cds_sequence_length;
+	uint8_t *cdna_sequence_bytes;
+	size_t cdna_sequence_length;
 	uint8_t *flank_sequence_bytes;
 	size_t flank_sequence_length;
 	uint16_t *interval_feature_seq_regions;
@@ -102,12 +107,14 @@ typedef struct duckvep_owned_model {
 	int interval_feature_index_complete;
 	int transcript_coverage_complete;
 	int transcript_flanks_complete;
+	int transcript_cdna_provided;
 	size_t known_seq_region_capacity;
 	size_t transcript_capacity;
 	size_t exon_capacity;
 	size_t mature_mirna_capacity;
 	size_t peptide_edit_capacity;
 	size_t cds_sequence_capacity;
+	size_t cdna_sequence_capacity;
 	size_t flank_sequence_capacity;
 	size_t interval_feature_capacity;
 	/* A model restored from a snapshot borrows its arrays from this storage (a read-only file

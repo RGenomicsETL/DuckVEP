@@ -343,8 +343,7 @@ static const char *const transcripts_sql[] = {
 		"SELECT DISTINCT e.source_exon_id, e.exon_start - 1 AS exon_start0, ",
 		"e.exon_end AS exon_end0, e.exon_length, e.exon_strand, ",
 		"tf.seq_region_name, tf.sequence_length ",
-		"FROM exons_with_cdna e JOIN transcript_facts tf USING (source_transcript_id) ",
-		"WHERE tf.source_translation_id IS NOT NULL AND tf.attribute_withheld_reason IS NULL",
+		"FROM exons_with_cdna e JOIN transcript_facts tf USING (source_transcript_id)",
 		"), needed_exon_slices AS MATERIALIZED (",
 		"SELECT source_exon_id, exon_start0, ",
 		"CASE WHEN exon_start0 >= exon_end0 THEN sequence_length ELSE exon_end0 END AS exon_end0, ",
@@ -371,7 +370,6 @@ static const char *const transcripts_sql[] = {
 		"sum(e.exon_length) AS expected_length ",
 		"FROM exons_with_cdna e JOIN transcript_facts tf USING (source_transcript_id) ",
 		"JOIN exon_sequences es USING (source_exon_id) ",
-		"WHERE tf.source_translation_id IS NOT NULL AND tf.attribute_withheld_reason IS NULL ",
 		"GROUP BY e.source_transcript_id",
 		"), prepared AS MATERIALIZED (",
 		"SELECT tg.*, el.exons, coalesce(mm.mature_mirna_regions, ",
@@ -487,6 +485,8 @@ static const char *const transcripts_sql[] = {
 		"OR NOT regexp_full_match(p.raw_pre_cds_sequence, '[ACGTN]*') ",
 		"OR NOT regexp_full_match(p.raw_post_cds_sequence, '[ACGTN]*') THEN NULL::BLOB ",
 		"ELSE CAST(p.raw_post_cds_sequence AS BLOB) END AS post_cds_sequence, ",
+		"CASE WHEN regexp_full_match(p.cdna_sequence, '[ACGTN]+') THEN ",
+		"CAST(p.cdna_sequence AS BLOB) ELSE NULL::BLOB END AS cdna_sequence, ",
 		"p.seq_region_name, p.sequence_length, p.source_seq_region_id, p.source_transcript_id, ",
 		"p.transcript_stable_id, p.transcript_version, p.transcript_biotype, ",
 		"p.mane_select_refseq, p.mane_plus_clinical_refseq, ",
@@ -785,6 +785,7 @@ static const char *const receipt_body[] = {
 		"transcript_flags := transcript_flags, cds_start := cds_start, cds_end := cds_end, ",
 		"cds_sequence := cds_sequence, codon_table := codon_table, ",
 		"pre_cds_sequence := pre_cds_sequence, post_cds_sequence := post_cds_sequence, ",
+		"cdna_sequence := CAST(cdna_sequence AS BLOB), ",
 		"seq_region_name := seq_region_name, sequence_length := sequence_length, ",
 		"source_seq_region_id := source_seq_region_id, source_transcript_id := source_transcript_id, ",
 		"transcript_stable_id := transcript_stable_id, transcript_version := transcript_version, ",
@@ -876,7 +877,7 @@ bool duckvep_core_receipt_sql(const char *const values[8], const char *option_ta
     if (ok) ok = duckvep_sql_append(sql, "), regions AS MATERIALIZED (SELECT * REPLACE (coalesce(circular, false) AS circular) FROM (SELECT NULL::BOOLEAN AS circular WHERE false UNION ALL BY NAME SELECT * FROM ");
     if (ok) ok = duckvep_sql_identifier(sql, values[0]);
     if (ok) ok = duckvep_sql_append(sql, ")");
-    if (ok) ok = duckvep_sql_append(sql, "), model AS MATERIALIZED (SELECT * FROM ");
+    if (ok) ok = duckvep_sql_append(sql, "), model AS MATERIALIZED (SELECT NULL::BLOB AS cdna_sequence WHERE false UNION ALL BY NAME SELECT * FROM ");
     if (ok) ok = duckvep_sql_identifier(sql, values[1]);
     if (ok) ok = duckvep_sql_append(sql, "), regulation AS MATERIALIZED (SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM ");
     if (ok && option_table) ok = duckvep_sql_identifier(sql, option_table);

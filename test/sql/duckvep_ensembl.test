@@ -1012,8 +1012,8 @@ FROM (
   SELECT * FROM duckvep_grch37_receipt
 ) ORDER BY assembly;
 ----
-GRCh37	de042a5650929ba7dca9c64b487e45463e71a0492b3df686f9365e40b6bda4e9	all current transcripts on MT and GL000201.1
-GRCh38	6d9f79077e8dfcca418ef82fffcc49f7c44f939eea83045a49bc1139e66b037b	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
+GRCh37	fe28be6a4f0c9751a5f292211ec6180d2798889b1b691b076993b3bd747c0eaf	all current transcripts on MT and GL000201.1
+GRCh38	1ad7465d502b18b55a764fba64c9bfba6826c2b731dcf1853de9d19c92166a0e	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
 
 query II
 SELECT (SELECT count(*) FROM duckvep_grch38_transcripts

@@ -1,5 +1,6 @@
 #include "duckvep_phase.h"
 
+#include <limits.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -124,4 +125,86 @@ duckvep_phase_status_t duckvep_phase_assign(
         if (allele >= 0) out->status = DUCKVEP_PHASE_UNPHASED;
     }
     return DUCKVEP_PHASE_OK;
+}
+
+static int arrangement_same_phase_block(const duckvep_phase_arrangement_site_t *left,
+                                        const duckvep_phase_arrangement_site_t *right) {
+    return left->phase_set_present == right->phase_set_present &&
+        (!left->phase_set_present || left->phase_set == right->phase_set);
+}
+
+static int arrangement_is_unit_start(const duckvep_phase_arrangement_site_t *sites,
+                                     size_t index) {
+    if (!sites[index].phase_before[1]) return 1;
+    for (size_t prior = 0u; prior < index; prior++) {
+        if (sites[prior].phase_before[1] &&
+            arrangement_same_phase_block(&sites[prior], &sites[index])) return 0;
+    }
+    return 1;
+}
+
+static size_t arrangement_unit_index(const duckvep_phase_arrangement_site_t *sites,
+                                     size_t index) {
+    size_t unit = 0u;
+    for (size_t site = 0u; site <= index; site++) {
+        if (!arrangement_is_unit_start(sites, site)) continue;
+        if (site == index || (sites[index].phase_before[1] && sites[site].phase_before[1] &&
+            arrangement_same_phase_block(&sites[site], &sites[index]))) return unit;
+        unit++;
+    }
+    return SIZE_MAX;
+}
+
+duckvep_phase_arrangement_status_t duckvep_phase_arrange_diploid(
+    const duckvep_phase_arrangement_site_t *sites, size_t site_count,
+    size_t alternative_limit, uint16_t *alt_lanes, size_t out_capacity,
+    size_t *required_alternatives) {
+    size_t unit_count = 0u, alternative_count, required_entries;
+
+    if (required_alternatives) *required_alternatives = 0u;
+    if (!sites || !site_count || site_count > DUCKVEP_PHASE_ARRANGEMENT_MAX_SITES ||
+        !alternative_limit || !required_alternatives || (!alt_lanes && out_capacity))
+        return DUCKVEP_PHASE_ARRANGEMENT_INVALID_ARG;
+    for (size_t site = 0u; site < site_count; site++) {
+        const duckvep_phase_arrangement_site_t *current = &sites[site];
+        if (site && current->sample_index != sites[0].sample_index)
+            return DUCKVEP_PHASE_ARRANGEMENT_MIXED_SAMPLE;
+        if (!current->source_id || current->phase_before[0] > 1u ||
+            current->phase_before[1] > 1u || current->phase_set_present > 1u ||
+            current->phase_before[0])
+            return DUCKVEP_PHASE_ARRANGEMENT_INVALID_ARG;
+        if (current->allele[0] < 0 || current->allele[1] < 0)
+            return DUCKVEP_PHASE_ARRANGEMENT_MISSING;
+        if (current->source_alt_count != 1u || current->allele[0] > 1 ||
+            current->allele[1] > 1)
+            return DUCKVEP_PHASE_ARRANGEMENT_MULTIALLELIC;
+        if (current->allele[0] == current->allele[1])
+            return DUCKVEP_PHASE_ARRANGEMENT_HOMOZYGOUS;
+        for (size_t prior = 0u; prior < site; prior++) {
+            if (sites[prior].source_id == current->source_id)
+                return DUCKVEP_PHASE_ARRANGEMENT_DUPLICATE_SOURCE_ID;
+        }
+        if (arrangement_is_unit_start(sites, site)) unit_count++;
+    }
+    if (unit_count > sizeof(size_t) * CHAR_BIT)
+        return DUCKVEP_PHASE_ARRANGEMENT_EXPLOSION;
+    alternative_count = (size_t)1u << (unit_count - 1u);
+    if (alternative_count > alternative_limit)
+        return DUCKVEP_PHASE_ARRANGEMENT_EXPLOSION;
+    if (alternative_count > SIZE_MAX / site_count)
+        return DUCKVEP_PHASE_ARRANGEMENT_OVERFLOW;
+    required_entries = alternative_count * site_count;
+    *required_alternatives = alternative_count;
+    if (!alt_lanes && !out_capacity) return DUCKVEP_PHASE_ARRANGEMENT_OK;
+    if (out_capacity < required_entries) return DUCKVEP_PHASE_ARRANGEMENT_CAPACITY;
+
+    for (size_t alternative = 0u; alternative < alternative_count; alternative++) {
+        for (size_t site = 0u; site < site_count; site++) {
+            size_t unit = arrangement_unit_index(sites, site);
+            uint16_t lane = sites[site].phase_before[1] && sites[site].allele[0] == 1 ? 1u : 2u;
+            if (unit && ((alternative >> (unit - 1u)) & 1u)) lane = (uint16_t)(3u - lane);
+            alt_lanes[alternative * site_count + site] = lane;
+        }
+    }
+    return DUCKVEP_PHASE_ARRANGEMENT_OK;
 }

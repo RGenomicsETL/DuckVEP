@@ -428,6 +428,7 @@ static void stage_finalize_exec(duckdb_v2_copy_to_finalize_info_handle info,
     if (bind->layout->hap_model) {
         entry->hap_model = copy_text(bind->layout->hap_model, strlen(bind->layout->hap_model));
         entry->hap = bind->layout->hap;
+        entry->arrangements = bind->layout->arrangements;
     }
     if (!entry->model || !entry->relation || (bind->layout->hap_model && !entry->hap_model)) {
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_stage: out of memory");

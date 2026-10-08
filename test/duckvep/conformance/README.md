@@ -19,7 +19,7 @@ The runner uses the current `WangLabCSU/blit` command API (tested at
 `940c2c1385ba6ad72f0c63b861e90abe8ae6e6f3`) to execute
 `micromamba run -p "$VEP_PREFIX" vep ...` through a generated shell script whose dynamic
 tokens are individually quoted. The default prefix is
-`/root/miniconda3/envs/vep`; override `VEP_PREFIX` for another VEP 116 environment.
+`$HOME/miniconda3/envs/vep`; override `VEP_PREFIX` for another VEP 116 environment.
 Install that `blit` checkout with `R CMD INSTALL /path/to/blit`. A matching VEP
 environment can be created with `micromamba create -p "$VEP_PREFIX"
 --file test/duckvep/upstream/receipts/vep116_2026-07-22.conda-explicit.txt` on
@@ -309,6 +309,57 @@ is returned. Compare the protein description only when the transcript/protein se
 and coding model match. These pinned outputs are regression expectations for this
 Mutalyzer version; they do not establish cross-tool equivalence or complete HGVS
 conformance.
+
+The loaded-extension runtime gate uses the same FASTA/GFF3 resources and separate
+`expected_native_hgvsc`/`expected_native_hgvsp` expectations:
+
+```bash
+make test_compound_hgvs_runtime
+```
+
+The native profile covers observed-cis, bounded nonoverlapping grouped literal DNA edits,
+including compound insertions and deletions, on both transcript strands. It checks
+final-CDS replay, protein bytes, contributor identities and rejects cis not established
+by the observed calls. HGVS DNA delins guidance combines adjacent changes and changes
+separated by one unchanged nucleotide in the same codon. HGVS protein guidance keeps
+changes separated by an unchanged amino acid individual. Mutalyzer 3.1.1's continuous
+protein delins and same-codon DNA member list differ from these rules; the tool-specific
+receipt expectations remain separate from the native standards expectations. See the
+[DNA](https://hgvs-nomenclature.org/stable/recommendations/DNA/delins/) and
+[protein](https://hgvs-nomenclature.org/main/recommendations/protein/delins/)
+recommendations. Overlapping edits, ambiguous same-gap insertions and general shifted or
+overlap nomenclature remain outside this bounded profile.
+
+From the repository root, these runtime checks build/use the default v1 release host;
+`make test_*_runtime` targets build it as needed:
+
+```bash
+make test_noncoding_haplotype_runtime
+make test_phase_arrangements_runtime
+make release
+Rscript --vanilla test/duckvep/conformance/curated_haplotype_prediction.R
+DUCKVEP_LEGACY_EXTENSION=/path/to/published-v1-writer.duckdb_extension \
+  Rscript --vanilla test/duckvep/conformance/snapshot_compatibility.R
+```
+
+The curated runtime covers typed same-codon conditional recoding and rejects legacy
+untyped metadata. Its paired conditional proteins are separate from raw `cds`/`protein`,
+do not imply biological recoding competence, leave NMD unknown and emit no unconditional
+consequence.
+
+The snapshot compatibility test accepts the published 38-element-array/8-count v1
+layout and the current 42-element-array/9-count v2 layout. It authenticates the original
+snapshot bytes and preserves absent metadata; `DUCKVEP_LEGACY_EXTENSION` explicitly
+selects the published v1 writer. The haplotype query contract differs by host: v1 accepts
+`duckvep_haplotypes(calls_query, model[, opts])`; the separate v2 preview host returns
+caller-executable statements from `duckvep_haplotype_load_sql(calls_query, model, job[, opts])`,
+then scans with `duckvep_haplotype_scan(job)`. The v2 host is not the default; see
+[`docs/v2-host.md`](../../../docs/v2-host.md).
+
+The arrangement runtime checks the bounded diploid alternatives relation, retaining
+observed GT/PS separately from hypothetical arrangement identity and including an explicit
+reference lane. Its 26-field output does not expose the paired conditional operands needed
+for conditional prediction of those alternatives.
 
 The adapter requires file-cache reads only, disables file-cache writes and the API
 cache, and blocks Python socket resolution and connections. A network attempt, API
@@ -1197,6 +1248,16 @@ match the pinned result. Public replay includes that source on all six diploid l
 including lanes with no coding edit, while preserving CDS/protein and coding flags.
 Five additional corruption controls guard full carrier keys, sequence, provenance and
 projection status. This checks literal replay, not splice prediction or combined SO.
+
+`make test_noncoding_haplotype_runtime` checks full-cDNA handling for fully noncoding
+transcripts and a separate final-RNA UTR profile for coding transcripts. Strict,
+equal-length substitutions wholly within one UTR are contrasted against the reconstructed
+reference RNA using complete loaded CDS/flanks and consistent cDNA coordinates; raw
+CDS/protein and contributor identity are preserved. Capacity, phase uncertainty, length
+changes, mixed features, incomplete flanks and exonic splice-region bases are rejection
+controls. The runtime also checks replay after rejected inputs and implicit pure-reference
+memberships. Intronic, splice and regulatory effects, length-changing UTR variants and
+general curated prediction remain unsupported.
 
 `sequence_diff_differential.R --artifacts results/<haplotype-run>
 --public-artifacts results/<haplotype-sql-run>` is a separate aligned-difference

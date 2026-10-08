@@ -1760,6 +1760,495 @@ duckvep_hgvs_status_t duckvep_hgvs_dna_render_basic(
     return hgvs_writer_finish(&writer, required_out);
 }
 
+static const duckvep_haplotype_edit_t *hgvs_haplotype_edit_at(
+    const duckvep_haplotype_edit_t *edits, size_t count, int descending,
+    size_t index) {
+
+    return &edits[descending ? count - index - 1u : index];
+}
+
+static size_t hgvs_haplotype_group_end(const duckvep_haplotype_edit_t *edits,
+    size_t count, size_t begin, int descending) {
+
+    size_t end = begin + 1u;
+    const duckvep_haplotype_edit_t *previous = hgvs_haplotype_edit_at(
+        edits, count, descending, begin);
+    while (end < count) {
+        const duckvep_haplotype_edit_t *next = hgvs_haplotype_edit_at(
+            edits, count, descending, end);
+        uint64_t adjacent = (uint64_t)previous->cds_start +
+            (previous->ref_len == 0u ? 1u : previous->ref_len);
+        if ((uint64_t)next->cds_start > adjacent &&
+            (next->cds_start - 1u) / 3u != (previous->cds_start - 1u) / 3u) {
+            break;
+        }
+        previous = next;
+        end++;
+    }
+    return end;
+}
+
+static duckvep_hgvs_status_t hgvs_haplotype_oriented_base(
+    const duckvep_haplotype_edit_t *edit, int alternate,
+    size_t index, int8_t transcript_strand, uint8_t *base_out) {
+
+    const uint8_t *bases = alternate ? edit->alt : edit->ref;
+    size_t length = alternate ? (size_t)edit->alt_len : (size_t)edit->ref_len;
+    char base;
+
+    if (base_out == NULL || bases == NULL || index >= length) {
+        return DUCKVEP_HGVS_INVALID_ARG;
+    }
+    if (edit->variant_strand != transcript_strand) index = length - index - 1u;
+    base = duckvep_dna_normalize((char)bases[index], 0);
+    if (base == '\0') return DUCKVEP_HGVS_INVALID_ALLELE;
+    if (edit->variant_strand != transcript_strand) {
+        base = duckvep_dna_complement(base);
+    }
+    *base_out = (uint8_t)base;
+    return DUCKVEP_HGVS_OK;
+}
+
+static void hgvs_haplotype_group_extent(const duckvep_haplotype_edit_t *edits,
+    size_t count, int descending, size_t begin, size_t end,
+    size_t *start_out, size_t *reference_length_out, size_t *alternate_length_out) {
+
+    const duckvep_haplotype_edit_t *first = hgvs_haplotype_edit_at(
+        edits, count, descending, begin);
+    size_t start = (size_t)first->cds_start - 1u;
+    size_t finish = start + (size_t)first->ref_len;
+    size_t alternate_length;
+    size_t index;
+
+    for (index = begin + 1u; index < end; index++) {
+        const duckvep_haplotype_edit_t *edit = hgvs_haplotype_edit_at(
+            edits, count, descending, index);
+        size_t edit_finish = (size_t)edit->cds_start - 1u + (size_t)edit->ref_len;
+        if (edit_finish > finish) finish = edit_finish;
+    }
+    alternate_length = finish - start;
+    for (index = begin; index < end; index++) {
+        const duckvep_haplotype_edit_t *edit = hgvs_haplotype_edit_at(
+            edits, count, descending, index);
+        alternate_length -= (size_t)edit->ref_len;
+        alternate_length += (size_t)edit->alt_len;
+    }
+    *start_out = start;
+    *reference_length_out = finish - start;
+    *alternate_length_out = alternate_length;
+}
+
+static void hgvs_haplotype_group_alternate(const uint8_t *reference_cds,
+    const duckvep_haplotype_edit_t *edits, size_t count, int descending,
+    size_t begin, size_t end, size_t start, size_t reference_length,
+    int8_t transcript_strand, uint8_t *alternate) {
+
+    size_t cursor = start;
+    size_t written = 0u;
+    size_t index;
+
+    for (index = begin; index < end; index++) {
+        const duckvep_haplotype_edit_t *edit = hgvs_haplotype_edit_at(
+            edits, count, descending, index);
+        size_t edit_start = (size_t)edit->cds_start - 1u;
+        size_t base_index;
+        if (edit_start > cursor) {
+            size_t unchanged = edit_start - cursor;
+            memcpy(alternate + written, reference_cds + cursor, unchanged);
+            written += unchanged;
+        }
+        for (base_index = 0u; base_index < (size_t)edit->alt_len; base_index++) {
+            (void)hgvs_haplotype_oriented_base(edit, 1, base_index,
+                transcript_strand, alternate + written + base_index);
+        }
+        written += (size_t)edit->alt_len;
+        cursor = edit_start + (size_t)edit->ref_len;
+    }
+    if (cursor < start + reference_length) {
+        size_t unchanged = start + reference_length - cursor;
+        memcpy(alternate + written, reference_cds + cursor, unchanged);
+    }
+}
+
+typedef struct {
+    size_t start;
+    size_t reference_length;
+    size_t alternate_offset;
+    size_t alternate_length;
+    size_t shift;
+    int duplication;
+} hgvs_haplotype_normalized_t;
+
+static uint8_t hgvs_haplotype_shifted_alternate_base(const uint8_t *alternate,
+    size_t alternate_length, size_t shift, size_t index,
+    const uint8_t *reference_cds, size_t start, size_t reference_length) {
+
+    size_t shifted_index = shift + index;
+    return shifted_index < alternate_length ? alternate[shifted_index] :
+        reference_cds[start + reference_length + shifted_index - alternate_length];
+}
+
+static void hgvs_haplotype_normalize(const uint8_t *reference_cds,
+    size_t reference_cds_length, size_t start, size_t reference_length,
+    const uint8_t *alternate, size_t alternate_length,
+    hgvs_haplotype_normalized_t *out) {
+
+    size_t alternate_offset = 0u;
+    size_t shift = 0u;
+
+    while (reference_length > 0u && alternate_length > 0u &&
+           reference_cds[start] == alternate[alternate_offset]) {
+        start++;
+        reference_length--;
+        alternate_offset++;
+        alternate_length--;
+    }
+    while (reference_length > 0u && alternate_length > 0u &&
+           reference_cds[start + reference_length - 1u] ==
+           alternate[alternate_offset + alternate_length - 1u]) {
+        reference_length--;
+        alternate_length--;
+    }
+    if (alternate_length == 0u) {
+        while (start + shift + reference_length < reference_cds_length &&
+               reference_cds[start + shift] ==
+               reference_cds[start + shift + reference_length]) {
+            shift++;
+        }
+    } else {
+        while (start + shift + reference_length < reference_cds_length &&
+               hgvs_haplotype_shifted_alternate_base(
+                   alternate + alternate_offset, alternate_length, shift, 0u,
+                   reference_cds, start, reference_length) ==
+               reference_cds[start + shift]) {
+            shift++;
+        }
+    }
+    out->start = start;
+    out->reference_length = reference_length;
+    out->alternate_offset = alternate_offset;
+    out->alternate_length = alternate_length;
+    out->shift = shift;
+    out->duplication = 0;
+    if (reference_length == 0u && alternate_length > 0u &&
+        start + shift >= alternate_length) {
+        size_t index;
+        out->duplication = 1;
+        for (index = 0u; index < alternate_length; index++) {
+            if (hgvs_haplotype_shifted_alternate_base(
+                    alternate + alternate_offset, alternate_length, shift, index,
+                    reference_cds, start, reference_length) !=
+                reference_cds[start + shift - alternate_length + index]) {
+                out->duplication = 0;
+                break;
+            }
+        }
+    }
+}
+
+static void hgvs_haplotype_fact_coordinates(
+    const hgvs_haplotype_normalized_t *normalized,
+    int64_t *first_out, int64_t *last_out) {
+
+    size_t start = normalized->start + normalized->shift;
+    if (normalized->reference_length == 0u) {
+        if (normalized->duplication) {
+            *first_out = (int64_t)(start - normalized->alternate_length + 1u);
+            *last_out = (int64_t)start;
+        } else {
+            *first_out = (int64_t)start;
+            *last_out = (int64_t)(start + 1u);
+        }
+    } else {
+        *first_out = (int64_t)(start + 1u);
+        *last_out = (int64_t)(start + normalized->reference_length);
+    }
+}
+
+duckvep_hgvs_status_t duckvep_hgvs_dna_haplotype_fact_build(
+    const uint8_t                  *reference_cds,
+    size_t                          reference_cds_length,
+    int8_t                          transcript_strand,
+    const duckvep_haplotype_edit_t *edits_descending,
+    size_t                          edit_count,
+    duckvep_hgvs_dna_fact_t        *facts,
+    size_t                          facts_capacity,
+    uint8_t                         *allele_scratch,
+    size_t                          allele_scratch_capacity,
+    size_t                          *fact_count_out) {
+
+    size_t source_index, input_index, group_end, group_count = 0u;
+    size_t scratch_required = 0u, scratch_used, fact_count;
+    int descending;
+    int64_t previous_last = INT64_MIN;
+
+    if (fact_count_out != NULL) *fact_count_out = 0u;
+    if (reference_cds == NULL || edits_descending == NULL || facts == NULL ||
+        allele_scratch == NULL || fact_count_out == NULL || edit_count < 2u ||
+        reference_cds_length == 0u ||
+        (transcript_strand != (int8_t)1 && transcript_strand != (int8_t)-1)) {
+        return DUCKVEP_HGVS_INVALID_ARG;
+    }
+    if (edits_descending[0].cds_start == edits_descending[1].cds_start) {
+        return DUCKVEP_HGVS_UNSUPPORTED_EDIT;
+    }
+    descending = edits_descending[0].cds_start > edits_descending[1].cds_start;
+
+    for (source_index = 0u; source_index < edit_count; source_index++) {
+        const duckvep_haplotype_edit_t *edit = &edits_descending[source_index];
+        size_t base_index;
+        if ((edit->ref_len == 0u && edit->alt_len == 0u) ||
+            (edit->ref_len > 0u && edit->ref == NULL) ||
+            (edit->alt_len > 0u && edit->alt == NULL) ||
+            (edit->variant_strand != (int8_t)1 && edit->variant_strand != (int8_t)-1) ||
+            edit->cds_start == 0u ||
+            (size_t)edit->cds_start > reference_cds_length + 1u ||
+            (edit->ref_len > 0u &&
+             ((size_t)edit->cds_start > reference_cds_length ||
+              (size_t)edit->ref_len > reference_cds_length -
+                  ((size_t)edit->cds_start - 1u))) ||
+            (source_index > 0u && (descending
+                ? edits_descending[source_index - 1u].cds_start <= edit->cds_start
+                : edits_descending[source_index - 1u].cds_start >= edit->cds_start))) {
+            return DUCKVEP_HGVS_UNSUPPORTED_EDIT;
+        }
+        for (base_index = 0u; base_index < (size_t)edit->ref_len; base_index++) {
+            uint8_t base;
+            duckvep_hgvs_status_t status = hgvs_haplotype_oriented_base(
+                edit, 0, base_index, transcript_strand, &base);
+            if (status != DUCKVEP_HGVS_OK) return status;
+            if (base != (uint8_t)duckvep_dna_normalize(
+                    (char)reference_cds[(size_t)edit->cds_start - 1u + base_index], 0)) {
+                return DUCKVEP_HGVS_REFERENCE_MISMATCH;
+            }
+        }
+        for (base_index = 0u; base_index < (size_t)edit->alt_len; base_index++) {
+            uint8_t base;
+            duckvep_hgvs_status_t status = hgvs_haplotype_oriented_base(
+                edit, 1, base_index, transcript_strand, &base);
+            if (status != DUCKVEP_HGVS_OK) return status;
+        }
+    }
+    for (input_index = 1u; input_index < edit_count; input_index++) {
+        const duckvep_haplotype_edit_t *previous = hgvs_haplotype_edit_at(
+            edits_descending, edit_count, descending, input_index - 1u);
+        const duckvep_haplotype_edit_t *edit = hgvs_haplotype_edit_at(
+            edits_descending, edit_count, descending, input_index);
+        if (previous->ref_len > 0u && (uint64_t)edit->cds_start <
+            (uint64_t)previous->cds_start + previous->ref_len) {
+            return DUCKVEP_HGVS_UNSUPPORTED_EDIT;
+        }
+    }
+    for (input_index = 0u; input_index < edit_count; input_index = group_end) {
+        size_t start, reference_length, alternate_length;
+        group_end = hgvs_haplotype_group_end(edits_descending, edit_count,
+            input_index, descending);
+        hgvs_haplotype_group_extent(edits_descending, edit_count, descending,
+            input_index, group_end, &start, &reference_length, &alternate_length);
+        (void)start;
+        (void)reference_length;
+        if (reference_length > UINT16_MAX || alternate_length > UINT16_MAX ||
+            scratch_required > SIZE_MAX - alternate_length) {
+            return DUCKVEP_HGVS_BUFFER_TOO_SMALL;
+        }
+        scratch_required += alternate_length;
+        group_count++;
+    }
+    if (facts_capacity < group_count || allele_scratch_capacity < scratch_required) {
+        return DUCKVEP_HGVS_BUFFER_TOO_SMALL;
+    }
+
+    scratch_used = 0u;
+    for (input_index = 0u; input_index < edit_count; input_index = group_end) {
+        size_t start, reference_length, alternate_length;
+        group_end = hgvs_haplotype_group_end(edits_descending, edit_count,
+            input_index, descending);
+        hgvs_haplotype_group_extent(edits_descending, edit_count, descending,
+            input_index, group_end, &start, &reference_length, &alternate_length);
+        hgvs_haplotype_group_alternate(reference_cds, edits_descending, edit_count,
+            descending, input_index, group_end, start, reference_length,
+            transcript_strand, allele_scratch + scratch_used);
+        scratch_used += alternate_length;
+    }
+
+    scratch_used = fact_count = 0u;
+    for (input_index = 0u; input_index < edit_count; input_index = group_end) {
+        size_t start, reference_length, alternate_length;
+        hgvs_haplotype_normalized_t normalized;
+        int64_t first, last;
+        group_end = hgvs_haplotype_group_end(edits_descending, edit_count,
+            input_index, descending);
+        hgvs_haplotype_group_extent(edits_descending, edit_count, descending,
+            input_index, group_end, &start, &reference_length, &alternate_length);
+        size_t normalization_end = reference_cds_length;
+        if (group_end < edit_count) {
+            normalization_end = (size_t)hgvs_haplotype_edit_at(edits_descending,
+                edit_count, descending, group_end)->cds_start - 1u;
+        }
+        hgvs_haplotype_normalize(reference_cds, normalization_end, start,
+            reference_length, allele_scratch + scratch_used, alternate_length, &normalized);
+        if (normalized.reference_length != 0u || normalized.alternate_length != 0u) {
+            hgvs_haplotype_fact_coordinates(&normalized, &first, &last);
+            if (previous_last >= first) return DUCKVEP_HGVS_UNSUPPORTED_EDIT;
+            previous_last = last;
+            fact_count++;
+        }
+        scratch_used += alternate_length;
+    }
+    if (fact_count == 0u) return DUCKVEP_HGVS_UNSUPPORTED_EDIT;
+
+    scratch_used = fact_count = 0u;
+    for (input_index = 0u; input_index < edit_count; input_index = group_end) {
+        size_t start, reference_length, alternate_length, shift;
+        hgvs_haplotype_normalized_t normalized;
+        duckvep_hgvs_dna_fact_t fact;
+        uint8_t *alternate;
+        int64_t first, last;
+        group_end = hgvs_haplotype_group_end(edits_descending, edit_count,
+            input_index, descending);
+        hgvs_haplotype_group_extent(edits_descending, edit_count, descending,
+            input_index, group_end, &start, &reference_length, &alternate_length);
+        alternate = allele_scratch + scratch_used;
+        size_t normalization_end = reference_cds_length;
+        if (group_end < edit_count) {
+            normalization_end = (size_t)hgvs_haplotype_edit_at(edits_descending,
+                edit_count, descending, group_end)->cds_start - 1u;
+        }
+        hgvs_haplotype_normalize(reference_cds, normalization_end, start,
+            reference_length, alternate, alternate_length, &normalized);
+        scratch_used += alternate_length;
+        if (normalized.reference_length == 0u && normalized.alternate_length == 0u) {
+            continue;
+        }
+        for (shift = 0u; normalized.alternate_length > 0u && shift < normalized.shift; shift++) {
+            uint8_t appended = reference_cds[normalized.start +
+                normalized.reference_length + shift];
+            memmove(alternate + normalized.alternate_offset,
+                alternate + normalized.alternate_offset + 1u,
+                normalized.alternate_length - 1u);
+            alternate[normalized.alternate_offset + normalized.alternate_length - 1u] = appended;
+        }
+        hgvs_haplotype_fact_coordinates(&normalized, &first, &last);
+        memset(&fact, 0, sizeof fact);
+        fact.first = (duckvep_hgvs_coordinate_t){
+            .base = first == 0 ? -1 : first, .kind = DUCKVEP_HGVS_COORDINATE_C };
+        fact.last = (duckvep_hgvs_coordinate_t){
+            .base = last > (int64_t)reference_cds_length ? last - (int64_t)reference_cds_length : last,
+            .kind = last > (int64_t)reference_cds_length ? DUCKVEP_HGVS_COORDINATE_C_STAR : DUCKVEP_HGVS_COORDINATE_C };
+        fact.ref = reference_cds + normalized.start + normalized.shift;
+        fact.alt = alternate + normalized.alternate_offset;
+        fact.ref_length = (uint32_t)normalized.reference_length;
+        fact.alt_length = (uint32_t)normalized.alternate_length;
+        fact.transcript_strand = 1;
+        fact.numbering = DUCKVEP_HGVS_NUMBERING_C;
+        if (normalized.reference_length == 0u) {
+            fact.shape = normalized.duplication ? DUCKVEP_HGVS_DNA_DUPLICATION :
+                DUCKVEP_HGVS_DNA_INSERTION;
+            if (normalized.duplication) {
+                fact.ref = reference_cds + normalized.start + normalized.shift -
+                    normalized.alternate_length;
+                fact.ref_length = (uint32_t)normalized.alternate_length;
+            }
+        } else if (normalized.alternate_length == 0u) {
+            fact.shape = DUCKVEP_HGVS_DNA_DELETION;
+        } else if (normalized.reference_length == 1u && normalized.alternate_length == 1u) {
+            fact.shape = DUCKVEP_HGVS_DNA_SUBSTITUTION;
+        } else {
+            fact.shape = DUCKVEP_HGVS_DNA_REPLACEMENT;
+        }
+        facts[fact_count++] = fact;
+    }
+    *fact_count_out = fact_count;
+    return DUCKVEP_HGVS_OK;
+}
+
+duckvep_hgvs_status_t duckvep_hgvs_dna_haplotype_render(
+    const duckvep_hgvs_dna_fact_t *facts,
+    size_t                         fact_count,
+    char                           *buffer,
+    size_t                         capacity,
+    size_t                         *required_out) {
+
+    hgvs_writer_t writer;
+    size_t index;
+
+    if (required_out != NULL) *required_out = 0u;
+    if (buffer != NULL && capacity > 0u) buffer[0] = '\0';
+    if (facts == NULL || required_out == NULL || fact_count == 0u ||
+        (buffer == NULL && capacity != 0u)) return DUCKVEP_HGVS_INVALID_ARG;
+    if (buffer != NULL && capacity > 0u) {
+        duckvep_hgvs_status_t status = duckvep_hgvs_dna_haplotype_render(
+            facts, fact_count, NULL, 0u, required_out);
+        if (status != DUCKVEP_HGVS_BUFFER_TOO_SMALL) return status;
+        if (*required_out >= capacity) return DUCKVEP_HGVS_BUFFER_TOO_SMALL;
+    }
+    if (fact_count == 1u) {
+        duckvep_hgvs_status_t status = duckvep_hgvs_dna_render_basic(
+            &facts[0], NULL, 0u, required_out);
+        if (status != DUCKVEP_HGVS_BUFFER_TOO_SMALL) return status;
+        if (buffer == NULL || *required_out >= capacity) return DUCKVEP_HGVS_BUFFER_TOO_SMALL;
+        return duckvep_hgvs_dna_render_basic(&facts[0], buffer, capacity, required_out);
+    }
+    memset(&writer, 0, sizeof writer);
+    writer.buffer = buffer;
+    writer.capacity = capacity;
+    if (!hgvs_writer_literal(&writer, "c.[")) return DUCKVEP_HGVS_OUT_OF_RANGE;
+    for (index = 0u; index < fact_count; index++) {
+        const duckvep_hgvs_dna_fact_t *fact = &facts[index];
+        duckvep_hgvs_status_t status;
+        if (index > 0u && !hgvs_writer_char(&writer, ';')) return DUCKVEP_HGVS_OUT_OF_RANGE;
+        if (fact->numbering != DUCKVEP_HGVS_NUMBERING_C ||
+            (index > 0u && facts[index - 1u].last.base >= fact->first.base)) {
+            return DUCKVEP_HGVS_INVALID_PROJECTION;
+        }
+        if (fact->shape == DUCKVEP_HGVS_DNA_SUBSTITUTION) {
+            if (fact->ref_length != 1u || fact->alt_length != 1u ||
+                !hgvs_coordinate_equal(&fact->first, &fact->last) ||
+                !hgvs_writer_coordinate(&writer, &fact->first)) return DUCKVEP_HGVS_INVALID_PROJECTION;
+            status = hgvs_writer_allele(&writer, fact, 0);
+            if (status != DUCKVEP_HGVS_OK) return status;
+            if (!hgvs_writer_char(&writer, '>')) return DUCKVEP_HGVS_OUT_OF_RANGE;
+            status = hgvs_writer_allele(&writer, fact, 1);
+        } else if (fact->shape == DUCKVEP_HGVS_DNA_DELETION ||
+                   fact->shape == DUCKVEP_HGVS_DNA_REPLACEMENT) {
+            if (!hgvs_writer_coordinate(&writer, &fact->first) ||
+                (!hgvs_coordinate_equal(&fact->first, &fact->last) &&
+                 (!hgvs_writer_char(&writer, '_') ||
+                  !hgvs_writer_coordinate(&writer, &fact->last)))) {
+                return DUCKVEP_HGVS_INVALID_PROJECTION;
+            }
+            if (fact->shape == DUCKVEP_HGVS_DNA_DELETION) {
+                if (fact->ref_length == 0u || fact->alt_length != 0u ||
+                    !hgvs_writer_literal(&writer, "del")) return DUCKVEP_HGVS_INVALID_PROJECTION;
+                status = DUCKVEP_HGVS_OK;
+            } else {
+                if (fact->ref_length == 0u || fact->alt_length == 0u ||
+                    !hgvs_writer_literal(&writer, "delins")) return DUCKVEP_HGVS_INVALID_PROJECTION;
+                status = hgvs_writer_allele(&writer, fact, 1);
+            }
+        } else if (fact->shape == DUCKVEP_HGVS_DNA_INSERTION) {
+            if (fact->ref_length != 0u || fact->alt_length == 0u ||
+                hgvs_coordinate_equal(&fact->first, &fact->last) ||
+                !hgvs_writer_coordinate(&writer, &fact->first) ||
+                !hgvs_writer_char(&writer, '_') ||
+                !hgvs_writer_coordinate(&writer, &fact->last) ||
+                !hgvs_writer_literal(&writer, "ins")) return DUCKVEP_HGVS_INVALID_PROJECTION;
+            status = hgvs_writer_allele(&writer, fact, 1);
+        } else if (fact->shape == DUCKVEP_HGVS_DNA_DUPLICATION) {
+            if (fact->ref_length == 0u ||
+                !hgvs_writer_coordinate(&writer, &fact->first) ||
+                (!hgvs_coordinate_equal(&fact->first, &fact->last) &&
+                 (!hgvs_writer_char(&writer, '_') ||
+                  !hgvs_writer_coordinate(&writer, &fact->last))) ||
+                !hgvs_writer_literal(&writer, "dup")) return DUCKVEP_HGVS_INVALID_PROJECTION;
+            status = DUCKVEP_HGVS_OK;
+        } else return DUCKVEP_HGVS_INVALID_PROJECTION;
+        if (status != DUCKVEP_HGVS_OK) return status;
+    }
+    if (!hgvs_writer_char(&writer, ']')) return DUCKVEP_HGVS_OUT_OF_RANGE;
+    return hgvs_writer_finish(&writer, required_out);
+}
+
 static int hgvs_protein_full_window(
     const duckvep_coding_context_t  *context,
     duckvep_coding_peptide_window_t *window) {

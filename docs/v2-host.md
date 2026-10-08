@@ -35,6 +35,10 @@ DUCKVEP_V2_DUCKDB=.deps-v2/duckdb-build/duckdb make test_v2
 
 The runtime suite tests repeated `LOAD` on writable and read-only databases, with no catalog DDL or database-file changes; v2-only SQL assertions; model and budget behavior; and the 585 cases in `test/sql_v2/equality_golden.json`. The golden records v1 results. When `build/release/duckvep.duckdb_extension` exists, the runner also checks those results against the live v1 extension. `test/sql_v2/README.md` documents the SQL and the separate whole-HG002 check.
 
+## Release preflight
+
+`make check-v2-release-selftest` runs offline negative controls. A release admission uses `make check-v2-release-preflight` with concrete arguments for the extension, pinned CLI, R library, and completed HG002 output directory. The preflight checks the SDK manifest and headers, the actual extension footer and load, runtime and source revisions, and the complete hashed HG002 comparison receipt. It contacts GitHub and CRAN only with explicit `--live-status`. The current preview manifest is blocked; the command can emit `READY_TO_QUALIFY` after upstream releases are visible but before local artifacts and qualification outputs are inspected. Details and the required invocation are in [`test/sql_v2/release-readiness.md`](../test/sql_v2/release-readiness.md).
+
 `LOAD` registers the native functions without executing SQL or creating persistent catalog objects. The read-only database test covers this contract.
 
 Geometry, repeat/phase, SQL-builder, annotation, coding-discovery and resource-control functions retain their v1 SQL names. The model and haplotype query workflows use v2-specific load builders; the workflow differences are described below. `duckvep_model_drop`, `duckvep_model_save` and `duckvep_model_restore` retain their v1 names.
@@ -68,6 +72,12 @@ The visible workflow differs by host: v1 performs loading in one table-function 
 The v1 `duckvep_haplotypes(calls_query, model, ...)` executes and normalizes its query on a private connection. On v2, `duckvep_haplotype_load_sql` returns caller-side normalization and staging statements; run them in order, then read `duckvep_haplotype_scan(job)`. The scan replays the captured rows through `src/core/duckvep_core_haplotypes.c`, the same core used by v1. With `input_mode = 'source_records'`, set `phase_policy = 'vep_compat'`; the builder returns four ordered statements for raw input, record-plan staging, normalized-call staging and cleanup. A job scan consumes the job once and releases it at completion or error; use `duckvep_haplotype_drop` to discard a staged job that will not be scanned.
 
 The staging collections are DuckDB-managed and governed by DuckDB's memory limit, not the native-memory budget. The scan's workspace and core allocations use the shared native budget. `duckvep_coding_calls` uses the same budget for its HTSlib reader and discovery workspace.
+
+## Haplotype arrangements
+
+`duckvep_haplotype_arrangements(calls_query, model, ...)` on v1 normalizes and replays strict diploid calls on its private query connection. It therefore sees committed permanent relations, but not caller TEMP relations or uncommitted rows. On v2, call `duckvep_haplotype_arrangements_load_sql(calls_query, model, job [, options])`, execute its single returned caller-side `COPY`, then query `duckvep_haplotype_arrangements(job)`. The staged query uses the same shared strict normalization recipe as v1 and preserves event IDs, REF/ALT values, both original alleles, `phase_before`, and `phase_set`.
+
+The v2 arrangement job is consumed once. The scan fully validates and charges the native arrangement workspace before returning an output row, then releases its cursor and staged collection. A failed or cancelled `COPY` publishes no job. Arrangement limits are accepted in the loader's optional options struct: `max_sites`, `max_calls`, `max_arrangements`, and `max_replays`; zero, invalid, and over-capacity values are rejected before a job is published. `CALLED` is not evidence of cis phase: unphased calls produce bounded hypotheses, while only observed phase metadata constrains the lanes.
 
 ## Whole-HG002 parity measurement
 

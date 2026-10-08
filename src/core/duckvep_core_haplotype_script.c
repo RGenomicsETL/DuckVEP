@@ -66,6 +66,36 @@ static const char final_tail[] =
     "FROM selected c LEFT JOIN genotypes g USING(event_index,sample_index),range(0,alt_count+2) a(i) "
     "ORDER BY seq_region,position,event_index,alt_index,transcript_index,sample_index";
 
+int duckvep_core_arrangement_input_sql(const char *query, duckvep_sql_text *out,
+    char *error, size_t error_size) {
+    bool ok;
+    size_t query_length, overhead;
+    if (!query || !*query) {
+        snprintf(error, error_size, "%s", "duckvep_haplotype_arrangements: calls_query must be a non-empty string");
+        return 2;
+    }
+    query_length = strlen(query);
+    overhead = strlen(alt_prefix) + strlen(alt_middle_strict) + strlen(alt_domain_strict) + strlen(alt_suffix);
+    if (query_length > 134217728u - overhead) {
+        snprintf(error, error_size, "%s", "duckvep_haplotype_arrangements: calls query text exceeds bounded workspace");
+        return 2;
+    }
+    ok = duckvep_sql_append(out, "WITH raw AS MATERIALIZED (SELECT event_index::UBIGINT event_index, "
+        "seq_region::UINTEGER seq_region, position::UBIGINT AS position, reference::VARCHAR AS reference, "
+        "alternate::VARCHAR AS alternate, alt_index::UINTEGER alt_index, transcript_index::UINTEGER transcript_index, "
+        "sample_index::UINTEGER sample_index, alleles::INTEGER[] alleles, phase_before::BOOLEAN[] phase_before, "
+        "phase_set::BIGINT phase_set FROM (\n") &&
+        duckvep_sql_append(out, query) && duckvep_sql_append(out, "\n") &&
+        duckvep_sql_append(out, alt_middle_strict) && duckvep_sql_append(out, alt_domain_strict) &&
+        duckvep_sql_append(out, alt_suffix);
+    if (!ok) {
+        duckvep_sql_free(out);
+        snprintf(error, error_size, "%s", "duckvep_haplotype_arrangements: out of memory building input SQL");
+        return 1;
+    }
+    return 0;
+}
+
 static bool append_copy_options(duckvep_sql_text *sql, const char *model, const char *job, const char *stage,
     const duckvep_haplotype_script_options_t *o) {
     char number[48];
