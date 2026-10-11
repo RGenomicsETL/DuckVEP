@@ -41,7 +41,7 @@ jobs:
         with:
           use-public-rspm: true
       - name: Install DuckDB runtime test dependencies
-        run: Rscript --vanilla -e 'install.packages(c("DBI", "duckdb"))'
+        run: Rscript --vanilla -e 'install.packages(c("DBI", "duckdb"), repos = Sys.getenv("RSPM"))'
       - name: Check the csq mapping, goldens and accounting (offline, base R)
         run: make test_haplotype_contract
       - name: Check the bounded noncoding haplotype runtime
