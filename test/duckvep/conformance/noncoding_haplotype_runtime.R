@@ -69,8 +69,17 @@ run_full_noncoding_producer <- function(connection, sql_quote) {
       is.na(observed$protein[[1L]]), observed$edit_count == 0L, observed$source_ids == "1,2")
     capacity <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status FROM ", sub("\\)$", ",max_sequence_bases:=19)", relation)))
     stopifnot(nrow(capacity) == 1L, capacity$prediction_status == "unsupported_context")
+    for (alleles in list(c("C", "CA"), c("CC", "C"), c("CC", "AGT"))) {
+      position <- if (strand == 1L) 16L else 34L
+      ref <- if (strand == 1L) alleles[[1L]] else reverse_complement(alleles[[1L]])
+      alt <- if (strand == 1L) alleles[[2L]] else reverse_complement(alleles[[2L]])
+      make_calls(sprintf("(1,0,%d,%s,%s,1,0,0,12,[1,1],[false,true])", position, sql_quote(ref), sql_quote(alt)))
+      indel <- result()
+      stopifnot(indel$prediction_status == "predicted", indel$edit_count == 0L,
+        indel$consequences == "non_coding_transcript_exon_variant", is.na(indel$cds[[1L]]), is.na(indel$protein[[1L]]))
+    }
     make_calls(conflict)
-    stopifnot(result()$prediction_status == "unsupported_context")
+    stopifnot(result()$prediction_status == "unsupported_overlap")
     make_calls(splice)
     stopifnot(result()$prediction_status == "unsupported_context")
     make_calls(external_edge)
@@ -109,6 +118,8 @@ main <- function(root) {
   extension <- Sys.getenv("DUCKVEP_EXTENSION",
     file.path(root, "build/release/duckvep.duckdb_extension"))
   DBI::dbExecute(connection, paste("LOAD", sql_quote(normalizePath(extension, mustWork = TRUE))))
+  source(file.path(root, "test/scripts/test_noncoding_haplotype_oracle.R"))
+  source(file.path(root, "test/duckvep/conformance/noncoding_indel_runtime.R"))
   checked <- 0L
   for (axis in axes) for (feature in names(fixtures)) {
     strand <- axis$strand
@@ -169,7 +180,7 @@ main <- function(root) {
     stopifnot(nrow(ambiguous) > 0L, all(ambiguous$prediction_status != "predicted"))
     DBI::dbExecute(connection, "UPDATE noncoding_calls SET alternate=alternate || 'A' WHERE event_index=2")
     length_change <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status FROM ", relation))
-    stopifnot(nrow(length_change) == 1L, length_change$prediction_status == "unsupported_context")
+    stopifnot(nrow(length_change) == 1L, length_change$prediction_status == "predicted")
     DBI::dbExecute(connection, create_calls)
     unchanged <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status,",
       "array_to_string(haplotype_consequences,',') consequences FROM duckvep_haplotypes(",
@@ -230,6 +241,7 @@ main <- function(root) {
     checked <- checked + 1L
   }
   run_full_noncoding_producer(connection, sql_quote)
+  run_noncoding_indels(connection, sql_quote)
   cat("Native final-allele UTR:", checked,
     "strand/feature cases; raw operands, contributors, reference calls, capacity, phase, mixed-feature, length-change, splice and missing-metadata guards verified\n")
 }

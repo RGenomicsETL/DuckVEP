@@ -2,6 +2,7 @@
 #include "duckvep_core_snapshot.h"
 #include "kernel/src/duckvep_model_internal.h"
 #include "kernel/src/duckvep_budget.h"
+#include "kernel/src/duckvep_dna.h"
 
 #include <htslib/faidx.h>
 
@@ -1313,7 +1314,7 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		cds_ends = duckvep_col_data(vectors[8]);
 		sequences = duckvep_col_data(vectors[9]);
 		tables = duckvep_col_data(vectors[10]);
-		pre_flanks = column_count == 13
+		pre_flanks = column_count >= 13
 		    ? duckvep_col_data(vectors[11]) : NULL;
 		post_flanks = column_count >= 13
 		    ? duckvep_col_data(vectors[12]) : NULL;
@@ -2794,8 +2795,7 @@ duckvep_validate_cdna_sequences(const duckvep_owned_model_t *model,
 		for (base = 0u; base < length; base++) {
 			uint8_t value = model->cdna_sequence_bytes[offset + base];
 
-			if (value != 'A' && value != 'C' && value != 'G' &&
-			    value != 'T' && value != 'N') {
+			if (duckvep_dna_normalize_n((char)value) == '\0') {
 				duckvep_sql_set_error(error, error_size,
 				    "full transcript cDNA contains a non-ACGTN byte");
 				return 0;

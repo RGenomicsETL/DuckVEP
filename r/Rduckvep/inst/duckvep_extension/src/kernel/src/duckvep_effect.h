@@ -186,11 +186,13 @@ uint64_t duckvep_effect_eval_coding_delta(const duckvep_sequence_delta_t *delta)
 
 /* Whole-haplotype consequences for one already-spliced transcript sequence.
  * `reference` and `alternate` are caller-owned, transcript-oriented byte strings.
- * This bounded lane accepts only net substitution haplotypes: equal nonzero
- * lengths, every changed base confined to exactly one simple feature. Coding
- * coordinates are one-based inclusive; pass both as zero for a non-coding
- * transcript. It deliberately does not infer splice remodeling, indels, or a
- * mixed coding/UTR consequence. The returned SO mask says nothing about source
+ * Reference length is nonzero; alternate length may differ. The caller proves
+ * reference-valid, nonoverlapping exonic edits confined to one UTR or a complete
+ * noncoding transcript. Coding coordinates are one-based inclusive on the
+ * reference RNA; pass both as zero for a noncoding transcript. A length-changing
+ * UTR contrast preserves the coding-and-opposite-flank prefix or suffix.
+ * Splice remodeling and mixed coding/UTR consequences are not inferred.
+ * The returned SO mask says nothing about source
  * contributor provenance, which remains owned by the composition caller. */
 typedef enum duckvep_haplotype_noncoding_status {
     DUCKVEP_HAPLOTYPE_NONCODING_OK = 0,

@@ -1984,15 +1984,15 @@ duckvep_hgvs_status_t duckvep_hgvs_dna_haplotype_fact_build(
 
     if (fact_count_out != NULL) *fact_count_out = 0u;
     if (reference_cds == NULL || edits_descending == NULL || facts == NULL ||
-        allele_scratch == NULL || fact_count_out == NULL || edit_count < 2u ||
+        allele_scratch == NULL || fact_count_out == NULL || edit_count == 0u ||
         reference_cds_length == 0u ||
         (transcript_strand != (int8_t)1 && transcript_strand != (int8_t)-1)) {
         return DUCKVEP_HGVS_INVALID_ARG;
     }
-    if (edits_descending[0].cds_start == edits_descending[1].cds_start) {
+    if (edit_count > 1u && edits_descending[0].cds_start == edits_descending[1].cds_start) {
         return DUCKVEP_HGVS_UNSUPPORTED_EDIT;
     }
-    descending = edits_descending[0].cds_start > edits_descending[1].cds_start;
+    descending = edit_count > 1u && edits_descending[0].cds_start > edits_descending[1].cds_start;
 
     for (source_index = 0u; source_index < edit_count; source_index++) {
         const duckvep_haplotype_edit_t *edit = &edits_descending[source_index];

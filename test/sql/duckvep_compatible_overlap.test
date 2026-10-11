@@ -1,0 +1,72 @@
+require duckvep
+
+statement ok
+SELECT * FROM duckvep_model_load('compatible_overlap',
+  'SELECT i::UINTEGER seq_region FROM range(2) t(i)',
+  'SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,100::UBIGINT transcript_start,111::UBIGINT transcript_end,(1-2*i)::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,100::UBIGINT cds_start,111::UBIGINT cds_end,''ATGGCTGAATAA''::BLOB cds_sequence,1::UTINYINT codon_table,''''::BLOB pre_cds_sequence,''''::BLOB post_cds_sequence FROM range(2) t(i)',
+  'SELECT i::UINTEGER transcript_index,100::UBIGINT exon_start,111::UBIGINT exon_end,1::UBIGINT exon_cdna_start,12::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase FROM range(2) t(i)')
+
+statement ok
+CREATE TABLE overlap_calls AS SELECT * FROM (VALUES
+ (1,0,103,'GC','AT',1,0,0,[0,1],[false,true],77::BIGINT),
+ (2,0,104,'CT','TT',1,0,0,[0,1],[false,true],77::BIGINT),
+ (3,1,107,'GC','AT',1,1,0,[0,1],[false,true],77::BIGINT),
+ (4,1,106,'AG','AA',1,1,0,[0,1],[false,true],77::BIGINT))
+ v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index,alleles,phase_before,phase_set)
+
+statement ok
+CREATE TABLE overlap_result AS SELECT * FROM duckvep_haplotypes('SELECT * FROM overlap_calls ORDER BY event_index DESC','compatible_overlap',phase_policy := 'strict',hgvs := true)
+
+query IIIII
+SELECT count(*),count(*) FILTER(WHERE cds='ATGATTGAATAA' AND protein='MIE*'),
+ count(*) FILTER(WHERE hgvsc='c.4_5delinsAT' AND hgvsp='p.(Ala2Ile)'),
+ count(*) FILTER(WHERE len(contributors)=2 AND len(coding_blocks)=1 AND len(coding_blocks[1].event_indices)=2),
+ count(*) FILTER(WHERE carriers[1].phase_set=77 AND carriers[1].haplotype_lane=2 AND carriers[1].ploidy=2)
+FROM overlap_result
+----
+2	2	2	2	2
+
+query III
+SELECT count(*),count(*) FILTER(WHERE c.position=s.position AND c.reference=s.reference AND c.alternate=s.alternate),
+ count(*) FILTER(WHERE s.alleles=[0,1] AND s.phase_before=[false,true] AND s.phase_set=77)
+FROM overlap_result r,unnest(r.contributors) u(c) JOIN overlap_calls s ON c.event_index=s.event_index
+----
+4	4	4
+
+statement ok
+UPDATE overlap_calls SET alternate=CASE WHEN seq_region=0 THEN 'GT' ELSE 'AC' END WHERE event_index IN (2,4)
+
+query IIII
+SELECT count(*),count(*) FILTER(WHERE cds IS NULL AND protein IS NULL AND hgvsc IS NULL AND hgvsp IS NULL),
+ count(*) FILTER(WHERE prediction_status='edit_conflict' AND haplotype_consequences IS NULL AND nmd_prediction='unknown'),
+ count(*) FILTER(WHERE len(contributors)=2)
+FROM duckvep_haplotypes('SELECT * FROM overlap_calls','compatible_overlap',phase_policy := 'strict',hgvs := true)
+----
+2	2	2	2
+
+statement ok
+SELECT * FROM duckvep_model_load('ov_multi','SELECT 0::UINTEGER seq_region','SELECT 0::UINTEGER transcript_index,0::UINTEGER seq_region,100::UBIGINT transcript_start,114::UBIGINT transcript_end,1::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,100::UBIGINT cds_start,114::UBIGINT cds_end,''ATGGCTGAATTTTAA''::BLOB cds_sequence,1::UTINYINT codon_table','SELECT 0::UINTEGER transcript_index,100::UBIGINT exon_start,114::UBIGINT exon_end,1::UBIGINT exon_cdna_start,15::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase')
+
+statement ok
+CREATE TABLE ov_multi_calls AS SELECT * FROM (VALUES (1,0,103,'GCTGAATT','ATTGAACT',1,0,0,[0,1],[false,true],77::BIGINT),(2,0,104,'CT','TT',1,0,0,[0,1],[false,true],77::BIGINT),(3,0,103,'GCTGAATT','ATTGAACT',1,0,0,[0,1],[false,true],77::BIGINT)) v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index,alleles,phase_before,phase_set)
+
+query IIIIIII
+SELECT cds='ATGATTGAACTTTAA',protein='MIEL*',hgvsc='c.[4_5delinsAT;10T>C]',hgvsp='p.[(Ala2Ile;Phe4Leu)]',list_sort(coding_blocks[1].event_indices)=[1,2,3],list_sort(coding_blocks[2].event_indices)=[1,3],(SELECT bool_and(e.block_index=CASE WHEN e.cds_start<7 THEN 0 ELSE 1 END) FROM unnest(normalized_edits) t(e)) FROM duckvep_haplotypes('SELECT * FROM ov_multi_calls ORDER BY event_index DESC','ov_multi',phase_policy:='strict',hgvs:=true)
+----
+true	true	true	true	true	true	true
+
+statement ok
+UPDATE ov_multi_calls SET position=106,reference='G',alternate='A' WHERE event_index=3
+
+query IIIIIII
+SELECT cds='ATGATTAAACTTTAA',protein='MIKL*',list_sort(coding_blocks[1].event_indices)=[1,2],coding_blocks[2].event_indices=[3],coding_blocks[3].event_indices=[1],len(normalized_edits)=4,(SELECT bool_and(e.event_index<>1 OR e.block_index<>1) FROM unnest(normalized_edits) t(e)) FROM duckvep_haplotypes('SELECT * FROM ov_multi_calls','ov_multi',hgvs:=true)
+----
+true	true	true	true	true	true	true
+
+statement ok
+UPDATE ov_multi_calls SET position=CASE WHEN event_index=3 THEN 107 ELSE 103 END,reference=CASE event_index WHEN 1 THEN 'GCTGA' WHEN 2 THEN 'GCT' ELSE 'A' END,alternate=CASE event_index WHEN 1 THEN 'TAAGC' WHEN 2 THEN 'TAA' ELSE 'C' END
+
+query IIIIII
+SELECT cds='ATGTAAGCATTTTAA',protein='M*',list_sort(nmd_contributors)=[1,2],nmd_prediction='escape',list_transform(list_sort(contributor_provenance),lambda c: c.role)=['applied','applied','post_stop'],list_sort(coding_blocks[2].event_indices)=[1,3] FROM duckvep_haplotypes('SELECT * FROM ov_multi_calls','ov_multi',hgvs:=true)
+----
+true	true	true	true	true	true

@@ -1347,6 +1347,10 @@ TEST haplotype_noncoding_uses_final_transcript_sequence(void) {
               duckvep_effect_eval_haplotype_noncoding(reference, 10u, noncoding, 10u,
                                                        0u, 0u, &mask));
     ASSERT_EQ(DUCKVEP_SO(DUCKVEP_SO_NON_CODING_TRANSCRIPT_EXON), mask);
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_OK,
+              duckvep_effect_eval_haplotype_noncoding(reference, 10u, (const uint8_t *)"", 0u,
+                                                       0u, 0u, &mask));
+    ASSERT_EQ(DUCKVEP_SO(DUCKVEP_SO_TRANSCRIPT_ABLATION), mask);
 
     /* A restored reference has no biological prediction even when upstream
      * geometry retains every contributor. Mixed or coding final differences
@@ -1363,7 +1367,7 @@ TEST haplotype_noncoding_uses_final_transcript_sequence(void) {
               duckvep_effect_eval_haplotype_noncoding(reference, 10u,
                                                        (const uint8_t *)"AACAGGTTAA", 10u,
                                                        4u, 7u, &mask));
-    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_LENGTH_CHANGE,
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_MIXED_FEATURE,
               duckvep_effect_eval_haplotype_noncoding(reference, 10u, utr5, 9u,
                                                        4u, 7u, &mask));
     ASSERT_EQ(DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT,

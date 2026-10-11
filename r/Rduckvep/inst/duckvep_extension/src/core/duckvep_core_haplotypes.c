@@ -169,6 +169,7 @@ void duckvep_hap_close(duckvep_hap_state_t *s) {
     duckvep_budget_free(b->carriers.active_transcripts); duckvep_budget_free(b->carriers.transcript_index);
     duckvep_budget_free(b->carriers.call_index); duckvep_budget_free(b->carriers.prefix_index);
     duckvep_budget_free(b->events); duckvep_budget_free(b->projections); duckvep_budget_free(b->alleles); duckvep_budget_free(b->leaf_events);
+    duckvep_budget_free(b->joint_edits); duckvep_budget_free(b->joint_alt); duckvep_budget_free(b->joint_assigned);
     duckvep_budget_free(b->contributors); duckvep_budget_free(b->edits); duckvep_budget_free(b->blocks); duckvep_budget_free(b->cds); duckvep_budget_free(b->protein);
     duckvep_budget_free(b->noncoding);
     duckvep_budget_free(b->edit_event_ids);
@@ -208,6 +209,7 @@ static int workspace_prepare(duckvep_hap_state_t *s, const duckvep_hap_config_t 
                          n[DUCKVEP_HAP_LIMIT_ALLELES] > SIZE_MAX -
                              n[DUCKVEP_HAP_LIMIT_SEQUENCE]))) return 0;
     b->cds_capacity = n[DUCKVEP_HAP_LIMIT_SEQUENCE];
+    b->joint_capacity = b->cds_capacity;
     b->protein_capacity = n[DUCKVEP_HAP_LIMIT_SEQUENCE] + 1u;
     if (b->protein_capacity > SIZE_MAX / 2u) return 0;
     s->difference_scratch.score_capacity = b->protein_capacity * 2u;
@@ -236,6 +238,8 @@ static int workspace_prepare(duckvep_hap_state_t *s, const duckvep_hap_config_t 
     X(b->carriers.prefix_index, b->carriers.prefix_buckets) \
     X(b->events, b->event_capacity) X(b->projections, b->projection_capacity) \
     X(b->alleles, b->allele_capacity) X(b->leaf_events, b->leaf_capacity) \
+    X(b->joint_edits, b->edit_capacity) X(b->joint_alt, b->joint_capacity) \
+    X(b->joint_assigned, b->joint_capacity) \
     X(b->contributors, b->leaf_capacity) X(b->edits, b->edit_capacity) \
     X(b->blocks, b->edit_capacity) X(b->edit_event_ids, b->edit_capacity) \
     X(b->cds, b->cds_capacity) X(b->protein, b->protein_capacity) X(b->noncoding, b->noncoding_capacity) \
@@ -573,8 +577,9 @@ static int append_hgvsc(duckvep_h_vector text, duckvep_h_vector status_vector, s
     if (!status) {
         strand = bind->model->transcripts.strand[leaf->carriers.transcript_index];
         hgvs_status = duckvep_hgvs_dna_haplotype_fact_build(
-            leaf->reference_cds, leaf->cds_length, strand, s->buffers.edits,
-            leaf->edit_count, s->hgvsc_facts,
+            leaf->reference_cds, leaf->cds_length, strand,
+            leaf->joint_edits ? leaf->joint_edits : s->buffers.edits,
+            leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count, s->hgvsc_facts,
             bind->limits[DUCKVEP_HAP_LIMIT_LEAF_EDITS], s->hgvsc_alleles,
             bind->limits[DUCKVEP_HAP_LIMIT_ALLELES] +
                 bind->limits[DUCKVEP_HAP_LIMIT_SEQUENCE], &fact_count);
@@ -632,8 +637,19 @@ static int append_hgvsp(duckvep_h_vector text, duckvep_h_vector status_vector, s
     if (!name && !reference_only) {
         duckvep_hgvs_protein_reference_t reference = {
             leaf->reference_protein, leaf->reference_protein_length};
+        /* HGVS includes a genetically defined terminal stop even when the
+         * compatibility peptide omits its token. Keep that raw peptide intact. */
+        if (leaf->path_status == DUCKVEP_PREDICTION_PREDICTED &&
+            reference.length + 1u == leaf->reference_coding_translation.length &&
+            leaf->reference_coding_protein[reference.length] == '*') {
+            memcpy(s->buffers.prediction_protein, reference.bases, reference.length);
+            s->buffers.prediction_protein[reference.length] = '*';
+            reference.bases = s->buffers.prediction_protein;
+            reference.length++;
+        }
         duckvep_hgvs_status_t status = duckvep_hgvs_protein_haplotype_build(coding,
-            &reference, s->buffers.edits, leaf->edit_count, leaf->blocks, leaf->block_count,
+            &reference, leaf->joint_edits ? leaf->joint_edits : s->buffers.edits,
+            leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count, leaf->blocks, leaf->block_count,
             bind->model->transcripts.flags[leaf->carriers.transcript_index],
             s->protein_operations, bind->limits[DUCKVEP_HAP_LIMIT_HGVS_OPERATIONS], &count);
         if (status == DUCKVEP_HGVS_BUFFER_TOO_SMALL) {
@@ -700,6 +716,8 @@ static const char *reason_name(duckvep_prediction_reason_t reason, duckvep_cds_e
     case DUCKVEP_REASON_REFERENCE_MISMATCH: return "reference_mismatch";
     case DUCKVEP_REASON_INVALID_BASE: return "invalid_base";
     case DUCKVEP_REASON_TRANSCRIPT_NOT_CODING: return "transcript_not_coding";
+    case DUCKVEP_REASON_NMD_GEOMETRY_UNAVAILABLE: return "nmd_geometry_unavailable";
+    case DUCKVEP_REASON_SEQUENCE_CAPACITY: return "sequence_capacity";
     case DUCKVEP_REASON_NON_STANDARD_CODON_TABLE: return "non_standard_codon_table";
     case DUCKVEP_REASON_CURATED_TRANSCRIPT: return "curated_transcript";
     case DUCKVEP_REASON_UNTYPED_CURATED_METADATA: return "untyped_curated_metadata";
@@ -738,6 +756,24 @@ static const char *nmd_name(duckvep_haplotype_nmd_t nmd) {
     case DUCKVEP_HAPLOTYPE_NMD_TRIGGER: return "trigger";
     default: return "unknown";
     }
+}
+
+/* Joint substitution membership follows changed bases, not source padding. */
+static int joint_source_in_block(const duckvep_haplotype_contributor_t *source,
+    const duckvep_haplotype_block_t *block, int8_t transcript_strand) {
+    const duckvep_haplotype_edit_t *edit = source->projected;
+    if (!edit) return 0;
+    uint64_t start = edit->cds_start > block->cds_start ? edit->cds_start : block->cds_start;
+    uint64_t end = (uint64_t)edit->cds_start + edit->ref_len;
+    uint64_t block_end = (uint64_t)block->cds_start + block->ref_len;
+    if (end > block_end) end = block_end;
+    for (uint64_t at = start; at < end; at++) {
+        size_t offset = (size_t)(at - edit->cds_start);
+        if (edit->variant_strand != transcript_strand) offset = edit->ref_len - 1u - offset;
+        if (duckvep_dna_normalize_n((char)edit->ref[offset]) !=
+            duckvep_dna_normalize_n((char)edit->alt[offset])) return 1;
+    }
+    return 0;
 }
 
 /* Status/reason plus complete contributor and normalized-edit
@@ -846,9 +882,14 @@ static int append_prediction(duckvep_h_chunk output, size_t row, duckvep_hap_sta
                 const duckvep_haplotype_edit_t *e = &s->buffers.edits[i];
                 ((uint64_t *)duckvep_h_data(fields[0]))[at] = i;
                 ((uint64_t *)duckvep_h_data(fields[1]))[at] = s->buffers.edit_event_ids[i];
-                while (leaf->cds && block < leaf->block_count &&
+                if (leaf->joint_edits) {
+                    while (block < leaf->block_count && e->cds_start >=
+                        (uint64_t)leaf->blocks[block].cds_start + leaf->blocks[block].ref_len)
+                        block++;
+                } else while (leaf->cds && block < leaf->block_count &&
                        i >= leaf->blocks[block].edit_begin + leaf->blocks[block].edit_count) block++;
-                if (leaf->cds && block < leaf->block_count && i >= leaf->blocks[block].edit_begin)
+                if (leaf->cds && block < leaf->block_count &&
+                    (leaf->joint_edits || i >= leaf->blocks[block].edit_begin))
                     ((uint64_t *)duckvep_h_data(fields[2]))[at] = block;
                 else null_cell(fields[2], at);
                 ((uint32_t *)duckvep_h_data(fields[3]))[at] = e->cds_start;
@@ -925,6 +966,23 @@ static int append_prediction(duckvep_h_chunk output, size_t row, duckvep_hap_sta
 static int append_leaf(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *s,
     const duckvep_hap_config_t *bind, const duckvep_haplotype_leaf_t *leaf,
     char *error, size_t error_size) {
+    /* Count the complete relation before publishing any row or extending a list. */
+    int8_t strand = bind->model->transcripts.strand[leaf->carriers.transcript_index];
+    size_t block_memberships = leaf->edit_count;
+    if (leaf->joint_edits) {
+        block_memberships = 0u;
+        for (size_t k = 0u; k < leaf->block_count; k++) {
+            const duckvep_haplotype_block_t *block = &leaf->blocks[k];
+            for (size_t j = 0u; j < leaf->contributor_count; j++)
+                if (joint_source_in_block(&leaf->contributors[j], block, strand)) {
+                    if (block_memberships == SIZE_MAX) {
+                        duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: block membership count overflow");
+                        return 0;
+                    }
+                    block_memberships++;
+                }
+        }
+    }
     if (!prepare_difference_reference(s, bind, leaf, error, error_size)) return 0;
     duckvep_coding_context_t coding;
     uint32_t tx = leaf->carriers.transcript_index;
@@ -932,10 +990,11 @@ static int append_leaf(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *
             (bind->hgvs && leaf->cds && leaf->reference_protein &&
              leaf->reference_coding_translation.length))) {
         const duckvep_owned_model_t *model = bind->model;
-        duckvep_edit_set_t edits = {s->buffers.edits, leaf->edit_count};
+        duckvep_edit_set_t edits = {leaf->joint_edits ? leaf->joint_edits : s->buffers.edits,
+            leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count};
         duckvep_haplotype_result_t applied = {leaf->cds_length,
             leaf->nominal_length_diff,
-            leaf->flags & ~(uint32_t)DUCKVEP_HAPLOTYPE_FLAG_STOP_TRUNCATED, leaf->edit_count};
+            leaf->flags & ~(uint32_t)DUCKVEP_HAPLOTYPE_FLAG_STOP_TRUNCATED, edits.count};
         duckvep_codon_table_t table = model->sequences.codon_table
             ? (duckvep_codon_table_t)model->sequences.codon_table[tx] : DUCKVEP_CODON_TABLE_STANDARD;
         const duckvep_event_t *event = NULL;
@@ -949,7 +1008,7 @@ static int append_leaf(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *
                 leaf->reference_coding_protein, &leaf->reference_coding_translation,
                 s->buffers.protein, &leaf->translation, &coding) != DUCKVEP_CODING_CONTEXT_OK ||
             duckvep_coding_context_attach_model(&model->transcripts, &model->exons, &model->sequences,
-                tx, event, leaf->edit_count == 1u ? edits.edits[0].cds_start : 0u, &coding) !=
+                tx, event, edits.count == 1u ? edits.edits[0].cds_start : 0u, &coding) !=
                 DUCKVEP_VARIANT_CODING_CONTEXT_OK) {
             duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: invalid completed coding context");
             return 0;
@@ -1008,17 +1067,29 @@ static int append_leaf(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *
         if (list == 2u && leaf->cds) {
             duckvep_h_vector event_vector = fields[HAPLOTYPE_BLOCK_EVENT_FIELD];
             duckvep_h_list_entry events;
-            if (!duckvep_h_list_extend(event_vector, leaf->edit_count, &events)) return 0;
+            if (!duckvep_h_list_extend(event_vector, block_memberships, &events)) return 0;
             event_base = events.offset;
             duckvep_h_vector ids = duckvep_h_list_values(event_vector);
             duckvep_h_ensure_validity(ids);
             uint64_t *data = duckvep_h_data(ids);
-            for (size_t i = 0u; i < leaf->edit_count; i++) {
+            size_t written = 0u;
+            if (leaf->joint_edits) {
+                for (size_t k = 0u; k < leaf->block_count; k++) {
+                    const duckvep_haplotype_block_t *block = &leaf->blocks[k];
+                    for (size_t i = 0u; i < leaf->contributor_count; i++) {
+                        uint64_t event = leaf->contributors[i].source.event_id;
+                        if (!joint_source_in_block(&leaf->contributors[i], block, strand)) continue;
+                        data[event_base + written] = event;
+                        duckvep_h_set_valid(ids, event_base + written++);
+                    }
+                }
+            } else for (size_t i = 0u; i < leaf->edit_count; i++) {
                 data[event_base + i] = leaf->edit_event_ids[i];
                 duckvep_h_set_valid(ids, event_base + i);
             }
         }
         uint32_t call_id = leaf->carriers.first_call;
+        size_t membership_cursor = 0u;
         for (size_t i = 0u; i < count; i++) {
             size_t at = base + i;
             duckvep_h_set_valid(records, at);
@@ -1059,7 +1130,8 @@ static int append_leaf(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *
                 duckvep_sequence_delta_t delta;
                 duckvep_context_delta_status_t status = leaf->ordered_replacements
                     ? DUCKVEP_CONTEXT_DELTA_UNSUPPORTED : duckvep_coding_context_block_delta_fill(
-                    &coding, s->buffers.edits, leaf->edit_count, block,
+                    &coding, leaf->joint_edits ? leaf->joint_edits : s->buffers.edits,
+                    leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count, block,
                     bind->model->transcripts.flags[tx], &delta);
                 const char *name = leaf->ordered_replacements ? "unsupported_ordered_replacements" :
                     status == DUCKVEP_CONTEXT_DELTA_OK ? "ok" :
@@ -1073,8 +1145,16 @@ static int append_leaf(duckvep_h_chunk output, size_t row, duckvep_hap_state_t *
                 ((bool *)duckvep_h_data(fields[8]))[at] =
                     leaf->translation.first_stop_position1 &&
                     block->alt_start0 / 3u >= leaf->translation.first_stop_position1;
+                size_t membership_begin = block->edit_begin, membership_count = block->edit_count;
+                if (leaf->joint_edits) {
+                    membership_begin = membership_cursor;
+                    membership_count = 0u;
+                    for (size_t j = 0u; j < leaf->contributor_count; j++)
+                        membership_count += joint_source_in_block(&leaf->contributors[j], block, strand);
+                    membership_cursor += membership_count;
+                }
                 ((duckvep_h_list_entry *)duckvep_h_data(fields[HAPLOTYPE_BLOCK_EVENT_FIELD]))[at] =
-                    (duckvep_h_list_entry){event_base + block->edit_begin, block->edit_count};
+                    (duckvep_h_list_entry){event_base + membership_begin, membership_count};
             }
         }
     }
