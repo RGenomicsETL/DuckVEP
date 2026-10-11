@@ -365,12 +365,10 @@ DUCKVEP_INTERNAL_API duckvep_hgvs_status_t duckvep_hgvs_dna_render_basic(
     size_t                          capacity,
     size_t                         *required_out);
 
-/* Build and render a compound coding-DNA suffix from the haplotype stream's
- * descending CDS replay order or the stream's final ascending interaction order.
- * Only non-overlapping single-base substitutions with literal reference assertions
- * are admitted. Substitutions in one CDS codon are one replacement fact: its
- * reference borrows `reference_cds` and its alternate borrows caller-owned
- * `allele_scratch`; other facts borrow one alternate byte there. The result is
+/* Build coding-DNA facts from one or more non-overlapping literal edits in
+ * descending CDS replay order or final ascending interaction order. Edits in one
+ * CDS codon form one replacement fact: its reference borrows `reference_cds` and
+ * its alternate borrows caller-owned `allele_scratch`. The result is
  * ascending transcript coordinates and retains every accepted edit. Insufficient
  * fact or scratch capacity leaves both output buffers untouched. It does not infer
  * cis support from sequence facts. */

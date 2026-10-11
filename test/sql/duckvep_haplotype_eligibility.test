@@ -1,9 +1,8 @@
 require duckvep
 
-# Coding-v1 eligibility and provenance (slice 2 of #2, contract design/duckvep_haplotype_contract.md).
-# prediction_status/prediction_reason only say whether a leaf is inside the supported domain; no SO, IMPACT or
-# NMD is predicted yet. The keyed result per sample/phase/lane is carrier_predictions. The row summary is
-# eligible_classifier_pending only when every carrier is.
+# Coding eligibility and provenance follow design/duckvep_haplotype_contract.md.
+# carrier_predictions retains the keyed result per sample/phase/lane; the row
+# summary is predicted only when every carrier is eligible.
 # Fixture transcript 0 is + strand with two coding exons: exon 1 = 100-108 (ATGGCTGCT), exon 2 = 120-128
 # (GAAGGTTAA); codons are Met Ala Ala Glu Gly Stop. Transcripts 1-6 are single-exon variants of it that each
 # break one v1 CDS requirement.
@@ -101,7 +100,7 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 7	NULL	1	unsupported_overlap	overlapping_edits
 8	NULL	1	edit_conflict	contradictory_edits
 9	NULL	1	unsupported_overlap	ambiguous_same_gap_insertions
-10	NULL	1	unsupported_overlap	duplicate_edits
+10	NULL	1	predicted	supported_domain
 11	NULL	1	unsupported_context	reference_mismatch
 12	NULL	1	unsupported_context	outside_cds
 13	NULL	1	unsupported_context	outside_cds
@@ -120,11 +119,9 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 40	NULL	1	predicted	supported_domain
 40	NULL	2	predicted	supported_domain
 
-# Per-carrier consequences (slice 4): the edited sequence is shared by the carriers of a row, so its SO set and IMPACT
-# are decided per carrier from the carrier's own keyed status. A row with one ineligible carrier keeps NULL row-level
-# haplotype_consequences/haplotype_impact but does not hide the eligible carriers' set. The path of event 1 alone
-# (a missense SNV) is shared by samples 2 and 3 (eligible), 4 (unphased), 5 (cross-PS) and the haploid sample 17,
-# whose single lane is predicted like the diploid lanes that carry the same edit.
+# Carriers with matching edits but different phase completeness occupy separate paths.
+# The complete lanes of samples 2, 3, 4 and 17 retain both row-level and per-carrier
+# consequences. Missing and cross-PS lanes retain explicit incomplete status.
 
 query IITTTTT
 SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason,
@@ -133,14 +130,14 @@ SELECT c.sample_index,c.haplotype_lane,c.prediction_status,c.prediction_reason,
 FROM (SELECT haplotype_consequences,unnest(carrier_predictions) c FROM duckvep_haplotypes(
  'SELECT * FROM hap_elig_calls WHERE sample_index IN (2,3,17,4,5)','hap_elig')) ORDER BY 1,2;
 ----
-2	1	predicted	supported_domain	missense_variant	MODERATE	row NULL
+2	1	predicted	supported_domain	missense_variant	MODERATE	missense_variant
 2	2	predicted	supported_domain	missense_variant	MODERATE	missense_variant
-3	1	predicted	supported_domain	missense_variant	MODERATE	row NULL
+3	1	predicted	supported_domain	missense_variant	MODERATE	missense_variant
 3	2	incomplete_input	missing_call	NULL	NULL	row NULL
-4	2	predicted	supported_domain	missense_variant	MODERATE	row NULL
+4	2	predicted	supported_domain	missense_variant	MODERATE	missense_variant
 5	1	incomplete_input	unresolved_cross_ps_phase	NULL	NULL	row NULL
 5	1	incomplete_input	unresolved_cross_ps_phase	NULL	NULL	row NULL
-17	1	predicted	supported_domain	missense_variant	MODERATE	row NULL
+17	1	predicted	supported_domain	missense_variant	MODERATE	missense_variant
 
 # A phased triploid call (ploidy 3) is predicted lane by lane, identically to the diploid carrier of the same path;
 # with every carrier predicted the row carries the set too. One unphased slot leaves the call incomplete.
@@ -242,7 +239,7 @@ SELECT count(*),count(*) FILTER (WHERE len(carriers)<>len(carrier_predictions) O
  count(DISTINCT prediction_policy),min(prediction_policy)
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
 ----
-26	0	1	duckvep-coding
+27	0	1	duckvep-coding
 
 # The row summary is eligible_classifier_pending or predicted only when every carrier is eligible or predicted;
 # otherwise it is the first ineligible carrier's keyed result.
@@ -265,7 +262,7 @@ FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index NOT IN 
 GROUP BY ALL ORDER BY ALL
 ----
 edit_conflict	contradictory_edits	edit_conflict	1
-predicted	supported_domain	ok	10
+predicted	supported_domain	ok	11
 unsupported_context	internal_stop	ok	1
 unsupported_context	invalid_allele	unavailable_projection	1
 unsupported_context	noncanonical_start	ok	1
@@ -274,8 +271,32 @@ unsupported_context	outside_cds	unavailable_projection	2
 unsupported_context	reference_mismatch	unavailable_projection	1
 unsupported_context	untyped_curated_metadata	ok	1
 unsupported_overlap	ambiguous_same_gap_insertions	edit_conflict	1
-unsupported_overlap	duplicate_edits	edit_conflict	1
 unsupported_overlap	overlapping_edits	edit_conflict	1
+
+# Agreeing duplicate records have one biological change and retain both sources.
+
+query TTTTII
+SELECT cds,protein,hgvsc,hgvsp,len(contributors),len(normalized_edits)
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index=10','hap_elig',hgvs:=true)
+----
+ATGACTGCTGAAGGTTAA	MTAEG*	c.4G>A	p.(Ala2Thr)	2	2
+
+# Unrelated samples cannot alter this complete carrier's result.
+
+statement ok
+CREATE TEMP TABLE all_calls AS
+SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig',hgvs:=true)
+WHERE list_contains(list_transform(carriers,lambda c: c.sample_index),10)
+
+statement ok
+CREATE TEMP TABLE isolated AS
+SELECT * FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index=10','hap_elig',hgvs:=true)
+
+query I
+SELECT count(*) FROM ((SELECT * FROM all_calls EXCEPT ALL SELECT * FROM isolated)
+ UNION ALL (SELECT * FROM isolated EXCEPT ALL SELECT * FROM all_calls)) differences
+----
+0
 
 # Contributor conservation: single-carrier leaves, keyed by their carrier. Every source keeps its ALT ordinal
 # and role. Omitted, unapplied (conflicting) and post-stop sources are retained, not dropped.
@@ -292,7 +313,7 @@ GROUP BY ALL ORDER BY ALL
 7	1	NULL	unsupported_overlap	1/1:unapplied 5/1:unapplied
 8	1	NULL	edit_conflict	1/1:unapplied 6/1:unapplied
 9	1	NULL	unsupported_overlap	71/1:unapplied 72/1:unapplied
-10	1	NULL	unsupported_overlap	1/1:unapplied 8/1:unapplied
+10	1	NULL	predicted	1/1:applied 8/1:applied
 11	1	NULL	unsupported_context	9/1:omitted
 12	1	NULL	unsupported_context	3/1:unapplied 11/1:omitted
 13	1	NULL	unsupported_context	12/1:omitted
@@ -325,7 +346,7 @@ SELECT count(*),count(*) FILTER (WHERE
  count(*) FILTER (WHERE len(normalized_edits)<>edit_count)
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig')
 ----
-26	0	0	0	0
+27	0	0	0	0
 
 # Normalized edits: ascending CDS order with their source event and block. Failed leaves keep them too,
 # without a block: sample 8 conflicts, sample 7 overlaps, sample 16 has an MNV plus a post-stop SNV.
@@ -342,7 +363,7 @@ FROM (SELECT *,unnest(normalized_edits) e FROM duckvep_haplotypes(
 7	1	0:5:-:4:GCT>/1 1:1:-:4:G>A/1
 8	1	0:6:-:4:G>T/1 1:1:-:4:G>A/1
 9	1	0:72:-:7:>CCC/1 1:71:-:7:>AAA/1
-10	1	0:8:-:4:G>A/1 1:1:-:4:G>A/1
+10	1	0:8:0:4:G>A/1 1:1:0:4:G>A/1
 12	1	0:3:-:13:G>C/1
 16	1	0:10:0:4:GCT>TAG/1 1:3:1:13:G>C/1
 30	1	0:16:0:4:GC>AT/1
@@ -362,7 +383,7 @@ ATGATTGCTGAAGGTTAA	1	2	1,2
 ATGATTGCTGAAGGTTAA	30	1	16
 
 # Reference lanes: the reference lane of a heterozygous call is not a leaf in strict decoded input, and
-# samples with the same edit path share one leaf whose contributors are listed once.
+# complete samples with the same edit path share one leaf whose contributors are listed once.
 
 query II
 SELECT count(*) FILTER (WHERE c.sample_index=1 AND c.haplotype_lane=1),

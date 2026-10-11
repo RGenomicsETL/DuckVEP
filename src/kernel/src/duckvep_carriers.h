@@ -4,7 +4,7 @@
  * The owner pins one immutable transcript model and owns all buffers. Projected
  * alleles/provenance stay in its event store until a transcript is drained.
  * This index stores event IDs and call evidence: identical prefixes share nodes across
- * samples/phase sets/lanes; reference paths require no entry. Input is ordered
+ * samples/phase sets/lanes with matching phase completeness; reference paths require no entry. Input is ordered
  * by (chrom_id, pos1, event_id), with a unique event ID per source event. Calls
  * for one event may span arbitrarily many input batches.
  *
@@ -38,8 +38,8 @@ typedef struct {
     uint16_t lane;                  /* One-based, at most ploidy. */
     uint16_t ploidy;
     uint8_t phase_set_present;      /* Absent and a present PS=0 are distinct. */
-    /* Provenance only, not identity: the sample has several heterozygous phase
-     * domains for this transcript, so cross-domain phase is unresolved. */
+    /* Not carrier-key identity: the sample has several heterozygous phase
+     * domains for this transcript. Prefix sharing preserves this qualification. */
     uint8_t domain_split;
 } duckvep_carrier_key_t;
 
@@ -81,7 +81,7 @@ typedef struct {
 typedef struct {
     uint64_t event_id;
     uint32_t transcript, parent, depth, first_call, call_count, next_transcript, next_free;
-    uint8_t evidence_flags;
+    uint8_t evidence_flags, domain_split;
 } duckvep_carrier_prefix_t;
 
 typedef struct {
@@ -128,7 +128,9 @@ duckvep_carriers_status_t duckvep_carriers_finish(
 
 /* Append the current event and nonzero evidence flags to one carrier. Missing
  * or unphased evidence is part of prefix identity, never an implicit reference
- * allele. The caller coalesces evidence for one event/key before pushing it.
+ * allele. Accumulated split-domain evidence also partitions prefixes, so one
+ * carrier cannot censor another carrier's complete phase evidence.
+ * The caller coalesces evidence for one event/key before pushing it.
  * Capacity failures,
  * duplicate calls and changed ploidy for an existing carrier key leave all
  * path/pool state unchanged.

@@ -2768,10 +2768,11 @@ TEST hgvsc_haplotype_facts_reverse_stream_order_and_validate_reference(void) {
             reference, sizeof reference - 1u, 1, descending, 2u, facts, 2u,
             alleles, sizeof alleles, &count));
     descending[1].ref = reference + 1u;
-    ASSERT_EQ(DUCKVEP_HGVS_INVALID_ARG,
+    ASSERT_EQ(DUCKVEP_HGVS_OK,
         duckvep_hgvs_dna_haplotype_fact_build(
             reference, sizeof reference - 1u, 1, descending + 1u, 1u, facts, 2u,
             alleles, sizeof alleles, &count));
+    ASSERT_EQ(1u, count);
     PASS();
 }
 

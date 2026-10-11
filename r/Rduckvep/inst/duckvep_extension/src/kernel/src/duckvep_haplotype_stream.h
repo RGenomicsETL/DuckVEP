@@ -121,14 +121,17 @@ typedef enum {
     DUCKVEP_REASON_INTERNAL_STOP,
     DUCKVEP_REASON_NON_LITERAL_ALLELE,
     /* No longer emitted since slice 5 (every eligible path is decided); kept so the numbering is stable. */
-    DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING
+    DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING,
+    DUCKVEP_REASON_NMD_GEOMETRY_UNAVAILABLE,
+    DUCKVEP_REASON_SEQUENCE_CAPACITY
 } duckvep_prediction_reason_t;
 
 /* Whole-haplotype NMD prediction under rule ejc50. An EJC-distance heuristic on the
  * edited spliced transcript only: no reinitiation, no long-exon exception, no NMD_transcript_variant biotype
  * term, and not the single-allele VEP NMD plugin. UNKNOWN (zero) is every path that is not PREDICTED, a
  * lost start, an edited CDS with no stop (termination unavailable) and incomplete exon topology;
- * NOT_APPLICABLE is a reference lane and known termination without a newly premature stop. */
+ * NOT_APPLICABLE is a reference lane and known termination without a newly premature stop.
+ * Length-changing coding UTR replay also evaluates the unchanged stop against the projected junction. */
 #define DUCKVEP_HAPLOTYPE_NMD_RULE "ejc50"
 #define DUCKVEP_HAPLOTYPE_NMD_THRESHOLD 50
 /* Exceptions to the junction rule that the literature describes for a premature stop. They are reported
@@ -216,6 +219,9 @@ typedef struct {
     duckvep_carrier_event_t *leaf_events;
     duckvep_haplotype_contributor_t *contributors;
     duckvep_haplotype_edit_t *edits;
+    duckvep_haplotype_edit_t *joint_edits;
+    uint8_t *joint_alt, *joint_assigned;
+    size_t joint_capacity;
     uint64_t *edit_event_ids; /* Edit payloads, compacted to applied source IDs for ordered replay. */
     duckvep_haplotype_block_t *blocks; /* At most edit_capacity interaction blocks. */
     size_t leaf_capacity, edit_capacity;
@@ -238,7 +244,8 @@ typedef struct {
     /* One source identity per differing island or applied full-span operation,
      * in ascending reference CDS order (tied-source order is not guaranteed).
      * A source may occur more than once or in several blocks. Borrowed only for
-     * known sequences; block.edit_begin/edit_count select the corresponding IDs. */
+     * known sequences. Ordinary blocks select these IDs with edit_begin/edit_count;
+     * joint blocks select joint_edits, and source membership uses projected spans. */
     const uint64_t *edit_event_ids;
     const duckvep_haplotype_block_t *blocks; /* Ascending reference CDS order. */
     size_t block_count;
@@ -296,6 +303,9 @@ typedef struct {
      * Listed for known sequences and for failed decoded-call leaves, so conflicts and
      * omitted or post-stop sources stay attributable. */
     size_t listed_edit_count;
+    /* Joint operands borrow separate scratch; source edits and identities remain intact. */
+    const duckvep_haplotype_edit_t *joint_edits;
+    size_t joint_edit_count;
 } duckvep_haplotype_leaf_t;
 
 /* Keyed result of one carrier of a completed leaf: unresolved cross-PS phase

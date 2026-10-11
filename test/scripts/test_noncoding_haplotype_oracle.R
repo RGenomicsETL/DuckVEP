@@ -5,55 +5,62 @@ reverse_complement <- function(sequence) {
   paste0(rev(c(A = "T", C = "G", G = "C", T = "A")[bases]), collapse = "")
 }
 
-compose_substitutions <- function(reference, edits) {
-  result <- strsplit(reference, "", fixed = TRUE)[[1L]]
+# Independent string construction on immutable, one-based reference positions.
+compose_rna <- function(reference, edits, capacity = Inf) {
+  edits <- edits[order(vapply(edits, `[[`, integer(1L), "position"))]
+  cursor <- 1L
+  pieces <- character()
+  delta <- 0L
+  previous_site <- 0L
   for (edit in edits) {
-    position <- edit[["position"]]
-    stopifnot(identical(result[[position]], edit[["reference"]]))
-    result[[position]] <- edit[["alternate"]]
+    position <- edit$position
+    nr <- nchar(edit$reference)
+    stopifnot(position >= cursor, position > previous_site,
+      position <= nchar(reference) + 1L,
+      position + nr - 1L <= nchar(reference),
+      identical(substr(reference, position, position + nr - 1L), edit$reference))
+    if (position > cursor) pieces <- c(pieces, substr(reference, cursor, position - 1L))
+    pieces <- c(pieces, edit$alternate)
+    cursor <- position + nr
+    previous_site <- position + max(1L, nr) - 1L
+    delta <- delta + nchar(edit$alternate) - nr
   }
-  paste0(result, collapse = "")
+  if (cursor <= nchar(reference)) pieces <- c(pieces, substr(reference, cursor, nchar(reference)))
+  sequence <- paste0(pieces, collapse = "")
+  stopifnot(nchar(sequence) == nchar(reference) + delta, nchar(sequence) <= capacity)
+  list(sequence = sequence, delta = delta)
 }
 
-classify_final <- function(reference, alternate, coding_start, coding_end) {
-  changed <- which(strsplit(reference, "", fixed = TRUE)[[1L]] !=
-                     strsplit(alternate, "", fixed = TRUE)[[1L]])
-  if (length(changed) == 0L) return("no_change")
-  if (is.na(coding_start)) return("non_coding_transcript_exon_variant")
-  if (all(changed < coding_start)) return("5_prime_UTR_variant")
-  if (all(changed > coding_end)) return("3_prime_UTR_variant")
-  "unsupported_mixed_feature"
-}
+rna_edit_cases <- function(base) list(
+  insertion = list(list(position = 2L, reference = base, alternate = paste0(base, "G"))),
+  deletion = list(list(position = 2L, reference = paste0(base, base), alternate = base)),
+  delins = list(list(position = 2L, reference = paste0(base, base), alternate = "GTG")),
+  compensating_change = list(list(position = 2L, reference = base, alternate = paste0(base, "G")),
+    list(position = 5L, reference = paste0(base, base), alternate = base)),
+  compensating_no_change = list(list(position = 2L, reference = base, alternate = paste0(base, base)),
+    list(position = 5L, reference = paste0(base, base), alternate = base)))
 
-reference <- "AACCGGTTAA"
-coding_start <- 4L
-coding_end <- 7L
-utr5 <- compose_substitutions(reference, list(
-  list(position = 2L, reference = "A", alternate = "T")
-))
-utr3 <- compose_substitutions(reference, list(
-  list(position = 9L, reference = "A", alternate = "C")
-))
-restored <- compose_substitutions(reference, list(
-  list(position = 2L, reference = "A", alternate = "T"),
-  list(position = 2L, reference = "T", alternate = "A")
-))
-reverse_genomic <- reverse_complement(reference)
-reverse_genomic_alternate <- compose_substitutions(reverse_genomic, list(
-  list(position = 9L, reference = "T", alternate = "A")
-))
-stopifnot(
-  identical(utr5, "ATCCGGTTAA"),
-  identical(utr3, "AACCGGTTCA"),
-  identical(restored, reference),
-  identical(reverse_complement(reverse_genomic_alternate), utr5),
-  identical(classify_final(reference, utr5, coding_start, coding_end),
-            "5_prime_UTR_variant"),
-  identical(classify_final(reference, utr3, coding_start, coding_end),
-            "3_prime_UTR_variant"),
-  identical(classify_final(reference, "AATCGGTTAA", NA_integer_, NA_integer_),
-            "non_coding_transcript_exon_variant"),
-  identical(classify_final(reference, restored, coding_start, coding_end), "no_change"),
-  identical(classify_final(reference, "ATCCGGTTCA", coding_start, coding_end),
-            "unsupported_mixed_feature")
-)
+reference <- "AAAAAAATGAAATAACCCCC"
+for (name in names(rna_edit_cases("A"))) {
+  edits <- rna_edit_cases("A")[[name]]
+  result <- compose_rna(reference, edits)
+  delta <- c(insertion = 1L, deletion = -1L, delins = 1L,
+    compensating_change = 0L, compensating_no_change = 0L)[[name]]
+  stopifnot(result$delta == delta, substr(result$sequence, 7L + delta, 15L + delta) == "ATGAAATAA")
+  genomic <- reverse_complement(reference)
+  reversed <- lapply(edits, function(edit) list(
+    position = nchar(reference) - edit$position - nchar(edit$reference) + 2L,
+    reference = reverse_complement(edit$reference), alternate = reverse_complement(edit$alternate)))
+  stopifnot(reverse_complement(compose_rna(genomic, reversed)$sequence) == result$sequence)
+  if (name == "compensating_no_change") stopifnot(result$sequence == reference)
+  short <- try(compose_rna(reference, edits, nchar(result$sequence) - 1L), silent = TRUE)
+  stopifnot(inherits(short, "try-error"))
+}
+for (bad in list(
+  list(list(position = 2L, reference = "C", alternate = "CG")),
+  list(list(position = 2L, reference = "AA", alternate = "C"),
+    list(position = 3L, reference = "A", alternate = "T"))))
+  stopifnot(inherits(try(compose_rna(reference, bad), silent = TRUE), "try-error"))
+stopifnot(compose_rna(reference, list(list(position = 21L, reference = "", alternate = "T")))$sequence ==
+  paste0(reference, "T"))
+cat("Independent RNA string oracle: positions, deltas, sequence, both strands, compensation, conflict and capacity verified\n")

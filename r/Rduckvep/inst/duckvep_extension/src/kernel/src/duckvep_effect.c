@@ -3,6 +3,7 @@
 
 #include "duckvep_projection.h"
 #include "duckvep_so.h"
+#include <string.h>
 
 void duckvep_nmd_predict(
     const duckvep_transcript_model_t *transcripts,
@@ -486,11 +487,26 @@ duckvep_haplotype_noncoding_status_t duckvep_effect_eval_haplotype_noncoding(
     if (reference == NULL || alternate == NULL || reference_len == 0u ||
         reference_len > UINT32_MAX)
         return DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT;
-    if (reference_len != alternate_len)
-        return DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_LENGTH_CHANGE;
     if ((coding_start1 == 0u) != (coding_end1 == 0u) ||
-        coding_start1 > coding_end1 || coding_end1 > reference_len)
+        coding_start1 > coding_end1 || coding_end1 > reference_len || alternate_len > UINT32_MAX)
         return DUCKVEP_HAPLOTYPE_NONCODING_INVALID_ARGUMENT;
+    if (reference_len != alternate_len) {
+        if (coding_start1 == 0u) {
+            *out_so_mask = alternate_len == 0u
+                ? duckvep_effect_eval(DUCKVEP_PRE(DUCKVEP_PRE_FEATURE_ABLATION))
+                : duckvep_effect_eval(DUCKVEP_PRE(DUCKVEP_PRE_EXON) |
+                    DUCKVEP_PRE(DUCKVEP_PRE_NONCODING) | DUCKVEP_PRE(DUCKVEP_PRE_NONCODING_EXON));
+        } else {
+            size_t suffix = reference_len - coding_start1 + 1u;
+            if (alternate_len >= suffix && memcmp(reference + coding_start1 - 1u,
+                    alternate + alternate_len - suffix, suffix) == 0)
+                *out_so_mask = duckvep_effect_eval(DUCKVEP_PRE(DUCKVEP_PRE_UTR5));
+            else if (alternate_len >= coding_end1 && memcmp(reference, alternate, coding_end1) == 0)
+                *out_so_mask = duckvep_effect_eval(DUCKVEP_PRE(DUCKVEP_PRE_UTR3));
+            else return DUCKVEP_HAPLOTYPE_NONCODING_UNSUPPORTED_MIXED_FEATURE;
+        }
+        return DUCKVEP_HAPLOTYPE_NONCODING_OK;
+    }
 
     for (i = 0u; i < reference_len; i++) {
         uint32_t position1;

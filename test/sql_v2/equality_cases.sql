@@ -1842,6 +1842,122 @@ SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/demo.vcf')
 SELECT * FROM duckvep_coding_calls('cc', 'test/data/coding_calls/cases.bcf')
 
 
+-- fixture: compatible overlap transcripts
+CREATE TABLE compatible_tx AS SELECT i::UINTEGER transcript_index, i::UINTEGER seq_region, 100::UBIGINT transcript_start, 114::UBIGINT transcript_end, 1::TINYINT strand, 0::UINTEGER gene_index, 3::UBIGINT transcript_flags, 100::UBIGINT cds_start, 114::UBIGINT cds_end, (CASE WHEN i=0 THEN 'ATGGCTGAATTTTAA' ELSE 'atggctgaattttaa' END)::BLOB cds_sequence, 1::UTINYINT codon_table FROM range(2) t(i)
+
+-- fixture: compatible overlap exons
+CREATE TABLE compatible_ex AS SELECT i::UINTEGER transcript_index, 100::UBIGINT exon_start, 114::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 15::UBIGINT exon_cdna_end, 0::TINYINT phase, 0::TINYINT end_phase FROM range(2) t(i)
+
+-- fixture: compatible overlap calls
+CREATE TABLE compatible_calls AS SELECT scenario, event_index, 0::UINTEGER seq_region, position, reference, alternate, 1::UINTEGER alt_index, 0::UINTEGER transcript_index, 0::UBIGINT sample_index, CASE WHEN scenario='ambiguity' THEN [NULL,1]::INTEGER[] ELSE [0,1]::INTEGER[] END alleles, [false,true]::BOOLEAN[] phase_before, 77::BIGINT phase_set FROM (VALUES ('positive',1::UBIGINT,103::UBIGINT,'GC','AT'),('positive',2,104,'CT','TT'),('multi_block',1,103,'GCTGAATT','ATTGAACT'),('multi_block',2,104,'CT','TT'),('multi_redundant',1,103,'GCTGAATT','ATTGAACT'),('multi_redundant',2,104,'CT','TT'),('multi_redundant',3,103,'GCTGAATT','ATTGAACT'),('conflict',1,103,'GC','AT'),('conflict',2,104,'CT','GT'),('padded_adjacent',1,103,'GC','AT'),('padded_adjacent',2,104,'CT','CA'),('ambiguity',1,103,'GC','AT'),('ambiguity',2,104,'CT','TT')) v(scenario,event_index,position,reference,alternate)
+
+-- fixture: neutral padding calls
+INSERT INTO compatible_calls
+SELECT * REPLACE('padded_disjoint' AS scenario,CASE WHEN event_index=1 THEN 'AC' ELSE 'TT' END AS alternate) FROM compatible_calls WHERE scenario='positive'
+UNION ALL
+SELECT * REPLACE('neutral_interior' AS scenario,CASE WHEN event_index=1 THEN 'GCT' ELSE 'CT' END AS reference,CASE WHEN event_index=1 THEN 'ACA' ELSE 'TA' END AS alternate) FROM compatible_calls WHERE scenario='positive'
+
+-- fixture-v1: compatible overlap model
+SELECT loaded FROM duckvep_model_load('compatible', 'SELECT i::UINTEGER seq_region FROM range(2) t(i)', 'SELECT * FROM compatible_tx', 'SELECT * FROM compatible_ex')
+
+-- fixture-v2: compatible overlap regions
+COPY (SELECT i::UINTEGER seq_region FROM range(2) t(i)) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'compatible', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: compatible overlap transcripts
+COPY (SELECT * FROM compatible_tx) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'compatible', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: compatible overlap exons
+COPY (SELECT * FROM compatible_ex) TO 'duckvep_stage' (FORMAT duckvep_stage, MODEL 'compatible', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE)
+
+-- fixture-v2: compatible overlap publish
+SELECT duckvep_model_publish('compatible')
+
+-- job: compatible_positive compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='positive'
+
+-- job: compatible_implicit_ps compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) REPLACE(NULL::BIGINT AS phase_set) FROM compatible_calls WHERE scenario='positive'
+
+-- job: compatible_lowercase compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) REPLACE(1::UINTEGER AS transcript_index,1::UINTEGER AS seq_region,lower(reference) AS reference,lower(alternate) AS alternate) FROM compatible_calls WHERE scenario='positive'
+
+-- job: compatible_multi_block compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='multi_block' ORDER BY event_index DESC
+
+-- job: compatible_multi_redundant compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='multi_redundant'
+
+-- job: compatible_conflict compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='conflict'
+
+-- job: compatible_padded_adjacent compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='padded_adjacent'
+
+-- job: compatible_padded_disjoint compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='padded_disjoint'
+
+-- job: compatible_neutral_interior compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='neutral_interior'
+
+-- job: compatible_ambiguity compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='ambiguity'
+
+-- job: compatible_missing_sample compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='positive'
+UNION ALL
+SELECT * EXCLUDE(scenario) REPLACE(1::UBIGINT AS sample_index,[NULL,NULL]::INTEGER[] AS alleles) FROM compatible_calls WHERE scenario='positive'
+
+-- job: compatible_split_sample compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='positive'
+UNION ALL
+SELECT * EXCLUDE(scenario) REPLACE(1::UBIGINT AS sample_index) FROM compatible_calls WHERE scenario='positive'
+UNION ALL
+SELECT 3,0,107,'A','C',1,0,1,[0,1],[false,true],78::BIGINT
+
+-- job: compatible_padded_block compatible phase_policy='strict' hgvs=true
+SELECT * EXCLUDE(scenario) FROM compatible_calls WHERE scenario='multi_block'
+UNION ALL
+SELECT 3,0,106,'G','A',1,0,0,[0,1],[false,true],77::BIGINT
+
+-- case: compatible_padded_block_full_row
+SELECT * FROM compatible_padded_block() ORDER BY ALL
+
+-- case: compatible_positive_full_row
+SELECT * FROM compatible_positive() ORDER BY ALL
+
+-- case: compatible_missing_sample_full_row
+SELECT * FROM compatible_missing_sample() ORDER BY ALL
+
+-- case: compatible_split_sample_full_row
+SELECT * FROM compatible_split_sample() ORDER BY ALL
+
+-- case: compatible_implicit_ps_full_row
+SELECT * FROM compatible_implicit_ps() ORDER BY ALL
+
+-- case: compatible_lowercase_full_row
+SELECT * FROM compatible_lowercase() ORDER BY ALL
+
+-- case: compatible_multi_block_full_row
+SELECT * FROM compatible_multi_block() ORDER BY ALL
+
+-- case: compatible_multi_redundant_full_row
+SELECT * FROM compatible_multi_redundant() ORDER BY ALL
+
+-- case: compatible_conflict_full_row
+SELECT * FROM compatible_conflict() ORDER BY ALL
+
+-- case: compatible_padded_adjacent_full_row
+SELECT * FROM compatible_padded_adjacent() ORDER BY ALL
+
+-- case: compatible_padded_disjoint_full_row
+SELECT * FROM compatible_padded_disjoint() ORDER BY ALL
+
+-- case: compatible_neutral_interior_full_row
+SELECT * FROM compatible_neutral_interior() ORDER BY ALL
+
+-- case: compatible_ambiguity_full_row
+SELECT * FROM compatible_ambiguity() ORDER BY ALL
+
 -- Policy, limit and error cases of test/sql/duckvep_haplotypes.test on its model "hap" (calls tables hap_calls, hap_raw_overlap, hap_raw).
 
 -- fixture: policy hap_tx
@@ -2653,3 +2769,99 @@ SELECT * FROM arrangement_homozygous()
 
 -- case: arrangement replay after refusals
 SELECT * FROM arrangement_unphased()
+
+-- fixture: complete RNA indel transcripts
+CREATE TABLE rna_indel_tx AS SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,100::UBIGINT transcript_start,229::UBIGINT transcript_end,1::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,CASE WHEN i=1 THEN 106 END::UBIGINT cds_start,CASE WHEN i=1 THEN 114 END::UBIGINT cds_end,CASE WHEN i=1 THEN 'ATGAAATAA' END::BLOB cds_sequence,CASE WHEN i=1 THEN 1 END::UTINYINT codon_table,CASE WHEN i=1 THEN 'AAAAAA' END::BLOB pre_cds_sequence,CASE WHEN i=1 THEN repeat('C',80) END::BLOB post_cds_sequence,('AAAAAAATGAAATAA'||repeat('C',80))::BLOB cdna_sequence FROM range(2) t(i)
+
+-- fixture: complete RNA indel exons
+CREATE TABLE rna_indel_ex AS SELECT i::UINTEGER transcript_index,s::UBIGINT exon_start,e::UBIGINT exon_end,a::UBIGINT exon_cdna_start,z::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase FROM range(2) t(i) CROSS JOIN (VALUES (100,164,1,65),(200,229,66,95)) v(s,e,a,z) ORDER BY i,s
+
+-- fixture-v1: complete RNA indel model
+SELECT loaded FROM duckvep_model_load('rna_indel','SELECT i::UINTEGER seq_region FROM range(2) t(i)','SELECT * FROM rna_indel_tx','SELECT * FROM rna_indel_ex')
+
+-- fixture-v2: complete RNA indel regions
+COPY (SELECT i::UINTEGER seq_region FROM range(2) t(i)) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'rna_indel',RELATION 'regions',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: complete RNA indel transcripts
+COPY (SELECT * FROM rna_indel_tx) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'rna_indel',RELATION 'transcripts',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: complete RNA indel exons
+COPY (SELECT * FROM rna_indel_ex) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'rna_indel',RELATION 'exons',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: complete RNA indel publish
+SELECT duckvep_model_publish('rna_indel')
+
+-- fixture: complete RNA indel calls
+CREATE TABLE rna_indel_calls AS SELECT kind,id::UBIGINT event_index,tx::UINTEGER seq_region,p::UBIGINT AS position,r::VARCHAR reference,a::VARCHAR alternate,1::UINTEGER alt_index,tx::UINTEGER transcript_index,0::UBIGINT sample_index,[1,1]::INTEGER[] alleles,[false,true]::BOOLEAN[] phase_before,12::BIGINT phase_set FROM (VALUES ('nc_delete',1,0,124,'CC','C'),('utr_restore',1,1,124,'C','CC'),('utr_restore',2,1,134,'CC','C'),('utr_transfer',1,1,124,'C','CC'),('utr_transfer',2,1,209,'CC','C'),('utr_terminal',1,1,209,'CC','C'),('utr_terminal',2,1,229,'C','CC')) v(kind,id,tx,p,r,a)
+
+-- job: rna_nc_delete rna_indel
+SELECT * EXCLUDE(kind) FROM rna_indel_calls WHERE kind='nc_delete'
+
+-- job: rna_nc_capacity rna_indel max_sequence_bases=94
+SELECT * EXCLUDE(kind) FROM rna_indel_calls WHERE kind='nc_delete'
+
+-- job: rna_utr_restore rna_indel
+SELECT * EXCLUDE(kind) FROM rna_indel_calls WHERE kind='utr_restore'
+
+-- job: rna_utr_transfer rna_indel
+SELECT * EXCLUDE(kind) FROM rna_indel_calls WHERE kind='utr_transfer'
+
+-- job: rna_utr_terminal rna_indel
+SELECT * EXCLUDE(kind) FROM rna_indel_calls WHERE kind='utr_terminal'
+
+-- case: noncoding deletion full row
+SELECT * FROM rna_nc_delete() ORDER BY ALL
+
+-- case: noncoding deletion capacity full row
+SELECT * FROM rna_nc_capacity() ORDER BY ALL
+
+-- case: restored RNA and exon geometry full row
+SELECT * FROM rna_utr_restore() ORDER BY ALL
+
+-- case: restored RNA with shifted junction full row
+SELECT * FROM rna_utr_transfer() ORDER BY ALL
+
+-- case: restored RNA at terminal insertion full row
+SELECT * FROM rna_utr_terminal() ORDER BY ALL
+
+-- fixture: overlapping stop and downstream calls
+CREATE TABLE compatible_stop_calls AS SELECT id::UBIGINT event_index,0::UINTEGER seq_region,p::UBIGINT AS position,r::VARCHAR reference,a::VARCHAR alternate,1::UINTEGER alt_index,0::UINTEGER transcript_index,0::UBIGINT sample_index,[0,1]::INTEGER[] alleles,[false,true]::BOOLEAN[] phase_before,77::BIGINT phase_set FROM (VALUES (1,103,'GCT','TAA'),(2,103,'GCT','TAA'),(3,107,'A','C')) v(id,p,r,a)
+
+-- job: compatible_stop compatible hgvs=true
+SELECT * FROM compatible_stop_calls
+
+-- job: compatible_mixed_stop compatible hgvs=true
+SELECT * REPLACE(CASE WHEN event_index=1 THEN 'GCTGA' ELSE reference END AS reference,CASE WHEN event_index=1 THEN 'TAAGC' ELSE alternate END AS alternate) FROM compatible_stop_calls
+
+-- case: overlapping stop contributor attribution full row
+SELECT * FROM compatible_stop() ORDER BY ALL
+
+-- case: overlapping mixed source post stop attribution full row
+SELECT * FROM compatible_mixed_stop() ORDER BY ALL
+
+-- fixture: terminal exon NMD transcript
+CREATE TABLE terminal_nmd_tx AS SELECT 0::UINTEGER transcript_index,0::UINTEGER seq_region,100::UBIGINT transcript_start,606::UBIGINT transcript_end,1::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,206::UBIGINT cds_start,214::UBIGINT cds_end,'ATGAAATAA'::BLOB cds_sequence,1::UTINYINT codon_table,repeat('A',86)::BLOB pre_cds_sequence,repeat('C',392)::BLOB post_cds_sequence
+
+-- fixture: terminal exon NMD exons
+CREATE TABLE terminal_nmd_ex AS SELECT 0::UINTEGER transcript_index,s::UBIGINT exon_start,e::UBIGINT exon_end,a::UBIGINT exon_cdna_start,z::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase FROM (VALUES (100,179,1,80),(200,606,81,487)) v(s,e,a,z)
+
+-- fixture-v1: terminal exon NMD model
+SELECT loaded FROM duckvep_model_load('terminal_nmd','SELECT 0::UINTEGER seq_region','SELECT * FROM terminal_nmd_tx','SELECT * FROM terminal_nmd_ex')
+
+-- fixture-v2: terminal exon NMD regions
+COPY (SELECT 0::UINTEGER seq_region) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'terminal_nmd',RELATION 'regions',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: terminal exon NMD transcripts
+COPY (SELECT * FROM terminal_nmd_tx) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'terminal_nmd',RELATION 'transcripts',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: terminal exon NMD exons
+COPY (SELECT * FROM terminal_nmd_ex) TO 'duckvep_stage' (FORMAT duckvep_stage,MODEL 'terminal_nmd',RELATION 'exons',USE_TMP_FILE FALSE,PRESERVE_ORDER TRUE)
+
+-- fixture-v2: terminal exon NMD publish
+SELECT duckvep_model_publish('terminal_nmd')
+
+-- job: terminal_nmd_insert terminal_nmd
+SELECT 1::UBIGINT event_index,0::UINTEGER seq_region,606::UBIGINT AS position,'C'::VARCHAR reference,'CG'::VARCHAR alternate,1::UINTEGER alt_index,0::UINTEGER transcript_index,0::UBIGINT sample_index,[0,1]::INTEGER[] alleles,[false,true]::BOOLEAN[] phase_before,7::BIGINT phase_set
+
+-- case: terminal RNA insertion long exon exception full row
+SELECT * FROM terminal_nmd_insert() ORDER BY ALL

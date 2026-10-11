@@ -153,9 +153,7 @@ local({
   }
   mixed <- which(vapply(result$carrier_predictions, function(x) any(x$prediction_status == "predicted") &&
     any(x$prediction_status != "predicted"), NA))
-  expect_true(length(mixed) > 0L)
-  expect_true(all(is.na(result$haplotype_impact[mixed])))
-  expect_true(all(vapply(mixed, function(i) any(!is.na(result$carrier_predictions[[i]]$haplotype_impact)), NA)))
+  expect_identical(mixed, integer())
 
   # Every contributor keeps its operands, evidence, ALT ordinal, role and normalized edits.
   for (i in seq_len(nrow(result))) {
