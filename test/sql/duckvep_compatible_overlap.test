@@ -70,3 +70,79 @@ query IIIIII
 SELECT cds='ATGTAAGCATTTTAA',protein='M*',list_sort(nmd_contributors)=[1,2],nmd_prediction='escape',list_transform(list_sort(contributor_provenance),lambda c: c.role)=['applied','applied','post_stop'],list_sort(coding_blocks[2].event_indices)=[1,3] FROM duckvep_haplotypes('SELECT * FROM ov_multi_calls','ov_multi',hgvs:=true)
 ----
 true	true	true	true	true	true
+
+# Intersecting literal indel islands on ATG GCT GAA TAA. One sample per witness; samples 6 and 7
+# repeat witnesses 0 and 3 on the reverse-strand transcript.
+statement ok
+CREATE TABLE indel_calls AS SELECT * FROM (VALUES
+ (1,0,102,'GGCT','G',1,0,0),(2,0,102,'GGCT','G',1,0,0),
+ (3,0,102,'GGCTGAA','G',1,0,1),(4,0,103,'GCT','G',1,0,1),
+ (5,0,105,'T','TCCC',1,0,2),(6,0,105,'T','TCCC',1,0,2),
+ (7,0,105,'T','TCCC',1,0,3),(8,0,106,'G','A',1,0,3),
+ (9,0,103,'GCT','G',1,0,4),(10,0,104,'C','A',1,0,4),
+ (11,0,102,'GGCT','G',1,0,5),(12,0,103,'GCT','G',1,0,5),
+ (13,1,105,'CAGC','C',1,1,6),(14,1,105,'CAGC','C',1,1,6),
+ (15,1,105,'C','CGGG',1,1,7),(16,1,105,'C','T',1,1,7))
+ v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index)
+
+statement ok
+CREATE TABLE indel_result AS SELECT * FROM duckvep_haplotypes('SELECT *,[0,1] alleles,[false,true] phase_before,77::BIGINT phase_set FROM indel_calls ORDER BY seq_region,position,event_index','compatible_overlap',phase_policy:='strict',hgvs:=true)
+
+query IIIIIIII
+SELECT carriers[1].sample_index,prediction_status,cds,protein,hgvsc,hgvsp,
+ list_transform(coding_blocks,lambda b: list_sort(b.event_indices)),
+ list_transform(list_sort(contributor_provenance),lambda c: c.role)
+FROM indel_result
+ORDER BY 1
+----
+0	predicted	ATGGAATAA	ME*	c.5_7del	p.(Ala2del)	[[1, 2]]	[applied, applied]
+1	predicted	ATGTAA	M*	c.4_9del	p.(Ala2_Glu3del)	[[3, 4]]	[applied, applied]
+2	predicted	ATGGCTCCCGAATAA	MAPE*	c.6_7insCCC	p.(Ala2_Glu3insPro)	[[5, 6]]	[applied, applied]
+3	predicted	ATGGCTCCCAAATAA	MAPK*	c.7delinsCCCA	p.(Glu3delinsProLys)	[[7, 8]]	[applied, applied]
+4	edit_conflict	NULL	NULL	NULL	NULL	NULL	[unapplied, unapplied]
+5	unsupported_overlap	NULL	NULL	NULL	NULL	NULL	[unapplied, unapplied]
+6	predicted	ATGGAATAA	ME*	c.5_7del	p.(Ala2del)	[[13, 14]]	[applied, applied]
+7	predicted	ATGGCTCCCAAATAA	MAPK*	c.7delinsCCCA	p.(Glu3delinsProLys)	[[15, 16]]	[applied, applied]
+
+# Source records survive verbatim and every source keeps its own normalized island.
+query III
+SELECT count(*),count(*) FILTER(WHERE c.position=s.position AND c.reference=s.reference AND c.alternate=s.alternate),
+ count(*) FILTER(WHERE c.event_index IN (SELECT unnest(r2.normalized_edits).event_index FROM indel_result r2 WHERE r2.carriers[1].sample_index=r.carriers[1].sample_index))
+FROM indel_result r,unnest(r.contributors) u(c) JOIN indel_calls s ON c.event_index=s.event_index
+----
+16	16	16
+
+# Two-exon transcript, CDS ATG AAA GCT GAA (CTG x25) TAA, exon 1 is cDNA 1..60. A redundant duplicate
+# source adds provenance only: samples 0/1 (duplicate c.4_6del) and 2/3 (duplicate stop MNV c.7_9)
+# keep the single-source blocks and HGVSp, and the abutting c.10G>A stays its own post-stop block.
+# Samples 4/5: a deletion inside an AA run that can sit at c.11 or c.12, with c.11A>T in either
+# source order, has two readings and is refused as an overlap, not a contradiction.
+statement ok
+SELECT loaded FROM duckvep_model_load('two_exon',
+ 'SELECT 0::UINTEGER seq_region',
+ 'SELECT 0::UINTEGER transcript_index,0::UINTEGER seq_region,1001::UBIGINT transcript_start,2030::UBIGINT transcript_end,1::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,1001::UBIGINT cds_start,2030::UBIGINT cds_end,(''ATGAAAGCTGAA''||repeat(''CTG'',25)||''TAA'')::BLOB cds_sequence,1::UTINYINT codon_table',
+ 'SELECT * FROM (VALUES (0::UINTEGER,1001::UBIGINT,1060::UBIGINT,1::UBIGINT,60::UBIGINT,0::TINYINT,0::TINYINT),(0::UINTEGER,2001::UBIGINT,2030::UBIGINT,61::UBIGINT,90::UBIGINT,0::TINYINT,0::TINYINT)) v(transcript_index,exon_start,exon_end,exon_cdna_start,exon_cdna_end,phase,end_phase)')
+
+statement ok
+CREATE TABLE dup_calls AS SELECT * FROM (VALUES
+ (1,0,1003,'GAAA','G',1,0,0),(2,0,1003,'GAAA','G',1,0,0),(3,0,1007,'GCT','TAA',1,0,0),(4,0,1010,'G','A',1,0,0),
+ (11,0,1003,'GAAA','G',1,0,1),(13,0,1007,'GCT','TAA',1,0,1),(14,0,1010,'G','A',1,0,1),
+ (21,0,1007,'GCT','TAA',1,0,2),(22,0,1007,'GCT','TAA',1,0,2),(23,0,1010,'G','A',1,0,2),
+ (31,0,1007,'GCT','TAA',1,0,3),(33,0,1010,'G','A',1,0,3),
+ (41,0,1010,'GA','G',1,0,4),(42,0,1011,'A','T',1,0,4),
+ (51,0,1011,'A','T',1,0,5),(52,0,1010,'GA','G',1,0,5))
+ v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index)
+
+query IIIIIII
+SELECT carriers[1].sample_index,prediction_status,protein,hgvsc,hgvsp,
+ list_transform(coding_blocks,lambda b: list_sort(b.event_indices)),
+ list_transform(list_sort(contributor_provenance),lambda c: c.role)
+FROM duckvep_haplotypes('SELECT *,[0,1] alleles,[false,true] phase_before,77::BIGINT phase_set FROM dup_calls ORDER BY seq_region,position,event_index','two_exon',phase_policy:='strict',hgvs:=true)
+ORDER BY 1
+----
+0	predicted	M*	c.4_10delinsTAAA	p.(Lys2Ter)	[[1, 2, 3], [4]]	[applied, applied, applied, post_stop]
+1	predicted	M*	c.4_10delinsTAAA	p.(Lys2Ter)	[[11, 13], [14]]	[applied, applied, post_stop]
+2	predicted	MK*	c.7_10delinsTAAA	p.(Ala3Ter)	[[21, 22], [23]]	[applied, applied, post_stop]
+3	predicted	MK*	c.7_10delinsTAAA	p.(Ala3Ter)	[[31], [33]]	[applied, post_stop]
+4	unsupported_overlap	NULL	NULL	NULL	NULL	[unapplied, unapplied]
+5	unsupported_overlap	NULL	NULL	NULL	NULL	[unapplied, unapplied]

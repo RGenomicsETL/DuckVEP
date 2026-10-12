@@ -2065,6 +2065,8 @@ SELECT transcript_index,cds,protein,sequence_status,sum(carrier_count),min(edit_
 1	TCTTTTTTTTTT	SFFF	conditional	8	1	1
 1	TCTTTTTTTTTT	SFFF	ok	2	1	1
 
+# Per row, here and below: sample 0's 1|1 lanes and sample 1's 0|1 lane 2 replay one path, listed as
+# copy-proven and copy-unproven rows of it in each transcript.
 query III
 SELECT count(*),count(*) FILTER(WHERE c.projection_status='source_unmapped' AND c.evidence_flags & 8 = 8),
  count(*) FILTER(WHERE c.alt_index IS NULL AND c.alternate='')
@@ -2072,14 +2074,14 @@ SELECT count(*),count(*) FILTER(WHERE c.projection_status='source_unmapped' AND 
  input_mode:='source_records',phase_policy:='vep_compat'),unnest(contributors) u(c)
  WHERE c.event_index=1;
 ----
-10	10	2
+12	12	2
 
 query III
 SELECT count(*),count(*) FILTER(WHERE block.event_indices=[2]),sum(len(block.event_indices))
  FROM duckvep_haplotypes('SELECT * FROM hap_unmapped_raw','hap_mixed',
  input_mode:='source_records',phase_policy:='vep_compat'),unnest(coding_blocks) u(block);
 ----
-12	12	12
+14	14	14
 
 # A mismatching coding-overlap REF is a projection failure, not an omission.
 query III

@@ -41,6 +41,12 @@ typedef struct {
     /* Not carrier-key identity: the sample has several heterozygous phase
      * domains for this transcript. Prefix sharing preserves this qualification. */
     uint8_t domain_split;
+    /* Neither carrier-key nor prefix identity: some call of the sample does not
+     * prove that this lane is one complete observed copy. Accumulated per carrier
+     * and, when the transcript closes, shared by every lane of the same sample
+     * and phase set; a drained leaf then lists proven and unproven carriers as
+     * separate views of one path, so neither qualifies or censors the other. */
+    uint8_t copy_unproven;
 } duckvep_carrier_key_t;
 
 enum {
@@ -101,6 +107,7 @@ typedef struct {
     uint32_t transcript_count, call_count, prefix_count;
     uint32_t peak_transcripts, peak_calls, peak_prefixes;
     uint32_t closing, next_leaf;
+    uint32_t part_leaf, part_call, part_count; /* Pending copy-unproven view of a drained path. */
     uint32_t pos1, pending_pos1;
     uint64_t event_id, pending_event_id;
     uint16_t chrom, pending_chrom;
@@ -134,13 +141,17 @@ duckvep_carriers_status_t duckvep_carriers_finish(
  * Capacity failures,
  * duplicate calls and changed ploidy for an existing carrier key leave all
  * path/pool state unchanged.
+ * Zero evidence with copy_unproven records that qualification alone: no event
+ * or prefix is added, but a carrier slot is charged when the key is new.
  * Phase interpretation belongs to the consumer; this preserves explicit keys. */
 duckvep_carriers_status_t duckvep_carriers_push(
     duckvep_carriers_t *stream, uint32_t transcript_index,
     const duckvep_carrier_key_t *key, uint8_t evidence_flags);
 
 /* Each distinct occupied prefix is emitted once, including a prefix that is
- * both a completed carrier path and an ancestor of a longer carrier path. */
+ * both a completed carrier path and an ancestor of a longer carrier path.
+ * A prefix with both copy-proven and copy-unproven carriers is emitted twice
+ * with the same id: first its proven carriers, then its unproven ones. */
 duckvep_carriers_status_t duckvep_carriers_next_leaf(
     duckvep_carriers_t *stream, duckvep_carrier_leaf_t *leaf);
 /* Events/evidence are returned in arrival order. No output on OUTPUT_FULL. */
@@ -150,6 +161,11 @@ duckvep_carriers_status_t duckvep_carriers_leaf_events(
 /* Iterate from leaf.first_call through next_leaf. Borrowed until release. */
 const duckvep_carrier_call_t *duckvep_carriers_call(
     const duckvep_carriers_t *stream, uint32_t call);
+/* The live carrier in peer's transcript whose key identity (sample, phase set,
+ * lane) matches key, or NULL. Hash lookup; borrowed until release. */
+const duckvep_carrier_call_t *duckvep_carriers_find_call(
+    const duckvep_carriers_t *stream, const duckvep_carrier_call_t *peer,
+    const duckvep_carrier_key_t *key);
 /* Requires next_leaf to have returned DONE. No other transcript is released. */
 duckvep_carriers_status_t duckvep_carriers_release(duckvep_carriers_t *stream);
 

@@ -319,6 +319,52 @@ TEST haplotype_restoring_edits_keep_changed_substitution_block(void) {
     PASS();
 }
 
+TEST hgvs_haplotype_immediate_stop_is_nonsense_substitution(void) {
+    static const uint8_t reference[] = "ATGAAAGCTGAATTTTAA";
+    for (int strand = -1; strand <= 1; strand += 2) {
+        for (int deletion = 0; deletion <= 1; deletion++) {
+            duckvep_haplotype_edit_t ascending[2] = {
+                {4u, deletion ? 3u : 6u, reference + 3u,
+                    deletion ? 0u : 6u, (const uint8_t *)"TAATTT", (int8_t)strand},
+                {7u, 3u, reference + 6u, 3u, (const uint8_t *)"TAA", (int8_t)strand}
+            };
+            size_t count = deletion ? 2u : 1u;
+            duckvep_haplotype_edit_t descending[2] = {
+                ascending[count - 1u], ascending[0]
+            };
+            duckvep_edit_set_t set = {descending, count};
+            duckvep_coding_context_t ctx;
+            uint8_t cds[32], rp[16], ap[16], saved_cds[32], saved_rp[16], saved_ap[16];
+            duckvep_haplotype_block_t blocks[2];
+            duckvep_hgvs_protein_operation_t facts[2];
+            size_t block_count, fact_count, required;
+            char rendered[64];
+            ASSERT_EQ(DUCKVEP_CODING_CONTEXT_OK, duckvep_coding_context_build(
+                reference, sizeof reference - 1u, &set, (int8_t)strand,
+                DUCKVEP_CODON_TABLE_STANDARD, cds, sizeof cds, rp, sizeof rp,
+                ap, sizeof ap, &ctx));
+            ctx.pre_cds_complete = ctx.post_cds_complete = 1u;
+            ASSERT_EQ(2u, ctx.alt_first_stop_position1);
+            memcpy(saved_cds, cds, ctx.alt_cds_len);
+            memcpy(saved_rp, rp, ctx.ref_peptide_len);
+            memcpy(saved_ap, ap, ctx.alt_peptide_len);
+            ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK,
+                duckvep_haplotype_partition(ascending, count, blocks, 2u, &block_count));
+            ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_protein_haplotype_build(
+                &ctx, NULL, ascending, count, blocks, block_count, 0u,
+                facts, 2u, &fact_count));
+            ASSERT_EQ(1u, fact_count);
+            ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_protein_haplotype_render(
+                facts, fact_count, 1, rendered, sizeof rendered, &required));
+            ASSERT_STR_EQ("p.(Lys2Ter)", rendered);
+            ASSERT_MEM_EQ(saved_cds, cds, ctx.alt_cds_len);
+            ASSERT_MEM_EQ(saved_rp, rp, ctx.ref_peptide_len);
+            ASSERT_MEM_EQ(saved_ap, ap, ctx.alt_peptide_len);
+        }
+    }
+    PASS();
+}
+
 TEST hgvs_haplotype_frameshift_uses_shifted_alternate_axis(void) {
     static const uint8_t reference[] = "ATGGGTCCTGCTGAACAATAA";
     duckvep_haplotype_edit_t ascending[2] = {
