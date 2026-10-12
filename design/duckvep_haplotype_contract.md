@@ -3,7 +3,9 @@
 Status: **signed for the coding correctness contract; bounded #11 and #50 profiles below are independently guarded.** `bcftools csq` is the executable authority for whole-haplotype consequences, and NMD uses `ejc50`.
 
 The separately measured 2× throughput criterion is met by the fused native reader on the
-pinned one-core HG002 workload; details and receipts are in the [qualification report](../benchmarks/data/haplotype_scale/README.md) and [#34](https://github.com/RGenomicsETL/DuckVEP/issues/34). Bounded current profiles under [#11](https://github.com/RGenomicsETL/DuckVEP/issues/11) and [#50](https://github.com/RGenomicsETL/DuckVEP/issues/50) are described in section 3; their broader issue scope remains open. [#28](https://github.com/RGenomicsETL/DuckVEP/issues/28) tracks phased structural composition.
+pinned one-core HG002 workload; details and receipts are in the [qualification report](../benchmarks/data/haplotype_scale/README.md) and [#34](https://github.com/RGenomicsETL/DuckVEP/issues/34). Bounded current profiles under [#11](https://github.com/RGenomicsETL/DuckVEP/issues/11) and [#50](https://github.com/RGenomicsETL/DuckVEP/issues/50) are described in section 3; their broader issue scope remains open. [#28](https://github.com/RGenomicsETL/DuckVEP/issues/28), closed as not planned, records the separate phased structural-composition scope.
+
+The [#11/#50 completion proposal](issue-11-50-completion.md) studies remaining options, assumptions and acceptance witnesses. It is pending owner review and does not widen this active contract.
 
 **Scope:** whole-haplotype coding prediction plus the bounded final-RNA profile in section 3, not general haplotype prediction. Maintainer approval is required before classifiers change. Keep independent-event and haplotype classifiers separate, sharing projection/edit/translation facts only where their semantics agree. `bcftools csq` is the pinned test oracle, not a runtime dependency; DuckVEP extends its existing native path.
 

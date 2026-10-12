@@ -45,6 +45,7 @@ documents <- c(
   `v2-host` = "docs/v2-host.md",
   design = "design/duckvep.md",
   `haplotype-contract` = "design/duckvep_haplotype_contract.md",
+  `haplotype-completion` = "design/issue-11-50-completion.md",
   `structural-hgvs` = "docs/structural-identity-hgvs.md",
   `corpus-workflow` = "design/duckvep_corpus_workflow.md",
   `mane-grch37` = "design/duckvep_mane_grch37.md",
@@ -61,6 +62,7 @@ documents <- c(
 titles <- c(functions = "SQL function reference", errata = "Compatibility and errata",
   `v2-host` = "DuckDB hosts and release profile", design = "Design and implementation contract",
   `haplotype-contract` = "The duckvep-coding haplotype contract",
+  `haplotype-completion` = "Completion proposal for issues 11 and 50",
   `structural-hgvs` = "Breakend identity, fusion evidence and structural HGVS",
   `corpus-workflow` = "Corpus workflow", `mane-grch37` = "MANE v1.5 mapped to GRCh37",
   conformance = "Conformance against Ensembl VEP", haplotypes = "Haplotypes",
@@ -71,7 +73,8 @@ titles <- c(functions = "SQL function reference", errata = "Compatibility and er
 # Sections of the docs index; every published document belongs to exactly one.
 sections <- list(
   Reference = c("functions", "errata", "v2-host"),
-  Contracts = c("design", "haplotype-contract", "structural-hgvs", "corpus-workflow", "mane-grch37"),
+  Contracts = c("design", "haplotype-contract", "haplotype-completion", "structural-hgvs",
+    "corpus-workflow", "mane-grch37"),
   Evidence = c("conformance", "haplotypes", "haplotypes-indel", "haplotype-scale", "projection"),
   Performance = c("throughput", "throughput_evidence", "vep_rs", "scale-runner"))
 stopifnot(setequal(names(titles), names(documents)),
