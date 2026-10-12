@@ -2865,3 +2865,51 @@ SELECT 1::UBIGINT event_index,0::UINTEGER seq_region,606::UBIGINT AS position,'C
 
 -- case: terminal RNA insertion long exon exception full row
 SELECT * FROM terminal_nmd_insert() ORDER BY ALL
+
+-- fixture: literal indel overlap calls
+CREATE TABLE literal_indel_calls AS SELECT kind,id::UBIGINT event_index,0::UINTEGER seq_region,p::UBIGINT AS position,r::VARCHAR reference,a::VARCHAR alternate,1::UINTEGER alt_index,0::UINTEGER transcript_index,0::UBIGINT sample_index,[0,1]::INTEGER[] alleles,[false,true]::BOOLEAN[] phase_before,77::BIGINT phase_set FROM (VALUES ('del',1,102,'GGCT','G'),('del',2,102,'GGCT','G'),('ins',1,105,'T','TCCC'),('ins',2,105,'T','TCCC'),('stop',1,102,'GGCT','G'),('stop',2,102,'GGCT','G'),('stop',3,106,'GAA','TAA'),('stop',4,109,'T','C'),('ambiguous',1,102,'GGCT','G'),('ambiguous',2,104,'C','T')) v(kind,id,p,r,a)
+
+-- job: literal_del compatible hgvs=true
+SELECT * EXCLUDE(kind) FROM literal_indel_calls WHERE kind='del'
+
+-- job: literal_ins compatible hgvs=true
+SELECT * EXCLUDE(kind) FROM literal_indel_calls WHERE kind='ins'
+
+-- job: literal_stop compatible hgvs=true
+SELECT * EXCLUDE(kind) FROM literal_indel_calls WHERE kind='stop'
+
+-- job: literal_ambiguous compatible hgvs=true
+SELECT * EXCLUDE(kind) FROM literal_indel_calls WHERE kind='ambiguous'
+
+-- case: duplicate deletion full row
+SELECT * FROM literal_del() ORDER BY ALL
+
+-- case: duplicate insertion full row
+SELECT * FROM literal_ins() ORDER BY ALL
+
+-- case: duplicate deletion immediate stop full row
+SELECT * FROM literal_stop() ORDER BY ALL
+
+-- case: slidable deletion overlap refusal full row
+SELECT * FROM literal_ambiguous() ORDER BY ALL
+
+-- fixture: raw observed copy proof calls
+CREATE TABLE raw_copy_calls AS SELECT id::UBIGINT event_index,0::UINTEGER seq_region,p::UBIGINT AS position,r::VARCHAR reference,[a]::VARCHAR[] alternates,0::UINTEGER transcript_index,s::UBIGINT sample_index,CASE WHEN s=0 THEN '1/1' ELSE '0/1' END::VARCHAR gt FROM (VALUES (1,103,'G','A'),(2,104,'C','T')) v(id,p,r,a) CROSS JOIN range(2) t(s)
+
+-- job: raw_copy_complete compatible input_mode='source_records' phase_policy='vep_compat' hgvs=true
+SELECT * FROM raw_copy_calls WHERE sample_index=0
+
+-- job: raw_copy_mixed compatible input_mode='source_records' phase_policy='vep_compat' hgvs=true
+SELECT * FROM raw_copy_calls
+
+-- job: raw_copy_haploid_ref compatible input_mode='source_records' phase_policy='vep_compat' hgvs=true
+SELECT * REPLACE(CASE WHEN event_index=2 THEN '0' ELSE gt END AS gt) FROM raw_copy_calls WHERE sample_index=0
+
+-- case: raw copy proof complete full row
+SELECT * FROM raw_copy_complete() ORDER BY ALL
+
+-- case: raw copy proof isolated full rows
+SELECT * FROM raw_copy_mixed() ORDER BY ALL
+
+-- case: raw copy proof omitted haploid reference full row
+SELECT * FROM raw_copy_haploid_ref() ORDER BY ALL

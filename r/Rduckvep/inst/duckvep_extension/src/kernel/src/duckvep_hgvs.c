@@ -3514,6 +3514,16 @@ static duckvep_hgvs_status_t hgvs_protein_haplotype_push(
         duckvep_hgvs_status_t status = hgvs_protein_fact_build_window(
             context, reference, flags, &window, &operation.fact);
         if (status != DUCKVEP_HGVS_OK) return status;
+        /* An immediate introduced stop is a nonsense substitution, irrespective
+         * of how many reference residues the nucleotide delins replaces. */
+        if (operation.fact.shape == DUCKVEP_HGVS_PROTEIN_DELINS &&
+            operation.fact.alternate_first == (uint8_t)'*' &&
+            operation.fact.reference_first != (uint8_t)'*') {
+            operation.fact.shape = DUCKVEP_HGVS_PROTEIN_SUBSTITUTION;
+            operation.fact.ref_length = operation.fact.alt_length = 1u;
+            operation.fact.last_position1 = operation.fact.first_position1;
+            operation.fact.reference_last = operation.fact.reference_first;
+        }
         if (!*used || !hgvs_protein_operations_touch(&operations[*used - 1u].fact,
                 &operation.fact)) break;
         const duckvep_hgvs_protein_operation_t *previous = operations + *used - 1u;

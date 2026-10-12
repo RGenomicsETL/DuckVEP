@@ -80,8 +80,10 @@
 #' `prediction_status` and `prediction_reason` state eligibility for its supported
 #' domain and whether the classifiers decided it (see below), and `nmd_prediction` gives
 #' the rule `ejc50` NMD prediction; `nmd_exceptions` lists the exceptions to that rule that apply to a
-#' premature stop (`start_proximal`, `long_exon`) without changing the prediction. When the stop is lost,
-#' `protein` continues through the stored 3' flank to the next stop. The domain is strict complete phased calls of
+#' premature stop (`start_proximal`, `long_exon`) without changing the prediction. On a decoded eligible path,
+#' a lost stop extends `protein` through the stored 3' flank to the next stop.
+#' Raw source replay retains its compatibility protein without that extension.
+#' The ordinary coding domain is strict complete phased calls of
 #' any ploidy (a haploid call has one lane), one unambiguous heterozygous phase
 #' domain per transcript and sample (an unphased heterozygous call that is the
 #' sample's only heterozygous call on the transcript needs no phase), literal ACGT SNVs, MNVs and indels of any
@@ -102,6 +104,25 @@
 #' result in `carriers` order; the row status is `predicted` or
 #' `eligible_classifier_pending` only when every carrier is eligible, and
 #' otherwise the first ineligible carrier's result.
+#'
+#' A bounded literal overlap profile composes agreeing substitutions, identical
+#' indels and compatibly placed pure deletions in one coding exon. Shared edits
+#' count once while each source retains its identity. Ambiguous placements and
+#' general overlapping delins remain unsupported. Immediate introduced stops in
+#' compound protein HGVS are nonsense substitutions, not multi-residue delins.
+#' Separate complete-RNA and typed-curation profiles are described in the
+#' function reference and haplotype contract.
+#'
+#' Raw `source_records` under `vep_compat` can qualify for coding prediction when
+#' every original call proves complete diploid homozygous ALT or diploid hom-REF
+#' and both observed copies finish on the same disjoint path. CALLED alone,
+#' hypothetical slots and non-diploid or missing calls do not prove this.
+#' Omitted non-diploid REF calls also prevent proof. Complete and unproven
+#' carriers occupy separate qualification rows, preserving the complete sample's
+#' outer prediction even when other samples share its sequence. Row counts can
+#' increase even when another context prevents prediction. Qualification-only
+#' carriers consume bounded carrier slots; per-carrier raw CDS/protein/HGVS stay
+#' unchanged.
 #'
 #' `haplotype_consequences` (a character list) and `haplotype_impact` give the
 #' reduced whole-protein SO set and IMPACT of the edited coding sequence, decided

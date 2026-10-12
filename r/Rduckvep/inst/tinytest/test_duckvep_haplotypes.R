@@ -271,8 +271,8 @@ local({
     rownames(result) <- NULL
     expect_identical(result$hgvsp, expected)
     expect_true(all(result$hgvsp_status == "ok"))
-    # A predicted path reads the lost stop through into the 3' flank; a path that is only replayed does not.
-    protein <- ifelse(result$prediction_status == "predicted", "MGPLKRTIITS*", "MGPL")
+    # Decoded prediction reads through the lost stop; raw compatibility protein stays unchanged.
+    protein <- ifelse(!raw & result$prediction_status == "predicted", "MGPLKRTIITS*", "MGPL")
     expect_true(all(result$cds == "ATGGGTCCTTTAA" & result$protein == protein))
     expect_true(all(result$carrier_count == 2L))
     for (i in 1:4) {
@@ -667,7 +667,8 @@ local({
     "v(event_index,position,reference,alternates) CROSS JOIN mixed_tx CROSS JOIN range(5) s(i)")
   unmapped <- rduckvep_haplotypes(con, unmapped_calls, "mixed", "vep_compat",
     input_mode = "source_records", max_leaf_edits = 1)
-  expect_equal(nrow(unmapped), 12L)
+  # Qualification views keep distinct copy evidence without changing carrier replay.
+  expect_equal(nrow(unmapped), 14L)
   expect_equal(sum(unmapped$carrier_count), 20L)
   expect_equal(sum(unmapped$carrier_count[unmapped$sequence_status == "conditional"]), 16L)
   expect_true(all(unmapped$projection_status == "ok" & unmapped$edit_count == 1))

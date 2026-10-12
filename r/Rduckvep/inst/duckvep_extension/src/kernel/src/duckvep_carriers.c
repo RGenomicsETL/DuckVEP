@@ -173,6 +173,47 @@ duckvep_carriers_status_t duckvep_carriers_init(
     return DUCKVEP_CARRIERS_OK;
 }
 
+/* Every input of the transcript is known: a lane whose copy is unproven leaves
+ * every lane of its sample and phase set unproven. No slot is added. */
+static void share_copy_unproven(duckvep_carriers_t *s, uint32_t tx_id) {
+    uint32_t at;
+    for (uint32_t id = s->buffers.transcripts[tx_id - 1u].first_call; id;
+         id = s->buffers.calls[id - 1u].next_transcript) {
+        const duckvep_carrier_call_t *call = &s->buffers.calls[id - 1u];
+        if (!call->key.copy_unproven) continue;
+        duckvep_carrier_key_t key = call->key;
+        for (key.lane = 1u; key.lane <= key.ploidy; key.lane++) {
+            uint32_t other = find_call(s, tx_id, &key, &at);
+            if (other) s->buffers.calls[other - 1u].key.copy_unproven = 1u;
+            if (key.lane == UINT16_MAX) break;
+        }
+    }
+}
+
+/* Stable relink of an occupied prefix: copy-proven carriers first. Returns their count. */
+static uint32_t partition_copy_proof(duckvep_carriers_t *s, duckvep_carrier_prefix_t *prefix,
+                                     uint32_t *unproven_first) {
+    uint32_t head[2] = {0u, 0u}, tail[2] = {0u, 0u}, proven = 0u;
+    for (uint32_t id = prefix->first_call; id;) {
+        duckvep_carrier_call_t *call = &s->buffers.calls[id - 1u];
+        uint32_t next = call->next_leaf, part = call->key.copy_unproven;
+        proven += !part;
+        call->previous_leaf = tail[part];
+        call->next_leaf = 0u;
+        if (tail[part]) s->buffers.calls[tail[part] - 1u].next_leaf = id;
+        else head[part] = id;
+        tail[part] = id;
+        id = next;
+    }
+    if (tail[0]) {
+        s->buffers.calls[tail[0] - 1u].next_leaf = head[1];
+        if (head[1]) s->buffers.calls[head[1] - 1u].previous_leaf = tail[0];
+    }
+    prefix->first_call = head[0] ? head[0] : head[1];
+    *unproven_first = head[1];
+    return proven;
+}
+
 static duckvep_carriers_status_t advance(
     duckvep_carriers_t *s, uint16_t chrom, uint32_t pos1, uint64_t event,
     int eof, uint32_t *completed) {
@@ -204,7 +245,9 @@ static duckvep_carriers_status_t advance(
             (s->model->chrom_id[ordinal] == chrom && s->model->end1[ordinal] < pos1)) {
             s->closing = id;
             s->next_leaf = tx->first_prefix;
+            s->part_count = 0u;
             s->drained = 0u;
+            share_copy_unproven(s, id);
             *completed = ordinal;
             return DUCKVEP_CARRIERS_TRANSCRIPT_READY;
         }
@@ -233,10 +276,10 @@ duckvep_carriers_status_t duckvep_carriers_finish(duckvep_carriers_t *s, uint32_
 
 duckvep_carriers_status_t duckvep_carriers_push(
     duckvep_carriers_t *s, uint32_t tx_index, const duckvep_carrier_key_t *key, uint8_t evidence) {
-    uint32_t tx_at, call_at, prefix_at;
+    uint32_t tx_at, call_at, prefix_at = 0u;
     if (!s || !s->initialized || !key || !s->have_event || s->finished || s->pending ||
         tx_index >= s->model->transcript_count || !key->lane || key->lane > key->ploidy ||
-        key->phase_set_present > 1u || !evidence ||
+        key->phase_set_present > 1u || key->copy_unproven > 1u || (!evidence && !key->copy_unproven) ||
         (evidence & ~(DUCKVEP_CARRIER_CALLED | DUCKVEP_CARRIER_MISSING |
                       DUCKVEP_CARRIER_UNPHASED | DUCKVEP_CARRIER_CONDITIONAL |
                       DUCKVEP_CARRIER_REFERENCE_REPLAY | DUCKVEP_CARRIER_HYPOTHETICAL)) ||
@@ -252,13 +295,14 @@ duckvep_carriers_status_t duckvep_carriers_push(
     uint32_t parent = call_id ? s->buffers.calls[call_id - 1u].leaf : 0u;
     if (call_id && s->buffers.calls[call_id - 1u].key.ploidy != key->ploidy)
         return DUCKVEP_CARRIERS_PLOIDY_CONFLICT;
-    if (parent && s->buffers.prefixes[parent - 1u].event_id == s->event_id)
+    if (evidence && parent && s->buffers.prefixes[parent - 1u].event_id == s->event_id)
         return DUCKVEP_CARRIERS_DUPLICATE_CALL;
     if (!call_id && !s->free_call) return DUCKVEP_CARRIERS_CALL_FULL;
     uint8_t domain_split = key->domain_split ||
         (call_id && s->buffers.calls[call_id - 1u].key.domain_split);
-    uint32_t prefix_id = find_prefix(s, tx_id, parent, s->event_id, evidence, domain_split, &prefix_at);
-    if (!prefix_id && !s->free_prefix) return DUCKVEP_CARRIERS_PREFIX_FULL;
+    uint32_t prefix_id = evidence ?
+        find_prefix(s, tx_id, parent, s->event_id, evidence, domain_split, &prefix_at) : 0u;
+    if (evidence && !prefix_id && !s->free_prefix) return DUCKVEP_CARRIERS_PREFIX_FULL;
 
     /* Every capacity and key check precedes publication of any new slot. */
     duckvep_carrier_transcript_t *tx = &s->buffers.transcripts[tx_id - 1u];
@@ -269,7 +313,7 @@ duckvep_carriers_status_t duckvep_carriers_push(
         open_transcript(s, tx_id);
         s->buffers.transcript_index[tx_at] = (duckvep_carrier_bucket_t){mix(tx_index), tx_id};
     }
-    if (!prefix_id) {
+    if (evidence && !prefix_id) {
         prefix_id = s->free_prefix;
         duckvep_carrier_prefix_t *prefix = &s->buffers.prefixes[prefix_id - 1u];
         s->free_prefix = prefix->next_free;
@@ -301,6 +345,11 @@ duckvep_carriers_status_t duckvep_carriers_push(
     }
     duckvep_carrier_call_t *call = &s->buffers.calls[call_id - 1u];
     call->key.domain_split = domain_split;
+    call->key.copy_unproven |= key->copy_unproven;
+    if (s->transcript_count > s->peak_transcripts) s->peak_transcripts = s->transcript_count;
+    if (s->call_count > s->peak_calls) s->peak_calls = s->call_count;
+    if (s->prefix_count > s->peak_prefixes) s->peak_prefixes = s->prefix_count;
+    if (!evidence) return DUCKVEP_CARRIERS_OK;
     if (parent) {
         duckvep_carrier_prefix_t *old = &s->buffers.prefixes[parent - 1u];
         if (call->previous_leaf) s->buffers.calls[call->previous_leaf - 1u].next_leaf = call->next_leaf;
@@ -315,9 +364,6 @@ duckvep_carriers_status_t duckvep_carriers_push(
     if (leaf->first_call) s->buffers.calls[leaf->first_call - 1u].previous_leaf = call_id;
     leaf->first_call = call_id;
     leaf->call_count++;
-    if (s->transcript_count > s->peak_transcripts) s->peak_transcripts = s->transcript_count;
-    if (s->call_count > s->peak_calls) s->peak_calls = s->call_count;
-    if (s->prefix_count > s->peak_prefixes) s->peak_prefixes = s->prefix_count;
     return DUCKVEP_CARRIERS_OK;
 }
 
@@ -325,14 +371,26 @@ duckvep_carriers_status_t duckvep_carriers_next_leaf(
     duckvep_carriers_t *s, duckvep_carrier_leaf_t *leaf) {
     if (leaf) memset(leaf, 0, sizeof(*leaf));
     if (!s || !s->initialized || !s->closing || !leaf) return DUCKVEP_CARRIERS_INVALID_ARG;
+    uint32_t tx_index = s->buffers.transcripts[s->closing - 1u].transcript_index;
+    if (s->part_count) {
+        *leaf = (duckvep_carrier_leaf_t){s->part_leaf, tx_index,
+            s->buffers.prefixes[s->part_leaf - 1u].depth, s->part_call, s->part_count};
+        s->part_count = 0u;
+        return DUCKVEP_CARRIERS_OK;
+    }
     while (s->next_leaf) {
-        uint32_t id = s->next_leaf;
-        const duckvep_carrier_prefix_t *prefix = &s->buffers.prefixes[id - 1u];
+        uint32_t id = s->next_leaf, unproven_first;
+        duckvep_carrier_prefix_t *prefix = &s->buffers.prefixes[id - 1u];
         s->next_leaf = prefix->next_transcript;
         if (!prefix->call_count) continue;
-        *leaf = (duckvep_carrier_leaf_t){id,
-            s->buffers.transcripts[s->closing - 1u].transcript_index,
-            prefix->depth, prefix->first_call, prefix->call_count};
+        uint32_t proven = partition_copy_proof(s, prefix, &unproven_first);
+        if (proven && proven < prefix->call_count) {
+            s->part_leaf = id;
+            s->part_call = unproven_first;
+            s->part_count = prefix->call_count - proven;
+        }
+        *leaf = (duckvep_carrier_leaf_t){id, tx_index, prefix->depth, prefix->first_call,
+            proven ? proven : prefix->call_count};
         return DUCKVEP_CARRIERS_OK;
     }
     s->drained = 1u;
@@ -362,6 +420,14 @@ const duckvep_carrier_call_t *duckvep_carriers_call(const duckvep_carriers_t *s,
     if (!s || !s->initialized || !s->closing || !id || id > s->buffers.call_capacity) return NULL;
     const duckvep_carrier_call_t *call = &s->buffers.calls[id - 1u];
     return call->transcript == s->closing ? call : NULL;
+}
+
+const duckvep_carrier_call_t *duckvep_carriers_find_call(const duckvep_carriers_t *s,
+    const duckvep_carrier_call_t *peer, const duckvep_carrier_key_t *key) {
+    if (!s || !s->initialized || !s->closing || !peer || !key || peer->transcript != s->closing)
+        return NULL;
+    uint32_t at, id = find_call(s, s->closing, key, &at);
+    return id ? &s->buffers.calls[id - 1u] : NULL;
 }
 
 duckvep_carriers_status_t duckvep_carriers_release(duckvep_carriers_t *s) {
