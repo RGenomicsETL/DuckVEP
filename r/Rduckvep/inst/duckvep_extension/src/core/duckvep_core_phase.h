@@ -54,8 +54,8 @@ duckvep_core_phase_result_t duckvep_core_phase_row(const duckvep_core_phase_read
  * UTF-8 sequences and unknown bytes are kept). */
 void duckvep_core_revcomp(const char *sequence, size_t length, char *out);
 
-/* _duckvep_raw_gt: the seven UINTEGER fields. */
-void duckvep_core_raw_gt(const char *gt, size_t length, uint32_t source_alt_count, uint32_t fields[7]);
+/* _duckvep_raw_gt: the eight UINTEGER fields. */
+void duckvep_core_raw_gt(const char *gt, size_t length, uint32_t source_alt_count, uint32_t fields[8]);
 
 /* _duckvep_record_order: 0 means an invalid ordinal (see the message). */
 uint64_t duckvep_core_record_order(uint64_t count, uint64_t ordinal);

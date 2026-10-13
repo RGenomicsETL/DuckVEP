@@ -296,9 +296,13 @@ models from those checked-in files in the run directory. The receipt records SHA
 for the fixture, adapter, lock, and generated reference-model files.
 
 `cases.jsonl` stores each compound allele as two `{position, reference, alternate}`
-records. The R runner serializes both source edits inside one `c.[edit1;edit2]`
-description and calls the Mutalyzer normalizer once; it never joins independently
-normalized HGVS names. The adapter input JSONL contains
+records. The R runner serializes source edits inside one `c.[edit1;edit2]`
+description unless an explicit molecular `input_description` is supplied. The eight
+external cases include two opaque-alias controls: their single delins description
+checks joint molecular nomenclature, not cis or duplicate-source semantics.
+`molecular_edits` supplies the single reference-relative replacement for native replay;
+its identity with the distinct source assertions is checked separately. The normalizer
+is called once per description; independently normalized HGVS names are not joined. The adapter input JSONL contains
 `case_id` and `description`. Each output JSONL record contains the input and normalized
 description, `protein.description`, `protein.reference`, `protein.predicted`, Mutalyzer
 error codes, and the pinned runtime versions. Compare `normalized_description` only for
@@ -308,7 +312,11 @@ context, not additional HGVS descriptions, and may be absent when no protein pre
 is returned. Compare the protein description only when the transcript/protein selector
 and coding model match. These pinned outputs are regression expectations for this
 Mutalyzer version; they do not establish cross-tool equivalence or complete HGVS
-conformance.
+conformance. For the negative-strand opaque control, Mutalyzer renders
+`c.[4delinsTTTC;6T>C]`: the retained c.5C gives `TTTC + C + C = TTTCCC`, the same
+molecule as native `c.4_6delinsTTTCCC`. The native form follows the same-codon
+one-unchanged-nucleotide delins rule. The normalizer's decomposition does not establish
+which ALT base descended from that reference C.
 
 The loaded-extension runtime gate uses the same FASTA/GFF3 resources and separate
 `expected_native_hgvsc`/`expected_native_hgvsp` expectations:
@@ -318,7 +326,8 @@ make test_compound_hgvs_runtime
 ```
 
 The native profile covers observed-cis, bounded nonoverlapping grouped literal DNA edits,
-including compound insertions and deletions, on both transcript strands. It checks
+including compound insertions and deletions, plus identical opaque-delins aliases on
+both transcript strands. It checks
 final-CDS replay, protein bytes, contributor identities and rejects cis not established
 by the observed calls. HGVS DNA delins guidance combines adjacent changes and changes
 separated by one unchanged nucleotide in the same codon. HGVS protein guidance keeps
@@ -327,8 +336,8 @@ protein delins and same-codon DNA member list differ from these rules; the tool-
 receipt expectations remain separate from the native standards expectations. See the
 [DNA](https://hgvs-nomenclature.org/stable/recommendations/DNA/delins/) and
 [protein](https://hgvs-nomenclature.org/main/recommendations/protein/delins/)
-recommendations. Overlapping edits, ambiguous same-gap insertions and general shifted or
-overlap nomenclature remain outside this bounded profile.
+recommendations. Distinct interacting delins, ambiguous same-gap insertions and general
+shifted or overlap nomenclature remain outside this bounded profile.
 
 From the repository root, these runtime checks build/use the default v1 release host;
 `make test_*_runtime` targets build it as needed:

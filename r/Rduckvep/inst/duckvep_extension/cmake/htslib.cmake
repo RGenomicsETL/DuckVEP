@@ -64,7 +64,7 @@ ExternalProject_Add(htslib_build
         "LIBS=-lz"
         ${HTSLIB_CONFIGURE_ENV_VARS}
         ${SH_COMMAND} ./configure ${HTSLIB_CONFIGURE_FLAGS}
-    BUILD_COMMAND ${MAKE_COMMAND} -j lib-static ${HTSLIB_MAKE_ARGS}
+    BUILD_COMMAND ${MAKE_COMMAND} "-j$ENV{CMAKE_BUILD_PARALLEL_LEVEL}" lib-static ${HTSLIB_MAKE_ARGS}
     BUILD_ALWAYS TRUE
     INSTALL_COMMAND ""
     BUILD_BYPRODUCTS "${HTSLIB_SRC_DIR}/libhts.a"

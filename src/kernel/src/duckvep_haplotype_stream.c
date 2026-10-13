@@ -487,7 +487,8 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
     if (!s || !s->initialized) return DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG;
     if (s->error) return s->error;
     if (!s->have_current || s->closing || s->carriers.pending || s->carriers.finished ||
-        !call || !call->source_ploidy || call->source_has_missing > 1u || source_selected > 1u ||
+        !call || !call->source_ploidy || call->source_has_missing > 1u ||
+        call->source_leading_separator > 1u || source_selected > 1u ||
         call->disposition < DUCKVEP_RAW_GT_OMITTED_REFERENCE ||
         call->disposition > DUCKVEP_RAW_GT_RETAINED ||
         (s->have_phase_policy && s->phase_policy != DUCKVEP_PHASE_VEP_RAW))
@@ -521,12 +522,14 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
         duckvep_carriers_status_t status = duckvep_carriers_push(&s->carriers, tx, &key, 0u);
         return status == DUCKVEP_CARRIERS_OK ? DUCKVEP_HAPLOTYPE_STREAM_OK : carrier_fail(s, status);
     }
-    /* Only a complete diploid homozygous ALT call proves both file lanes are
-     * observed copies: its file slots are its original atoms, and a leading
-     * separator coerces the first slot to REF, so no prefixed spelling passes. */
+    /* Original complete diploid evidence precedes projection and REF folding.
+     * One REF/ALT record has one unordered copy pair against homozygous calls.
+     * ALT/ALT heterozygotes remain outside this proof profile. */
+    const uint8_t het = call->allele_index[0] != call->allele_index[1];
     const uint8_t unproven = call->disposition != DUCKVEP_RAW_GT_RETAINED ||
         call->source_ploidy != 2u || call->parsed_slots != 2u || call->source_has_missing ||
-        !call->allele_index[0] || call->allele_index[0] != call->allele_index[1];
+        call->source_leading_separator ||
+        (het && call->allele_index[0] && call->allele_index[1]);
     for (uint16_t lane = 1u; lane <= 2u; lane++) {
         uint8_t evidence = 0u;
         if (call->disposition == DUCKVEP_RAW_GT_OMITTED_EMPTY) {
@@ -545,6 +548,8 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
         duckvep_carrier_key_t key = {sample, 0, lane, 2u, 0u, 0u, unproven};
         duckvep_carriers_status_t status = duckvep_carriers_push(&s->carriers, tx, &key, evidence);
         if (status != DUCKVEP_CARRIERS_OK) return carrier_fail(s, status);
+        if (het && !unproven)
+            duckvep_carriers_observe_copy_het(&s->carriers, tx, &key, event->source.event_id);
     }
     return DUCKVEP_HAPLOTYPE_STREAM_OK;
 }
@@ -1430,8 +1435,8 @@ static void conditional_prediction(duckvep_haplotype_stream_t *s,
     leaf->nmd_junction_position1 = 0u;
 }
 
-/* raw_called: every retained source-record event of the path was pushed as
- * CALLED alone, before private REF-replay evidence was folded. */
+/* raw_called: retained source events have only CALLED or private REF replay
+ * evidence before folding. Original-call qualification is checked per carrier. */
 static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf,
     int raw_called) {
     const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
@@ -1444,7 +1449,8 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
      * found more than one placement is never re-read as a contradiction of its literal spans. */
     if (!raw && !leaf->cds && leaf->edit_count) {
         sort_edits_descending(b->edits, b->edit_event_ids, leaf->edit_count, NULL);
-        if (relation != DUCKVEP_REASON_CONTRADICTORY_EDITS) {
+        if (relation != DUCKVEP_REASON_CONTRADICTORY_EDITS &&
+            leaf->path_reason != DUCKVEP_REASON_REFERENCE_MISMATCH) {
             relation = edit_relation(b->edits, leaf->edit_count);
             if (relation == DUCKVEP_REASON_CONTRADICTORY_EDITS && leaf->path_reason == DUCKVEP_REASON_OVERLAPPING_EDITS)
                 relation = DUCKVEP_REASON_OVERLAPPING_EDITS;
@@ -1621,18 +1627,18 @@ void duckvep_haplotype_carrier_prediction(const duckvep_carriers_t *carriers,
         *status = DUCKVEP_PREDICTION_INCOMPLETE_INPUT;
         *reason = DUCKVEP_REASON_CROSS_PS_UNRESOLVED;
     }
-    /* A raw file lane is one observed haplotype only when both lanes of the
-     * sample end on this same path and every call routed to either lane was a
-     * complete diploid homozygous ALT; then the two copies are this sequence
-     * whatever the phase. Otherwise lane order is compatibility, not cis proof. */
+    /* Complete original calls prove both real lanes. At most one REF/ALT
+     * record may distinguish their paths; homozygous background cannot alter
+     * that unique unordered pair. Qualification is independent of leaf sharing. */
     if (leaf->contributor_count && leaf->contributors[0].source.source_record &&
         leaf->path_status == DUCKVEP_PREDICTION_PREDICTED) {
         duckvep_carrier_key_t other = call->key;
         other.lane = (uint16_t)(3u - call->key.lane);
         const duckvep_carrier_call_t *sibling = call->key.ploidy == 2u
             ? duckvep_carriers_find_call(carriers, call, &other) : NULL;
-        if (call->key.copy_unproven || !sibling || sibling->leaf != call->leaf ||
-            sibling->key.copy_unproven) {
+        if (call->key.copy_unproven || !sibling || !sibling->leaf ||
+            sibling->key.copy_unproven || sibling->copy_has_het != call->copy_has_het ||
+            (call->copy_has_het && sibling->copy_het_record != call->copy_het_record)) {
             *status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
             *reason = DUCKVEP_REASON_NON_STRICT_PHASE_POLICY;
         }
@@ -1695,8 +1701,9 @@ static int island_relation(const uint8_t *ref, size_t length, const duckvep_hapl
 
 /* Reference-coordinate composition for intersecting literal CDS islands.
  * joint_alt holds substituted bases; joint_assigned marks bit 0 substituted,
- * bit 1 deleted, bit 2 an insertion before that base and bit 3 a base that
- * shares an island with the previous base. Islands arrive in
+ * bit 1 consumed, bit 2 an insertion or opaque replacement payload before that
+ * base and bit 3 a base that shares an island with the previous base. Opaque
+ * replacements may coincide exactly, never acquire interior base ancestry. Islands arrive in
  * descending CDS order. Storage belongs to the stream caller; ingestion owns
  * ordering and identity. */
 static duckvep_haplotype_stream_status_t strict_literal_union(
@@ -1736,24 +1743,41 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
         return fail(s, DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL);
     const uint8_t *reference = s->sequences->cds_bytes + (size_t)offset;
     const int8_t strand = m->strand[tx];
-    int relation = UNION_COMPATIBLE;
+    int relation = UNION_COMPATIBLE, check_full_ref = 0;
     uint32_t widest = 0u;
     for (size_t i = 0u; i < leaf->edit_count; i++) {
         const duckvep_haplotype_edit_t *e = &b->edits[i];
         if (!e->cds_start || e->cds_start - 1u > length || e->ref_len > length - (e->cds_start - 1u))
             return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
-        /* A delins island and an insertion at the CDS end have no reference-indexed state. */
-        if ((e->ref_len && e->alt_len && e->ref_len != e->alt_len) ||
-            (!e->ref_len && e->cds_start - 1u == length))
-            return DUCKVEP_HAPLOTYPE_STREAM_OK;
+        check_full_ref |= (e->ref_len && e->alt_len && e->ref_len != e->alt_len) ||
+            (!e->ref_len && e->cds_start - 1u == length);
         if (e->ref_len > widest) widest = e->ref_len;
+    }
+    /* Opaque replacements and terminal gaps retain their original REF context, including padding. */
+    if (check_full_ref) for (size_t i = 0u; i < leaf->contributor_count; i++) {
+        const duckvep_haplotype_contributor_t *c = &b->contributors[i];
+        const duckvep_haplotype_source_t *a = &c->source;
+        duckvep_coding_projection_t start;
+        uint32_t pos = strand > 0 ? (uint32_t)a->pos1 : (uint32_t)(a->pos1 + a->ref_len - 1u);
+        if (!duckvep_project_coding_base(m, s->exons, tx, pos, &start) ||
+            !start.cds_pos || start.cds_pos - 1u > length || a->ref_len > length - (start.cds_pos - 1u))
+            return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
+        for (uint32_t j = 0u; j < a->ref_len; j++) {
+            uint8_t base = strand > 0 ? a->ref[j] :
+                (uint8_t)duckvep_dna_complement((char)a->ref[a->ref_len - 1u - j]);
+            if ((reference[start.cds_pos - 1u + j] & 0xDFu) != (base & 0xDFu)) {
+                leaf->sequence_status = DUCKVEP_HAPLOTYPE_REF_MISMATCH;
+                leaf->path_reason = DUCKVEP_REASON_REFERENCE_MISMATCH;
+                return DUCKVEP_HAPLOTYPE_STREAM_OK;
+            }
+        }
     }
     /* Pairs are checked only inside the widest island's reach, and a repeat of the preceding
      * island has that island's relations, so duplicate sources stay linear. */
     for (size_t i = 0u; i < leaf->edit_count; i++) {
         const duckvep_haplotype_edit_t *e = &b->edits[i];
         if (i && same_island(e, &b->edits[i - 1u], strand)) continue;
-        for (size_t j = i + 1u; j < leaf->edit_count && b->edits[j].cds_start + widest >= e->cds_start; j++) {
+        for (size_t j = i + 1u; j < leaf->edit_count && (uint64_t)b->edits[j].cds_start + widest >= e->cds_start; j++) {
             int r = island_relation(reference, length, e, &b->edits[j], strand);
             if (r > relation) relation = r;
         }
@@ -1774,13 +1798,14 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
     for (size_t i = 0u; i < leaf->edit_count; i++) {
         const duckvep_haplotype_edit_t *e = &b->edits[i];
         size_t start0 = (size_t)e->cds_start - 1u;
-        if (!e->ref_len) { b->joint_assigned[start0] |= 4u; continue; }
+        if (start0 < length && e->alt_len && e->ref_len != e->alt_len) b->joint_assigned[start0] |= 4u;
+        if (!e->ref_len) continue;
         for (uint32_t j = 0u; j < e->ref_len; j++) {
             size_t at = start0 + j;
             if (j) b->joint_assigned[at] |= 8u;
             uint8_t r = island_base(e, e->ref, e->ref_len, j, strand);
             mismatch |= (reference[at] & 0xDFu) != r;
-            if (!e->alt_len) { b->joint_assigned[at] |= 2u; continue; }
+            if (e->ref_len != e->alt_len) { b->joint_assigned[at] |= 2u; continue; }
             uint8_t v = island_base(e, e->alt, e->alt_len, j, strand);
             if (r == v) continue;
             conflict |= (b->joint_assigned[at] & 1u) && b->joint_alt[at] != v;
@@ -1803,7 +1828,8 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
     for (size_t at = 0u; at <= length; at++) {
         size_t group = k;
         while (group && b->edits[group - 1u].cds_start - 1u == at) group--;
-        int touched = at < length && (b->joint_assigned[at] & 4u);
+        /* The terminal interbase site is represented by its edit group, not a reference byte. */
+        int touched = at < length ? (b->joint_assigned[at] & 4u) != 0u : group < k;
         for (int item = 0; item < 2; item++) {
             if (item) touched = at < length && (b->joint_assigned[at] & 3u);
             int joined = item && touched && (b->joint_assigned[at] & 12u);
@@ -1819,11 +1845,11 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
                 open = 0;
             }
             if (touched && !open) { open = 1; start = end = at; alt_start = out; }
-            if (at == length) break;
+            if (item && at == length) break;
             if (!item) {
                 for (size_t i = group; touched && i < k; i++) {
                     const duckvep_haplotype_edit_t *e = &b->edits[i];
-                    if (e->ref_len) continue;
+                    if (!e->alt_len || e->ref_len == e->alt_len) continue;
                     if (e->alt_len > b->cds_capacity - out) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL);
                     for (uint32_t j = 0u; j < e->alt_len; j++) b->cds[out++] = island_base(e, e->alt, e->alt_len, j, strand);
                     break;
@@ -1861,19 +1887,21 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
         displaced |= (uint8_t)intersects;
     }
     /* An island is post-stop when its own site in the edited CDS follows the first stop codon. */
-    for (size_t at = 0u, alt = 0u, k = leaf->edit_count; first_stop && at < length; at++) {
-        size_t group = k, inserted = 0u;
+    for (size_t at = 0u, alt = 0u, k = leaf->edit_count; first_stop && at <= length; at++) {
+        size_t group = k, inserted = 0u, replaced = 0u;
         while (group && b->edits[group - 1u].cds_start - 1u == at) group--;
         for (int item = 0; item < 2; item++)
             for (size_t i = group; i < k; i++) {
                 if (!b->edits[i].ref_len != !item) continue;
                 if (!item) inserted = b->edits[i].alt_len;
+                else if (b->edits[i].ref_len != b->edits[i].alt_len)
+                    replaced = b->edits[i].alt_len;
                 if (alt + (item ? inserted : 0u) < first_stop * 3u) continue;
                 for (size_t c = 0u; c < leaf->contributor_count; c++)
                     if (b->contributors[c].source.event_id == b->edit_event_ids[i])
                         b->contributors[c].post_stop_edits++;
             }
-        alt += inserted + !(b->joint_assigned[at] & 2u);
+        if (at < length) alt += inserted + replaced + !(b->joint_assigned[at] & 2u);
         k = group;
     }
     for (size_t i = 0u; i < leaf->edit_count / 2u; i++) {
@@ -1927,7 +1955,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_next(
         const duckvep_haplotype_projection_t *p = e ? find_projection(s, e, tx) : NULL;
         if (!p) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INTERNAL_ERROR);
         uint8_t evidence = b->leaf_events[i].evidence_flags;
-        raw_called &= evidence == DUCKVEP_CARRIER_CALLED;
+        raw_called &= evidence == DUCKVEP_CARRIER_CALLED || evidence == DUCKVEP_CARRIER_REFERENCE_REPLAY;
         if (!i) raw_records = e->source.source_record;
         if (raw_records != e->source.source_record)
             return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);

@@ -1245,7 +1245,7 @@ static duckvep_haplotype_stream_status_t consume_call(duckvep_hap_state_t *s, ch
     if (bind->source_records) {
         duckvep_raw_gt_status_t parsed = (duckvep_raw_gt_status_t)r->raw[0];
         duckvep_raw_gt_t call = {{r->raw[1], r->raw[2]}, r->raw[3], (uint16_t)r->raw[4],
-            (uint8_t)r->raw[5], (duckvep_raw_gt_disposition_t)r->raw[6]};
+            (uint8_t)r->raw[5], (duckvep_raw_gt_disposition_t)r->raw[6], (uint8_t)r->raw[7]};
         if (parsed != DUCKVEP_RAW_GT_OK) {
             snprintf(error, error_size, "duckvep_haplotypes: raw GT status %u at event %llu, sample %u",
                 (unsigned)parsed, (unsigned long long)source.event_id, r->sample);

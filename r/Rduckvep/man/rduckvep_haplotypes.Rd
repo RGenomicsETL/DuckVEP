@@ -152,21 +152,28 @@ result in `carriers` order; the row status is `predicted` or
 otherwise the first ineligible carrier's result.
 
 A bounded literal overlap profile composes agreeing substitutions, identical
-indels and compatibly placed pure deletions in one coding exon. Shared edits
-count once while each source retains its identity. Ambiguous placements and
-general overlapping delins remain unsupported. Immediate introduced stops in
+indels, identical minimal delins and compatibly placed pure deletions in one
+coding exon shared by every contributing source. Disjoint sources in other
+exons remain outside this overlap profile. Opaque delins aliases apply one replacement without assigning
+ancestry to ALT bases; every original REF, including padding, must match.
+Shared edits count once while each source retains its identity. Ambiguous
+placements and distinct interacting delins remain unsupported. Immediate introduced stops in
 compound protein HGVS are nonsense substitutions, not multi-residue delins.
 Separate complete-RNA and typed-curation profiles are described in the
 function reference and haplotype contract.
 
 Raw `source_records` under `vep_compat` can qualify for coding prediction when
-every original call proves complete diploid homozygous ALT or diploid hom-REF
-and both observed copies finish on the same disjoint path. CALLED alone,
-hypothetical slots and non-diploid or missing calls do not prove this.
-Omitted non-diploid REF calls also prevent proof. Complete and unproven
-carriers occupy separate qualification rows, preserving the complete sample's
-outer prediction even when other samples share its sequence. Row counts can
-increase even when another context prevents prediction. Qualification-only
+every original call is complete diploid, with at most one original REF/ALT
+heterozygote and homozygous background. Each retained slot must map to its
+original copy; those copies may follow different disjoint coding paths.
+Multiallelic 0/2 is one original heterozygote; 1/2 is outside this profile.
+CALLED alone, hypothetical slots, leading separators, non-diploid or missing
+calls do not prove copies. Omitted non-diploid REF calls also prevent proof.
+Reference-only compatibility rows retain their status rather than becoming
+ALT predictions. Complete and unproven carriers occupy separate qualification
+rows, preserving the complete sample's
+outer prediction even when other samples share its sequence. Row grouping can
+change even when another context prevents prediction. Qualification-only
 carriers consume bounded carrier slots; per-carrier raw CDS/protein/HGVS stay
 unchanged.
 

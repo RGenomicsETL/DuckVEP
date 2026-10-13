@@ -2913,3 +2913,48 @@ SELECT * FROM raw_copy_mixed() ORDER BY ALL
 
 -- case: raw copy proof omitted haploid reference full row
 SELECT * FROM raw_copy_haploid_ref() ORDER BY ALL
+
+-- fixture: opaque replacement aliases
+CREATE TABLE opaque_alias_calls AS SELECT kind,id::UBIGINT event_index,0::UINTEGER seq_region,p::UBIGINT AS position,r::VARCHAR reference,a::VARCHAR alternate,1::UINTEGER alt_index,0::UINTEGER transcript_index,0::UBIGINT sample_index,[0,1]::INTEGER[] alleles,[false,true]::BOOLEAN[] phase_before,77::BIGINT phase_set FROM (VALUES ('expand',1,103,'GCT','TTTCCC'),('expand',2,103,'GCT','TTTCCC'),('shrink',1,103,'GCTGAA','AAA'),('shrink',2,103,'GCTGAA','AAA'),('terminal',1,103,'GCT','TAAGAA'),('terminal',2,103,'GCT','TAAGAA'),('terminal',3,114,'A','AC')) v(kind,id,p,r,a)
+
+-- job: opaque_expand compatible hgvs=true
+SELECT * EXCLUDE(kind) FROM opaque_alias_calls WHERE kind='expand'
+
+-- job: opaque_shrink compatible hgvs=true
+SELECT * EXCLUDE(kind) FROM opaque_alias_calls WHERE kind='shrink'
+
+-- job: opaque_terminal compatible hgvs=true
+SELECT * EXCLUDE(kind) FROM opaque_alias_calls WHERE kind='terminal'
+
+-- job: raw_single_het compatible input_mode='source_records' phase_policy='vep_compat' hgvs=true
+SELECT * REPLACE(CASE WHEN event_index=1 THEN '0/1' ELSE '1/1' END AS gt) FROM raw_copy_calls WHERE sample_index=0
+
+-- job: raw_single_het_mixed compatible input_mode='source_records' phase_policy='vep_compat' hgvs=true
+SELECT * REPLACE(CASE WHEN event_index=1 OR sample_index=1 THEN '0/1' ELSE '1/1' END AS gt) FROM raw_copy_calls
+
+-- job: raw_single_het_prefixed compatible input_mode='source_records' phase_policy='vep_compat' hgvs=true
+SELECT * REPLACE(CASE WHEN event_index=1 THEN '/1|0' ELSE '1/1' END AS gt) FROM raw_copy_calls WHERE sample_index=0
+
+-- job: raw_single_het_multialt compatible input_mode='source_records' phase_policy='vep_compat' hgvs=true
+SELECT * REPLACE(CASE WHEN event_index=1 THEN '0/2' ELSE '1/1' END AS gt,CASE WHEN event_index=1 THEN ['C','A'] ELSE alternates END AS alternates) FROM raw_copy_calls WHERE sample_index=0
+
+-- case: opaque expanding alias full row
+SELECT * FROM opaque_expand() ORDER BY ALL
+
+-- case: opaque shrinking alias full row
+SELECT * FROM opaque_shrink() ORDER BY ALL
+
+-- case: opaque alias terminal gap full row
+SELECT * FROM opaque_terminal() ORDER BY ALL
+
+-- case: raw single heterozygote full rows
+SELECT * FROM raw_single_het() ORDER BY ALL
+
+-- case: raw single heterozygote mixed full rows
+SELECT * FROM raw_single_het_mixed() ORDER BY ALL
+
+-- case: raw leading separator refusal full row
+SELECT * FROM raw_single_het_prefixed() ORDER BY ALL
+
+-- case: raw single heterozygote multiallelic full rows
+SELECT * FROM raw_single_het_multialt() ORDER BY ALL

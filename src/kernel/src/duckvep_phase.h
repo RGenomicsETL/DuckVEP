@@ -34,6 +34,7 @@ typedef struct {
     uint16_t source_ploidy;
     uint8_t source_has_missing;
     duckvep_raw_gt_disposition_t disposition;
+    uint8_t source_leading_separator; /* Original spelling; raw coercion does not prove a copy. */
 } duckvep_raw_gt_t;
 
 /* VEP-116 BaseVCF4::get_samples_genotypes(non_ref_only=1), followed by

@@ -1,12 +1,12 @@
 # Completing compound HGVS and whole-haplotype prediction
 
-**Status: proposal for owner review.** This document recommends implementation choices and acceptance experiments for [#11](https://github.com/RGenomicsETL/DuckVEP/issues/11) and [#50](https://github.com/RGenomicsETL/DuckVEP/issues/50). It does not change the [active prediction contract](duckvep_haplotype_contract.md), authorize new biological assumptions, or close either issue. The implementation baseline is `9290d8b0670b49414a9f8455654f62f7ca2920cc` (PR #54).
+**Status: completion plan with bounded alias and copy-proof profiles.** This document records implementation choices and acceptance experiments for [#11](https://github.com/RGenomicsETL/DuckVEP/issues/11) and [#50](https://github.com/RGenomicsETL/DuckVEP/issues/50). The [active prediction contract](duckvep_haplotype_contract.md) defines current admission. Remaining biological assumptions and output-representation decisions require owner approval; neither issue is closed by these profiles.
 
 ## Decision in brief
 
 Extend the existing pipeline in small, independently proved slices: **source evidence → joint edits and ownership → RNA/product qualification → translation → consequences/HGVS/NMD**. Keep compatibility replay as a separate output contract. Reuse the phase, projection, translation and nomenclature kernels; do not build another inference engine or a generic plugin system.
 
-Start with coincident identical general delins and complete diploid single-heterozygote raw evidence. The probes establish an exact-duplicate admission gap and unique unordered diploid sequences for the single-heterozygote case; raw-slot identifiability is a separate unproved acceptance obligation. Then add reached subeffects and reference-backed positional domains, while building the typed RNA/programme inputs needed for the remaining biological domains. This order reduces uncertainty; later rows remain required work, not optional follow-ups.
+Coincident identical general delins and complete diploid single-heterozygote raw evidence form the first bounded profiles. Their tests distinguish molecular equality, source ownership and original-slot copy mapping. Next add reached subeffects and reference-backed positional domains, while building the typed RNA/programme inputs needed for the remaining biological domains. This order reduces uncertainty; later rows remain required work, not optional follow-ups.
 
 A single output DNA string is not proof of source attribution, phase, HGVS or a particular splice product. A lack of information is also not an implementation excuse: distinguish a reproducibly underdetermined input from a determinate case the implementation cannot yet handle.
 
@@ -14,10 +14,10 @@ A single output DNA string is not proof of source attribution, phase, HGVS or a 
 
 #11 requires compound phased DNA HGVS, protein HGVS beyond independent-event coverage, original/shifted operand ownership, independent nomenclature validation and retention of supported protein behavior. #50 requires consequences and NMD for the rebuilt haplotype, covering the unfinished overlap, phase/source and transcript-programme domains. Its historical HG002 counts describe `bbe2ec4`, not the current implementation.
 
-| Obligation | Delivered profile at the baseline | Remaining acceptance work |
+| Obligation | Implemented profile | Remaining acceptance work |
 |---|---|---|
-| Compound HGVS and literal overlaps (#11/#50) | Nonoverlapping compound edits; agreeing substitutions; duplicate insertions/deletions and guarded placed deletions; source-aware blocks, post-stop roles and joint geometry | General unequal-length delins and distinct interacting indel/gap constraints; complete source-sensitive nomenclature inventory |
-| Non-strict/raw source prediction (#50) | Complete original diploid homozygous copy proof; omitted non-diploid REF evidence; sample-independent qualification views | Other provably identifiable paths; missing, mixed-ploidy and phase-block contexts with explicit observed/conditional boundaries |
+| Compound HGVS and literal overlaps (#11/#50) | Nonoverlapping compound edits; agreeing substitutions; duplicate insertions/deletions, opaque identical minimal delins and guarded placed deletions; source-aware blocks, post-stop roles and joint geometry | Cross-exon alias paths, distinct interacting delins and indel/gap constraints; complete source-sensitive nomenclature inventory |
+| Non-strict/raw source prediction (#50) | Complete original diploid copy proof with at most one REF/ALT heterozygote and homozygous background; omitted non-diploid REF evidence; sample-independent qualification views | Other provably identifiable paths; missing, mixed-ploidy and phase-block contexts with explicit observed/conditional boundaries |
 | Noncoding/UTR indels (#50) | Complete noncoding RNA or one UTR, guarded nonoverlapping literal indels/compensation on both strands | Overlapping RNA edits, boundary cases and mixed domains; public whole-transcript ablation admission distinct from a native empty-RNA classifier |
 | Intronic, splice, regulatory and mixed domains (#50) | Existing independent-event classification is available; it is not a compound-product oracle | Joint positional facts, explicit product assumptions, feature inputs and dependencies; no invented splice product |
 | Recoding and curated translation (#50) | Typed Sec, readthrough, initial-M and amino-acid-substitution programmes for guarded substitutions, with separate conditional peptides | Coordinate-preserving indel/frame interactions, wider programmes and programme-disruption evidence |
@@ -29,7 +29,7 @@ The issue checkboxes describing all agreeing overlaps or all noncoding indels as
 
 ## Executed design probes
 
-The [study script](../test/duckvep/conformance/completion_options_probe.R) runs through the public R wrapper and independently enumerates small unordered diploid haplotype pairs in base R. It asserts baseline behavior, not the desired future admission. Runtime: Linux, R 4.6.0, Rduckdb 1.5.5; extension SHA256 `3e7b867252adc19eb7b4feee80eb011672426720777ca1012cfbd0d8db21dcd6`, whose native sources match the baseline. Its footer predates the publication commit; source equality, not the footer, connects this artifact to the baseline. Do not use an unrebuilt main-checkout binary as evidence for these sources.
+The [study script](../test/duckvep/conformance/completion_options_probe.R) runs through the public R wrapper and independently enumerates small unordered diploid haplotype pairs in base R. It asserts the bounded admissions and the reached-subeffect gap. Run it against a rebuilt extension matching the checkout; retain its source and binary hashes with the receipt. An unrebuilt main-checkout binary is not evidence for changed sources.
 
 ```sh
 DUCKVEP_EXTENSION=/absolute/path/to/qualified/duckvep.duckdb_extension \
@@ -43,16 +43,16 @@ All three studies use reference CDS `ATGGCTGCTGAAGGTTAA` (`MAAEG*`), a complete 
    | Original GTs | Independent unordered pairs | Raw source status | Decoded strict status | Public arrangement API |
    |---|---:|---|---|---|
    | `1/1`, `1/1` | 1 | `predicted` | `predicted` | Rejects homozygous rows |
-   | `0/1`, `1/1` | 1 | `unsupported_context` | `predicted` | Rejects homozygous background |
+   | `0/1`, `1/1` | 1 | `predicted` | `predicted` | Rejects homozygous background |
    | `0/1`, `0/1` | 2 | `unsupported_context` | `incomplete_input` | Two explicitly hypothetical arrangements |
 
-   A unique unordered pair does not establish physical lane names. The single-heterozygote case has a potential observed-copy mapping, but that mapping still needs proof against retained raw slots. The public arrangement function is not a drop-in validator for complete genotypes; filtering out homozygous background would change the biological input.
+   A unique unordered pair does not establish physical lane names. The single-heterozygote proof retains original allele slots and source identity, separately from this enumeration; its public tests check lane-specific sequences. The public arrangement function is not a drop-in validator for complete genotypes; filtering out homozygous background would change the biological input.
 
-2. **A determinate #11 gap:** one c.4_9 `GCTGCT>AAA` replacement yields `ATGAAAGAAGGTTAA / MKEG*` and predicts. Two distinct IDs asserting that exact same delins yield `unsupported_overlap`. Opaque duplicate-once semantics do not require guessing which ALT base descended from which deleted REF base.
+2. **Opaque alias composition:** one c.4_9 `GCTGCT>AAA` replacement and two distinct IDs asserting that exact same minimal delins both yield `ATGAAAGAAGGTTAA / MKEG*`. Both source IDs survive; molecular length and geometry count the replacement once. No ALT base is assigned ancestry within the deleted REF span.
 
 3. **A reached-subeffect gap:** c.4G>A, c.10G>T and c.13G>C yield `MTA*`. Current whole-haplotype terms are only `stop_gained`; roles are `applied/applied/post_stop`. The Ala2Thr difference is before the reached stop at residue 4. The Gly5Arg DNA change is after it and cannot become a translated missense subeffect.
 
-These probes establish specific gaps, not whole-domain correctness. The proposed admission, nomenclature extensions and experiments below are **NOT_RUN** implementations unless explicitly identified as existing baseline tests.
+These probes establish specific behavior, not whole-domain correctness. The acceptance tests below identify implemented checks; wider biological experiments remain **NOT_RUN**.
 
 ## Options and recommendations
 
@@ -66,9 +66,9 @@ These probes establish specific gaps, not whole-domain correctness. The proposed
 
 **Recommend the second option incrementally, retaining existing proved predicates.** Begin with coincident identical minimal delins, independently validate every original REF, and attach every original source to one molecular atom. Unchanged padding is context, not an assignment. Use exact immutable-reference span and payload identity, not equality of two final proteins or CDS strings. Keep raw ordered replay separate.
 
-For the first slice, permit only the alias group and disjoint already-supported edits under existing observed-cis and ordinary-CDS guards; refuse distinct edits inside the opaque replacement. Do not infer a base-level map inside its ALT. Joint molecular sequence, joint HGVS and molecular geometry must match the single-source control. Preserve and independently validate each source's original and shifted nomenclature operands; source membership and source-labelled block/provenance materialization may differ. Do not equate source HGVS merely because final DNA or protein agrees. The duplicate-assertion convention requires owner approval; it is not a claim that two records prove two independent biological events. Start/frame/stop-sensitive controls are mandatory before widening that admission; a temporary guard must remain an explicit unfinished case.
+For the first slice, permit only the alias group and disjoint already-supported edits under existing observed-cis and ordinary-CDS guards, with every contributing source in the same coding exon. A terminal insertion in a different exon remains outside this profile. Refuse distinct edits inside the opaque replacement. Do not infer a base-level map inside its ALT. Joint molecular sequence, joint HGVS and molecular geometry must match the single-source control. Preserve and independently validate each source's original and shifted nomenclature operands; source membership and source-labelled block/provenance materialization may differ. Do not equate source HGVS merely because final DNA or protein agrees. The admitted duplicate-assertion convention is not a claim that two records prove two independent biological events. Start/frame/stop-sensitive controls are mandatory before widening that admission; a temporary guard must remain an explicit unfinished case.
 
-Reuse source/edit IDs and joint builders. The current CDS-sized `joint_alt` scratch does **not** establish space for expanding replacements. Core must own or pin payload storage for the complete borrow lifetime and charge any expansion; kernels allocate nothing and perform no I/O. Account for sequence, atom, membership and HGVS capacities before publishing a row. Exact/one-short bounds must fail atomically and allow connection reuse.
+Reuse source/edit IDs and joint builders. The CDS-sized `joint_alt` scratch stores reference-position substitutions, not expanding payloads. ALT payloads remain borrowed from retained source storage while replay writes them into the charged CDS output buffer; joint edits then borrow that output through materialization. The terminal interbase site uses its edit group without indexing beyond the reference grid. Kernels allocate nothing and perform no I/O. Account for sequence, atom, membership and HGVS capacities before publishing a row. Exact/one-short bounds must fail atomically and allow connection reuse.
 
 For distinct overlapping replacements, first enumerate tiny independent witness spaces, then justify an admissible representation. Distinguish: proved inconsistency; multiple valid alleles; one allele with incompatible attribution/nomenclature interpretations; and an exhausted work budget. Only the first is `edit_conflict`. A cap hit is not evidence of contradiction, ambiguity or uniqueness. The alias slice needs no search; future placement search needs explicit state/comparison/payload limits and a capacity result approved before implementation.
 
@@ -76,7 +76,7 @@ For distinct overlapping replacements, first enumerate tiny independent witness 
 
 ### 2. Phase: prove original calls, do not promote replay slots
 
-Prefer a shared proof path rooted in the existing phase/carrier code over either unconditional raw admission or another enumeration engine. Capture required original genotype evidence before compatibility slot expansion/folding. The first target is complete diploid input with one unphased heterozygous site and homozygous background, still using disjoint literal coding replay.
+Prefer a shared proof path rooted in the existing phase/carrier code over either unconditional raw admission or another enumeration engine. Capture required original genotype evidence before compatibility slot expansion/folding. The admitted profile is complete diploid input with at most one original REF/ALT heterozygous site and homozygous background, using disjoint literal coding replay. A multiallelic `0/2` is one original heterozygote; `1/2` and two independent heterozygotes remain outside this profile.
 
 Prove both the unordered pair and the mapping of each retained raw output slot to a real copy. Map every retained slot and contributor to complete original calls, including REF-only evidence; preserve raw operands byte-for-byte and do not invent observed lane labels. If that mapping fails, the raw path stays unresolved even when decoded prediction succeeds. Keep global lane-swap equivalence separate from observed phase labels. Missing alleles, unresolved PS relationships, non-diploid normalization and absent original evidence cannot inherit this proof. Genotypes omitted because they push no ALT remain evidence. Extend homogeneous qualification views so unrelated samples cannot change a carrier's eligibility.
 
@@ -133,9 +133,15 @@ For truncated/internal-stop reference residuals, first rerun a named-model audit
 | Programme extraction, validation and persistence | [`duckvep_core_ensembl.c`](../src/core/duckvep_core_ensembl.c), [`duckvep_core_model.c`](../src/core/duckvep_core_model.c), [`duckvep_core_snapshot.c`](../src/core/duckvep_core_snapshot.c) |
 | Compound nomenclature | Existing DNA/protein builders in [`duckvep_hgvs.c`](../src/kernel/src/duckvep_hgvs.c); consume proved joint edits and separate source ownership |
 
-## Assumptions to approve and ways to falsify them
+### Bounds for the alias and original-copy profiles
 
-| Proposed assumption | Evidence required / falsifier |
+No model-owned storage or persistent format is added. Alias replay reuses the charged reference-sized grids, edit/contributor arrays and CDS output buffer. With `E` edit islands, maximum payload width `A`, total checked original REF bytes `R`, reference length `L` and output length `L'`, the conservative comparison/replay bound is `O(E²(A + 1) + R + L + L')`, plus source-to-exon projections and source/block materialization. Duplicate sources retain their own REF validation and provenance costs. There is no alignment or placement search and no uniqueness claim based on a search cap. A sequence-buffer limit produces an atomic capacity failure, not biological conflict or ambiguity.
+
+Original-copy tracking uses a 64-byte carrier slot on the qualified 64-bit build, charged through the existing core pool sizing. It retains an original heterozygous-record ID and presence bit; no arrangement collection is allocated. The internal raw-GT transport has eight cells, including leading-separator provenance, with both host adapters consuming the same shape. These query-local fields do not change the 36-field public result, the 32-argument scalar bridge or snapshot versions. Tracking and sibling proof use bounded carrier-table lookups: expected constant work per lookup, with at most the configured call capacity examined under collisions. Complete-call/source validation remains at ingestion; qualification views share existing prefix/event storage and consume charged leaf slots.
+
+## Assumptions and ways to falsify them
+
+| Assumption | Evidence required / falsifier |
 |---|---|
 | Identical reference-relative delins assert one molecular change | Every original REF validates; minimal atoms and source membership agree. Different padding/source count must not change geometry or nomenclature. A distinct interior interaction invalidates the alias-only proof. |
 | A complete diploid single-heterozygote path is identifiable | Independent unordered-pair enumeration plus a real-copy mapping. A missing/ref-only/PS/ploidy counterexample or dependence on another sample rejects admission. |
@@ -148,11 +154,11 @@ Assumptions about ambiguous source conventions, product selection or new output 
 
 ## Experiments and closure gates
 
-The executed studies above are the seed cases. These extensions are **NOT_RUN** and become required acceptance work for the corresponding slice:
+The executed studies above are the seed cases. [Opaque-alias public tests](../r/Rduckvep/inst/tinytest/test_opaque_delins_aliases.R), [original-copy public tests](../r/Rduckvep/inst/tinytest/test_single_heterozygote_raw.R) and registered native properties cover the bounded profiles. Wider experiments are **NOT_RUN** unless identified below:
 
-- **Opaque delins:** duplicate `GCT>TTTCCC` must match the single-source `ATGTTTCCCGAATAA / MFPE*` control on reference `ATGGCTGAATAA`; compare a second source c.5C>T inside the opaque replacement, whose ancestry is not supplied. Test positive/negative strands, tied-source order, redundant sources, padding, expanding payloads, frame/stop boundaries and separate source/joint HGVS expectations.
+- **Opaque delins — implemented checks:** duplicate `GCT>TTTCCC` matches `ATGTTTCCCGAATAA / MFPE*` on reference `ATGGCTGAATAA`; a distinct interior substitution remains unsupported. Tests cover both strands, tied-source order, redundant sources, padding/REF mismatch, shrinking/expanding payloads, start/frame/stop boundaries, terminal gaps, source/joint HGVS controls, NMD geometry, borrowed operands and exact/one-short CDS capacity with buffer reuse. Cross-exon alias paths are explicit negative controls, not completed cross-exon composition. A single-source `not_compound` HGVS status is not compared as a molecular string; applicable rendered facts and source-sensitive admission are checked separately.
 - **Placement/gap ambiguity:** repeat-slidable deletion plus a substitution; two unequal insertions in one gap; an insertion whose attachment is deleted. Enumerate consistent bounded interpretations independently. Never choose an order by event ID, source order or smallest HGVS string.
-- **Phase:** one versus two unphased heterozygotes with homozygous background; missing and omitted non-diploid REF calls before/after ALT; split PS and sample addition/removal; map every retained slot to observed or hypothetical evidence. Limits must not silently drop an arrangement or call.
+- **Phase — implemented checks:** one versus two heterozygotes with homozygous background; original-slot lane mapping; multiallelic source identity; leading separators, missing and omitted non-diploid REF before/after ALT; complete per-carrier sample isolation and connection reuse. Wider PS/ploidy inference remains **NOT_RUN**; limits must not silently drop an arrangement or call.
 - **Subeffects:** reached upstream missense plus stop gain, downstream-only changes, same-codon cancellation and frame restoration. Verify the final mask, severity, impact, source roles and unchanged compatibility peptide separately.
 - **Splice/mixed:** the same donor-damaging allele is compatible with at least two transcript products; without a supplied programme, assert no selected protein/NMD. With each explicitly supplied product, independently reconstruct RNA and mapping and keep conditional results labelled. Include pure intronic, UTR/CDS and regulatory-feature controls.
 - **RNA/recoding:** a substrate-preserving edit, the same site disrupted, insertion/deletion shifting CDS boundaries, boundary overrides and omitted versus empty metadata; an upstream indel preserving a curated codon's ancestry versus a frameshift destroying it. Cross-junction RNA changes must not fabricate EJC geometry.
@@ -166,10 +172,10 @@ Before merging an implementation slice, require registered native properties, pu
 
 ## Proposed delivery and review boundaries
 
-1. **Alias and copy-proof slices:** exact duplicate general delins; complete diploid single-heterozygote raw paths. Separate commits/receipts, with no producer or schema change. Keep each reversible by restoring its admission guard.
+1. **Alias and copy-proof slices:** exact duplicate general delins; complete diploid single-heterozygote raw paths. Independently reviewable receipts, with no model-producer, persisted-format or public result-schema change. Internal raw-GT transport retains an explicit leading-separator field. Keep each admission reversible.
 2. **Reached effects and positional profile:** add joint subeffects, then approve the positional/conditional output contract and implement reference-backed intronic/splice/regulatory/mixed facts. No inferred product.
 3. **Typed programme substrate:** producer capture, model validation/ownership, fingerprints/snapshots, RNA/CDS maps and migration tests; then conditional RNA and wider peptide programmes.
 4. **Product-dependent domains and full inventory:** explicit splice/translation scenarios, alternative initiation, remaining distinct overlaps/nomenclature and reference residuals. Their witness design can proceed in parallel; none is removed from the finish line.
 5. **Acceptance audit:** rerun the original class matrix and current-model residual inventory, reconcile issue checkboxes with exact receipts, and seek closure approval. Do not use issue wording changes as implementation evidence.
 
-The owner's immediate decisions are the alias/source interpretation, the strict original-call proof boundary, the positional versus conditional output representation, and the typed programme contract. Approving this plan authorizes neither arbitrary biological defaults nor automatic issue closure.
+The owner's remaining architectural decisions are the positional versus conditional output representation and the typed programme contract. Wider source interpretations and copy-proof boundaries require their own evidence and approval. Approving this plan authorizes neither arbitrary biological defaults nor automatic issue closure.

@@ -59,8 +59,8 @@ typedef struct {
     const uint8_t *phase; const uint64_t *phase_validity; size_t phase_offset, phase_length;
     int phase_set_present; int64_t phase_set;
     const int64_t *sets; const uint64_t *sets_validity; size_t sets_offset, sets_length;
-    /* source_records: the parsed raw GT struct (seven UINTEGER fields) and the selection flag. */
-    uint32_t raw[7];
+    /* source_records: the parsed raw GT struct (eight UINTEGER fields) and the selection flag. */
+    uint32_t raw[8];
     int source_selected;
     const struct duckvep_hap_replay_context *replay;
 } duckvep_hap_row_t;

@@ -1919,10 +1919,17 @@ TEST haplotype_stream_literal_indel_overlaps_compose_or_refuse(void) {
         {{"GCT", "CTG"}, {"G", "C"}, {4u, 5u}, 2u, "ATGGAATAA", "ME*", 5u, 3u, "", 0u},
         /* identical CCC insertions between c.6 and c.7 */
         {{"T", "T"}, {"TCCC", "TCCC"}, {6u, 6u}, 2u, "ATGGCTCCCGAATAA", "MAPE*", 7u, 0u, "CCC", 0u},
+        /* identical insertions at the terminal interbase site */
+        {{"A", "A"}, {"AC", "AC"}, {12u, 12u}, 2u, "ATGGCTGAATAAC", "MAE*", 13u, 0u, "C", 3u},
         /* unslidable CCC insertion before c.7G>A */
         {{"T", "G"}, {"TCCC", "A"}, {6u, 7u}, 2u, "ATGGCTCCCAAATAA", "MAPK*", 7u, 1u, "CCCA", 0u},
         /* c.7G>T stop, then a duplicated c.11_12 deletion after it */
         {{"G", "TAA", "TAA"}, {"T", "T", "T"}, {7u, 10u, 10u}, 3u, "ATGGCTTAAT", "MA*", 7u, 1u, "T", 6u},
+        /* Opaque replacement payloads have no per-base ancestry; exact aliases apply once. */
+        {{"GCT", "GCT"}, {"TTTCCC", "TTTCCC"}, {4u, 4u}, 2u, "ATGTTTCCCGAATAA", "MFPE*", 4u, 3u, "TTTCCC", 0u},
+        {{"GCTGAA", "GCTGAA"}, {"CCC", "CCC"}, {4u, 4u}, 2u, "ATGCCCTAA", "MP*", 4u, 6u, "CCC", 0u},
+        {{"GCT", "GCT"}, {"TAAGAA", "TAAGAA"}, {4u, 4u}, 2u, "ATGTAAGAAGAATAA", "M*", 4u, 3u, "TAAGAA", 0u},
+        {{"GCT", "GCT", "A"}, {"TAAGAA", "TAAGAA", "AC"}, {4u, 4u, 12u}, 3u, "ATGTAAGAAGAATAAC", "M*", 4u, 3u, "TAAGAA", 4u},
     };
     for (unsigned reverse = 0u; reverse < 2u; reverse++)
     for (unsigned w = 0u; w < sizeof(composed) / sizeof(composed[0]); w++)
@@ -1966,13 +1973,19 @@ TEST haplotype_stream_literal_indel_overlaps_compose_or_refuse(void) {
         ASSERT_EQ(length != 12u, (leaf.flags & DUCKVEP_HAPLOTYPE_FLAG_INDEL) != 0u);
         ASSERT_EQ(c->sources, leaf.contributor_count); ASSERT_EQ(c->sources, leaf.edit_count);
         const duckvep_haplotype_edit_t *last = &leaf.joint_edits[leaf.joint_edit_count - 1u];
-        ASSERT_EQ(c->post_stop_mask ? 2u : 1u, leaf.joint_edit_count);
-        if (!c->post_stop_mask) ASSERT_EQ(1u, leaf.block_count);
+        unsigned joint_count = c->post_stop_mask && c->sources == 3u ? 2u : 1u;
+        ASSERT_EQ(joint_count, leaf.joint_edit_count);
+        ASSERT_EQ(joint_count, leaf.block_count);
         const duckvep_haplotype_edit_t *first = &leaf.joint_edits[0];
         ASSERT_EQ(c->joint_start, first->cds_start); ASSERT_EQ(c->joint_ref_len, first->ref_len);
         ASSERT_EQ(strlen(c->joint_alt), first->alt_len);
         ASSERT_MEM_EQ(c->joint_alt, first->alt, first->alt_len);
-        if (c->post_stop_mask) { ASSERT_EQ(11u, last->cds_start); ASSERT_EQ(2u, last->ref_len); ASSERT_EQ(0u, last->alt_len); }
+        if (c->post_stop_mask == 6u) {
+            ASSERT_EQ(11u, last->cds_start); ASSERT_EQ(2u, last->ref_len); ASSERT_EQ(0u, last->alt_len);
+        } else if (c->post_stop_mask) {
+            ASSERT_EQ(13u, last->cds_start); ASSERT_EQ(0u, last->ref_len); ASSERT_EQ(1u, last->alt_len);
+            ASSERT_MEM_EQ("C", last->alt, 1u);
+        }
         for (size_t i = 0u; i < leaf.contributor_count; i++) {
             const duckvep_haplotype_contributor_t *k = &leaf.contributors[i];
             unsigned post = (c->post_stop_mask >> order[k->source.event_id - 1u]) & 1u;
@@ -1991,6 +2004,8 @@ TEST haplotype_stream_literal_indel_overlaps_compose_or_refuse(void) {
     } refused[] = {
         /* c.4_6 slides to c.5_7, so its union with c.5_6 is not one deletion */
         {{{"GGCT", "GCT"}, {"G", "G"}, {3u, 4u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
+        /* terminal insertion aliases must match their original reference anchor */
+        {{{"T", "T"}, {"TC", "TC"}, {12u, 12u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT},
         /* different insertions in one interbase site have no order */
         {{{"T", "T"}, {"TCCC", "TAAA"}, {6u, 6u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
         /* GGG can slide past c.7G, so it may follow or precede c.7G>A */
@@ -2003,8 +2018,10 @@ TEST haplotype_stream_literal_indel_overlaps_compose_or_refuse(void) {
         {{{"GA", "A"}, {"G", "T"}, {7u, 8u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
         /* an insertion whose right flank is deleted */
         {{{"G", "GCT"}, {"GAAA", "G"}, {4u, 4u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
-        /* a delins island is never decomposed into a reference-indexed union */
+        /* a distinct mutation inside an opaque replacement has no supplied ancestry */
         {{{"CT", "C"}, {"AAA", "G"}, {5u, 5u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
+        /* normalized aliases cannot conceal an incorrect unchanged padding base */
+        {{{"GCT", "AGCT"}, {"TTTCCC", "ATTTCCC"}, {4u, 3u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT},
     };
     for (unsigned reverse = 0u; reverse < 2u; reverse++)
     for (unsigned w = 0u; w < sizeof(refused) / sizeof(refused[0]); w++) {
@@ -2032,10 +2049,16 @@ TEST haplotype_stream_literal_indel_overlaps_compose_or_refuse(void) {
         ASSERT_EQ(refused[w].status, leaf.path_status);
         if (refused[w].status == DUCKVEP_PREDICTION_EDIT_CONFLICT)
             ASSERT_EQ(DUCKVEP_REASON_CONTRADICTORY_EDITS, leaf.path_reason);
+        if (refused[w].status == DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT)
+            ASSERT(leaf.path_reason == DUCKVEP_REASON_REFERENCE_MISMATCH ||
+                (leaf.path_reason == DUCKVEP_REASON_PROJECTION &&
+                 leaf.prediction_projection == DUCKVEP_CDS_EDIT_REF_MISMATCH));
         ASSERT(!leaf.cds && !leaf.protein && !leaf.joint_edits);
         ASSERT_EQ(0u, leaf.cds_length); ASSERT_EQ(0u, leaf.block_count);
-        for (size_t i = 0u; i < leaf.contributor_count; i++)
-            ASSERT_EQ(DUCKVEP_ROLE_UNAPPLIED, leaf.contributors[i].role);
+        for (size_t i = 0u; i < leaf.contributor_count; i++) {
+            const duckvep_haplotype_contributor_t *k = &leaf.contributors[i];
+            ASSERT_EQ(k->edit_count || k->source_replaced ? DUCKVEP_ROLE_UNAPPLIED : DUCKVEP_ROLE_OMITTED, k->role);
+        }
         ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_DONE, duckvep_haplotype_stream_next(&f.stream, &leaf));
     }
 
@@ -2062,6 +2085,60 @@ TEST haplotype_stream_literal_indel_overlaps_compose_or_refuse(void) {
         ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL, duckvep_haplotype_stream_next(&f.stream, &leaf));
         duckvep_haplotype_leaf_t zero = {0};
         ASSERT_MEM_EQ(&zero, &leaf, sizeof(leaf));
+    }
+    PASS();
+}
+
+TEST haplotype_stream_opaque_alias_capacity_and_reuse(void) {
+    const struct literal_overlap_case c = {{"GCT", "GCT", "A"}, {"TTTCCC", "TTTCCC", "AC"},
+        {4u, 4u, 12u}, 3u, "ATGTTTCCCGAATAAC", "MFPE*", 4u, 3u, "TTTCCC", 0u};
+    for (unsigned reverse = 0u; reverse < 2u; reverse++)
+    for (unsigned terminal = 0u; terminal < 2u; terminal++) {
+        struct haplotype_stream_scene f;
+        haplotype_stream_scene_prepare(&f, 1u);
+        memcpy(f.reference, "ATGGCTGAATAA", 12u); f.strands[0] = reverse ? -1 : 1;
+        duckvep_haplotype_edit_t joint[8]; uint8_t alt[12], assigned[12];
+        f.buffers.joint_edits = joint; f.buffers.joint_alt = alt;
+        f.buffers.joint_assigned = assigned; f.buffers.joint_capacity = 12u;
+        char refs[3][8] = {{0}}, alts[3][8] = {{0}};
+        char refs_before[3][8], alts_before[3][8];
+        duckvep_haplotype_source_t sources[3];
+        for (unsigned i = 0u; i < 3u; i++) literal_overlap_source(&c, i, (int)reverse, refs[i], alts[i], &sources[i]);
+        memcpy(refs_before, refs, sizeof(refs)); memcpy(alts_before, alts, sizeof(alts));
+        uint32_t tx = 0u; duckvep_carrier_key_t key = carrier_test_key(1u);
+        size_t length = 15u + terminal;
+        for (unsigned attempt = 0u; attempt < 3u; attempt++) {
+            f.buffers.cds_capacity = attempt ? length : length - 1u;
+            ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, duckvep_haplotype_stream_init(
+                &f.stream, &f.model, &f.exons, &f.sequences, &f.buffers));
+            for (unsigned i = 0u; i < 2u + terminal; i++) {
+                unsigned source = reverse && terminal ? (i + 2u) % 3u : i;
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, haplotype_test_begin_candidates(&f.stream, &sources[source], &tx, 1u));
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, haplotype_test_push_called(&f.stream, &key));
+            }
+            duckvep_haplotype_leaf_t leaf;
+            ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_TRANSCRIPT_READY, duckvep_haplotype_stream_finish(&f.stream));
+            memset(&leaf, 0xa5, sizeof(leaf));
+            if (!attempt) {
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL, duckvep_haplotype_stream_next(&f.stream, &leaf));
+                duckvep_haplotype_leaf_t zero = {0};
+                ASSERT_MEM_EQ(&zero, &leaf, sizeof(leaf));
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL, duckvep_haplotype_stream_next(&f.stream, &leaf));
+            } else {
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, duckvep_haplotype_stream_next(&f.stream, &leaf));
+                ASSERT_EQ(DUCKVEP_PREDICTION_PREDICTED, leaf.path_status);
+                ASSERT_EQ(length, leaf.cds_length); ASSERT_MEM_EQ(c.cds, leaf.cds, length);
+                ASSERT_EQ(1u + terminal, leaf.joint_edit_count);
+                ASSERT_EQ(f.cds + 3u, leaf.joint_edits[0].alt);
+                ASSERT_MEM_EQ("TTTCCC", leaf.joint_edits[0].alt, 6u);
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_DONE, duckvep_haplotype_stream_next(&f.stream, &leaf));
+                ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_DONE, duckvep_haplotype_stream_finish(&f.stream));
+                ASSERT_EQ(0u, f.stream.event_count); ASSERT_EQ(0u, f.stream.projection_count);
+            }
+            ASSERT_MEM_EQ("ATGGCTGAATAA", f.reference, 12u);
+            ASSERT_MEM_EQ(refs_before, refs, sizeof(refs));
+            ASSERT_MEM_EQ(alts_before, alts, sizeof(alts));
+        }
     }
     PASS();
 }
@@ -2357,7 +2434,7 @@ TEST haplotype_stream_preserves_restored_rna_and_tests_exon_geometry(void) {
             ASSERT_EQ(DUCKVEP_ROLE_APPLIED, leaf.contributors[i].role);
             ASSERT_EQ(DUCKVEP_CDS_EDIT_OUT_OF_CDS, leaf.contributors[i].projection_status);
             ASSERT_EQ(101u <= leaf.contributors[i].source.event_id && leaf.contributors[i].source.event_id <= 102u, 1u);
-            ASSERT_MEM_EQ(reverse ? "GG" : "CC", leaf.contributors[i].source.ref, leaf.contributors[i].source.ref_len);
+            ASSERT_MEM_EQ((reverse ? "GG" : "CC"), leaf.contributors[i].source.ref, leaf.contributors[i].source.ref_len);
         }
         if (!kind) {
             ASSERT_EQ(DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE, leaf.nmd);
@@ -2471,10 +2548,122 @@ static duckvep_haplotype_stream_status_t raw_proof_record(duckvep_haplotype_stre
     return DUCKVEP_HAPLOTYPE_STREAM_OK;
 }
 
-/* Raw source records predict a carrier only when original GTs prove both diploid
- * copies are the path: every routed call complete homozygous ALT, both file lanes
- * on the same leaf. Independent witness: the strict decoded replay of the same two
- * events (MKP* -> MRL*), and the unchanged compatibility CDS/protein. */
+/* Complete original diploid calls identify one unordered copy pair. */
+TEST haplotype_stream_raw_single_het_has_two_real_copies(void) {
+    static const char *const alts_a[] = {"G"}, *const alts_b[] = {"T"};
+    static const char *const het[] = {"0/1", "1/0", "0|1", "1|0"};
+    for (unsigned reverse = 0u; reverse < 2u; reverse++)
+      for (unsigned order = 0u; order < 2u; order++)
+        for (unsigned spelling = 0u; spelling < 4u; spelling++) {
+            struct haplotype_stream_scene f;
+            haplotype_stream_scene_prepare(&f, 1u);
+            f.strands[0] = reverse ? -1 : 1;
+            memcpy(f.reference, "ATGAAACCCTAA", 12u);
+            const char *a[] = {order ? "1/1" : het[spelling]};
+            const char *b[] = {order ? het[spelling] : "1|1"};
+            ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, duckvep_haplotype_stream_init(
+                &f.stream, &f.model, &f.exons, &f.sequences, &f.buffers));
+            const char *const minus_a[] = {"A"}, *const minus_b[] = {"C"};
+            ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, raw_proof_record(&f.stream, 11u,
+                104u, reverse ? "G" : "A", reverse ? minus_a : alts_a, 1u, a, 1u));
+            ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, raw_proof_record(&f.stream, 12u,
+                107u, reverse ? "T" : "C", reverse ? minus_b : alts_b, 1u, b, 1u));
+            ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_TRANSCRIPT_READY, duckvep_haplotype_stream_finish(&f.stream));
+            duckvep_haplotype_leaf_t leaf;
+            unsigned lanes = 0u;
+            while (duckvep_haplotype_stream_next(&f.stream, &leaf) == DUCKVEP_HAPLOTYPE_STREAM_OK) {
+                ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.prediction_status);
+                uint32_t id = leaf.carriers.first_call;
+                for (uint32_t i = 0u; i < leaf.carriers.call_count; i++) {
+                    const duckvep_carrier_call_t *c = duckvep_carriers_call(&f.stream.carriers, id);
+                    lanes |= 1u << (c->key.lane - 1u);
+                    unsigned alt_lane = spelling % 2u ? 1u : 2u;
+                    ASSERT_MEM_EQ((c->key.lane == alt_lane ? "ATGAGACTCTAA" :
+                        (order != reverse) ? "ATGAGACCCTAA" : "ATGAAACTCTAA"), leaf.cds, 12u);
+                    id = c->next_leaf;
+                }
+                ASSERT_EQ(0u, leaf.ordered_replacements);
+                ASSERT_MEM_EQ("ATGAAACCCTAA", f.reference, 12u);
+            }
+            ASSERT_EQ(3u, lanes);
+        }
+    PASS();
+}
+
+TEST haplotype_stream_raw_single_het_multialt_is_one_original_record(void) {
+    static const char *const alts_a[] = {"T", "G"}, *const alts_b[] = {"T"};
+    struct haplotype_stream_scene f;
+    haplotype_stream_scene_prepare(&f, 1u);
+    memcpy(f.reference, "ATGAAACCCTAA", 12u);
+    const char *a[] = {"0/2", "2/0", "1/2", "2/1"};
+    const char *b[] = {"1/1", "1/1", "1/1", "1/1"};
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, duckvep_haplotype_stream_init(
+        &f.stream, &f.model, &f.exons, &f.sequences, &f.buffers));
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, raw_proof_record(&f.stream, 11u, 104u, "A", alts_a, 2u, a, 4u));
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, raw_proof_record(&f.stream, 12u, 107u, "C", alts_b, 1u, b, 4u));
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_TRANSCRIPT_READY, duckvep_haplotype_stream_finish(&f.stream));
+    duckvep_haplotype_leaf_t leaf;
+    unsigned seen[4] = {0};
+    while (duckvep_haplotype_stream_next(&f.stream, &leaf) == DUCKVEP_HAPLOTYPE_STREAM_OK) {
+        uint32_t id = leaf.carriers.first_call;
+        for (uint32_t i = 0u; i < leaf.carriers.call_count; i++) {
+            const duckvep_carrier_call_t *c = duckvep_carriers_call(&f.stream.carriers, id);
+            duckvep_prediction_status_t status; duckvep_prediction_reason_t reason;
+            duckvep_haplotype_carrier_prediction(&f.stream.carriers, &leaf, c, &status, &reason);
+            ASSERT_EQ(c->key.sample_index >= 2u ? DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT :
+                DUCKVEP_PREDICTION_PREDICTED, status);
+            if (c->key.sample_index < 2u) {
+                unsigned alt_lane = c->key.sample_index ? 1u : 2u;
+                ASSERT_MEM_EQ((c->key.lane == alt_lane ? "ATGAGACTCTAA" : "ATGAAACTCTAA"), leaf.cds, 12u);
+                ASSERT_EQ(1u, c->copy_has_het); ASSERT_EQ(11u, c->copy_het_record);
+            }
+            seen[c->key.sample_index] |= 1u << (c->key.lane - 1u);
+            id = c->next_leaf;
+        }
+    }
+    for (unsigned i = 0u; i < 4u; i++) ASSERT_EQ(3u, seen[i]);
+    PASS();
+}
+
+TEST haplotype_stream_raw_single_het_original_evidence_is_sample_local(void) {
+    static const char *const bad[] = {"0/1", "1", "1/1/1", "./1", "|0/1", "/1|0", "0", "0/0/0", "./."};
+    static const char *const alts_a[] = {"G"}, *const alts_b[] = {"T"};
+    for (unsigned order = 0u; order < 2u; order++)
+      for (size_t scenario = 0u; scenario < sizeof(bad) / sizeof(bad[0]); scenario++) {
+        struct haplotype_stream_scene f;
+        haplotype_stream_scene_prepare(&f, 1u);
+        memcpy(f.reference, "ATGAAACCCTAA", 12u);
+        const char *a[] = {"0/1", order ? bad[scenario] : "0/1", "0/0", "1/1"};
+        const char *b[] = {"1/1", order ? "0/1" : bad[scenario], "1/1", "1/1"};
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, duckvep_haplotype_stream_init(
+            &f.stream, &f.model, &f.exons, &f.sequences, &f.buffers));
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, raw_proof_record(&f.stream, 11u, 104u, "A", alts_a, 1u, a, 4u));
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, raw_proof_record(&f.stream, 12u, 107u, "C", alts_b, 1u, b, 4u));
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_TRANSCRIPT_READY, duckvep_haplotype_stream_finish(&f.stream));
+        duckvep_haplotype_leaf_t leaf;
+        unsigned seen[4] = {0};
+        while (duckvep_haplotype_stream_next(&f.stream, &leaf) == DUCKVEP_HAPLOTYPE_STREAM_OK) {
+            uint32_t id = leaf.carriers.first_call;
+            for (uint32_t i = 0u; i < leaf.carriers.call_count; i++) {
+                const duckvep_carrier_call_t *c = duckvep_carriers_call(&f.stream.carriers, id);
+                duckvep_prediction_status_t status; duckvep_prediction_reason_t reason;
+                duckvep_haplotype_carrier_prediction(&f.stream.carriers, &leaf, c, &status, &reason);
+                ASSERT_EQ(c->key.sample_index == 1u ? DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT :
+                    DUCKVEP_PREDICTION_PREDICTED, status);
+                seen[c->key.sample_index] |= 1u << (c->key.lane - 1u);
+                id = c->next_leaf;
+            }
+            ASSERT_MEM_EQ("ATGAAACCCTAA", f.reference, 12u);
+        }
+        for (unsigned i = 0u; i < 4u; i++) ASSERT_EQ(3u, seen[i]);
+        ASSERT_EQ(0u, f.stream.carriers.call_count);
+        ASSERT_EQ(0u, f.stream.carriers.prefix_count);
+        ASSERT_EQ(0u, f.stream.carriers.transcript_count);
+      }
+    PASS();
+}
+
+/* Homozygous original calls prove two copies of the same raw path. */
 TEST haplotype_stream_raw_homozygous_alt_paths_predict_only_proven_copies(void) {
     static const char *const a_alts[] = {"G", "T"}, *const b_alts[] = {"T"};
     /* Samples: 0 proof; 1 unphased het pair joins lane 2; 2 triploid 1/1/0; 3 missing slot; 4 haploid
@@ -2643,7 +2832,7 @@ TEST haplotype_stream_raw_copy_proof_is_context_independent(void) {
             const char *const *a = order ? omitted + g : alt, *const *b = order ? alt : omitted + g;
             ASSERT(raw_proof_view(&f, a, b, 1u, 0u, &mixed, &views, cds));
             ASSERT_EQ(1u, views);
-            ASSERT_MEM_EQ(order ? "ATGAAACTCTAA" : "ATGAGACCCTAA", cds, 12u);
+            ASSERT_MEM_EQ((order ? "ATGAAACTCTAA" : "ATGAGACCCTAA"), cds, 12u);
             ASSERT_EQ((int)(g == 2u ? DUCKVEP_PREDICTION_PREDICTED : DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT),
                       (int)mixed.prediction_status);
         }

@@ -51,7 +51,7 @@ build_fault_injection: check_configure
 	cmake $(CMAKE_VERSION_PARAMS) -DCMAKE_BUILD_TYPE=Debug \
 		"-DCMAKE_C_FLAGS=-fsanitize=address -fno-omit-frame-pointer -O1 -g -DDUCKVEP_FAULT_INJECTION=1" \
 		-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address -S $(PROJ_DIR) -B cmake_build/fault
-	cmake --build cmake_build/fault --parallel
+	cmake --build cmake_build/fault --parallel $(CMAKE_BUILD_PARALLEL_LEVEL)
 	mkdir -p build/fault
 	$(PYTHON_VENV_BIN) extension-ci-tools/scripts/append_extension_metadata.py \
 		-l cmake_build/fault/$(EXTENSION_LIB_FILENAME) -o build/fault/$(EXTENSION_FILENAME) \
@@ -155,7 +155,7 @@ check-v2-sdk:
 	python3 scripts/fetch-v2-sdk.py
 release_v2: check-v2-sdk
 	cmake -S host_v2 -B $(V2_BUILD) -DCMAKE_BUILD_TYPE=Release
-	cmake --build $(V2_BUILD) --parallel
+	cmake --build $(V2_BUILD) --parallel $(CMAKE_BUILD_PARALLEL_LEVEL)
 	mkdir -p $(V2_OUT) build/configure_v2
 	python3 extension-ci-tools/scripts/configure_helper.py -p -ev -o build/configure_v2
 	python3 extension-ci-tools/scripts/append_extension_metadata.py \
@@ -178,7 +178,7 @@ test_v2_asan: check-v2-sdk
 	cmake -S host_v2 -B $(V2_ASAN_BUILD) -DCMAKE_BUILD_TYPE=Debug \
 		"-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -O1 -g" \
 		-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined
-	cmake --build $(V2_ASAN_BUILD) --parallel
+	cmake --build $(V2_ASAN_BUILD) --parallel $(CMAKE_BUILD_PARALLEL_LEVEL)
 	mkdir -p build/asan_v2 build/configure_v2
 	python3 extension-ci-tools/scripts/configure_helper.py -p -ev -o build/configure_v2
 	python3 extension-ci-tools/scripts/append_extension_metadata.py \

@@ -1,9 +1,8 @@
 library(tinytest)
 library(DBI)
 
-# Coding-v1 eligibility and provenance (slice 2 of #2), the same-codon classifier (slice 3) and the frame/stop-gain
-# classifier (slice 4) and the start/stop classifier (slice 5). prediction_status says whether a path is inside the supported domain and whether a
-# classifier decided it (`predicted`); since slice 5 no eligible path is left pending (`eligible_classifier_pending`).
+# Coding prediction admission, source provenance and whole-haplotype effects.
+# prediction_status distinguishes supported predictions from explicit refusals.
 # Transcript 0 is + strand with exons 100-108 (ATGGCTGCT) and 120-128 (GAAGGTTAA).
 # Transcripts 1-6 are single-exon variants that each break one v1 CDS requirement.
 local({
@@ -191,7 +190,7 @@ local({
   same <- which(result$cds == "ATGATTGCTGAAGGTTAA")
   expect_equal(sort(vapply(same, function(i) nrow(result$contributor_provenance[[i]]), 0L)), c(1L, 2L))
 
-  # vep_compat is a compatibility interpretation, outside the strict v1 domain.
+  # Decoded vep_compat replay has no original-call copy proof.
   compat <- rduckvep_haplotypes(con, "SELECT * FROM elig_calls WHERE sample_index IN (1,2,3,4)",
     "elig", phase_policy = "vep_compat")
   ck <- do.call(rbind, compat$carrier_predictions)
@@ -200,8 +199,12 @@ local({
   dbExecute(con, "CREATE TABLE elig_raw AS SELECT 1::UBIGINT event_index,0::UINTEGER seq_region,103::UBIGINT AS position,'G' AS reference,['A'] AS alternates,0::UINTEGER transcript_index,0::UINTEGER sample_index,'1|0' AS gt")
   rawres <- rduckvep_haplotypes(con, "SELECT * FROM elig_raw", "elig",
     phase_policy = "vep_compat", input_mode = "source_records")
-  expect_true(all(rawres$prediction_status == "unsupported_context"))
-  expect_true(all(rawres$prediction_reason == "non_strict_phase_policy"))
+  expect_identical(rawres$cds[rawres$edit_count == 1L], "ATGACTGCTGAAGGTTAA")
+  expect_identical(rawres$protein[rawres$edit_count == 1L], "MTAEG*")
+  expect_identical(rawres$prediction_status[rawres$edit_count == 1L], "predicted")
+  expect_identical(rawres$prediction_reason[rawres$edit_count == 1L], "supported_domain")
+  expect_identical(rawres$cds[rawres$edit_count == 0L], "ATGGCTGCTGAAGGTTAA")
+  expect_identical(rawres$prediction_reason[rawres$edit_count == 0L], "non_strict_phase_policy")
   expect_true(all(mapply(function(a, b) nrow(a) == nrow(b), rawres$contributors,
     rawres$contributor_provenance)))
   expect_true(any(rawres$edit_count == 0L))

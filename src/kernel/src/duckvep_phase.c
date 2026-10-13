@@ -14,6 +14,7 @@ duckvep_raw_gt_status_t duckvep_phase_parse_vep_raw(
     size_t at = 0u;
     int has_pipe = 0, hom_ref = 1;
     if (gt[0] == '|' || gt[0] == '/') {
+        result.source_leading_separator = 1u;
         has_pipe = gt[0] == '|';
         hom_ref = 0; /* The upstream non-reference filter does not accept a prefix. */
         at++;

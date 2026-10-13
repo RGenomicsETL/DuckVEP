@@ -310,9 +310,9 @@ typedef struct {
 
 /* Keyed result of one carrier of a completed leaf: unresolved cross-PS phase
  * and non-diploid calls are properties of the sample/phase/lane, not of the shared path.
- * A predicted source-record path is predicted only for a carrier whose sibling
- * file lane ends on the same path and whose routed calls were all complete
- * diploid homozygous ALT; other carriers keep non_strict_phase_policy.
+ * A predicted source-record path requires complete original diploid calls and
+ * a real sibling lane, with at most one original REF/ALT heterozygous record.
+ * ALT/ALT heterozygotes and incomplete evidence keep non_strict_phase_policy.
  * carriers is the stream's index while the leaf's transcript is draining. */
 void duckvep_haplotype_carrier_prediction(const duckvep_carriers_t *carriers,
     const duckvep_haplotype_leaf_t *leaf, const duckvep_carrier_call_t *call,

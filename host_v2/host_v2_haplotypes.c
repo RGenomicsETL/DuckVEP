@@ -508,7 +508,7 @@ typedef struct {
     job_scan scan;
     int source_records;
     column cols[17];
-    column gt, phase, sets, raw[7];
+    column gt, phase, sets, raw[8];
 } scan_state;
 
 static void scan_bind_destroy(void *pointer) {
@@ -676,7 +676,7 @@ static bool scan_load_chunk(scan_state *s, char *message, size_t size) {
         (void)duckdb_v2_error_info_destroy(&detail);
     }
     if (s->source_records) {
-        for (unsigned i = 0; i < 7; ++i) {
+        for (unsigned i = 0; i < 8; ++i) {
             if (!column_child(&s->cols[8], i, &s->raw[i], error)) {
                 (void)snprintf(message, size, "duckvep_haplotype_scan: could not read the raw GT struct");
                 return false;
@@ -731,7 +731,7 @@ static int scan_input_next(void *context, duckvep_hap_row_t *out, char *error, s
     out->versions = AT(int64_t, s->cols[13], row);
     out->ploidies = AT(int64_t, s->cols[14], row);
     if (s->source_records) {
-        for (unsigned i = 0; i < 7; ++i) {
+        for (unsigned i = 0; i < 8; ++i) {
             out->raw[i] = AT(uint32_t, s->raw[i], row);
         }
         out->replay_order = AT(uint64_t, s->cols[15], row);

@@ -399,9 +399,8 @@ FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index IN (1,1
 ----
 1	1	3
 
-# Source-record replay (vep_compat) is a compatibility interpretation, outside the strict v1 domain:
-# reference-only lanes (the 0|0 record, whose nonmutating REF contributor is not emitted) and shadowed/duplicate
-# sources keep provenance but get non_strict_phase_policy.
+# The single original heterozygote with homozygous REF background predicts its mutated copy.
+# Reference-only lanes and samples with multiple original heterozygous calls retain compatibility replay.
 
 statement ok
 CREATE TABLE hap_elig_raw AS SELECT * FROM (VALUES
@@ -419,7 +418,8 @@ SELECT prediction_status,prediction_reason,count(*),sum(len(contributors)),sum(l
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_raw','hap_elig',input_mode:='source_records',
  phase_policy:='vep_compat') GROUP BY ALL ORDER BY ALL
 ----
-unsupported_context	non_strict_phase_policy	6	5	5	0	3
+predicted	supported_domain	1	1	1	0	0
+unsupported_context	non_strict_phase_policy	5	4	4	0	3
 
 query IITTI
 SELECT x.event_index,x.alt_index,x.role,x.projection_status,x.evidence_flags
@@ -435,8 +435,8 @@ FROM (SELECT unnest(contributor_provenance) x FROM duckvep_haplotypes('SELECT * 
 statement ok
 DROP TABLE hap_elig_raw
 
-# Source records predict a carrier only when the original GTs prove both diploid copies are the path: every
-# call of the sample is complete homozygous ALT or diploid hom-REF and both file lanes end on the same path.
+# Complete original diploid calls prove mutated paths with at most one REF/ALT heterozygote and
+# homozygous background; original slots map to copies, whose paths may differ.
 # Sample 10 is that proof (103 G>A, 123 G>C: Ala2Thr and Gly5Arg) and 15 has 103 G>A alone. On the proof path
 # the unphased 0/1 pair (11, lane 2), triploid 1/1/0 (12) and one-slot haploid GT (13, lane 1) stay
 # compatibility lanes, listed in their own row of the same path; the missing slot (14) is conditional.
