@@ -73,6 +73,32 @@ static void regulation_builder(duckdb_function_info info, duckdb_data_chunk inpu
     ensembl_builder(info, input, output, DUCKVEP_ENSEMBL_REGULATION);
 }
 
+static void rna_builder(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+    if (duckdb_data_chunk_get_column_count(input) != 2) {
+        duckdb_scalar_function_set_error(info, "duckvep_ensembl_rna_edits_sql: options are not supported");
+        return;
+    }
+    duckdb_vector args[2] = {duckdb_data_chunk_get_vector(input, 0),
+                             duckdb_data_chunk_get_vector(input, 1)};
+    for (idx_t row = 0; row < duckdb_data_chunk_get_size(input); row++) {
+        char *values[2] = {NULL, NULL};
+        bool ok = true;
+        for (idx_t i = 0; i < 2; i++) {
+            uint64_t *valid = duckdb_vector_get_validity(args[i]);
+            if (valid && !duckdb_validity_row_is_valid(valid, row)) { ok = false; break; }
+            values[i] = duckvep_builder_string(((duckdb_string_t *)duckdb_vector_get_data(args[i]))[row]);
+            if (!values[i] || !*values[i]) { ok = false; break; }
+        }
+        duckvep_sql_text sql = {0};
+        if (ok) ok = duckvep_core_ensembl_rna_sql(values[0], values[1], &sql);
+        if (ok) duckdb_vector_assign_string_element(output, row, sql.data);
+        else duckvep_builder_set_error(info, "duckvep_ensembl_rna_edits_sql: two non-empty source names required");
+        duckvep_sql_free(&sql);
+        for (size_t i = 0; i < 2; i++) duckvep_budget_free(values[i]);
+        if (!ok) return;
+    }
+}
+
 static void duckvep_model_receipt_sql(duckdb_function_info info,
                                      duckdb_data_chunk input, duckdb_vector output) {
     static const char *const options[] = {"regulation_features_table"};
@@ -119,7 +145,8 @@ static void duckvep_model_receipt_sql(duckdb_function_info info,
 bool
 register_duckvep_ensembl_functions(duckhts_registration_t *registration)
 {
-	return duckvep_register_builder(registration->connection, "duckvep_ensembl_regions_sql", 3, regions_builder) &&
+	return duckvep_register_builder(registration->connection, "duckvep_ensembl_rna_edits_sql", 2, rna_builder) &&
+	    duckvep_register_builder(registration->connection, "duckvep_ensembl_regions_sql", 3, regions_builder) &&
 	    duckvep_register_builder(registration->connection, "duckvep_ensembl_transcripts_sql", 3, transcripts_builder) &&
 	    duckvep_register_builder(registration->connection, "duckvep_ensembl_regulation_features_sql", 2, regulation_builder) &&
 	    duckvep_register_builder(registration->connection, "duckvep_model_receipt_sql", 8,

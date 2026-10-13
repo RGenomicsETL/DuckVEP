@@ -83,9 +83,11 @@ test_haplotype_contract:
 PROPERTY_CC ?= cc
 PROPERTY_BUILD := $(PROJ_DIR)build/properties
 PROPERTY_SANITIZE := -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer
-PROPERTY_FLAGS ?= -std=gnu11 -O1 -g
+PROPERTY_FLAGS ?= -std=gnu11 -O1 -g -DDUCKVEP_FAULT_INJECTION=1
 PROPERTY_SOURCES := $(wildcard $(PROJ_DIR)test/duckvep/property/*.c) \
-	$(wildcard $(PROJ_DIR)test/duckvep/vendor/theft/src/*.c) $(wildcard $(PROJ_DIR)src/kernel/src/*.c)
+	$(wildcard $(PROJ_DIR)test/duckvep/vendor/theft/src/*.c) $(wildcard $(PROJ_DIR)src/kernel/src/*.c) \
+	$(PROJ_DIR)src/core/duckvep_core_products.c $(PROJ_DIR)src/core/duckvep_core_product_scenario.c \
+	$(PROJ_DIR)src/core/duckvep_core_product_fields.c
 .PHONY: test_runner_contracts test_compound_hgvs_oracle test_phase_arrangements_oracle
 test_runner_contracts:
 	shellcheck scripts/check_v2_hg002.sh scripts/check_v2_hg002_selftest.sh benchmarks/benchmark_duckvep_vep_rs.sh benchmarks/benchmark_duckvep_vep_rs_selftest.sh
@@ -113,7 +115,7 @@ test_properties:
 	perl $(PROJ_DIR)test/duckvep/property/read_sources.pl >/dev/null
 	mkdir -p $(PROPERTY_BUILD)
 	$(PROPERTY_CC) $(PROPERTY_FLAGS) $(PROPERTY_SANITIZE) \
-		-I$(PROJ_DIR)src/kernel/include -I$(PROJ_DIR)src/kernel/src -I$(PROJ_DIR)test/duckvep/property \
+		-I$(PROJ_DIR)src -I$(PROJ_DIR)src/kernel/include -I$(PROJ_DIR)src/kernel/src -I$(PROJ_DIR)test/duckvep/property \
 		-I$(PROJ_DIR)test/duckvep/vendor/greatest -I$(PROJ_DIR)test/duckvep/vendor/theft/inc \
 		-I$(PROJ_DIR)test/duckvep/vendor/theft/src \
 		$(PROPERTY_SOURCES) -lm -o $(PROPERTY_BUILD)/duckvep_properties

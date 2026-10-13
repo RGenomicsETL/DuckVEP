@@ -69,9 +69,8 @@ scenarios <- list(
   stop_retained_single = list(slice = 5L, edits = list(v(72, 'A', 'G'))))
 
 # ---- independent policy for the frame-preserving scenarios above ------------------------------
-# Identical peptide -> synonymous. Otherwise, by the normalized edit path: substitutions only ->
-# missense; every edit a pure insertion -> inframe_insertion; every edit a pure deletion ->
-# inframe_deletion; anything else that preserves the frame -> protein_altering_variant.
+# For substitutions, classify reached codons in the final edited CDS. Pure indel paths retain
+# their frame-preserving class; a mixed replacement uses protein_altering_variant.
 edit_lane <- function(seq, edits, lane) {
     for (e in edits[order(-vapply(edits, function(x) x$pos, numeric(1L)))]) {
         if (!(lane %in% e$lane)) next
@@ -109,8 +108,17 @@ classify <- function(edits, lane) {
                           logical(1L)))
         del <- all(vapply(mine, function(e) nchar(e$alt) < nchar(e$ref) && startsWith(e$ref, e$alt),
                           logical(1L)))
-        terms <- if (identical(a, r)) 'synonymous_variant' else if (subs) 'missense_variant' else
-            if (ins) 'inframe_insertion' else if (del) 'inframe_deletion' else 'protein_altering_variant'
+        if (subs) {
+            changed <- which(vapply(seq_len(nchar(cds) / 3L), function(k)
+                sub_at(cds, 3L * k - 2L, 3L) != sub_at(alt, 3L * k - 2L, 3L), logical(1L)))
+            effects <- ifelse(ref_protein[changed] == protein[changed],
+                              'synonymous_variant', 'missense_variant')
+            terms <- c('missense_variant', 'synonymous_variant')[
+                c('missense_variant', 'synonymous_variant') %in% effects]
+        } else {
+            terms <- if (identical(a, r)) 'synonymous_variant' else if (ins) 'inframe_insertion' else
+                if (del) 'inframe_deletion' else 'protein_altering_variant'
+        }
     }
     list(terms = terms, protein = paste(visible, collapse = ''))
 }
@@ -176,6 +184,14 @@ for (layout_name in names(layouts)) {
 records <- do.call(rbind, records)
 golden <- do.call(rbind, gold)
 stopifnot(!anyDuplicated(contigs), nrow(golden) == 2L * length(contigs))
+
+# A distant substitution changes codon 2 GCT (A) to GGT (G), while codon 3 GAA (E)
+# becomes GAG (E). Both codons precede the unchanged terminal stop in the final CDS.
+stopifnot(sub_at(cds, 4L, 3L) == 'GCT', sub_at(cds, 7L, 3L) == 'GAA',
+          all(golden$so_terms[golden$scenario == 'far_syn_and_missense' & golden$lane == 0L] ==
+              'missense_variant,synonymous_variant'),
+          all(golden$protein[golden$scenario == 'far_syn_and_missense' & golden$lane == 0L] ==
+              paste(translate(edit_lane(cds, scenarios$far_syn_and_missense$edits, 0L)), collapse = '')))
 
 # Every scenario keeps the reference in the other lane empty (the trans and hom_alt scenarios excepted).
 stopifnot(all(golden$so_terms[golden$lane == 1L & golden$scenario == 'cis_mis_pair'] == ''))

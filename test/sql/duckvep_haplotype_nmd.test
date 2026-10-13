@@ -118,15 +118,39 @@ frameshift_variant,stop_gained	escape	12
 frameshift_variant,stop_gained	trigger	20
 frameshift_variant,stop_lost	unknown	12
 inframe_deletion	not_applicable	4
+inframe_deletion,stop_gained	escape	8
+inframe_deletion,stop_gained	trigger	4
 inframe_insertion	not_applicable	4
+inframe_insertion,stop_gained	escape	4
+inframe_insertion,stop_gained	trigger	12
 missense_variant	not_applicable	24
 protein_altering_variant	not_applicable	4
 start_lost	unknown	8
-stop_gained	escape	78
-stop_gained	trigger	76
+stop_gained	escape	66
+stop_gained	trigger	60
 stop_lost	unknown	4
 stop_retained_variant	not_applicable	4
 synonymous_variant	not_applicable	4
+
+# A source-anchored full-codon insertion or deletion precedes the first translated TAA
+# on these seven scenarios (test/scripts/check_nmd_reached_effects.R). The stop and
+# the reached codon indel are both classified, with exact per-lane equality.
+query TII
+SELECT scenario,count(*),count(*) FILTER (WHERE
+  list_sort(haplotype_consequences)=list_sort(
+    CASE WHEN scenario LIKE 'up_del%' THEN ['inframe_deletion','stop_gained']
+         ELSE ['inframe_insertion','stop_gained'] END))
+FROM nm_named WHERE scenario IN ('up_ins3_d51','up_ins3_d50','up_del3_d50','up_del3_d51',
+ 'up_ins6_three_exons','up_indel_in_pen_exon','up_del_in_first_exon_of_three')
+GROUP BY ALL ORDER BY ALL;
+----
+up_del3_d50	4	4
+up_del3_d51	4	4
+up_del_in_first_exon_of_three	4	4
+up_indel_in_pen_exon	4	4
+up_ins3_d50	4	4
+up_ins3_d51	4	4
+up_ins6_three_exons	4	4
 
 # Threshold: stop codon 17 (S = 51, 64 with the 13-nt 5' UTR) against a penultimate exon ending 0, 49, 50, 51 and 52
 # bases later. J - S = 50 escapes, 51 triggers, on both strands with and without a UTR (4 layouts each).

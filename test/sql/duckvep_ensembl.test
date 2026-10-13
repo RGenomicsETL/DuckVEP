@@ -295,7 +295,527 @@ FROM duckvep_prepared_transcripts ORDER BY transcript_index;
 ----
 0	22019	ATGAAAGGGTAA	0	CC	1	16	NULL	2
 1	8197	ATGCCCTAA	0	AGG	24	32	NULL	1
-2	259	NULL	NULL	NULL	24	32	rna_edit	1
+2	131331	NULL	NULL	NULL	24	32	rna_edit	1
+
+query ITTII
+SELECT transcript_index, CAST(cdna_sequence AS VARCHAR), codon_table,
+       cds_start, cds_end
+FROM duckvep_prepared_transcripts WHERE transcript_index = 2;
+----
+2	ATGCCCTAAAGG	NULL	24	32
+
+# The declared source code and translation/exon geometry remain available
+# independently of the compatibility CDS and codon table.
+query ITIIIIIT
+SELECT transcript_index, CAST(cdna_sequence AS VARCHAR),
+       rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table,
+       strand, cds_start, CAST(codon_table AS VARCHAR)
+FROM duckvep_prepared_transcripts WHERE transcript_index IN (0, 2)
+ORDER BY transcript_index;
+----
+0	ATGAAAGGGTAACC	1	12	2	1	1	2
+2	ATGCCCTAAAGG	1	9	2	-1	24	NULL
+
+statement ok
+CREATE VIEW duckvep_source_rna_rows AS
+SELECT * FROM query(duckvep_ensembl_rna_edits_sql(
+  'duckvep_core', 'duckvep_prepared_transcripts'
+));
+
+query IITTTTTI
+SELECT transcript_index, cdna_start, expected_substrate,
+       alternate_sequence, operation_kind, programme_name, evidence_name,
+       boundary_overrides FROM duckvep_source_rna_rows;
+----
+2	4	CC	A	replacement	Ensembl116:_rna_edit	transcript_attrib:SeqEdit	0
+
+query TTT
+SELECT typeof(rna_cds_cdna_start), typeof(rna_cds_cdna_end), typeof(rna_codon_table)
+FROM duckvep_prepared_transcripts WHERE transcript_index = 0;
+----
+UBIGINT	UBIGINT	UTINYINT
+
+query IIII
+SELECT transcript_index, coalesce(rna_cds_cdna_start, 0),
+       coalesce(rna_cds_cdna_end, 0), coalesce(rna_codon_table, 0)
+FROM duckvep_prepared_transcripts ORDER BY transcript_index;
+----
+0	1	12	2
+1	1	9	2
+2	1	9	2
+
+query I
+SELECT loaded FROM duckvep_model_load(
+  'ensembl-authority',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  rna_edit_query := 'SELECT * FROM duckvep_source_rna_rows',
+  transcript_coverage_complete := true
+);
+----
+1
+
+query I
+SELECT duckvep_model_save('ensembl-authority', '__TEST_DIR__/ensembl-authority.dvsnap');
+----
+1
+
+query I
+SELECT duckvep_model_restore('ensembl-authority-copy', '__TEST_DIR__/ensembl-authority.dvsnap');
+----
+1
+
+query I
+SELECT _duckvep_model_fingerprint('ensembl-authority') = _duckvep_model_fingerprint('ensembl-authority-copy');
+----
+1
+
+statement ok
+CREATE MACRO authority_wire_offset(data, at_byte) AS (
+  SELECT CAST(sum(('0x' || substr(hex(data), (at_byte + i) * 2 - 1, 2))::UBIGINT *
+             (1::UBIGINT << (i * 8))) AS BIGINT) FROM range(8) AS r(i)
+);
+
+query TTT
+SELECT substr(hex(content), (authority_wire_offset(content, 1017) + 1) * 2 - 1, 24),
+       substr(hex(content), (authority_wire_offset(content, 1025) + 1) * 2 - 1, 24),
+       substr(hex(content), (authority_wire_offset(content, 1033) + 1) * 2 - 1, 6)
+FROM read_blob('__TEST_DIR__/ensembl-authority.dvsnap');
+----
+010000000100000001000000	0C0000000900000009000000	020202
+
+query I
+SELECT duckvep_model_save('ensembl-authority-copy', '__TEST_DIR__/ensembl-authority-copy.dvsnap');
+----
+1
+
+query TTT
+SELECT substr(hex(content), (authority_wire_offset(content, 1017) + 1) * 2 - 1, 24),
+       substr(hex(content), (authority_wire_offset(content, 1025) + 1) * 2 - 1, 24),
+       substr(hex(content), (authority_wire_offset(content, 1033) + 1) * 2 - 1, 6)
+FROM read_blob('__TEST_DIR__/ensembl-authority-copy.dvsnap');
+----
+010000000100000001000000	0C0000000900000009000000	020202
+
+statement error
+SELECT * FROM duckvep_model_load('authority-partial',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT * REPLACE (NULL::UBIGINT AS rna_cds_cdna_end) FROM (SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts)',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon)');
+----
+original RNA coding authority
+
+statement error
+SELECT * FROM duckvep_model_load('authority-code',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT * REPLACE (99::UTINYINT AS rna_codon_table) FROM (SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts)',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon)');
+----
+original RNA coding authority
+
+statement error
+SELECT * FROM duckvep_model_load('authority-overflow',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT * REPLACE (4294967296::UBIGINT AS rna_cds_cdna_end) FROM (SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts)',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon)');
+----
+original RNA coding authority
+
+statement error
+SELECT * FROM duckvep_model_load('authority-start-overflow',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT * REPLACE (4294967296::UBIGINT AS rna_cds_cdna_start) FROM (SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts)',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon)');
+----
+original RNA coding authority
+
+statement error
+SELECT * FROM duckvep_model_load('authority-wrap-valid',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT * REPLACE (4294967297::UBIGINT AS rna_cds_cdna_start) FROM (SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts)',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon)');
+----
+original RNA coding authority
+
+statement error
+SELECT * FROM duckvep_model_load('authority-end-wrap-valid',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT * REPLACE (4294967305::UBIGINT AS rna_cds_cdna_end) FROM (SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts)',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon)');
+----
+original RNA coding authority
+
+statement error
+SELECT * FROM duckvep_model_load('authority-geometry',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT * REPLACE (CASE WHEN transcript_index = 2 THEN 2::UBIGINT ELSE rna_cds_cdna_start END AS rna_cds_cdna_start, CASE WHEN transcript_index = 2 THEN 10::UBIGINT ELSE rna_cds_cdna_end END AS rna_cds_cdna_end) FROM (SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts)',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon)');
+----
+original RNA coding authority
+
+query IIIIIII
+SELECT duckvep_model_drop('authority-partial'), duckvep_model_drop('authority-code'),
+       duckvep_model_drop('authority-overflow'), duckvep_model_drop('authority-start-overflow'),
+       duckvep_model_drop('authority-wrap-valid'), duckvep_model_drop('authority-end-wrap-valid'),
+       duckvep_model_drop('authority-geometry');
+----
+0	0	0	0	0	0	0
+
+query I
+SELECT loaded FROM duckvep_model_load(
+  'authority-reuse',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_prepared_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_prepared_transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  rna_edit_query := 'SELECT * FROM duckvep_source_rna_rows', transcript_coverage_complete := true);
+----
+1
+
+query I
+SELECT _duckvep_model_fingerprint('authority-reuse') = _duckvep_model_fingerprint('ensembl-authority');
+----
+1
+
+query III
+SELECT duckvep_model_drop('authority-reuse'), duckvep_model_drop('ensembl-authority'), duckvep_model_drop('ensembl-authority-copy');
+----
+1	1	1
+
+# The source retains its curated peptide edit; a separate translated RNA-edit
+# transcript shares the genomic locus without inheriting that peptide operation.
+statement ok
+INSERT INTO duckvep_core.transcript VALUES
+  (33, 21, 10, 21, 32, -1, 'protein_coding', 1, 'ENST_TEST_RNA_ONLY', 1);
+
+statement ok
+INSERT INTO duckvep_core.exon_transcript VALUES (42, 33, 1);
+
+statement ok
+INSERT INTO duckvep_core.translation VALUES
+  (53, 33, 1, 42, 9, 42, 'ENSP_TEST_RNA_ONLY', 1);
+
+statement ok
+INSERT INTO duckvep_core.transcript_attrib VALUES (33, 65, '4 5 TT');
+
+statement ok
+UPDATE duckvep_core.transcript_attrib SET value = '4 5 TT'
+WHERE transcript_id = 32 AND attrib_type_id = 65;
+
+statement ok
+CREATE TABLE duckvep_rna_producer_transcripts AS
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
+  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'));
+
+query IIIT
+SELECT rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table,
+       CAST(cdna_sequence AS VARCHAR)
+FROM duckvep_rna_producer_transcripts WHERE transcript_index = 3;
+----
+1	9	2	ATGCCCTAAAGG
+
+query III
+SELECT cds_sequence IS NULL, codon_table IS NULL, transcript_flags & 131072 = 0
+FROM duckvep_rna_producer_transcripts WHERE transcript_index = 3;
+----
+1	1	1
+
+query I
+SELECT transcript_flags & 131072 != 0
+FROM duckvep_rna_producer_transcripts WHERE transcript_index = 2;
+----
+1
+
+query I
+SELECT loaded FROM duckvep_model_load(
+  'ensembl-rna-conditional',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_rna_producer_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_rna_producer_transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  rna_edit_query := 'SELECT * FROM query(duckvep_ensembl_rna_edits_sql(''duckvep_core'', ''duckvep_rna_producer_transcripts''))'
+);
+----
+1
+
+statement ok
+DELETE FROM duckvep_core.transcript_attrib WHERE transcript_id = 33;
+
+statement ok
+UPDATE duckvep_core.transcript_attrib SET value = '4 5 A'
+WHERE transcript_id = 32 AND attrib_type_id = 65;
+
+statement ok
+DELETE FROM duckvep_core.translation WHERE translation_id = 53;
+
+statement ok
+DELETE FROM duckvep_core.exon_transcript WHERE transcript_id = 33;
+
+statement ok
+DELETE FROM duckvep_core.transcript WHERE transcript_id = 33;
+
+query I
+SELECT count(*) FROM duckvep_core.transcript_attrib
+WHERE transcript_id = 32 AND attrib_type_id = 65 AND value = '4 5 A';
+----
+1
+
+query IIII
+SELECT (SELECT count(*) FROM duckvep_core.transcript WHERE transcript_id IN (33, 35)) = 0,
+       (SELECT count(*) FROM duckvep_core.exon WHERE exon_id = 44) = 0,
+       (SELECT value FROM duckvep_core.seq_region_attrib
+        WHERE seq_region_id = 10 AND attrib_type_id = 66) = 2,
+       (SELECT seq FROM duckvep_reference_chunks WHERE "start" = 20) = 'CCTTTAGGGCATAAAAAAAA';
+----
+1	1	1	1
+
+query TTTT
+SELECT prediction_status, prediction_reason, prediction_reference_protein, prediction_protein
+FROM duckvep_haplotypes(
+  'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 26::BIGINT AS position, ''A'' reference, ''G'' alternate, 1 alt_index, 3::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
+  'ensembl-rna-conditional')
+WHERE transcript_index = 3 AND prediction_status = 'conditional_assumed_rna_programme';
+----
+conditional_assumed_rna_programme	assumed_rna_programme	MF*	MFQ*
+
+query IIIIII
+SELECT cds IS NULL, protein IS NULL, haplotype_consequences IS NULL,
+       haplotype_impact IS NULL, nmd_prediction = 'unknown',
+       prediction_reference_protein = 'MF*' AND prediction_protein = 'MFQ*'
+FROM duckvep_haplotypes(
+  'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 26::BIGINT AS position, ''A'' reference, ''G'' alternate, 1 alt_index, 3::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
+  'ensembl-rna-conditional')
+WHERE transcript_index = 3;
+----
+1	1	1	1	1	1
+
+query I
+SELECT count(*) FROM duckvep_haplotypes(
+  'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 26::BIGINT AS position, ''A'' reference, ''G'' alternate, 1 alt_index, 2::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
+  'ensembl-rna-conditional')
+WHERE prediction_status = 'conditional_assumed_rna_programme';
+----
+0
+
+query I
+SELECT duckvep_model_drop('ensembl-rna-conditional');
+----
+1
+
+# The forward single-exon source retains its original stop while a declared
+# equal-length operation supplies its non-start genomic codon's initiator.
+statement ok
+UPDATE duckvep_reference_chunks SET seq = substr(seq, 1, 6) || 'TAA' || substr(seq, 10)
+WHERE "start" = 20;
+
+statement ok
+UPDATE duckvep_core.seq_region_attrib SET value = '1'
+WHERE seq_region_id = 10 AND attrib_type_id = 66;
+
+statement ok
+INSERT INTO duckvep_core.exon VALUES
+  (44, 10, 21, 32, 1, 0, 0, 1, 'ENSE_TEST_RNA_PLUS');
+
+statement ok
+INSERT INTO duckvep_core.transcript VALUES
+  (35, 21, 10, 21, 32, 1, 'protein_coding', 1, 'ENST_TEST_RNA_PLUS', 1);
+
+statement ok
+INSERT INTO duckvep_core.exon_transcript VALUES (44, 35, 1);
+
+statement ok
+INSERT INTO duckvep_core.translation VALUES
+  (55, 35, 1, 44, 9, 44, 'ENSP_TEST_RNA_PLUS', 1);
+
+statement ok
+INSERT INTO duckvep_core.transcript_attrib VALUES (35, 65, '1 3 ATG');
+
+statement ok
+CREATE TABLE duckvep_rna_plus_code1_transcripts AS
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
+  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'));
+
+query IIIT
+SELECT rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table,
+       CAST(cdna_sequence AS VARCHAR)
+FROM duckvep_rna_plus_code1_transcripts WHERE transcript_index = 3;
+----
+1	9	1	CCTTTATAACAT
+
+query I
+SELECT loaded FROM duckvep_model_load(
+  'ensembl-rna-plus-code1',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_rna_plus_code1_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_rna_plus_code1_transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  rna_edit_query := 'SELECT * FROM query(duckvep_ensembl_rna_edits_sql(''duckvep_core'', ''duckvep_rna_plus_code1_transcripts''))'
+);
+----
+1
+
+statement ok
+DELETE FROM duckvep_core.transcript_attrib WHERE transcript_id = 35;
+
+statement ok
+DELETE FROM duckvep_core.translation WHERE translation_id = 55;
+
+statement ok
+DELETE FROM duckvep_core.exon_transcript WHERE transcript_id = 35;
+
+statement ok
+DELETE FROM duckvep_core.transcript WHERE transcript_id = 35;
+
+statement ok
+DELETE FROM duckvep_core.exon WHERE exon_id = 44;
+
+statement ok
+UPDATE duckvep_core.seq_region_attrib SET value = '2'
+WHERE seq_region_id = 10 AND attrib_type_id = 66;
+
+statement ok
+UPDATE duckvep_reference_chunks SET seq = substr(seq, 1, 6) || 'GGG' || substr(seq, 10)
+WHERE "start" = 20;
+
+query IIII
+SELECT (SELECT count(*) FROM duckvep_core.transcript WHERE transcript_id = 35) = 0,
+       (SELECT count(*) FROM duckvep_core.exon WHERE exon_id = 44) = 0,
+       (SELECT value FROM duckvep_core.seq_region_attrib
+        WHERE seq_region_id = 10 AND attrib_type_id = 66) = 2,
+       (SELECT seq FROM duckvep_reference_chunks WHERE "start" = 20) = 'CCTTTAGGGCATAAAAAAAA';
+----
+1	1	1	1
+
+query TTTT
+SELECT prediction_status, prediction_reason, prediction_reference_protein, prediction_protein
+FROM duckvep_haplotypes(
+  'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 25::BIGINT AS position, ''T'' reference, ''C'' alternate, 1 alt_index, 3::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
+  'ensembl-rna-plus-code1')
+WHERE transcript_index = 3 AND prediction_status = 'conditional_assumed_rna_programme';
+----
+conditional_assumed_rna_programme	assumed_rna_programme	ML*	MS*
+
+query I
+SELECT duckvep_model_drop('ensembl-rna-plus-code1');
+----
+1
+
+# A declared original-coordinate operation supplies the initiator itself.
+# No alternative downstream start is selected from the unedited genome.
+statement ok
+UPDATE duckvep_reference_chunks SET seq = substr(seq, 1, 11) || 'C' || substr(seq, 13)
+WHERE "start" = 20;
+
+statement ok
+INSERT INTO duckvep_core.transcript VALUES
+  (34, 21, 10, 21, 32, -1, 'protein_coding', 1, 'ENST_TEST_RNA_START', 1);
+
+statement ok
+INSERT INTO duckvep_core.exon_transcript VALUES (42, 34, 1);
+
+statement ok
+INSERT INTO duckvep_core.translation VALUES
+  (54, 34, 1, 42, 9, 42, 'ENSP_TEST_RNA_START', 1);
+
+statement ok
+INSERT INTO duckvep_core.transcript_attrib VALUES
+  (34, 65, '1 1 A'), (34, 65, '4 5 TT');
+
+statement ok
+CREATE TABLE duckvep_rna_start_transcripts AS
+SELECT * FROM query(duckvep_ensembl_transcripts_sql(
+  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'));
+
+query IIIT
+SELECT rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table,
+       CAST(cdna_sequence AS VARCHAR)
+FROM duckvep_rna_start_transcripts WHERE transcript_index = 3;
+----
+1	9	2	GTGCCCTAAAGG
+
+query I
+SELECT loaded FROM duckvep_model_load(
+  'ensembl-rna-start',
+  'SELECT seq_region, sequence_length FROM duckvep_prepared_regions ORDER BY seq_region',
+  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table FROM duckvep_rna_start_transcripts ORDER BY seq_region, transcript_start, transcript_index',
+  'SELECT transcript_index, exon.exon_start, exon.exon_end, exon.exon_cdna_start, exon.exon_cdna_end, exon.phase, exon.end_phase FROM duckvep_rna_start_transcripts, LATERAL unnest(exons) AS u(exon) ORDER BY transcript_index, exon.exon_cdna_start',
+  rna_edit_query := 'SELECT * FROM query(duckvep_ensembl_rna_edits_sql(''duckvep_core'', ''duckvep_rna_start_transcripts''))'
+);
+----
+1
+
+statement ok
+DELETE FROM duckvep_core.transcript_attrib WHERE transcript_id = 34;
+
+statement ok
+DELETE FROM duckvep_core.translation WHERE translation_id = 54;
+
+statement ok
+DELETE FROM duckvep_core.exon_transcript WHERE transcript_id = 34;
+
+statement ok
+DELETE FROM duckvep_core.transcript WHERE transcript_id = 34;
+
+statement ok
+UPDATE duckvep_reference_chunks SET seq = substr(seq, 1, 11) || 'T' || substr(seq, 13)
+WHERE "start" = 20;
+
+query TTTT
+SELECT prediction_status, prediction_reason, prediction_reference_protein, prediction_protein
+FROM duckvep_haplotypes(
+  'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 26::BIGINT AS position, ''A'' reference, ''G'' alternate, 1 alt_index, 3::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
+  'ensembl-rna-start')
+WHERE transcript_index = 3 AND prediction_status = 'conditional_assumed_rna_programme';
+----
+conditional_assumed_rna_programme	assumed_rna_programme	MF*	MFQ*
+
+query I
+SELECT duckvep_model_drop('ensembl-rna-start');
+----
+1
+
+statement ok
+BEGIN TRANSACTION;
+
+statement ok
+INSERT INTO duckvep_core.attrib_type VALUES (70, '_transl_start'), (71, 'cds_start_NF');
+
+statement ok
+INSERT INTO duckvep_core.transcript_attrib VALUES (32, 70, '2');
+
+query ITIT
+SELECT transcript_index, CAST(cdna_sequence AS VARCHAR),
+       CAST(rna_cds_cdna_start AS INTEGER), CAST(rna_codon_table AS VARCHAR)
+FROM query(duckvep_ensembl_transcripts_sql(
+  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
+)) WHERE transcript_index = 2;
+----
+2	ATGCCCTAAAGG	NULL	NULL
+
+statement ok
+DELETE FROM duckvep_core.transcript_attrib WHERE transcript_id = 32 AND attrib_type_id = 70;
+
+statement ok
+INSERT INTO duckvep_core.transcript_attrib VALUES (32, 71, '1');
+
+query ITI
+SELECT transcript_index, CAST(cdna_sequence AS VARCHAR),
+       CAST(rna_cds_cdna_start AS INTEGER)
+FROM query(duckvep_ensembl_transcripts_sql(
+  'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'
+)) WHERE transcript_index = 2;
+----
+2	ATGCCCTAAAGG	NULL
+
+statement ok
+ROLLBACK;
+
+query IIII
+SELECT CAST(a.value AS INTEGER), CAST(exon.exon_cdna_start AS INTEGER),
+       CAST(exon.exon_cdna_end AS INTEGER), CAST(exon.phase AS INTEGER)
+FROM duckvep_core.seq_region_attrib a, duckvep_prepared_transcripts t,
+     LATERAL unnest(t.exons) AS u(exon)
+WHERE t.transcript_index = 2 AND a.seq_region_id = 10 AND a.attrib_type_id = 66;
+----
+2	1	12	0
 
 query I
 SELECT count(*) FROM information_schema.columns
@@ -1012,8 +1532,8 @@ FROM (
   SELECT * FROM duckvep_grch37_receipt
 ) ORDER BY assembly;
 ----
-GRCh37	fe28be6a4f0c9751a5f292211ec6180d2798889b1b691b076993b3bd747c0eaf	all current transcripts on MT and GL000201.1
-GRCh38	1ad7465d502b18b55a764fba64c9bfba6826c2b731dcf1853de9d19c92166a0e	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
+GRCh37	cc6c7fe9de77e61c52011b5c3b68e0017a1112f2a26e63954bde2e7ae70a1b1f	all current transcripts on MT and GL000201.1
+GRCh38	ac35b613089f6ba2f9d15ffa2a91c4625cee24d2fc9496c9dd08b5ebb4217d5f	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
 
 query II
 SELECT (SELECT count(*) FROM duckvep_grch38_transcripts

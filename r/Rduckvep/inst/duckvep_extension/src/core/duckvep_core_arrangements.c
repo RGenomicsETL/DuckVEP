@@ -518,6 +518,7 @@ const char *duckvep_arrangement_prediction_status(uint8_t status) {
     switch ((duckvep_prediction_status_t)status) {
     case DUCKVEP_PREDICTION_ELIGIBLE: return "eligible_classifier_pending";
     case DUCKVEP_PREDICTION_PREDICTED: return "predicted";
+    case DUCKVEP_PREDICTION_CONDITIONAL_RNA: return "conditional_assumed_rna_programme";
     case DUCKVEP_PREDICTION_INCOMPLETE_INPUT: return "incomplete_input";
     case DUCKVEP_PREDICTION_EDIT_CONFLICT: return "edit_conflict";
     case DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP: return "unsupported_overlap";

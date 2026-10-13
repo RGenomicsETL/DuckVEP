@@ -1,0 +1,147 @@
+# name: test/sql/duckvep_rna_programme.test
+# description: Transcript-attached Ensembl 116 SeqEdit capture, substrate ownership and wire persistence
+# group: [duckvep]
+
+require duckvep
+
+query I
+SELECT duckvep_model_restore('old_wire', '__WORKING_DIRECTORY__/test/data/duckvep/rna/raw-cdna-v2.dvsnap');
+----
+1
+
+query I
+SELECT _duckvep_model_fingerprint('old_wire');
+----
+7835186884573121370
+
+statement ok
+CREATE SCHEMA core;
+
+statement ok
+CREATE TABLE core.attrib_type(attrib_type_id INTEGER, code VARCHAR);
+
+statement ok
+INSERT INTO core.attrib_type VALUES (7, '_rna_edit'), (8, '_transl_start');
+
+statement ok
+CREATE TABLE core.transcript_attrib(transcript_id INTEGER, attrib_type_id INTEGER, value VARCHAR);
+
+statement ok
+INSERT INTO core.transcript_attrib VALUES (3, 7, '5 5 G'), (4, 7, '6 6 A'), (4, 8, '2');
+
+statement ok
+CREATE TABLE prepared_transcripts AS SELECT 0::UINTEGER transcript_index, 3::INTEGER source_transcript_id, 'ATGAAACCCTAA'::BLOB cdna_sequence UNION ALL SELECT 1::UINTEGER, 4::INTEGER, 'TTAGGGTTTCAT'::BLOB;
+
+statement ok
+CREATE VIEW rna_rows AS FROM query(duckvep_ensembl_rna_edits_sql('core', 'prepared_transcripts'));
+
+query IIITTTTTI
+SELECT transcript_index, cdna_start, cdna_end, expected_substrate, alternate_sequence, operation_kind, programme_name, evidence_name, boundary_overrides FROM rna_rows ORDER BY transcript_index;
+----
+0	5	5	A	G	substitution	Ensembl116:_rna_edit	transcript_attrib:SeqEdit	0
+1	6	6	G	A	substitution	Ensembl116:_rna_edit	transcript_attrib:SeqEdit	1
+
+statement ok
+CREATE TABLE regions AS SELECT 0::UINTEGER seq_region, 12::UBIGINT sequence_length, 'plus'::VARCHAR seq_region_name UNION ALL SELECT 1::UINTEGER, 12::UBIGINT, 'minus'::VARCHAR;
+
+statement ok
+CREATE TABLE transcripts AS SELECT p.transcript_index, p.transcript_index AS seq_region, 1::UBIGINT transcript_start, 12::UBIGINT transcript_end, CASE WHEN p.transcript_index = 0 THEN 1 ELSE -1 END::TINYINT strand, p.transcript_index AS gene_index, 259::UBIGINT transcript_flags, 1::UBIGINT cds_start, 12::UBIGINT cds_end, p.cdna_sequence AS cds_sequence, 1::UTINYINT codon_table, ''::BLOB pre_cds_sequence, ''::BLOB post_cds_sequence, p.cdna_sequence FROM prepared_transcripts p;
+
+statement ok
+CREATE TABLE exons AS SELECT transcript_index, 1::UBIGINT exon_start, 12::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 12::UBIGINT exon_cdna_end, 0::TINYINT phase, 0::TINYINT end_phase FROM prepared_transcripts;
+
+query I
+SELECT loaded FROM duckvep_model_load('rna', 'SELECT * FROM regions', 'SELECT * FROM transcripts', 'SELECT * FROM exons', rna_edit_query := 'SELECT * FROM rna_rows');
+----
+1
+
+query I
+SELECT duckvep_model_save('rna', '__TEST_DIR__/rna.dvsnap');
+----
+1
+
+query I
+SELECT duckvep_model_restore('rna_copy', '__TEST_DIR__/rna.dvsnap');
+----
+1
+
+query I
+SELECT _duckvep_model_fingerprint('rna') = _duckvep_model_fingerprint('rna_copy');
+----
+1
+
+statement ok
+CREATE VIEW rna_other AS SELECT transcript_index, cdna_start, cdna_end, expected_substrate, CASE WHEN transcript_index = 0 THEN 'T' ELSE alternate_sequence END::VARCHAR alternate_sequence, operation_kind, programme_name, evidence_name, boundary_overrides FROM rna_rows;
+
+query I
+SELECT loaded FROM duckvep_model_load('rna_other', 'SELECT * FROM regions', 'SELECT * FROM transcripts', 'SELECT * FROM exons', rna_edit_query := 'SELECT * FROM rna_other');
+----
+1
+
+query I
+SELECT _duckvep_model_fingerprint('rna') != _duckvep_model_fingerprint('rna_other');
+----
+1
+
+statement error
+SELECT * FROM duckvep_model_load('rna_bad', 'SELECT * FROM regions', 'SELECT * FROM transcripts', 'SELECT * FROM exons', rna_edit_query := 'SELECT transcript_index, cdna_start, cdna_end, ''T''::VARCHAR expected_substrate, alternate_sequence, operation_kind, programme_name, evidence_name, boundary_overrides FROM rna_rows');
+----
+RNA programme expected substrate disagrees with raw cDNA
+
+query I
+SELECT duckvep_model_drop('rna_bad');
+----
+0
+
+statement error
+SELECT * FROM duckvep_model_load('rna_overflow', 'SELECT * FROM regions', 'SELECT * FROM transcripts', 'SELECT * FROM exons', rna_edit_query := 'SELECT transcript_index, 4294967295::UINTEGER cdna_start, 4294967295::UINTEGER cdna_end, expected_substrate, alternate_sequence, operation_kind, programme_name, evidence_name, boundary_overrides FROM rna_rows');
+----
+RNA programme coordinates or order are invalid
+
+query I
+SELECT duckvep_model_drop('rna_overflow');
+----
+0
+
+statement ok
+CREATE VIEW rna_overlap AS SELECT * FROM rna_rows UNION ALL SELECT 0::UINTEGER transcript_index, 4::UINTEGER cdna_start, 5::UINTEGER cdna_end, 'AA'::VARCHAR expected_substrate, 'GG'::VARCHAR alternate_sequence, 'substitution'::VARCHAR operation_kind, 'Ensembl116:_rna_edit'::VARCHAR programme_name, 'transcript_attrib:SeqEdit'::VARCHAR evidence_name, 0::UTINYINT boundary_overrides ORDER BY transcript_index, cdna_start DESC;
+
+statement error
+SELECT * FROM duckvep_model_load('rna_overlap', 'SELECT * FROM regions', 'SELECT * FROM transcripts', 'SELECT * FROM exons', rna_edit_query := 'SELECT * FROM rna_overlap');
+----
+RNA programme edits overlap
+
+query I
+SELECT duckvep_model_drop('rna_overlap');
+----
+0
+
+query I
+SELECT loaded FROM duckvep_model_load('rna_untyped', 'SELECT * FROM regions', 'SELECT * FROM transcripts', 'SELECT * FROM exons');
+----
+1
+
+query I
+SELECT _duckvep_model_fingerprint('rna') != _duckvep_model_fingerprint('rna_untyped');
+----
+1
+
+query I
+SELECT loaded FROM duckvep_model_load('known_empty', 'SELECT * FROM regions', 'SELECT * REPLACE (3::UBIGINT AS transcript_flags) FROM transcripts', 'SELECT * FROM exons', rna_edit_query := 'SELECT * FROM rna_rows WHERE FALSE');
+----
+1
+
+query I
+SELECT loaded FROM duckvep_model_load('unknown_empty', 'SELECT * FROM regions', 'SELECT * REPLACE (3::UBIGINT AS transcript_flags) FROM transcripts', 'SELECT * FROM exons');
+----
+1
+
+query I
+SELECT _duckvep_model_fingerprint('known_empty') != _duckvep_model_fingerprint('unknown_empty');
+----
+1
+
+query I
+SELECT _duckvep_model_fingerprint('rna') = _duckvep_model_fingerprint('rna_copy');
+----
+1

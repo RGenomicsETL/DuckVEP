@@ -32,16 +32,16 @@
 #endif
 
 #define SNAP_MAGIC "DVEPSNAP"
-#define SNAP_VERSION UINT64_C(2)
+#define SNAP_VERSION UINT64_C(3)
 #define SNAP_ENDIAN UINT64_C(0x0102030405060708)
 #define SNAP_ALIGN ((uint64_t)64)
-#define SNAP_ARRAYS 42u
+#define SNAP_ARRAYS 54u
 #define SNAP_NAMES SNAP_ARRAYS
 #define SNAP_REFERENCE (SNAP_ARRAYS + 1u)
 #define SNAP_SECTIONS (SNAP_ARRAYS + 2u)
 
 enum { SNAP_REGIONS, SNAP_TRANSCRIPTS, SNAP_EXONS, SNAP_MIRNA, SNAP_PEPTIDE, SNAP_CDS, SNAP_CDNA,
-       SNAP_FLANK, SNAP_FEATURES, SNAP_COUNTS };
+       SNAP_FLANK, SNAP_FEATURES, SNAP_RNA, SNAP_RNA_ALT, SNAP_COUNTS };
 enum { SNAP_FLAG_COVERAGE = 1u, SNAP_FLAG_FLANKS = 2u, SNAP_FLAG_CDNA = 4u };
 
 /* Every field is a uint64_t, so the layout has no padding. */
@@ -60,6 +60,18 @@ typedef struct {
 	uint64_t offset[SNAP_SECTIONS];
 	uint64_t bytes[SNAP_SECTIONS];
 } snap_header_t;
+
+#define SNAP_V2_ARRAYS 42u
+#define SNAP_V2_SECTIONS (SNAP_V2_ARRAYS + 2u)
+typedef struct {
+	char magic[8];
+	uint64_t version, endian, header_bytes, file_bytes, checksum, fingerprint;
+	uint64_t counts[9];
+	uint64_t flags, present;
+	uint64_t width[SNAP_V2_SECTIONS];
+	uint64_t offset[SNAP_V2_SECTIONS];
+	uint64_t bytes[SNAP_V2_SECTIONS];
+} snap_v2_header_t;
 
 #define SNAP_V1_ARRAYS 38u
 #define SNAP_V1_SECTIONS (SNAP_V1_ARRAYS + 2u)
@@ -93,6 +105,7 @@ snap_arrays(duckvep_owned_model_t *m, const uint64_t counts[SNAP_COUNTS], snap_a
 {
 	uint64_t r = counts[SNAP_REGIONS], t = counts[SNAP_TRANSCRIPTS], e = counts[SNAP_EXONS];
 	uint64_t mi = counts[SNAP_MIRNA], p = counts[SNAP_PEPTIDE], f = counts[SNAP_FEATURES];
+	uint64_t rn = counts[SNAP_RNA];
 	size_t i = 0;
 
 #define A(field, n) do { out[i].slot = (void **)&m->field; out[i].width = sizeof(*m->field); \
@@ -113,6 +126,10 @@ snap_arrays(duckvep_owned_model_t *m, const uint64_t counts[SNAP_COUNTS], snap_a
 	A(flank_sequence_bytes, counts[SNAP_FLANK]);
 	A(interval_feature_seq_regions, f); A(interval_feature_starts, f); A(interval_feature_ends, f);
 	A(interval_feature_kinds, f);
+	A(rna_presence, t); A(rna_offsets, t + 1u); A(rna_starts, rn); A(rna_ends, rn);
+	A(rna_kinds, rn); A(rna_alt_offsets, rn); A(rna_alt_lengths, rn);
+	A(rna_alt_bytes, counts[SNAP_RNA_ALT]); A(rna_boundary_overrides, t);
+	A(rna_cds_cdna_starts, t); A(rna_cds_cdna_ends, t); A(rna_codon_tables, t);
 #undef A
 }
 
@@ -128,6 +145,8 @@ snap_counts(const duckvep_owned_model_t *m, uint64_t counts[SNAP_COUNTS])
 	counts[SNAP_CDNA] = m->cdna_sequence_length;
 	counts[SNAP_FLANK] = m->flank_sequence_length;
 	counts[SNAP_FEATURES] = m->interval_feature_count;
+	counts[SNAP_RNA] = m->rna_count;
+	counts[SNAP_RNA_ALT] = m->rna_alt_bytes_length;
 }
 
 static uint64_t
@@ -239,6 +258,11 @@ duckvep_core_model_snapshot_save(const duckvep_owned_model_t *model, const char 
 		header.width[section] = arrays[section].width;
 		if (data[section] != NULL) {
 			header.present |= UINT64_C(1) << section;
+			if (arrays[section].count > UINT64_MAX / arrays[section].width ||
+			    arrays[section].count > SIZE_MAX / arrays[section].width) {
+				snap_error(error, error_size, label, "snapshot array length overflows", NULL);
+				goto done;
+			}
 			header.bytes[section] = arrays[section].count * arrays[section].width;
 		}
 	}
@@ -256,8 +280,19 @@ duckvep_core_model_snapshot_save(const duckvep_owned_model_t *model, const char 
 	    ? strlen(model->reference_fasta_path) + 1u : 0u;
 	at = (sizeof(header) + SNAP_ALIGN - 1u) / SNAP_ALIGN * SNAP_ALIGN;
 	for (section = 0; section < SNAP_SECTIONS; section++) {
+		uint64_t length = header.bytes[section];
+
+		if (length > SIZE_MAX || length > UINT64_MAX - (SNAP_ALIGN - 1u) ||
+		    (length + SNAP_ALIGN - 1u) / SNAP_ALIGN * SNAP_ALIGN > UINT64_MAX - at) {
+			snap_error(error, error_size, label, "snapshot section length overflows", NULL);
+			goto done;
+		}
 		header.offset[section] = at;
-		at += (header.bytes[section] + SNAP_ALIGN - 1u) / SNAP_ALIGN * SNAP_ALIGN;
+		at += (length + SNAP_ALIGN - 1u) / SNAP_ALIGN * SNAP_ALIGN;
+	}
+	if (at > SIZE_MAX) {
+		snap_error(error, error_size, label, "snapshot file length overflows", NULL);
+		goto done;
 	}
 	header.file_bytes = at;
 	header.checksum = snap_hash(SNAP_VERSION, &header, sizeof(header));
@@ -266,6 +301,10 @@ duckvep_core_model_snapshot_save(const duckvep_owned_model_t *model, const char 
 
 	/* Written beside the target and renamed, so a reader never maps a partial file. */
 	path_length = strlen(path);
+	if (path_length > SIZE_MAX - sizeof(".partial")) {
+		snap_error(error, error_size, label, "snapshot path length overflows", NULL);
+		goto done;
+	}
 	partial = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, path_length + sizeof(".partial"));
 	if (partial == NULL) {
 		snap_error(error, error_size, label, "out of memory", NULL);
@@ -504,6 +543,41 @@ snap_validate(duckvep_owned_model_t *m)
 	    !snap_offsets(m->peptide_edit_offsets, transcripts, m->peptide_edit_count,
 	    m->peptide_edit_positions != NULL && m->peptide_edit_alts != NULL))
 		return "a side relation's row offsets do not cover it";
+	if (!snap_offsets(m->rna_offsets, transcripts, m->rna_count,
+	    m->rna_starts && m->rna_ends && m->rna_kinds && m->rna_alt_offsets && m->rna_alt_lengths) ||
+	    (m->rna_presence == NULL && (m->rna_offsets != NULL || m->rna_boundary_overrides != NULL ||
+	        m->rna_alt_bytes_length != 0)) ||
+	    (m->rna_presence != NULL && (m->rna_offsets == NULL || m->rna_boundary_overrides == NULL ||
+	        m->cdna_sequence_bytes == NULL)) ||
+	    (m->rna_alt_bytes_length != 0 && m->rna_alt_bytes == NULL))
+		return "RNA programme arrays are incomplete";
+	for (i = 0; m->rna_presence != NULL && i < transcripts; i++) {
+		uint32_t cdna_len = m->cdna_sequence_lengths[i];
+		uint64_t cdna_offset = m->cdna_sequence_offsets[i];
+		if ((m->rna_presence[i] != 1u && m->rna_presence[i] != 2u) ||
+		    m->rna_boundary_overrides[i] > 3u ||
+		    (m->rna_presence[i] == 1u && m->rna_boundary_overrides[i] != 0u) ||
+		    (m->rna_presence[i] == 2u) != (m->rna_offsets[i] < m->rna_offsets[i + 1u]) ||
+		    ((m->transcript_flags[i] & DUCKVEP_TX_RNA_EDIT) != 0) != (m->rna_presence[i] == 2u))
+			return "RNA programme presence disagrees with transcript flags";
+		for (k = m->rna_offsets[i]; k < m->rna_offsets[i + 1u]; k++) {
+			uint32_t start = m->rna_starts[k], end = m->rna_ends[k];
+			uint32_t ref_len = start != 0 && end != UINT32_MAX && start == end + 1u ? 0u :
+			    start != 0 && start <= end ? end - start + 1u : UINT32_MAX;
+			uint32_t alt_len = m->rna_alt_lengths[k];
+			uint8_t kind = ref_len == 0u ? 3u : alt_len == 0u ? 2u :
+			    ref_len == alt_len ? 1u : 4u;
+			if (start == 0 || ref_len == UINT32_MAX || end > cdna_len ||
+			    (uint64_t)start > (uint64_t)cdna_len + (ref_len == 0u) ||
+			    cdna_offset > m->cdna_sequence_length || cdna_len > m->cdna_sequence_length - cdna_offset ||
+			    m->rna_kinds[k] != kind ||
+			    (k > m->rna_offsets[i] && (start >= m->rna_starts[k - 1u] ||
+		        end >= m->rna_starts[k - 1u])) ||
+			    m->rna_alt_offsets[k] > m->rna_alt_bytes_length ||
+			    alt_len > m->rna_alt_bytes_length - m->rna_alt_offsets[k])
+				return "RNA programme coordinates or ALT pool are invalid";
+		}
+	}
 	if (!snap_slices(m->cds_sequence_offsets, m->cds_sequence_lengths, transcripts,
 	    m->cds_sequence_bytes, m->cds_sequence_length) ||
 	    !snap_slices(m->pre_cds_sequence_offsets, m->pre_cds_sequence_lengths, transcripts,
@@ -554,7 +628,7 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 	const char *problem = NULL, *reference = NULL;
 	const uint64_t *width, *offset, *length;
 	uint64_t at, checksum, counts[SNAP_COUNTS] = {0}, flags, present;
-	union { snap_header_t v2; snap_v1_header_t v1; } zeroed;
+	union { snap_header_t v3; snap_v2_header_t v2; snap_v1_header_t v1; } zeroed;
 	size_t bytes = 0, section, wire_arrays, header_bytes;
 	int mapped = 0;
 
@@ -572,6 +646,7 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 	}
 	if (prefix->endian != SNAP_ENDIAN ||
 	    !((prefix->version == 1u && prefix->header_bytes == sizeof(snap_v1_header_t)) ||
+	    (prefix->version == 2u && prefix->header_bytes == sizeof(snap_v2_header_t)) ||
 	    (prefix->version == SNAP_VERSION && prefix->header_bytes == sizeof(snap_header_t))) ||
 	    prefix->header_bytes > bytes) {
 		problem = "the snapshot was written by an incompatible DuckVEP build";
@@ -586,6 +661,14 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 		present = prefix->present;
 		width = prefix->width; offset = prefix->offset; length = prefix->bytes;
 		wire_arrays = SNAP_V1_ARRAYS;
+	} else if (prefix->version == 2u) {
+		const snap_v2_header_t *header = (const snap_v2_header_t *)base;
+
+		memcpy(counts, header->counts, sizeof(header->counts));
+		flags = header->flags;
+		present = header->present;
+		width = header->width; offset = header->offset; length = header->bytes;
+		wire_arrays = SNAP_V2_ARRAYS;
 	} else {
 		const snap_header_t *header = (const snap_header_t *)base;
 
@@ -599,11 +682,12 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 		problem = "the snapshot is truncated or has trailing bytes";
 	else if ((present >> wire_arrays) != 0 ||
 	    (flags & ~(uint64_t)(SNAP_FLAG_COVERAGE | SNAP_FLAG_FLANKS |
-	    (prefix->version == SNAP_VERSION ? SNAP_FLAG_CDNA : 0u))) != 0)
+	    (prefix->version >= 2u ? SNAP_FLAG_CDNA : 0u))) != 0)
 		problem = "the snapshot header has unknown presence bits or flags";
 	else if (counts[SNAP_TRANSCRIPTS] > UINT32_MAX || counts[SNAP_REGIONS] > UINT16_MAX + 1u ||
 	    counts[SNAP_EXONS] > UINT32_MAX || counts[SNAP_MIRNA] > UINT32_MAX ||
 	    counts[SNAP_PEPTIDE] > UINT32_MAX || counts[SNAP_FEATURES] > UINT32_MAX ||
+	    counts[SNAP_RNA] > UINT32_MAX || counts[SNAP_RNA_ALT] > bytes ||
 	    counts[SNAP_CDS] > bytes || counts[SNAP_CDNA] > bytes || counts[SNAP_FLANK] > bytes)
 		problem = "the snapshot header has counts out of range";
 	if (problem != NULL)
@@ -622,6 +706,11 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 
 			if (width[section] != arrays[slot].width)
 				problem = "the snapshot was written by an incompatible DuckVEP build";
+			if (arrays[slot].count > UINT64_MAX / arrays[slot].width ||
+			    arrays[slot].count > SIZE_MAX / arrays[slot].width) {
+				problem = "the snapshot array length overflows";
+				goto fail;
+			}
 			expected = ((present >> section) & 1u) != 0 ? arrays[slot].count * arrays[slot].width : 0u;
 		} else if (width[section] != 1u) {
 			problem = "the snapshot was written by an incompatible DuckVEP build";
@@ -640,6 +729,11 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 	}
 	if (at != bytes) {
 		problem = "the snapshot sections do not match its header";
+		goto fail;
+	}
+	if (prefix->version == SNAP_VERSION &&
+	    (((present >> 51u) & 7u) != 0u && ((present >> 51u) & 7u) != 7u)) {
+		problem = "the original RNA coding authority arrays are incomplete";
 		goto fail;
 	}
 	/* Authenticate the original wire header and original section order, before slot mapping. */
@@ -674,9 +768,26 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 	model->cdna_sequence_length = (size_t)counts[SNAP_CDNA];
 	model->flank_sequence_length = (size_t)counts[SNAP_FLANK];
 	model->interval_feature_count = (size_t)counts[SNAP_FEATURES];
+	model->rna_count = (size_t)counts[SNAP_RNA];
+	model->rna_alt_bytes_length = (size_t)counts[SNAP_RNA_ALT];
 	model->transcript_coverage_complete = (flags & SNAP_FLAG_COVERAGE) != 0;
 	model->transcript_flanks_complete = (flags & SNAP_FLAG_FLANKS) != 0;
 	model->transcript_cdna_provided = (flags & SNAP_FLAG_CDNA) != 0;
+	if (model->transcripts.transcript_count != 0 &&
+	    model->rna_cds_cdna_starts == NULL && model->rna_cds_cdna_ends == NULL &&
+	    model->rna_codon_tables == NULL) {
+		model->rna_cds_cdna_starts = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
+		    model->transcripts.transcript_count, sizeof(*model->rna_cds_cdna_starts));
+		model->rna_cds_cdna_ends = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
+		    model->transcripts.transcript_count, sizeof(*model->rna_cds_cdna_ends));
+		model->rna_codon_tables = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL,
+		    model->transcripts.transcript_count, sizeof(*model->rna_codon_tables));
+		if (model->rna_cds_cdna_starts == NULL || model->rna_cds_cdna_ends == NULL ||
+		    model->rna_codon_tables == NULL) {
+			problem = "out of memory migrating the original coding authority";
+			goto fail;
+		}
+	}
 	if ((!model->transcript_cdna_provided && model->cdna_sequence_length != 0) ||
 	    (model->transcript_cdna_provided &&
 	    (model->cdna_sequence_offsets == NULL || model->cdna_sequence_lengths == NULL))) {

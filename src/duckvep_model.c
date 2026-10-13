@@ -32,6 +32,7 @@ typedef struct duckvep_load_bind {
 	char *mature_mirna_query;
 	char *peptide_edit_query;
 	char *interval_feature_query;
+	char *rna_edit_query;
 	char *reference_fasta;
 	int transcript_coverage_complete;
 } duckvep_load_bind_t;
@@ -52,7 +53,7 @@ typedef struct duckvep_query_source {
 	int have_result;
 	duckdb_data_chunk chunk;
 	duckvep_batch_t batch;
-	duckvep_col_t columns[16];
+	duckvep_col_t columns[20];
 } duckvep_query_source_t;
 
 static void
@@ -218,8 +219,8 @@ duckvep_qs_next(void *context)
 	if (source->chunk == NULL)
 		return NULL;
 	columns = duckdb_column_count(&source->result);
-	if (columns > 16)
-		columns = 16;
+	if (columns > 20)
+		columns = 20;
 	for (column = 0; column < columns; column++) {
 		duckdb_vector vector = duckdb_data_chunk_get_vector(source->chunk, column);
 
@@ -290,12 +291,12 @@ duckvep_model_load_queries(duckdb_connection connection,
 	const char *region_query, const char *transcript_query,
 	const char *exon_query, const char *mature_mirna_query,
 	const char *peptide_edit_query, const char *interval_feature_query,
-	const char *reference_fasta, int transcript_coverage_complete,
+	const char *rna_edit_query, const char *reference_fasta, int transcript_coverage_complete,
 	duckvep_owned_model_t *model,
 	char *error, size_t error_size)
 {
-	duckvep_query_source_t queries[6];
-	duckvep_source_t sources[6];
+	duckvep_query_source_t queries[7];
+	duckvep_source_t sources[7];
 	duckvep_model_sources_t model_sources;
 	int ok;
 
@@ -311,6 +312,7 @@ duckvep_model_load_queries(duckdb_connection connection,
 	duckvep_query_source_init(&queries[3], &sources[3], connection, mature_mirna_query);
 	duckvep_query_source_init(&queries[4], &sources[4], connection, peptide_edit_query);
 	duckvep_query_source_init(&queries[5], &sources[5], connection, interval_feature_query);
+	duckvep_query_source_init(&queries[6], &sources[6], connection, rna_edit_query);
 	memset(&model_sources, 0, sizeof(model_sources));
 	model_sources.regions = &sources[0];
 	model_sources.transcripts = &sources[1];
@@ -318,6 +320,7 @@ duckvep_model_load_queries(duckdb_connection connection,
 	model_sources.mature_mirna = mature_mirna_query != NULL ? &sources[3] : NULL;
 	model_sources.peptide_edits = peptide_edit_query != NULL ? &sources[4] : NULL;
 	model_sources.interval_features = interval_feature_query != NULL ? &sources[5] : NULL;
+	model_sources.rna_edits = rna_edit_query != NULL ? &sources[6] : NULL;
 	model_sources.reference_fasta = reference_fasta;
 	model_sources.transcript_coverage_complete = transcript_coverage_complete;
 	if (!duckvep_query_command(connection, "BEGIN TRANSACTION", error,
@@ -426,6 +429,8 @@ duckvep_model_load_bind_destroy(void *pointer)
 		duckdb_free(bind->peptide_edit_query);
 	if (bind->interval_feature_query != NULL)
 		duckdb_free(bind->interval_feature_query);
+	if (bind->rna_edit_query != NULL)
+		duckdb_free(bind->rna_edit_query);
 	if (bind->reference_fasta != NULL)
 		duckdb_free(bind->reference_fasta);
 	duckvep_budget_free(bind);
@@ -515,6 +520,20 @@ duckvep_model_load_bind(duckdb_bind_info info)
 			    bind->interval_feature_query[0] == '\0') {
 				duckdb_bind_set_error(info,
 				    "duckvep_model_load: interval_feature_query must be a non-empty string");
+				duckvep_model_load_bind_destroy(bind);
+				return;
+			}
+		}
+	}
+	duckdb_value rna_edit_value = duckdb_bind_get_named_parameter(info, "rna_edit_query");
+	if (rna_edit_value != NULL) {
+		if (duckdb_is_null_value(rna_edit_value)) {
+			duckdb_destroy_value(&rna_edit_value);
+		} else {
+			bind->rna_edit_query = duckdb_get_varchar(rna_edit_value);
+			duckdb_destroy_value(&rna_edit_value);
+			if (bind->rna_edit_query == NULL || bind->rna_edit_query[0] == '\0') {
+				duckdb_bind_set_error(info, "duckvep_model_load: rna_edit_query must be non-empty");
 				duckvep_model_load_bind_destroy(bind);
 				return;
 			}
@@ -620,7 +639,7 @@ duckvep_model_load_init(duckdb_init_info info)
 	    bind->mature_mirna_query,
 	    bind->peptide_edit_query,
 	    bind->interval_feature_query,
-	    bind->reference_fasta, bind->transcript_coverage_complete,
+	    bind->rna_edit_query, bind->reference_fasta, bind->transcript_coverage_complete,
 	    &entry->model, error,
 	    sizeof(error));
 	pthread_mutex_unlock(&registry->query_mutex);
@@ -895,6 +914,8 @@ duckvep_register_model_functions(duckdb_connection connection,
 	    "peptide_edit_query", varchar_type);
 	duckdb_table_function_add_named_parameter(table,
 	    "interval_feature_query", varchar_type);
+	duckdb_table_function_add_named_parameter(table,
+	    "rna_edit_query", varchar_type);
 	duckdb_table_function_add_named_parameter(table,
 	    "reference_fasta", varchar_type);
 	duckdb_table_function_add_named_parameter(table,

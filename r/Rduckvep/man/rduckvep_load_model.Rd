@@ -14,7 +14,8 @@ rduckvep_load_model(
   peptide_edit_query = NULL,
   interval_feature_query = NULL,
   reference_fasta = NULL,
-  transcript_coverage_complete = NULL
+  transcript_coverage_complete = NULL,
+  rna_edit_query = NULL
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ SELECT statements for the optional relations.}
 \item{reference_fasta}{Optional path of an indexed reference FASTA.}
 
 \item{transcript_coverage_complete}{Optional logical (`NA` is an error).}
+
+\item{rna_edit_query}{Optional SELECT statement for typed transcript RNA edits.}
 }
 \value{
 `TRUE`, invisibly, when the model is loaded.

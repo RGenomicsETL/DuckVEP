@@ -3190,7 +3190,7 @@ local({
     fixed = TRUE
   )
   expect_error(load_model("r-short-tail", short_tail_queries),
-    "transcript query must return 11 CDS-only columns, 13 with complete pre_cds_sequence and post_cds_sequence, or 14 with optional cdna_sequence")
+    "transcript query must return 11 CDS-only, 13 with flanks, 14 with cDNA, or 17 with the original RNA coding authority triple")
   missing_flank <- dbGetQuery(
     con,
     paste(

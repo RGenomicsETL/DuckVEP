@@ -4,9 +4,10 @@ library(DBI)
 # Coding prediction admission, source provenance and whole-haplotype effects.
 # prediction_status distinguishes supported predictions from explicit refusals.
 # Transcript 0 is + strand with exons 100-108 (ATGGCTGCT) and 120-128 (GAAGGTTAA).
-# Transcripts 1-6 are single-exon variants that each break one v1 CDS requirement.
+# Transcripts 1-6 are single-exon contexts with declared translation tables.
 local({
-  con <- rduckvep_connect()
+  extension_path <- Sys.getenv("DUCKVEP_EXTENSION", unset = "")
+  con <- if (nzchar(extension_path)) rduckvep_connect(extension_path = extension_path) else rduckvep_connect()
   on.exit(dbDisconnect(con, shutdown = TRUE))
   tx <- paste(
     "SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,100::UBIGINT transcript_start,",
@@ -75,12 +76,12 @@ local({
     haplotype_lane = c(1, 1, 2, 1, 2, 2, 1, 1, rep(1, 14)),
     prediction_status = unname(status[c("predicted", "predicted", "predicted", "predicted", "incomplete",
       "predicted", "incomplete", "incomplete", "overlap", "conflict", "context",
-      "predicted", "predicted", rep("context", 4), "predicted", "predicted", "predicted", "predicted", "predicted")]),
+      "predicted", "predicted", "predicted", rep("context", 3), "predicted", "predicted", "predicted", "predicted", "predicted")]),
     prediction_reason = c("supported_domain", "supported_domain", "supported_domain",
       "supported_domain", "missing_call", "supported_domain",
       "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "overlapping_edits",
       "contradictory_edits", "outside_cds", "supported_domain", "supported_domain",
-      "noncanonical_start", "internal_stop", "noncanonical_stop", "untyped_curated_metadata",
+      "supported_domain", "internal_stop", "noncanonical_stop", "untyped_curated_metadata",
       "supported_domain", "supported_domain", "supported_domain", "supported_domain",
       "supported_domain"),
     stringsAsFactors = FALSE)
@@ -221,7 +222,8 @@ local({
 # 4,200 input rows and 2,800 output rows. Kind i %% 3: 0 cis pair, 1 unphased heterozygous
 # pair (incomplete_input), 2 trans pair (two leaves).
 local({
-  con <- rduckvep_connect()
+  extension_path <- Sys.getenv("DUCKVEP_EXTENSION", unset = "")
+  con <- if (nzchar(extension_path)) rduckvep_connect(extension_path = extension_path) else rduckvep_connect()
   on.exit(dbDisconnect(con, shutdown = TRUE))
   tx <- paste("SELECT i::UINTEGER transcript_index,0::UINTEGER seq_region,(100+30*i)::UBIGINT transcript_start,",
     "(117+30*i)::UBIGINT transcript_end,1::TINYINT strand,i::UINTEGER gene_index,3::UBIGINT transcript_flags,",

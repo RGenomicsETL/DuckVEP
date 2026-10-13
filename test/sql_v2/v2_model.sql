@@ -159,8 +159,40 @@ EXECUTE released_arrangement;
 EXECUTE released_arrangement;
 DEALLOCATE released_arrangement;
 
--- The statements duckvep_model_load_sql returns load a model.
-SELECT CASE WHEN len(duckvep_model_load_sql('m1', 'SELECT 1', 'SELECT 2', 'SELECT 3')) = 4 AND len(duckvep_model_load_sql('m1', 'SELECT 1', 'SELECT 2', 'SELECT 3', {'mature_mirna_query': 'SELECT 4', 'reference_fasta': '/x', 'transcript_coverage_complete': true})) = 5 THEN true ELSE error('statement counts') END;
+-- Model scripts stage every declared optional source before publication.
+SELECT CASE WHEN len(duckvep_model_load_sql('m1', 'SELECT 1', 'SELECT 2', 'SELECT 3')) = 4 AND len(duckvep_model_load_sql('m1', 'SELECT 1', 'SELECT 2', 'SELECT 3', {'mature_mirna_query': 'SELECT 4', 'reference_fasta': '/x', 'transcript_coverage_complete': true})) = 5 AND len(duckvep_model_load_sql('m1', 'SELECT 1', 'SELECT 2', 'SELECT 3', {'rna_edit_query': 'SELECT 5'})) = 5 THEN true ELSE error('statement counts') END;
+SELECT CASE WHEN contains(duckvep_model_load_sql('m1', 'SELECT 1', 'SELECT 2', 'SELECT 3', {'rna_edit_query': 'SELECT 5'})[4], 'SELECT 5') THEN true ELSE error('RNA source missing from stage script') END;
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-needs-cdna', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-needs-cdna', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-needs-cdna', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT 0::UINTEGER transcript_index, 1::UINTEGER cdna_start, 1::UINTEGER cdna_end,
+             'A'::VARCHAR expected_substrate, 'G'::VARCHAR alternate_sequence,
+             'substitution'::VARCHAR operation_kind, '_rna_edit'::VARCHAR programme_name,
+             '_rna_edit'::VARCHAR evidence_name, 0::UTINYINT boundary_overrides)
+  TO 'x' (FORMAT duckvep_stage, MODEL 'rna-needs-cdna', RELATION 'rna_edits', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+-- expect error: RNA programmes require raw cDNA substrate
+SELECT duckvep_model_publish('rna-needs-cdna');
+SELECT CASE WHEN _duckvep_model_fingerprint('rna-needs-cdna') IS NULL THEN true ELSE error('RNA source failure published a model') END;
+-- expect error: relation 'regions' is not staged
+SELECT duckvep_model_publish('rna-needs-cdna');
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-needs-cdna', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-needs-cdna', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-needs-cdna', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN duckvep_model_publish('rna-needs-cdna') AND duckvep_model_drop('rna-needs-cdna') THEN true ELSE error('RNA source failure prevents model-name reuse') END;
+CREATE TEMP TABLE m_rna_transcripts AS
+  SELECT * REPLACE ((transcript_flags | 256)::UBIGINT AS transcript_flags,
+                    NULL::BLOB AS cds_sequence, NULL::UTINYINT AS codon_table,
+                    NULL::BLOB AS pre_cds_sequence, NULL::BLOB AS post_cds_sequence),
+         repeat('A', 102)::BLOB AS cdna_sequence FROM m_transcripts;
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-typed', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_rna_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-typed', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'rna-typed', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT 0::UINTEGER transcript_index, 1::UINTEGER cdna_start, 1::UINTEGER cdna_end,
+             'A'::VARCHAR expected_substrate, 'G'::VARCHAR alternate_sequence,
+             'substitution'::VARCHAR operation_kind, 'Ensembl116:_rna_edit'::VARCHAR programme_name,
+             'transcript_attrib:SeqEdit'::VARCHAR evidence_name, 0::UTINYINT boundary_overrides)
+  TO 'x' (FORMAT duckvep_stage, MODEL 'rna-typed', RELATION 'rna_edits', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN duckvep_model_publish('rna-typed') AND duckvep_model_drop('rna-typed') THEN true ELSE error('typed RNA source did not publish and release') END;
 SELECT CASE WHEN duckvep_model_load_sql('it''s', 'SELECT 1 -- c', 'SELECT 2', 'SELECT 3')[4] = 'SELECT duckvep_model_publish(''it''''s'')' THEN true ELSE error('publish statement text') END;
 SELECT CASE WHEN contains(duckvep_model_load_sql('m', 'SELECT 1 -- c', 'SELECT 2', 'SELECT 3')[1], E'-- c\n) TO ''duckvep_stage''') THEN true ELSE error('trailing comment stays inside the parentheses') END;
 -- expect error: arguments must be non-empty strings

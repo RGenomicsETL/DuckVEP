@@ -10,3 +10,5 @@ duckvep_prop_annotation.c
 duckvep_prop_coding.c
 duckvep_prop_haplotype_hgvs.c
 duckvep_prop_circular.c
+duckvep_prop_products.c
+duckvep_prop_product_owner.c

@@ -49701,7 +49701,7 @@
  },
  "builder ensembl transcripts defaults": {
   "rows": [
-   "{\"h\":\"97d86b2c60e7a7d6d0b0b4547ef2cbe1\",\"n\":29889}"
+   "{\"h\":\"7acafe02a20f054e56926e767a306d93\",\"n\":31672}"
   ]
  },
  "builder ensembl transcripts empty assembly error": {
@@ -49712,7 +49712,7 @@
  },
  "builder ensembl transcripts many rows": {
   "rows": [
-   "{\"n\":1200,\"h\":\"890151e156298d1300205b7417e084d6\"}"
+   "{\"n\":1200,\"h\":\"dad4c327842bd8a669377da5eeb7baf0\"}"
   ]
  },
  "builder ensembl transcripts null core error": {
@@ -49720,7 +49720,7 @@
  },
  "builder ensembl transcripts null options": {
   "rows": [
-   "{\"h\":\"5577f2c5dcb5433a3529ef83348b5480\",\"n\":29860}"
+   "{\"h\":\"e591f1adff1b0786bb08922543c734f6\",\"n\":31643}"
   ]
  },
  "builder ensembl transcripts options not a struct error": {
@@ -49728,52 +49728,52 @@
  },
  "builder ensembl transcripts quoting": {
   "rows": [
-   "{\"h\":\"d04a91b78b68c62a5e7450900bfc41a7\",\"n\":29915}"
+   "{\"h\":\"c00a4cd8b68369f8f4dc99a67b3df313\",\"n\":31698}"
   ]
  },
  "builder ensembl transcripts schema qualified": {
   "rows": [
-   "{\"h\":\"b2e51d085f3646b4d5b9df4e055270ea\",\"n\":29921}"
+   "{\"h\":\"3869ec30614101ba2094618f1ac3442c\",\"n\":31704}"
   ]
  },
  "builder ensembl transcripts species 0": {
   "rows": [
-   "{\"h\":\"ee0c130cf1afcbbf106db8f3d099fe76\",\"n\":29860}"
+   "{\"h\":\"b0f328fcdaceabb387d89815cc39a67e\",\"n\":31643}"
   ]
  },
  "builder ensembl transcripts species 1": {
   "rows": [
-   "{\"h\":\"5577f2c5dcb5433a3529ef83348b5480\",\"n\":29860}"
+   "{\"h\":\"e591f1adff1b0786bb08922543c734f6\",\"n\":31643}"
   ]
  },
  "builder ensembl transcripts species 255UTINYINT": {
   "rows": [
-   "{\"h\":\"5edd4eb30d82fde6c44f5c1e2cb5b5ed\",\"n\":29862}"
+   "{\"h\":\"183377b1ade28277a2f85cbc5101bd4d\",\"n\":31645}"
   ]
  },
  "builder ensembl transcripts species 7": {
   "rows": [
-   "{\"h\":\"458eee4198bbcddccf0511a1e558a9aa\",\"n\":29860}"
+   "{\"h\":\"b44ede8034900cf11f742752822b4b6d\",\"n\":31643}"
   ]
  },
  "builder ensembl transcripts species 9223372036854775807UBIGI": {
   "rows": [
-   "{\"h\":\"b09720b79aaa2686585379f3dd2e12ca\",\"n\":29878}"
+   "{\"h\":\"f5408908b0f709eb25197f77518e1a6a\",\"n\":31661}"
   ]
  },
  "builder ensembl transcripts species NULL": {
   "rows": [
-   "{\"h\":\"4099c9e072dc6445f59c9bb2139397d7\",\"n\":29863}"
+   "{\"h\":\"0dd36f0ca8a1f30276931da02571713f\",\"n\":31646}"
   ]
  },
  "builder ensembl transcripts species NULLINTEGER": {
   "rows": [
-   "{\"h\":\"4099c9e072dc6445f59c9bb2139397d7\",\"n\":29863}"
+   "{\"h\":\"0dd36f0ca8a1f30276931da02571713f\",\"n\":31646}"
   ]
  },
  "builder ensembl transcripts species m2BIGINT": {
   "rows": [
-   "{\"h\":\"7196d459f664aee5fa3d444b2f7bfa1c\",\"n\":29861}"
+   "{\"h\":\"99f1c0d5fca105052766ed9cf5c0daf5\",\"n\":31644}"
   ]
  },
  "builder ensembl transcripts species too large error": {
@@ -50222,12 +50222,12 @@
  },
  "builder receipt defaults": {
   "rows": [
-   "{\"h\":\"1cf96be95af7eee5f2c5518aa767b573\",\"n\":9624}"
+   "{\"h\":\"830876e2fa9a2958ff3e2ba8a20b9849\",\"n\":10304}"
   ]
  },
  "builder receipt many rows": {
   "rows": [
-   "{\"n\":1500,\"h\":\"13240d1853607d5437eb7048059393ac\"}"
+   "{\"n\":1500,\"h\":\"04cefde6b7ad007d3dc717e64da10d20\"}"
   ]
  },
  "builder receipt nul in parameter error": {
@@ -50238,12 +50238,12 @@
  },
  "builder receipt null options": {
   "rows": [
-   "{\"h\":\"1cf96be95af7eee5f2c5518aa767b573\",\"n\":9624}"
+   "{\"h\":\"830876e2fa9a2958ff3e2ba8a20b9849\",\"n\":10304}"
   ]
  },
  "builder receipt null parameters": {
   "rows": [
-   "{\"h\":\"892284f3c12e203503a8bc4c46924841\",\"n\":9611}"
+   "{\"h\":\"8f7b347945be295d0c84b3872cfb8502\",\"n\":10291}"
   ]
  },
  "builder receipt null regions error": {
@@ -50257,27 +50257,27 @@
  },
  "builder receipt quoting": {
   "rows": [
-   "{\"h\":\"b9a1f3817a0ef14eee6d780d159ebf19\",\"n\":9613}"
+   "{\"h\":\"a0181d6c4296b46144ee95bcd65b3435\",\"n\":10293}"
   ]
  },
  "builder receipt regulation null": {
   "rows": [
-   "{\"h\":\"1cf96be95af7eee5f2c5518aa767b573\",\"n\":9624}"
+   "{\"h\":\"830876e2fa9a2958ff3e2ba8a20b9849\",\"n\":10304}"
   ]
  },
  "builder receipt regulation qualified": {
   "rows": [
-   "{\"h\":\"3d931be6a51c10e3bd9773251889c437\",\"n\":9445}"
+   "{\"h\":\"a4e504aa9b27d96dd97f8e31f7a8b949\",\"n\":10125}"
   ]
  },
  "builder receipt regulation table": {
   "rows": [
-   "{\"h\":\"eb7128fc9a69af6b19cd894844105eb9\",\"n\":9440}"
+   "{\"h\":\"240b560ce0ebc81fee4b537af91c6fb6\",\"n\":10120}"
   ]
  },
  "builder receipt schema tables": {
   "rows": [
-   "{\"h\":\"10fb33ea59a089c3762043cd81b2b9f6\",\"n\":9614}"
+   "{\"h\":\"8ca9677689f9ec88ec40ec1bbfc58748\",\"n\":10294}"
   ]
  },
  "builder receipt unknown option error": {
@@ -50827,7 +50827,7 @@
  },
  "duplicate deletion immediate stop full row": {
   "rows": [
-   "{\"transcript_index\":0,\"cds\":\"ATGTAACTTTAA\",\"protein\":\"M*\",\"sequence_flags\":9,\"evidence_flags\":1,\"projection_status\":\"ok\",\"sequence_status\":\"ok\",\"edit_count\":4,\"carrier_count\":1,\"carriers\":[{\"sample_index\":0,\"phase_set\":77,\"haplotype_lane\":2,\"ploidy\":2}],\"contributors\":[{\"event_index\":1,\"seq_region\":0,\"position\":102,\"reference\":\"GGCT\",\"alternate\":\"G\",\"evidence_flags\":1,\"projection_status\":\"ok\"},{\"event_index\":2,\"seq_region\":0,\"position\":102,\"reference\":\"GGCT\",\"alternate\":\"G\",\"evidence_flags\":1,\"projection_status\":\"ok\"},{\"event_index\":3,\"seq_region\":0,\"position\":106,\"reference\":\"GAA\",\"alternate\":\"TAA\",\"evidence_flags\":1,\"projection_status\":\"ok\"},{\"event_index\":4,\"seq_region\":0,\"position\":109,\"reference\":\"T\",\"alternate\":\"C\",\"evidence_flags\":1,\"projection_status\":\"ok\"}],\"coding_blocks\":[{\"cds_start\":4,\"reference\":\"GCTG\",\"alternate\":\"T\",\"alt_start0\":3,\"length_change\":-3,\"sequence_flags\":1,\"coding_status\":\"ok\",\"local_consequence_mask\":16384,\"after_first_stop\":false,\"event_indices\":[1,2,3]},{\"cds_start\":10,\"reference\":\"T\",\"alternate\":\"C\",\"alt_start0\":6,\"length_change\":0,\"sequence_flags\":0,\"coding_status\":\"ok\",\"local_consequence_mask\":8192,\"after_first_stop\":true,\"event_indices\":[4]}],\"cds_differences\":[{\"ref_start0\":3,\"alt_start0\":3,\"reference\":\"GC\",\"alternate\":\"\",\"alignment_start0\":3},{\"ref_start0\":6,\"alt_start0\":4,\"reference\":\"G\",\"alternate\":\"\",\"alignment_start0\":6},{\"ref_start0\":9,\"alt_start0\":6,\"reference\":\"T\",\"alternate\":\"C\",\"alignment_start0\":9}],\"protein_differences\":[{\"ref_start0\":1,\"alt_start0\":1,\"reference\":\"AEF\",\"alternate\":\"\",\"alignment_start0\":1}],\"stop_in_displaced_frame\":false,\"hgvsc\":\"c.[4_7delinsT;10T>C]\",\"hgvsc_status\":\"ok\",\"hgvsp\":\"p.(Ala2Ter)\",\"hgvsp_status\":\"ok\",\"prediction_policy\":\"duckvep-coding\",\"prediction_status\":\"predicted\",\"prediction_reason\":\"supported_domain\",\"contributor_provenance\":[{\"event_index\":1,\"alt_index\":1,\"seq_region\":0,\"position\":102,\"reference\":\"GGCT\",\"alternate\":\"G\",\"evidence_flags\":1,\"projection_status\":\"ok\",\"role\":\"applied\",\"edit_count\":1},{\"event_index\":2,\"alt_index\":1,\"seq_region\":0,\"position\":102,\"reference\":\"GGCT\",\"alternate\":\"G\",\"evidence_flags\":1,\"projection_status\":\"ok\",\"role\":\"applied\",\"edit_count\":1},{\"event_index\":3,\"alt_index\":1,\"seq_region\":0,\"position\":106,\"reference\":\"GAA\",\"alternate\":\"TAA\",\"evidence_flags\":1,\"projection_status\":\"ok\",\"role\":\"applied\",\"edit_count\":1},{\"event_index\":4,\"alt_index\":1,\"seq_region\":0,\"position\":109,\"reference\":\"T\",\"alternate\":\"C\",\"evidence_flags\":1,\"projection_status\":\"ok\",\"role\":\"post_stop\",\"edit_count\":1}],\"normalized_edits\":[{\"edit_index\":0,\"event_index\":2,\"block_index\":0,\"cds_start\":4,\"reference\":\"GCT\",\"alternate\":\"\",\"variant_strand\":1},{\"edit_index\":1,\"event_index\":1,\"block_index\":0,\"cds_start\":4,\"reference\":\"GCT\",\"alternate\":\"\",\"variant_strand\":1},{\"edit_index\":2,\"event_index\":3,\"block_index\":0,\"cds_start\":7,\"reference\":\"G\",\"alternate\":\"T\",\"variant_strand\":1},{\"edit_index\":3,\"event_index\":4,\"block_index\":1,\"cds_start\":10,\"reference\":\"T\",\"alternate\":\"C\",\"variant_strand\":1}],\"carrier_predictions\":[{\"sample_index\":0,\"phase_set\":77,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"prediction_reason\":\"supported_domain\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":6,\"nmd_junction_position\":null}],\"haplotype_consequences\":[\"stop_gained\"],\"haplotype_impact\":\"HIGH\",\"nmd_rule\":\"ejc50\",\"nmd_prediction\":\"escape\",\"nmd_stop_position\":6,\"nmd_junction_position\":null,\"nmd_contributors\":[1,2,3],\"nmd_exceptions\":\"start_proximal\",\"prediction_reference_protein\":null,\"prediction_protein\":null,\"nominal_length_diff\":-3}"
+   "{\"transcript_index\":0,\"cds\":\"ATGTAACTTTAA\",\"protein\":\"M*\",\"sequence_flags\":9,\"evidence_flags\":1,\"projection_status\":\"ok\",\"sequence_status\":\"ok\",\"edit_count\":4,\"carrier_count\":1,\"carriers\":[{\"sample_index\":0,\"phase_set\":77,\"haplotype_lane\":2,\"ploidy\":2}],\"contributors\":[{\"event_index\":1,\"seq_region\":0,\"position\":102,\"reference\":\"GGCT\",\"alternate\":\"G\",\"evidence_flags\":1,\"projection_status\":\"ok\"},{\"event_index\":2,\"seq_region\":0,\"position\":102,\"reference\":\"GGCT\",\"alternate\":\"G\",\"evidence_flags\":1,\"projection_status\":\"ok\"},{\"event_index\":3,\"seq_region\":0,\"position\":106,\"reference\":\"GAA\",\"alternate\":\"TAA\",\"evidence_flags\":1,\"projection_status\":\"ok\"},{\"event_index\":4,\"seq_region\":0,\"position\":109,\"reference\":\"T\",\"alternate\":\"C\",\"evidence_flags\":1,\"projection_status\":\"ok\"}],\"coding_blocks\":[{\"cds_start\":4,\"reference\":\"GCTG\",\"alternate\":\"T\",\"alt_start0\":3,\"length_change\":-3,\"sequence_flags\":1,\"coding_status\":\"ok\",\"local_consequence_mask\":16384,\"after_first_stop\":false,\"event_indices\":[1,2,3]},{\"cds_start\":10,\"reference\":\"T\",\"alternate\":\"C\",\"alt_start0\":6,\"length_change\":0,\"sequence_flags\":0,\"coding_status\":\"ok\",\"local_consequence_mask\":8192,\"after_first_stop\":true,\"event_indices\":[4]}],\"cds_differences\":[{\"ref_start0\":3,\"alt_start0\":3,\"reference\":\"GC\",\"alternate\":\"\",\"alignment_start0\":3},{\"ref_start0\":6,\"alt_start0\":4,\"reference\":\"G\",\"alternate\":\"\",\"alignment_start0\":6},{\"ref_start0\":9,\"alt_start0\":6,\"reference\":\"T\",\"alternate\":\"C\",\"alignment_start0\":9}],\"protein_differences\":[{\"ref_start0\":1,\"alt_start0\":1,\"reference\":\"AEF\",\"alternate\":\"\",\"alignment_start0\":1}],\"stop_in_displaced_frame\":false,\"hgvsc\":\"c.[4_7delinsT;10T>C]\",\"hgvsc_status\":\"ok\",\"hgvsp\":\"p.(Ala2Ter)\",\"hgvsp_status\":\"ok\",\"prediction_policy\":\"duckvep-coding\",\"prediction_status\":\"predicted\",\"prediction_reason\":\"supported_domain\",\"contributor_provenance\":[{\"event_index\":1,\"alt_index\":1,\"seq_region\":0,\"position\":102,\"reference\":\"GGCT\",\"alternate\":\"G\",\"evidence_flags\":1,\"projection_status\":\"ok\",\"role\":\"applied\",\"edit_count\":1},{\"event_index\":2,\"alt_index\":1,\"seq_region\":0,\"position\":102,\"reference\":\"GGCT\",\"alternate\":\"G\",\"evidence_flags\":1,\"projection_status\":\"ok\",\"role\":\"applied\",\"edit_count\":1},{\"event_index\":3,\"alt_index\":1,\"seq_region\":0,\"position\":106,\"reference\":\"GAA\",\"alternate\":\"TAA\",\"evidence_flags\":1,\"projection_status\":\"ok\",\"role\":\"applied\",\"edit_count\":1},{\"event_index\":4,\"alt_index\":1,\"seq_region\":0,\"position\":109,\"reference\":\"T\",\"alternate\":\"C\",\"evidence_flags\":1,\"projection_status\":\"ok\",\"role\":\"post_stop\",\"edit_count\":1}],\"normalized_edits\":[{\"edit_index\":0,\"event_index\":2,\"block_index\":0,\"cds_start\":4,\"reference\":\"GCT\",\"alternate\":\"\",\"variant_strand\":1},{\"edit_index\":1,\"event_index\":1,\"block_index\":0,\"cds_start\":4,\"reference\":\"GCT\",\"alternate\":\"\",\"variant_strand\":1},{\"edit_index\":2,\"event_index\":3,\"block_index\":0,\"cds_start\":7,\"reference\":\"G\",\"alternate\":\"T\",\"variant_strand\":1},{\"edit_index\":3,\"event_index\":4,\"block_index\":1,\"cds_start\":10,\"reference\":\"T\",\"alternate\":\"C\",\"variant_strand\":1}],\"carrier_predictions\":[{\"sample_index\":0,\"phase_set\":77,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"prediction_reason\":\"supported_domain\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":6,\"nmd_junction_position\":null}],\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"haplotype_impact\":\"HIGH\",\"nmd_rule\":\"ejc50\",\"nmd_prediction\":\"escape\",\"nmd_stop_position\":6,\"nmd_junction_position\":null,\"nmd_contributors\":[1,2,3],\"nmd_exceptions\":\"start_proximal\",\"prediction_reference_protein\":null,\"prediction_protein\":null,\"nominal_length_diff\":-3}"
   ]
  },
  "duplicate insertion full row": {
@@ -51150,12 +51150,12 @@
  },
  "haplotypes nm full-row hash": {
   "rows": [
-   "{\"n\":250,\"total\":2206918717975886787721,\"x\":9268254449696724081,\"transcripts\":238}"
+   "{\"n\":250,\"total\":2214137170784349814859,\"x\":3113897188211712037,\"transcripts\":238}"
   ]
  },
  "haplotypes nm hgvs full-row hash": {
   "rows": [
-   "{\"n\":250,\"total\":2203978465762580879390,\"x\":5136244193682519752}"
+   "{\"n\":250,\"total\":2195180746304829467013,\"x\":17558476449629570859}"
   ]
  },
  "haplotypes nm hgvs status counts": {
@@ -51237,34 +51237,34 @@
    "{\"transcript_index\":65,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":25,\"nmd_junction_position\":null}",
    "{\"transcript_index\":66,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":12,\"nmd_junction_position\":null}",
    "{\"transcript_index\":67,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":25,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":68,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":54,\"nmd_junction_position\":105}",
-   "{\"transcript_index\":69,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":67,\"nmd_junction_position\":118}",
-   "{\"transcript_index\":70,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":54,\"nmd_junction_position\":105}",
-   "{\"transcript_index\":71,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":67,\"nmd_junction_position\":118}",
-   "{\"transcript_index\":72,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":54,\"nmd_junction_position\":104}",
-   "{\"transcript_index\":73,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":67,\"nmd_junction_position\":117}",
-   "{\"transcript_index\":74,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":54,\"nmd_junction_position\":104}",
-   "{\"transcript_index\":75,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":67,\"nmd_junction_position\":117}",
-   "{\"transcript_index\":76,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":48,\"nmd_junction_position\":98}",
-   "{\"transcript_index\":77,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":61,\"nmd_junction_position\":111}",
-   "{\"transcript_index\":78,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":48,\"nmd_junction_position\":98}",
-   "{\"transcript_index\":79,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":61,\"nmd_junction_position\":111}",
-   "{\"transcript_index\":80,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":48,\"nmd_junction_position\":99}",
-   "{\"transcript_index\":81,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":61,\"nmd_junction_position\":112}",
-   "{\"transcript_index\":82,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":48,\"nmd_junction_position\":99}",
-   "{\"transcript_index\":83,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":61,\"nmd_junction_position\":112}",
-   "{\"transcript_index\":84,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":57,\"nmd_junction_position\":108}",
-   "{\"transcript_index\":85,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":70,\"nmd_junction_position\":121}",
-   "{\"transcript_index\":86,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":57,\"nmd_junction_position\":108}",
-   "{\"transcript_index\":87,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":70,\"nmd_junction_position\":121}",
-   "{\"transcript_index\":88,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":54,\"nmd_junction_position\":105}",
-   "{\"transcript_index\":89,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":67,\"nmd_junction_position\":118}",
-   "{\"transcript_index\":90,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":54,\"nmd_junction_position\":105}",
-   "{\"transcript_index\":91,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":67,\"nmd_junction_position\":118}",
-   "{\"transcript_index\":92,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":48,\"nmd_junction_position\":98}",
-   "{\"transcript_index\":93,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":61,\"nmd_junction_position\":111}",
-   "{\"transcript_index\":94,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":48,\"nmd_junction_position\":98}",
-   "{\"transcript_index\":95,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":61,\"nmd_junction_position\":111}",
+   "{\"transcript_index\":68,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":54,\"nmd_junction_position\":105}",
+   "{\"transcript_index\":69,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":67,\"nmd_junction_position\":118}",
+   "{\"transcript_index\":70,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":54,\"nmd_junction_position\":105}",
+   "{\"transcript_index\":71,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":67,\"nmd_junction_position\":118}",
+   "{\"transcript_index\":72,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":54,\"nmd_junction_position\":104}",
+   "{\"transcript_index\":73,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":67,\"nmd_junction_position\":117}",
+   "{\"transcript_index\":74,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":54,\"nmd_junction_position\":104}",
+   "{\"transcript_index\":75,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":67,\"nmd_junction_position\":117}",
+   "{\"transcript_index\":76,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":48,\"nmd_junction_position\":98}",
+   "{\"transcript_index\":77,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":61,\"nmd_junction_position\":111}",
+   "{\"transcript_index\":78,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":48,\"nmd_junction_position\":98}",
+   "{\"transcript_index\":79,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":61,\"nmd_junction_position\":111}",
+   "{\"transcript_index\":80,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":48,\"nmd_junction_position\":99}",
+   "{\"transcript_index\":81,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":61,\"nmd_junction_position\":112}",
+   "{\"transcript_index\":82,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":48,\"nmd_junction_position\":99}",
+   "{\"transcript_index\":83,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":61,\"nmd_junction_position\":112}",
+   "{\"transcript_index\":84,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":57,\"nmd_junction_position\":108}",
+   "{\"transcript_index\":85,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":70,\"nmd_junction_position\":121}",
+   "{\"transcript_index\":86,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":57,\"nmd_junction_position\":108}",
+   "{\"transcript_index\":87,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":70,\"nmd_junction_position\":121}",
+   "{\"transcript_index\":88,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":54,\"nmd_junction_position\":105}",
+   "{\"transcript_index\":89,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":67,\"nmd_junction_position\":118}",
+   "{\"transcript_index\":90,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":54,\"nmd_junction_position\":105}",
+   "{\"transcript_index\":91,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_insertion\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":67,\"nmd_junction_position\":118}",
+   "{\"transcript_index\":92,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":48,\"nmd_junction_position\":98}",
+   "{\"transcript_index\":93,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":61,\"nmd_junction_position\":111}",
+   "{\"transcript_index\":94,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":48,\"nmd_junction_position\":98}",
+   "{\"transcript_index\":95,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\",\"inframe_deletion\"],\"nmd_prediction\":\"escape\",\"nmd_stop_position\":61,\"nmd_junction_position\":111}",
    "{\"transcript_index\":96,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":51,\"nmd_junction_position\":103}",
    "{\"transcript_index\":97,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":64,\"nmd_junction_position\":116}",
    "{\"transcript_index\":98,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_gained\"],\"nmd_prediction\":\"trigger\",\"nmd_stop_position\":51,\"nmd_junction_position\":103}",
@@ -51657,7 +51657,7 @@
  },
  "haplotypes sc full-row hash": {
   "rows": [
-   "{\"n\":144,\"total\":1278663369435005428560,\"x\":4495889223471160240,\"transcripts\":138}"
+   "{\"n\":144,\"total\":1266892723490166823604,\"x\":12412779472436768854,\"transcripts\":138}"
   ]
  },
  "haplotypes sc nested carriers": {
@@ -51677,7 +51677,7 @@
    "{\"transcript_index\":10,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":11,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":12,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":13,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":13,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":14,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":15,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":16,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -51702,7 +51702,7 @@
    "{\"transcript_index\":33,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":34,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":35,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":36,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":36,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":37,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":38,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":39,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -51727,7 +51727,7 @@
    "{\"transcript_index\":56,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":57,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":58,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":59,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":59,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":60,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":61,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":62,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -51752,7 +51752,7 @@
    "{\"transcript_index\":79,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":80,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":81,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":82,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":82,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":83,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":84,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":85,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -51777,7 +51777,7 @@
    "{\"transcript_index\":102,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":103,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":104,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":105,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":105,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":106,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":107,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":108,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -51802,7 +51802,7 @@
    "{\"transcript_index\":125,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":126,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_deletion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":127,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":128,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":128,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":129,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":130,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":131,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -51830,7 +51830,7 @@
  },
  "haplotypes ss full-row hash": {
   "rows": [
-   "{\"n\":366,\"total\":3616752480536518701126,\"x\":8127280110378016880,\"transcripts\":348}"
+   "{\"n\":366,\"total\":3657813613620810045685,\"x\":2650681600858943641,\"transcripts\":348}"
   ]
  },
  "haplotypes ss nested carriers": {
@@ -51871,12 +51871,12 @@
    "{\"transcript_index\":30,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":31,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":31,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":32,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":32,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\",\"missense_variant\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":33,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":34,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":35,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":35,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":36,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":37,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":37,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\",\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":38,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":38,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":39,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -51935,12 +51935,12 @@
    "{\"transcript_index\":88,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":89,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":89,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":90,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":90,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\",\"missense_variant\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":91,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":92,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":93,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":93,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":94,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":95,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":95,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\",\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":96,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":96,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":97,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -51999,12 +51999,12 @@
    "{\"transcript_index\":146,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":147,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":147,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":148,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":148,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\",\"missense_variant\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":149,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":150,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":151,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":151,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":152,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":153,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":153,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\",\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":154,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":154,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":155,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -52063,12 +52063,12 @@
    "{\"transcript_index\":204,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":205,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":205,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":206,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":206,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\",\"missense_variant\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":207,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":208,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":209,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":209,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":210,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":211,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":211,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\",\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":212,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":212,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":213,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -52127,12 +52127,12 @@
    "{\"transcript_index\":262,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":263,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":263,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":264,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":264,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\",\"missense_variant\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":265,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":266,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":267,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":267,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":268,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":269,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":269,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\",\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":270,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":270,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":271,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
@@ -52191,12 +52191,12 @@
    "{\"transcript_index\":320,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":321,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":321,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":322,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":322,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"HIGH\",\"haplotype_consequences\":[\"stop_lost\",\"missense_variant\"],\"nmd_prediction\":\"unknown\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":323,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":324,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":325,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":325,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\",\"synonymous_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":326,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
-   "{\"transcript_index\":327,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
+   "{\"transcript_index\":327,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"inframe_insertion\",\"protein_altering_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":328,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":328,\"sample_index\":0,\"haplotype_lane\":2,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"MODERATE\",\"haplotype_consequences\":[\"missense_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",
    "{\"transcript_index\":329,\"sample_index\":0,\"haplotype_lane\":1,\"prediction_status\":\"predicted\",\"haplotype_impact\":\"LOW\",\"haplotype_consequences\":[\"stop_retained_variant\"],\"nmd_prediction\":\"not_applicable\",\"nmd_stop_position\":null,\"nmd_junction_position\":null}",

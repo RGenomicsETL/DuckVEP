@@ -112,3 +112,9 @@ Required relation names are passed as strings; the native builders quote them.
 Optional named arguments are forwarded as a DuckDB STRUCT. Load the extension
 on `con` with [rduckvep_load()] before calling a builder.
 }
+\details{
+Model receipts include nonempty original RNA coding authority in
+  their content hash. Absent or all-NULL authority preserves legacy receipt
+  identity. A receipt commits to supplied content, not independently verified
+  biological correctness.
+}

@@ -205,6 +205,9 @@ duckvep_model_reserve_transcripts(duckvep_owned_model_t *model,
 	DUCKVEP_RESIZE_TRANSCRIPT(cdna_sequence_offsets);
 	DUCKVEP_RESIZE_TRANSCRIPT(cdna_sequence_lengths);
 	DUCKVEP_RESIZE_TRANSCRIPT(codon_tables);
+	DUCKVEP_RESIZE_TRANSCRIPT(rna_cds_cdna_starts);
+	DUCKVEP_RESIZE_TRANSCRIPT(rna_cds_cdna_ends);
+	DUCKVEP_RESIZE_TRANSCRIPT(rna_codon_tables);
 	DUCKVEP_RESIZE_TRANSCRIPT(pre_cds_sequence_offsets);
 	DUCKVEP_RESIZE_TRANSCRIPT(pre_cds_sequence_lengths);
 	DUCKVEP_RESIZE_TRANSCRIPT(post_cds_sequence_offsets);
@@ -417,6 +420,9 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 	duckvep_model_array_free(model, model->cdna_sequence_offsets);
 	duckvep_model_array_free(model, model->cdna_sequence_lengths);
 	duckvep_model_array_free(model, model->codon_tables);
+	duckvep_model_array_free(model, model->rna_cds_cdna_starts);
+	duckvep_model_array_free(model, model->rna_cds_cdna_ends);
+	duckvep_model_array_free(model, model->rna_codon_tables);
 	duckvep_model_array_free(model, model->pre_cds_sequence_offsets);
 	duckvep_model_array_free(model, model->pre_cds_sequence_lengths);
 	duckvep_model_array_free(model, model->post_cds_sequence_offsets);
@@ -434,6 +440,15 @@ duckvep_owned_model_destroy(duckvep_owned_model_t *model)
 	duckvep_model_array_free(model, model->peptide_edit_positions);
 	duckvep_model_array_free(model, model->peptide_edit_alts);
 	duckvep_model_array_free(model, model->peptide_edit_codes);
+	duckvep_model_array_free(model, model->rna_presence);
+	duckvep_model_array_free(model, model->rna_boundary_overrides);
+	duckvep_model_array_free(model, model->rna_offsets);
+	duckvep_model_array_free(model, model->rna_starts);
+	duckvep_model_array_free(model, model->rna_ends);
+	duckvep_model_array_free(model, model->rna_kinds);
+	duckvep_model_array_free(model, model->rna_alt_offsets);
+	duckvep_model_array_free(model, model->rna_alt_lengths);
+	duckvep_model_array_free(model, model->rna_alt_bytes);
 	duckvep_model_array_free(model, model->cds_sequence_bytes);
 	duckvep_model_array_free(model, model->cdna_sequence_bytes);
 	duckvep_model_array_free(model, model->flank_sequence_bytes);
@@ -1240,7 +1255,8 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		"transcript_index", "seq_region", "transcript_start",
 		"transcript_end", "strand", "gene_index", "transcript_flags",
 		"cds_start", "cds_end", "cds_sequence", "codon_table",
-		"pre_cds_sequence", "post_cds_sequence", "cdna_sequence"
+		"pre_cds_sequence", "post_cds_sequence", "cdna_sequence",
+		"rna_cds_cdna_start", "rna_cds_cdna_end", "rna_codon_table"
 	};
 	static const duckvep_ctype_t types[] = {
 		DUCKVEP_CT_UINTEGER, DUCKVEP_CT_UINTEGER,
@@ -1249,7 +1265,8 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		DUCKVEP_CT_UBIGINT, DUCKVEP_CT_UBIGINT,
 		DUCKVEP_CT_UBIGINT, DUCKVEP_CT_BLOB,
 		DUCKVEP_CT_UTINYINT, DUCKVEP_CT_BLOB,
-		DUCKVEP_CT_BLOB, DUCKVEP_CT_BLOB
+		DUCKVEP_CT_BLOB, DUCKVEP_CT_BLOB,
+		DUCKVEP_CT_UBIGINT, DUCKVEP_CT_UBIGINT, DUCKVEP_CT_UTINYINT
 	};
 		duckvep_batch_t *chunk;
 	size_t column_count;
@@ -1277,9 +1294,9 @@ duckvep_load_transcripts(duckvep_source_t *source,
 	received = 0;
 	ok = 0;
 	column_count = duckvep_source_columns(source);
-	if (column_count != 11 && column_count != 13 && column_count != 14) {
+	if (column_count != 11 && column_count != 13 && column_count != 14 && column_count != 17) {
 		duckvep_sql_set_error(error, error_size,
-		    "transcript query must return 11 CDS-only columns, 13 with complete pre_cds_sequence and post_cds_sequence, or 14 with optional cdna_sequence");
+		    "transcript query must return 11 CDS-only, 13 with flanks, 14 with cDNA, or 17 with the original RNA coding authority triple");
 		goto done;
 	}
 	if (!duckvep_result_schema(source, names, types,
@@ -1287,15 +1304,16 @@ duckvep_load_transcripts(duckvep_source_t *source,
 	    error, error_size))
 		goto done;
 	model->transcript_flanks_complete = column_count >= 13;
-	model->transcript_cdna_provided = column_count == 14;
+	model->transcript_cdna_provided = column_count >= 14;
 	while ((chunk = duckvep_source_next(source)) != NULL) {
-		const duckvep_col_t *vectors[14];
+		const duckvep_col_t *vectors[17];
 		uint32_t *transcript_indices, *seq_regions, *gene_indices;
 		uint64_t *starts, *ends, *flags, *cds_starts, *cds_ends;
 		int8_t *strands;
 		duckvep_string_t *sequences, *pre_flanks;
 		duckvep_string_t *post_flanks, *cdnas;
-		uint8_t *tables;
+		uint8_t *tables, *rna_tables;
+		uint64_t *rna_starts, *rna_ends;
 		size_t row, rows;
 		size_t column;
 
@@ -1318,7 +1336,10 @@ duckvep_load_transcripts(duckvep_source_t *source,
 		    ? duckvep_col_data(vectors[11]) : NULL;
 		post_flanks = column_count >= 13
 		    ? duckvep_col_data(vectors[12]) : NULL;
-		cdnas = column_count == 14 ? duckvep_col_data(vectors[13]) : NULL;
+		cdnas = column_count >= 14 ? duckvep_col_data(vectors[13]) : NULL;
+		rna_starts = column_count == 17 ? duckvep_col_data(vectors[14]) : NULL;
+		rna_ends = column_count == 17 ? duckvep_col_data(vectors[15]) : NULL;
+		rna_tables = column_count == 17 ? duckvep_col_data(vectors[16]) : NULL;
 		for (row = 0; row < rows; row++) {
 			size_t cdna_length, cdna_offset, flank_offset, index, post_length, pre_length;
 			size_t sequence_length, sequence_offset;
@@ -1499,6 +1520,30 @@ duckvep_load_transcripts(duckvep_source_t *source,
 			    (uint64_t)sequence_offset;
 			model->cds_sequence_lengths[index] =
 			    (uint32_t)sequence_length;
+			model->rna_cds_cdna_starts[index] = 0;
+			model->rna_cds_cdna_ends[index] = 0;
+			model->rna_codon_tables[index] = 0;
+			if (rna_starts != NULL) {
+				int present = !duckvep_col_is_null(vectors[14], row);
+				if (present != !duckvep_col_is_null(vectors[15], row) ||
+				    present != !duckvep_col_is_null(vectors[16], row) ||
+				    (present && (cdna_length == 0 || rna_starts[row] == 0 ||
+				    rna_starts[row] > UINT32_MAX || rna_ends[row] > UINT32_MAX ||
+				    rna_ends[row] < rna_starts[row] ||
+				    rna_ends[row] > cdna_length ||
+				    (rna_ends[row] - rna_starts[row] + 1u) % 3u != 0u ||
+				    !duckvep_codon_table_supported((duckvep_codon_table_t)rna_tables[row])))) {
+					duckvep_sql_set_error(error, error_size,
+					    "original RNA coding authority is incomplete or invalid");
+					duckvep_batch_release(&chunk);
+					goto done;
+				}
+				if (present) {
+					model->rna_cds_cdna_starts[index] = (uint32_t)rna_starts[row];
+					model->rna_cds_cdna_ends[index] = (uint32_t)rna_ends[row];
+					model->rna_codon_tables[index] = rna_tables[row];
+				}
+			}
 			model->cdna_sequence_offsets[index] = (uint64_t)cdna_offset;
 			model->cdna_sequence_lengths[index] = (uint32_t)cdna_length;
 			model->pre_cds_sequence_offsets[index] =
@@ -2726,6 +2771,199 @@ duckvep_core_model_validate_reference(const char *reference_fasta, duckvep_owned
 	return duckvep_validate_reference_fasta(reference_fasta, model, error, error_size);
 }
 
+static int
+duckvep_load_rna_edits(duckvep_source_t *source, duckvep_owned_model_t *model,
+    char *error, size_t error_size)
+{
+    static const char *const names[] = { "transcript_index", "cdna_start", "cdna_end",
+        "expected_substrate", "alternate_sequence", "operation_kind", "programme_name",
+        "evidence_name", "boundary_overrides" };
+    static const duckvep_ctype_t types[] = { DUCKVEP_CT_UINTEGER, DUCKVEP_CT_UINTEGER,
+        DUCKVEP_CT_UINTEGER, DUCKVEP_CT_VARCHAR, DUCKVEP_CT_VARCHAR,
+        DUCKVEP_CT_VARCHAR, DUCKVEP_CT_VARCHAR, DUCKVEP_CT_VARCHAR, DUCKVEP_CT_UTINYINT };
+    const size_t transcripts = model->transcripts.transcript_count;
+    size_t expected, cursor = 0, last_transcript = 0, last_start = 0, capacity = 0;
+    duckvep_batch_t *batch;
+    int ok = 0;
+
+    if (!model->transcript_cdna_provided || !duckvep_source_count(source, &expected, error, error_size)) {
+        if (!model->transcript_cdna_provided)
+            duckvep_sql_set_error(error, error_size, "RNA programmes require raw cDNA substrate");
+        return 0;
+    }
+    if (expected > UINT32_MAX || transcripts >= SIZE_MAX / sizeof(uint32_t)) {
+        duckvep_sql_set_error(error, error_size, "RNA programme row count out of range");
+        return 0;
+    }
+    model->rna_presence = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, transcripts != 0 ? transcripts : 1u, 1u);
+    model->rna_offsets = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, transcripts + 1u, sizeof(uint32_t));
+    model->rna_boundary_overrides = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, transcripts != 0 ? transcripts : 1u, 1u);
+#define RNA_ALLOC(field, n) model->field = duckvep_budget_calloc(DUCKVEP_OWNER_MODEL, (n) != 0 ? (n) : 1u, sizeof(*model->field))
+    RNA_ALLOC(rna_starts, expected);
+    RNA_ALLOC(rna_ends, expected);
+    RNA_ALLOC(rna_kinds, expected);
+    RNA_ALLOC(rna_alt_offsets, expected);
+    RNA_ALLOC(rna_alt_lengths, expected);
+#undef RNA_ALLOC
+    if (!model->rna_presence || !model->rna_boundary_overrides || !model->rna_offsets || !model->rna_starts || !model->rna_ends ||
+        !model->rna_kinds || !model->rna_alt_offsets || !model->rna_alt_lengths) {
+        duckvep_sql_set_error(error, error_size, "out of memory loading RNA programmes");
+        return 0;
+    }
+    if (!duckvep_source_open(source, error, error_size))
+        return 0;
+    if (!duckvep_result_schema(source, names, types, 9u, SIZE_MAX, error, error_size))
+        goto done;
+    while ((batch = duckvep_source_next(source)) != NULL) {
+        const duckvep_col_t *c[9];
+        size_t row, col;
+        for (col = 0; col < 9u; col++) c[col] = duckvep_batch_column(batch, col);
+        for (row = 0; row < duckvep_batch_rows(batch); row++) {
+            uint32_t transcript, start, end, ref_len, alt_len;
+            const char *ref, *alt;
+            uint64_t cdna_offset;
+            uint32_t cdna_len;
+            duckvep_string_t *s;
+            for (col = 0; col < 9u; col++) {
+                if (duckvep_col_is_null(c[col], row)) {
+                    duckvep_sql_set_error(error, error_size, "RNA programme contains NULL or malformed SeqEdit");
+                    duckvep_batch_release(&batch);
+                    goto done;
+                }
+            }
+            if (cursor >= expected) {
+                duckvep_sql_set_error(error, error_size, "RNA programme count changed during load");
+                duckvep_batch_release(&batch);
+                goto done;
+            }
+            transcript = ((const uint32_t *)duckvep_col_data(c[0]))[row];
+            start = ((const uint32_t *)duckvep_col_data(c[1]))[row];
+            end = ((const uint32_t *)duckvep_col_data(c[2]))[row];
+            if (transcript >= transcripts || start == 0 || end > UINT32_MAX - 1u ||
+                start > end + 1u || (cursor != 0 && (transcript < last_transcript ||
+                (transcript == last_transcript && start >= last_start)))) {
+                duckvep_sql_set_error(error, error_size, "RNA programme coordinates or order are invalid");
+                duckvep_batch_release(&batch);
+                goto done;
+            }
+            if (cursor != 0 && transcript == last_transcript && end >= last_start) {
+                duckvep_sql_set_error(error, error_size, "RNA programme edits overlap");
+                duckvep_batch_release(&batch);
+                goto done;
+            }
+            cdna_offset = model->cdna_sequence_offsets[transcript];
+            cdna_len = model->cdna_sequence_lengths[transcript];
+            ref_len = start == end + 1u ? 0u : end - start + 1u;
+            if ((uint64_t)start > (uint64_t)cdna_len + (ref_len == 0u) || end > cdna_len ||
+                cdna_offset > model->cdna_sequence_length ||
+                cdna_len > model->cdna_sequence_length - cdna_offset) {
+                duckvep_sql_set_error(error, error_size, "RNA programme is outside raw cDNA");
+                duckvep_batch_release(&batch);
+                goto done;
+            }
+            s = (duckvep_string_t *)duckvep_col_data(c[3]);
+            ref = duckvep_string_t_data(&s[row]);
+            if (duckvep_string_t_length(s[row]) != ref_len ||
+                (ref_len && memcmp(ref, model->cdna_sequence_bytes + cdna_offset + start - 1u, ref_len))) {
+                duckvep_sql_set_error(error, error_size, "RNA programme expected substrate disagrees with raw cDNA");
+                duckvep_batch_release(&batch);
+                goto done;
+            }
+            s = (duckvep_string_t *)duckvep_col_data(c[4]);
+            alt = duckvep_string_t_data(&s[row]);
+            alt_len = duckvep_string_t_length(s[row]);
+            s = (duckvep_string_t *)duckvep_col_data(c[5]);
+            {
+                const char *kind = duckvep_string_t_data(&s[row]);
+                uint32_t n = duckvep_string_t_length(s[row]);
+                uint8_t code = ref_len == 0u ? 3u : alt_len == 0u ? 2u :
+                    ref_len == alt_len ? 1u : 4u;
+                const char *expected_kind = code == 1u ? "substitution" : code == 2u ? "deletion" :
+                    code == 3u ? "insertion" : "replacement";
+                if (strlen(expected_kind) != n || memcmp(kind, expected_kind, n)) {
+                    duckvep_sql_set_error(error, error_size, "RNA programme operation kind disagrees with operands");
+                    duckvep_batch_release(&batch);
+                    goto done;
+                }
+                model->rna_kinds[cursor] = code;
+            }
+            s = (duckvep_string_t *)duckvep_col_data(c[6]);
+            if (duckvep_string_t_length(s[row]) != sizeof("Ensembl116:_rna_edit") - 1u ||
+                memcmp(duckvep_string_t_data(&s[row]), "Ensembl116:_rna_edit", sizeof("Ensembl116:_rna_edit") - 1u)) {
+                duckvep_sql_set_error(error, error_size, "RNA programme has unrecognized authority");
+                duckvep_batch_release(&batch);
+                goto done;
+            }
+            s = (duckvep_string_t *)duckvep_col_data(c[7]);
+            if (duckvep_string_t_length(s[row]) != sizeof("transcript_attrib:SeqEdit") - 1u ||
+                memcmp(duckvep_string_t_data(&s[row]), "transcript_attrib:SeqEdit", sizeof("transcript_attrib:SeqEdit") - 1u)) {
+                duckvep_sql_set_error(error, error_size, "RNA programme has unrecognized evidence");
+                duckvep_batch_release(&batch);
+                goto done;
+            }
+            {
+                uint8_t boundaries = ((const uint8_t *)duckvep_col_data(c[8]))[row];
+                if (boundaries > 3u || (model->rna_presence[transcript] == 2u &&
+                    model->rna_boundary_overrides[transcript] != boundaries)) {
+                    duckvep_sql_set_error(error, error_size, "RNA programme boundary authority is inconsistent");
+                    duckvep_batch_release(&batch);
+                    goto done;
+                }
+                model->rna_boundary_overrides[transcript] = boundaries;
+            }
+            if (alt_len > SIZE_MAX - model->rna_alt_bytes_length ||
+                model->rna_alt_bytes_length + alt_len > UINT32_MAX) {
+                duckvep_sql_set_error(error, error_size, "RNA programme ALT pool is too large");
+                duckvep_batch_release(&batch);
+                goto done;
+            }
+            if (alt_len && model->rna_alt_bytes_length + alt_len > capacity) {
+                size_t next = duckvep_sql_next_capacity(capacity, model->rna_alt_bytes_length + alt_len);
+                if (next < model->rna_alt_bytes_length + alt_len ||
+                    !duckvep_sql_resize((void **)&model->rna_alt_bytes, 1u, next)) {
+                    duckvep_sql_set_error(error, error_size, "out of memory loading RNA ALT pool");
+                    duckvep_batch_release(&batch);
+                    goto done;
+                }
+                capacity = next;
+            }
+            if (alt_len) memcpy(model->rna_alt_bytes + model->rna_alt_bytes_length, alt, alt_len);
+            model->rna_alt_offsets[cursor] = model->rna_alt_bytes_length;
+            model->rna_alt_lengths[cursor] = alt_len;
+            model->rna_alt_bytes_length += alt_len;
+            model->rna_starts[cursor] = start;
+            model->rna_ends[cursor] = end;
+            model->rna_presence[transcript] = 2u;
+            while (last_transcript < transcript) model->rna_offsets[++last_transcript] = (uint32_t)cursor;
+            last_start = start;
+            cursor++;
+        }
+        duckvep_batch_release(&batch);
+    }
+    if (cursor != expected) {
+        duckvep_sql_set_error(error, error_size, "RNA programme count changed during load");
+        goto done;
+    }
+    while (last_transcript < transcripts) model->rna_offsets[++last_transcript] = (uint32_t)cursor;
+    for (size_t t = 0; t < transcripts; t++) {
+        if (model->rna_presence[t] == 0u) {
+            if (model->transcript_flags[t] & DUCKVEP_TX_RNA_EDIT) {
+                duckvep_sql_set_error(error, error_size, "RNA flag has no declared programme");
+                goto done;
+            }
+            model->rna_presence[t] = 1u;
+        } else if (!(model->transcript_flags[t] & DUCKVEP_TX_RNA_EDIT)) {
+            duckvep_sql_set_error(error, error_size, "RNA programme has no transcript RNA flag");
+            goto done;
+        }
+    }
+    model->rna_count = cursor;
+    ok = 1;
+done:
+    duckvep_source_close(source);
+    return ok;
+}
+
 int
 duckvep_core_model_load_relations(duckvep_owned_model_t *model,
 	const duckvep_model_sources_t *sources, char *error, size_t error_size)
@@ -2749,7 +2987,9 @@ duckvep_core_model_load_relations(duckvep_owned_model_t *model,
 	    error, error_size)) &&
 	    (sources->interval_features == NULL ||
 	    duckvep_load_interval_features(sources->interval_features,
-	    model, error, error_size));
+	    model, error, error_size)) &&
+	    (sources->rna_edits == NULL ||
+	    duckvep_load_rna_edits(sources->rna_edits, model, error, error_size));
 	return ok;
 }
 
@@ -2806,12 +3046,82 @@ duckvep_validate_cdna_sequences(const duckvep_owned_model_t *model,
 }
 
 int
+duckvep_core_model_validate_rna_coding_authority(const duckvep_owned_model_t *model,
+    char *error, size_t error_size)
+{
+	size_t t;
+
+	if (model->rna_cds_cdna_starts == NULL ||
+	    model->rna_cds_cdna_ends == NULL || model->rna_codon_tables == NULL)
+		return 1;
+	for (t = 0; t < model->transcripts.transcript_count; t++) {
+		uint32_t start = model->rna_cds_cdna_starts[t];
+		uint32_t end = model->rna_cds_cdna_ends[t];
+		uint8_t code = model->rna_codon_tables[t];
+		uint32_t genomic_start = 0, genomic_end = 0;
+		size_t exon;
+
+		if (start == 0 && end == 0 && code == 0)
+			continue;
+		if (start == 0 || end < start || code == 0 ||
+		    !duckvep_codon_table_supported((duckvep_codon_table_t)code) ||
+		    model->cdna_sequence_lengths[t] == 0 ||
+		    end > model->cdna_sequence_lengths[t] ||
+		    (end - start + 1u) % 3u != 0 ||
+		    (model->transcript_flags[t] & (16u | 32u)) != 0 ||
+		    (model->rna_boundary_overrides != NULL &&
+		    model->rna_boundary_overrides[t] != 0) ||
+		    (model->transcript_flags[t] & DUCKVEP_TX_RNA_EDIT &&
+		    (model->rna_presence == NULL || model->rna_presence[t] == 0))) {
+			duckvep_sql_set_error(error, error_size,
+			    "original RNA coding authority is partial or incompatible with source flags");
+			return 0;
+		}
+		for (exon = model->exon_offsets[t];
+		    exon < (size_t)model->exon_offsets[t] + model->exon_counts[t]; exon++) {
+			uint32_t first = model->exon_cdna_starts[exon];
+			uint32_t last = model->exon_cdna_ends[exon];
+			uint32_t p;
+			if (start >= first && start <= last) {
+				p = start - first;
+				genomic_start = model->strands[t] == 1
+				    ? model->exon_starts[exon] + p : model->exon_ends[exon] - p;
+			}
+			if (end >= first && end <= last) {
+				p = end - first;
+				genomic_end = model->strands[t] == 1
+				    ? model->exon_starts[exon] + p : model->exon_ends[exon] - p;
+			}
+		}
+		if (model->cds_sequence_lengths[t] != 0 &&
+		    (model->cds_sequence_lengths[t] != (size_t)(end - start + 1u) ||
+		    memcmp(model->cds_sequence_bytes + model->cds_sequence_offsets[t],
+		    model->cdna_sequence_bytes + model->cdna_sequence_offsets[t] + start - 1u,
+		    model->cds_sequence_lengths[t]) != 0)) {
+			duckvep_sql_set_error(error, error_size,
+			    "original RNA coding authority disagrees with raw compatibility CDS");
+			return 0;
+		}
+		if (genomic_start == 0 || genomic_end == 0 ||
+		    (model->cds_starts[t] != 0 &&
+		    (model->cds_starts[t] != (model->strands[t] == 1 ? genomic_start : genomic_end) ||
+		    model->cds_ends[t] != (model->strands[t] == 1 ? genomic_end : genomic_start)))) {
+			duckvep_sql_set_error(error, error_size,
+			    "original RNA coding authority disagrees with exon or CDS geometry");
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int
 duckvep_core_model_finish(duckvep_owned_model_t *model, char *error, size_t error_size)
 {
 	duckvep_error_t kernel_error;
 	size_t transcript;
 
-	if (!duckvep_validate_cdna_sequences(model, error, error_size)) {
+	if (!duckvep_validate_cdna_sequences(model, error, error_size) ||
+	    !duckvep_core_model_validate_rna_coding_authority(model, error, error_size)) {
 		duckvep_owned_model_destroy(model);
 		return 0;
 	}
@@ -2840,6 +3150,14 @@ duckvep_core_model_finish(duckvep_owned_model_t *model, char *error, size_t erro
 	 * a lifted linear view of the model; the source arrays stay the contract
 	 * for provenance, metadata ordinals and output. */
 	if (model->has_wrapped_coordinates) {
+		for (transcript = 0; transcript < model->transcripts.transcript_count; transcript++) {
+			if (model->rna_codon_tables != NULL && model->rna_codon_tables[transcript] != 0) {
+				duckvep_sql_set_error(error, error_size,
+				    "original RNA coding authority is unsupported in circular lifted models");
+				duckvep_owned_model_destroy(model);
+				return 0;
+			}
+		}
 		if (!duckvep_lifted_build(model, error, error_size)) {
 			duckvep_owned_model_destroy(model);
 			return 0;
@@ -3023,11 +3341,32 @@ duckvep_core_model_fingerprint(const duckvep_owned_model_t *model)
 		if (model->peptide_edit_codes != NULL)
 			FP(hash, model->peptide_edit_codes, model->peptide_edit_count);
 	}
+	if (model->rna_presence != NULL) {
+		FP(hash, model->rna_presence, transcripts);
+		FP(hash, model->rna_boundary_overrides, transcripts);
+		FP(hash, &model->rna_count, 1);
+		FP(hash, model->rna_offsets, transcripts + 1u);
+		FP(hash, model->rna_starts, model->rna_count);
+		FP(hash, model->rna_ends, model->rna_count);
+		FP(hash, model->rna_kinds, model->rna_count);
+		FP(hash, model->rna_alt_offsets, model->rna_count);
+		FP(hash, model->rna_alt_lengths, model->rna_count);
+		FP(hash, &model->rna_alt_bytes_length, 1);
+		FP(hash, model->rna_alt_bytes, model->rna_alt_bytes_length);
+	}
 	FP(hash, &model->interval_feature_count, 1);
 	FP(hash, model->interval_feature_seq_regions, model->interval_feature_count);
 	FP(hash, model->interval_feature_starts, model->interval_feature_count);
 	FP(hash, model->interval_feature_ends, model->interval_feature_count);
 	FP(hash, model->interval_feature_kinds, model->interval_feature_count);
+	for (index = 0; index < transcripts; index++) {
+		if (model->rna_codon_tables != NULL && model->rna_codon_tables[index] != 0) {
+			FP(hash, model->rna_cds_cdna_starts, transcripts);
+			FP(hash, model->rna_cds_cdna_ends, transcripts);
+			FP(hash, model->rna_codon_tables, transcripts);
+			break;
+		}
+	}
 	FP(hash, &model->transcript_coverage_complete, 1);
 	FP(hash, &model->transcript_flanks_complete, 1);
 	return hash;

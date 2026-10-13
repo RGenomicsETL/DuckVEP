@@ -125,6 +125,17 @@ SELECT * FROM query(duckvep_ensembl_transcripts_sql(
   'duckvep_core', 'duckvep_reference_chunks', 'GRCh38'));
 ```
 
+<a id="duckvep_ensembl_rna_edits_sql"></a>
+
+### duckvep_ensembl_rna_edits_sql
+
+Builds a typed transcript SeqEdit query from an Ensembl core schema and reference chunks. The original raw-cDNA coding start/end (`UBIGINT`) and explicit genetic code (`UTINYINT`) travel with each programme; the producer must supply all three together. Optional compatibility CDS/code columns may be NULL. SeqEdit coordinates refer to original cDNA, not edited CDS. The query's two source names must be nonempty; its optional options STRUCT is currently unsupported.
+
+```sql
+SELECT left(duckvep_ensembl_rna_edits_sql(
+  'duckvep_core', 'duckvep_reference_chunks'), 120) AS query_prefix;
+```
+
 <a id="duckvep_ensembl_regulation_features_sql"></a>
 
 ### duckvep_ensembl_regulation_features_sql
@@ -152,7 +163,7 @@ SELECT * FROM query(duckvep_ensembl_regulation_features_sql(
 
 ### duckvep_model_receipt_sql
 
-Builds the SQL that summarizes a prepared model as one receipt row: source identity, counts and content hashes. A reused model can be checked by reproducing its stored receipt.
+Builds the SQL that summarizes a prepared model as one receipt row: source identity, counts and content hashes. A reused model can be checked by reproducing its stored receipt. Nonempty original RNA coding authority participates in the model hash; absent or all-NULL authority preserves legacy receipt identity. The receipt commits to supplied content, not independently verified biological correctness.
 
 Signatures:
 
@@ -192,6 +203,7 @@ duckvep_model_load(name VARCHAR, regions_query VARCHAR, transcripts_query VARCHA
                    [, interval_feature_query := VARCHAR]
                    [, peptide_edit_query := VARCHAR]
                    [, mature_mirna_query := VARCHAR]
+                   [, rna_edit_query := VARCHAR]
                    [, reference_fasta := VARCHAR]) -> TABLE(loaded BOOLEAN)
 ```
 
@@ -212,9 +224,10 @@ Named parameters:
 | `interval_feature_query` | VARCHAR | Regulatory and motif features: feature ordinal, region ordinal, inclusive start, inclusive end and kind (1 RegulatoryFeature, 2 MotifFeature), ordered by region, start and ordinal. |
 | `peptide_edit_query` | VARCHAR | Curated peptide edits: transcript ordinal, one-based protein position and an uppercase replacement amino acid, unique and ordered by transcript and position. An optional fourth `edit_code` column carries `_selenocysteine`, `_stop_codon_rt`, `initial_met` or `amino_acid_sub` for conditional prediction. Three-column metadata remains reference-peptide compatible but does not qualify for conditional prediction. |
 | `mature_mirna_query` | VARCHAR | Mature miRNA ranges: transcript ordinal, inclusive genomic start and end, ordered by transcript and start. |
+| `rna_edit_query` | VARCHAR | Optional typed transcript SeqEdit records, including the original raw-cDNA coding start/end (`UBIGINT`) and explicit genetic code (`UTINYINT`). The three coding-authority fields are all present or all absent; checked narrowing stores coordinates in owned 32-bit arrays. Only fixed-map nonoverlapping equal-length programmes qualify for conditional peptide replay. |
 | `reference_fasta` | VARCHAR | Path to an indexed reference FASTA. Needed to shift and render HGVS notation. Requires `seq_region`, `sequence_length` and `seq_region_name` in the region query. |
 
-A NULL value for an optional query or the FASTA path is the same as omitting it. Without a reference FASTA, HGVS fields that need flanking sequence come back with a `missing_reference` reason (see [`duckvep_annotate_sql`](#duckvep_annotate_sql)).
+The typed RNA programme and owned model state use provisional snapshot V3; V1/V2 migrations and their fingerprints remain available. A NULL value for an optional query or the FASTA path is the same as omitting it. Without a reference FASTA, HGVS fields that need flanking sequence come back with a `missing_reference` reason (see [`duckvep_annotate_sql`](#duckvep_annotate_sql)).
 
 Returns: one row, `loaded BOOLEAN`. A load that exceeds the native budget publishes nothing and leaves every loaded model usable.
 
@@ -554,6 +567,26 @@ ORDER BY event_index;
 
 These builders normalize raw VCF records into typed preparation rows, one row per input record, with a status and a stable reason. They return SQL text and take a trailing options STRUCT like every builder. Only `duckvep_prepare_structural_hgvs_sql` has an option; the others take no options. `docs/structural-identity-hgvs.md` explains the identity and HGVS rules and the VEP 116 evidence behind them.
 
+<a id="duckvep_product_scenario_v1"></a>
+
+### duckvep_product_scenario_v1
+
+Experimental, explicitly supplied joint DNA/product scenario, not observed phase or an inferred splice or alternative-start product. The STRUCT supplies a reference interval (`start1`, `dna`, `strand`), variable-length exon and coding-block interval lists, sources (`source_id`, `start1`, `reference`, `alternate`) and a named programme (`id`, `evidence_id`, `assumption_id`, `expected_reference_rna`, `annotated_start1`, `alternative_start1`, `alternative_trigger_id`, `genetic_code`). Genomic coordinates and source IDs are full `UBIGINT` values, including zero-valued IDs. It validates disjoint fixed-length substitutions against the supplied product, returns explicit source operands and per-source effects, and labels the evidence `hypothetical_assignment`/`supplied_programme`. Each peptide begins with methionine at its declared valid initiator and ends at its first reached stop; the RNA fields retain the complete mapped sequence. Conditional NMD is unknown. The R boundary is `rduckvep_product_scenario_v1`.
+
+```sql
+SELECT s.programme_id, s.allele_evidence, s.product_evidence, s.conditional_nmd
+FROM (SELECT duckvep_product_scenario_v1(STRUCT_PACK(
+  reference := STRUCT_PACK(start1 := 1::UBIGINT, dna := 'ATGAAATAA', strand := 1::TINYINT),
+  exons := [STRUCT_PACK(start1 := 1::UBIGINT, end1 := 9::UBIGINT)],
+  blocks := [STRUCT_PACK(start1 := 1::UBIGINT, end1 := 9::UBIGINT)],
+  sources := [STRUCT_PACK(source_id := 0::UBIGINT, start1 := 4::UBIGINT,
+                          reference := 'A', alternate := 'G')],
+  programme := STRUCT_PACK(id := 'annotated', evidence_id := 'supplied',
+    assumption_id := 'joint_assignment', expected_reference_rna := 'ATGAAATAA',
+    annotated_start1 := 1::UINTEGER, alternative_start1 := 0::UINTEGER,
+    alternative_trigger_id := '', genetic_code := 1::UTINYINT))) AS s);
+```
+
 <a id="duckvep_prepare_sv_geometry_sql"></a>
 
 ### duckvep_prepare_sv_geometry_sql
@@ -874,16 +907,18 @@ Returns:
 | `haplotype_consequences`, `haplotype_impact` | VARCHAR[], VARCHAR | The whole-protein Sequence Ontology set and IMPACT of the edited sequence, NULL unless `prediction_status` is `predicted`. |
 | `nmd_rule`, `nmd_prediction`, `nmd_stop_position`, `nmd_junction_position`, `nmd_contributors` | VARCHAR, VARCHAR, UBIGINT, UBIGINT, UBIGINT[] | The whole-haplotype NMD prediction under rule `ejc50` and its evidence. Restored RNA is `not_applicable` only when exon geometry also matches; unavailable or curated geometry is `unknown` with reason `nmd_geometry_unavailable`. |
 | `nmd_exceptions` | VARCHAR | Exceptions to the junction rule that apply to a premature stop, reported beside the prediction without changing it: `start_proximal` (the stop codon lies within the first 100 coding bases) and `long_exon` (the stop lies in an exon of the edited transcript longer than 407 bases), comma-separated; NULL when none applies. |
-| `prediction_reference_protein`, `prediction_protein` | VARCHAR | Separate paired peptides for `conditional_assumed_recoding`; NULL outside that admitted profile. Raw `cds` and `protein` remain compatibility replay operands. |
+| `prediction_reference_protein`, `prediction_protein` | VARCHAR | Separate paired peptides for admitted `conditional_assumed_recoding` and `conditional_assumed_rna_programme` lanes; NULL otherwise. Known RNA translation stops at the first stop. Raw `cds` and `protein` remain compatibility replay operands. |
 | `nominal_length_diff` | BIGINT | Final column of the 36-column relation: signed projected CDS ALT-minus-REF delta; shared indels count once in a composed path. UTR-only paths report 0, fully noncoding paths NULL; raw source replay retains its compatibility accounting. |
 
-Compatible overlaps require every contributing source to project within the same coding exon of an uncurated complete CDS; disjoint sources in other exons remain outside this profile. They admit strict decoded literal A/C/G/T edits: agreeing substitutions, identical deletions or insertions, identical minimal delins, and overlapping or nested pure deletions whose placement is unambiguous. A shared gap, including the terminal interbase site, must have one agreed insertion sequence. Opaque delins aliases validate every original REF including padding and apply one replacement without assigning ancestry to ALT bases. Reference bases must match; repeated changes at a position must agree. Distinct interacting delins, deletions with unresolved placement and unequal same-gap insertions remain unsupported. Unchanged REF/ALT padding is reference context and does not constrain another mutation. Admission is per carrier lane: every contributing lane needs complete observed strict phase evidence, including the implicit default phase set, while an independently known phased lane in a partial GT can qualify and a missing lane cannot. Raw source replay uses its own copy-evidence rules and is not composed by this overlap profile. Unresolved phase and curated contexts remain excluded. Original sources and normalized edit islands remain distinct; every island retains its own `block_index`, even where its source contributes to more than one coding block. Conflicts retain source/carrier identity, NULL unconditional SO/IMPACT and NMD `unknown`. The default joint arrays add exactly 4,718,592 charged bytes on 64-bit Linux (`65536 * sizeof(duckvep_haplotype_edit_t)` plus two 1,048,576-byte base arrays); the two buffer descriptors add 64 worker-state bytes. These are included in workspace admission and native budget accounting.
+Compatible overlaps require each contributing source to stay within one coding exon of an uncurated complete CDS; source-local edit islands may occupy different coding exons. Identical cDNA coordinates do not collapse distinct genomic-gap ownership. They admit strict decoded literal A/C/G/T edits: agreeing substitutions, identical deletions or insertions, identical minimal delins, and overlapping or nested pure deletions whose placement is unambiguous. A shared gap, including the terminal interbase site, must have one agreed insertion sequence. Opaque delins aliases validate every original REF including padding and apply one replacement without assigning ancestry to ALT bases. Reference bases must match; repeated changes at a position must agree. Distinct interacting delins, deletions with unresolved placement and unequal same-gap insertions remain unsupported. Unchanged REF/ALT padding is reference context and does not constrain another mutation. Admission is per carrier lane: every contributing lane needs complete observed strict phase evidence, including the implicit default phase set, while an independently known phased lane in a partial GT can qualify and a missing lane cannot. Raw source replay uses its own copy-evidence rules and is not composed by this overlap profile. Unresolved phase and curated contexts remain excluded. Original sources and normalized edit islands remain distinct; every island retains its own `block_index`, even where its source contributes to more than one coding block. Conflicts retain source/carrier identity, NULL unconditional SO/IMPACT and NMD `unknown`. Workspace admission charges the joint edit array at its configured `max_leaf_edits` capacity and the joint ALT and assignment arrays at `max_sequence_bases` capacity; the model-owned coding-edit cache charges 20 bytes per edit island. These allocations participate in the native budget. No fixed byte total applies across caller-selected capacities.
 
-For `source_records` with `vep_compat`, disjoint coding paths can qualify when every original call is complete diploid, with at most one original REF/ALT heterozygote and homozygous background. Each retained slot must map to its original copy; the two copies may follow different paths. A multiallelic `0/2` is one original heterozygote, while `1/2` and two independent heterozygotes remain outside this profile. `CALLED` alone, hypothetical slots, leading separators, missing calls and non-diploid calls do not prove copies. Reference-only compatibility rows retain their status rather than becoming ALT predictions. Omitted haploid or polyploid REF calls also invalidate copy proof. Proven and unproven carriers are emitted in separate qualification rows, including when another context prevents prediction; row counts can therefore increase without changing any per-carrier replay. Qualification-only carriers consume the bounded carrier pool. A 64-bit carrier slot occupies 64 charged bytes, including original-record proof state. The internal raw-GT struct retains eight cells, including explicit leading-separator provenance; this is query-local transport, not a persisted model format or a public result-schema change. Raw CDS, protein and HGVS retain compatibility semantics; raw stop-lost replay does not acquire the decoded path's downstream extension.
+For `source_records` with `vep_compat`, disjoint coding paths can qualify when every original call is complete diploid, with at most one original heterozygous record (REF/ALT or ALT/ALT) and homozygous background. Each retained slot must map to its original copy; both sibling lanes must be present and may follow different paths. Multiallelic `0/2` and `1/2` each count as one original heterozygote; two independent heterozygous records remain outside this profile. `CALLED` alone, hypothetical slots, leading separators, missing calls and non-diploid calls do not prove copies. Reference-only compatibility rows retain their status rather than becoming ALT predictions. Omitted haploid or polyploid REF calls also invalidate copy proof. Proven and unproven carriers are emitted in separate qualification rows, including when another context prevents prediction; row counts can therefore increase without changing any per-carrier replay. Qualification-only carriers consume the bounded carrier pool. A 64-bit carrier slot occupies 64 charged bytes, including original-record proof state. The internal raw-GT struct retains eight cells, including explicit leading-separator provenance; this is query-local transport, not a persisted model format or a public result-schema change. Raw CDS, protein and HGVS retain compatibility semantics; raw stop-lost replay does not acquire the decoded path's downstream extension.
 
 Complete exonic noncoding cDNA and coding-transcript UTR replay admits literal nonoverlapping substitutions, insertions, deletions/delins and compensating edits when final RNA is complete and each edit lies within one exon away from internal splice edges. Coding-transcript edits must all occupy the same UTR. RNA comparison is case-insensitive; model RNA bytes, original source operands, CDS and protein remain immutable. It contrasts the reference with the final transcript allele rather than unioning independent-event consequences. Structural and empty-ALT source-record inputs retain their separate admission rules; this is not general structural-variant composition. Insufficient RNA replay workspace returns `unsupported_context` with reason `sequence_capacity`. Intronic, splice, regulatory, mixed-domain and overlapping noncoding composition remain unsupported. These profiles preserve the public 36-column relation and 32-argument scalar bridge.
 
-Conditional curated prediction requires complete framed CDS and nonoverlapping CDS substitutions. A typed programme is inherited only at an unchanged reference codon; a changed codon uses ordinary translation. `conditional_assumed_recoding` asserts this programme, not preserved biological recoding competence. Its unconditional consequence fields remain NULL and NMD is unknown.
+Conditional curated prediction requires a complete framed CDS and an intact original codon substrate. A typed peptide programme can follow an unchanged reference codon through a bounded indel and restored frame, but cannot cross an opaque replacement interior. Changed programme codons translate ordinarily. `conditional_assumed_recoding` is a programme assumption, not proof of biological recoding competence. Conditional RNA SeqEdit replay requires a typed, model-owned programme with original raw-cDNA coding boundaries, a fixed RNA/CDS map and nonoverlapping equal-length operations and substitutions; edited-codon/substrate collisions, untyped or coexisting peptide programmes, unknown metadata and boundary changes are refused. Its paired peptides use `conditional_assumed_rna_programme` and `assumed_rna_programme` and translate known RNA to the first stop. Neither conditional lane supplies unconditional SO or NMD.
+
+For complete annotated code-1 CDS, CTG and TTG at the original coding start initiate as methionine. An existing nonempty CDS/code pair is coding authority; the Ensembl standard-code default is a declared source policy, not proof of a regional override. ENST00000336066.8/ENSP00000477229.2 is a chr20 source positive. Nuclear ATG-to-non-ATG start loss has no downstream-start scan. Raw compatibility translation and differences remain separate from the biological coding reference.
 
 `nmd_prediction` is an EJC-distance heuristic on the whole haplotype, not a union of single-allele results and not the VEP NMD plugin.
 

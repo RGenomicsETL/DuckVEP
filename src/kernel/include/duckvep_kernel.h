@@ -180,7 +180,8 @@ typedef enum duckvep_tx_flag {
     DUCKVEP_TX_GENCODE_PRIMARY        = UINT64_C(1) << 13,
     DUCKVEP_TX_CCDS                   = UINT64_C(1) << 14,
     DUCKVEP_TX_READTHROUGH_TRANSCRIPT = UINT64_C(1) << 15,
-    DUCKVEP_TX_UPSTREAM_ATG           = UINT64_C(1) << 16
+    DUCKVEP_TX_UPSTREAM_ATG           = UINT64_C(1) << 16,
+    DUCKVEP_TX_INITIAL_METHIONINE     = UINT64_C(1) << 17
 } duckvep_tx_flag_t;
 
 /* ---------------------------------------------------- borrowed input views

@@ -63,13 +63,13 @@ plus_1exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that 
 plus_1exon__run_off_trans_control	1	missense_variant	.
 plus_1exon__stop_lost_hom_alt	0	stop_lost	.
 plus_1exon__stop_lost_hom_alt	1	stop_lost	.
-plus_1exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_1exon__stop_lost_and_missense	0	missense_variant,stop_lost	.
 plus_1exon__stop_lost_and_missense	1		.
 plus_1exon__stop_retained_tag	0	stop_retained_variant	.
 plus_1exon__stop_retained_tag	1		.
 plus_1exon__stop_retained_tga	0	stop_retained_variant	.
 plus_1exon__stop_retained_tga	1		.
-plus_1exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_1exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	.
 plus_1exon__stop_retained_plus_synonymous	1		.
 plus_1exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
 plus_1exon__stop_retained_plus_missense	1		.
@@ -179,13 +179,13 @@ plus_2exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that 
 plus_2exon__run_off_trans_control	1	missense_variant	.
 plus_2exon__stop_lost_hom_alt	0	stop_lost	.
 plus_2exon__stop_lost_hom_alt	1	stop_lost	.
-plus_2exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_2exon__stop_lost_and_missense	0	missense_variant,stop_lost	.
 plus_2exon__stop_lost_and_missense	1		.
 plus_2exon__stop_retained_tag	0	stop_retained_variant	.
 plus_2exon__stop_retained_tag	1		.
 plus_2exon__stop_retained_tga	0	stop_retained_variant	.
 plus_2exon__stop_retained_tga	1		.
-plus_2exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_2exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	.
 plus_2exon__stop_retained_plus_synonymous	1		.
 plus_2exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
 plus_2exon__stop_retained_plus_missense	1		.
@@ -295,13 +295,13 @@ plus_3exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that 
 plus_3exon__run_off_trans_control	1	missense_variant	.
 plus_3exon__stop_lost_hom_alt	0	stop_lost	.
 plus_3exon__stop_lost_hom_alt	1	stop_lost	.
-plus_3exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_3exon__stop_lost_and_missense	0	missense_variant,stop_lost	.
 plus_3exon__stop_lost_and_missense	1		.
 plus_3exon__stop_retained_tag	0	stop_retained_variant	.
 plus_3exon__stop_retained_tag	1		.
 plus_3exon__stop_retained_tga	0	stop_retained_variant	.
 plus_3exon__stop_retained_tga	1		.
-plus_3exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+plus_3exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	.
 plus_3exon__stop_retained_plus_synonymous	1		.
 plus_3exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
 plus_3exon__stop_retained_plus_missense	1		.
@@ -411,13 +411,13 @@ minus_1exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that
 minus_1exon__run_off_trans_control	1	missense_variant	.
 minus_1exon__stop_lost_hom_alt	0	stop_lost	.
 minus_1exon__stop_lost_hom_alt	1	stop_lost	.
-minus_1exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_1exon__stop_lost_and_missense	0	missense_variant,stop_lost	.
 minus_1exon__stop_lost_and_missense	1		.
 minus_1exon__stop_retained_tag	0	stop_retained_variant	.
 minus_1exon__stop_retained_tag	1		.
 minus_1exon__stop_retained_tga	0	stop_retained_variant	.
 minus_1exon__stop_retained_tga	1		.
-minus_1exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_1exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	.
 minus_1exon__stop_retained_plus_synonymous	1		.
 minus_1exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
 minus_1exon__stop_retained_plus_missense	1		.
@@ -527,13 +527,13 @@ minus_2exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that
 minus_2exon__run_off_trans_control	1	missense_variant	.
 minus_2exon__stop_lost_hom_alt	0	stop_lost	.
 minus_2exon__stop_lost_hom_alt	1	stop_lost	.
-minus_2exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_2exon__stop_lost_and_missense	0	missense_variant,stop_lost	.
 minus_2exon__stop_lost_and_missense	1		.
 minus_2exon__stop_retained_tag	0	stop_retained_variant	.
 minus_2exon__stop_retained_tag	1		.
 minus_2exon__stop_retained_tga	0	stop_retained_variant	.
 minus_2exon__stop_retained_tga	1		.
-minus_2exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_2exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	.
 minus_2exon__stop_retained_plus_synonymous	1		.
 minus_2exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
 minus_2exon__stop_retained_plus_missense	1		.
@@ -643,13 +643,13 @@ minus_3exon__run_off_trans_control	0	frameshift_variant	csq reports a frame that
 minus_3exon__run_off_trans_control	1	missense_variant	.
 minus_3exon__stop_lost_hom_alt	0	stop_lost	.
 minus_3exon__stop_lost_hom_alt	1	stop_lost	.
-minus_3exon__stop_lost_and_missense	0	missense_variant,stop_lost	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_3exon__stop_lost_and_missense	0	missense_variant,stop_lost	.
 minus_3exon__stop_lost_and_missense	1		.
 minus_3exon__stop_retained_tag	0	stop_retained_variant	.
 minus_3exon__stop_retained_tag	1		.
 minus_3exon__stop_retained_tga	0	stop_retained_variant	.
 minus_3exon__stop_retained_tga	1		.
-minus_3exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	csq also reports the lower-severity effect (missense, synonymous or in-frame) of another edit; the reduced set reports the one highest whole-protein category
+minus_3exon__stop_retained_plus_synonymous	0	stop_retained_variant,synonymous_variant	.
 minus_3exon__stop_retained_plus_synonymous	1		.
 minus_3exon__stop_retained_plus_missense	0	missense_variant,stop_retained_variant	csq adds stop_retained_variant for the terminal codon next to an expressed effect; the policy reports the expressed effect only (stop_retained is LOW and lower classes give way)
 minus_3exon__stop_retained_plus_missense	1		.

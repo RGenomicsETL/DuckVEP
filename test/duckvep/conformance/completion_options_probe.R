@@ -93,11 +93,10 @@ main <- function() {
   stopifnot(nrow(effects) == 1L,
     identical(effects$cds, paste0(alternate, collapse = "")),
     identical(effects$protein, "MTA*"),
-    identical(effects$haplotype_consequences[[1L]], "stop_gained"),
+    identical(effects$haplotype_consequences[[1L]], c("stop_gained", "missense_variant")),
     identical(effects$contributor_provenance[[1L]]$role, c("applied", "applied", "post_stop")))
-  message("Subeffect witness: MAAEG* -> MTA*; current terms=stop_gained; ",
-    "roles=applied/applied/post_stop. Ala2Thr is upstream of termination; ",
-    "the Gly5Arg DNA change is downstream and is not a translated subeffect.")
+  message("Subeffect witness: MAAEG* -> MTA*; stop_gained and reached Ala2Thr; ",
+    "roles=applied/applied/post_stop.")
 
   delins_sql <- paste("SELECT event_index,0 seq_region,103 AS position,'GCTGCT' reference,",
     "'AAA' alternate,1 alt_index,0 transcript_index,0 sample_index,[1,1] alleles,",

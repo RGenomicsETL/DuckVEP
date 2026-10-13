@@ -236,7 +236,7 @@ static void projection_exec(duckdb_v2_scalar_function_exec_info_handle info,
 }
 
 /* ---------------------------------------------------------------------------
- * duckvep_ensembl_{regions,transcripts,regulation_features}_sql
+ * Ensembl SQL builders
  * ------------------------------------------------------------------------- */
 
 static void ensembl_common(duckdb_v2_scalar_function_exec_info_handle info,
@@ -306,6 +306,26 @@ static void ensembl_common(duckdb_v2_scalar_function_exec_info_handle info,
         if (!ok) {
             return;
         }
+    }
+}
+
+static void rna_exec(duckdb_v2_scalar_function_exec_info_handle info,
+                     duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
+    (void)context;
+    call c;
+    if (!call_open(info, 2, &c, error)) return;
+    for (idx_t row = 0; row < c.rows; ++row) {
+        char *schema = copy_argument(&c, 0, row);
+        char *model = copy_argument(&c, 1, row);
+        duckvep_sql_text sql = {0};
+        bool ok = schema && *schema && model && *model &&
+                  duckvep_core_ensembl_rna_sql(schema, model, &sql);
+        if (ok) ok = write_sql(&c, row, &sql);
+        else plain_error(&c, "duckvep_ensembl_rna_edits_sql: two non-empty source names required");
+        duckvep_sql_free(&sql);
+        duckvep_budget_free(schema);
+        duckvep_budget_free(model);
+        if (!ok) return;
     }
 }
 
@@ -636,7 +656,8 @@ static bool register_builder(duckdb_v2_extension_handle extension, duckdb_v2_con
 
 bool host_v2_register_builders(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
                                duckdb_v2_error_info_handle *error) {
-    return register_builder(extension, context, "duckvep_ensembl_regions_sql", 3, regions_exec, error) &&
+    return register_builder(extension, context, "duckvep_ensembl_rna_edits_sql", 2, rna_exec, error) &&
+           register_builder(extension, context, "duckvep_ensembl_regions_sql", 3, regions_exec, error) &&
            register_builder(extension, context, "duckvep_ensembl_transcripts_sql", 3, transcripts_exec, error) &&
            register_builder(extension, context, "duckvep_ensembl_regulation_features_sql", 2,
                             regulation_exec, error) &&

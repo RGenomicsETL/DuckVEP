@@ -88,6 +88,39 @@ CREATE TABLE f_hcalls AS SELECT (row_number() OVER ())::BIGINT event_index, seq_
    (2, 14, 'A', 'T'), (2, 15, 'A', 'G')) t(seq_region, position, reference, alternate);
 CREATE VIEW f_small AS SELECT * FROM f_ev WHERE reference IS NOT NULL
   ORDER BY seq_region, position, event_index;
+CREATE TABLE f_rna_tr AS SELECT 0::UINTEGER transcript_index, 0::UINTEGER seq_region,
+  1::UBIGINT transcript_start, 12::UBIGINT transcript_end, -1::TINYINT strand,
+  0::UINTEGER gene_index, 259::UBIGINT transcript_flags,
+  4::UBIGINT cds_start, 12::UBIGINT cds_end, NULL::BLOB cds_sequence,
+  NULL::UTINYINT codon_table, NULL::BLOB pre_cds_sequence,
+  NULL::BLOB post_cds_sequence, 'ATGCCCTAAAGG'::BLOB cdna_sequence,
+  1::UBIGINT rna_cds_cdna_start, 9::UBIGINT rna_cds_cdna_end,
+  2::UTINYINT rna_codon_table;
+CREATE TABLE f_rna_edit AS SELECT 0::UINTEGER transcript_index, 4::UINTEGER cdna_start,
+  5::UINTEGER cdna_end, 'CC'::VARCHAR expected_substrate,
+  'TT'::VARCHAR alternate_sequence, 'substitution'::VARCHAR operation_kind,
+  'Ensembl116:_rna_edit'::VARCHAR programme_name,
+  'transcript_attrib:SeqEdit'::VARCHAR evidence_name,
+  0::UTINYINT boundary_overrides;
+CREATE TABLE f_rna_calls AS SELECT 41::BIGINT event_index, 0::UINTEGER seq_region,
+  6::BIGINT AS position, 'A'::VARCHAR AS reference, 'G'::VARCHAR AS alternate,
+  1::INTEGER alt_index, 0::UINTEGER transcript_index, 1::INTEGER sample_index,
+  [1,1]::INTEGER[] alleles, [false,true]::BOOLEAN[] phase_before,
+  NULL::BIGINT phase_set;
+CREATE TABLE f_product AS SELECT profile.* FROM (SELECT unnest([
+  {id:'include',blocks:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:13::UBIGINT,end1:15::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],rna:'ATGAAACCCAAATTTCCCTAAATGAAATAAAAA'},
+  {id:'skip',blocks:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],rna:'ATGAAACCCTTTCCCTAAATGAAATAAAAA'}
+]) profile) t;
+CREATE VIEW f_product_input AS SELECT id, {
+  reference:{start1:1::UBIGINT,dna:'ATGAAACCCGGGAAAGGGTTTCCCTAAGGGATGAAATAAGGGAAA',strand:1::TINYINT},
+  exons:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:13::UBIGINT,end1:15::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],
+  blocks:blocks,
+  sources:[{source_id:0::UBIGINT,start1:13::UBIGINT,reference:'A',alternate:'C'},
+           {source_id:22::UBIGINT,start1:29::UBIGINT,reference:'G',alternate:'C'}],
+  programme:{id:id,evidence_id:'declared',assumption_id:'splice',expected_reference_rna:rna,
+             annotated_start1:1::UINTEGER,alternative_start1:0::UINTEGER,
+             alternative_trigger_id:'',genetic_code:1::UTINYINT}
+} AS input FROM f_product;
 """
 
 LOAD = """SELECT 'LOADED ' || loaded FROM duckvep_model_load('fm',
@@ -105,6 +138,12 @@ LOAD_CIRCULAR = """SELECT 'LOADED ' || loaded FROM duckvep_model_load('fc',
  'SELECT 0::UINTEGER transcript_index, 27::UBIGINT exon_start, 6::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 12::UBIGINT exon_cdna_end, 0::TINYINT phase, 0::TINYINT end_phase',
  interval_feature_query := 'SELECT * FROM f_cfeat',
  reference_fasta := '{fasta}');"""
+
+LOAD_RNA = """SELECT 'LOADED ' || loaded FROM duckvep_model_load('fr',
+ 'SELECT 0::UINTEGER seq_region, 12::UBIGINT sequence_length',
+ 'SELECT * FROM f_rna_tr',
+ 'SELECT 0::UINTEGER transcript_index, 1::UBIGINT exon_start, 12::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 12::UBIGINT exon_cdna_end, 0::TINYINT phase, 0::TINYINT end_phase',
+ rna_edit_query := 'SELECT * FROM f_rna_edit');"""
 
 # Each query prints one line: 'RESULT <name> <rows> <hash>'.
 QUERIES = {
@@ -135,18 +174,35 @@ QUERIES = {
  query(duckvep_annotate_sql('f_cev_full', 'fc')) a;""",
     "lifted_projected": """SELECT 'RESULT lifted_projected ' || count(*) || ' ' || hash(list(a ORDER BY hash(a))) FROM
  query(duckvep_annotate_projected_sql('f_cev', 'fc')) a;""",
+    "rna": """SELECT 'RESULT rna ' || count(*) || ' ' || hash(list(h ORDER BY hash(h))) FROM
+ duckvep_haplotypes('SELECT * FROM f_rna_calls', 'fr') h;""",
+    "product": """SELECT 'RESULT product ' || count(*) || ' ' || hash(list(p ORDER BY hash(p))) FROM
+ (SELECT id, duckvep_product_scenario_v1(input) result FROM f_product_input) p;""",
 }
 # The same models restored from snapshots (duckvep_model_restore): 'fms' and 'fcs'.
 QUERIES["hgvs_restored"] = QUERIES["hgvs"].replace("'fm'", "'fms'").replace("RESULT hgvs ", "RESULT hgvs_restored ")
 QUERIES["lifted_hgvs_restored"] = QUERIES["lifted_hgvs"].replace("'fc'", "'fcs'").replace(
     "RESULT lifted_hgvs ", "RESULT lifted_hgvs_restored ")
+QUERIES["rna_restored"] = QUERIES["rna"].replace("'fr'", "'frs'").replace("RESULT rna ", "RESULT rna_restored ")
+RNA_POSITIVE = """SELECT 'POSITIVE ' || prediction_status || ' ' || prediction_reason || ' ' ||
+ prediction_reference_protein || ' ' || prediction_protein FROM
+ duckvep_haplotypes('SELECT * FROM f_rna_calls', 'fr');"""
+PRODUCT_SOURCE = "SELECT 'SOURCE ' || hash(list(input ORDER BY id)) FROM f_product_input;"
+PRODUCT_POSITIVE = """SELECT 'PRODUCT ' || id || ' ' || p.programme_id || ' ' ||
+ p.allele_evidence || ' ' || p.product_evidence || ' ' ||
+ list_count(p.sources) || ' ' || list_count(p.source_effects) || ' ' ||
+ p.verified_sources || ' ' || p.sources[1].source_id FROM
+ (SELECT id, duckvep_product_scenario_v1(input) p FROM f_product_input)
+ ORDER BY id;"""
 RESTORE = "SELECT 'LOADED ' || duckvep_model_restore('{model}', '{path}');"
 # The model each annotation phase runs on, and the query that proves a load published nothing.
 MODEL_OF = {"haplotype": "fm", "discovery": "fm", "coding_calls": "fm", "coding_calls_haplotype": "fm", "hgvs": "fm", "regulation": "fm", "projected": "fm",
             "lifted_hgvs": "fc", "lifted": "fc", "lifted_projected": "fc",
-            "hgvs_restored": "fms", "lifted_hgvs_restored": "fcs"}
+            "hgvs_restored": "fms", "lifted_hgvs_restored": "fcs",
+            "rna": "fr", "rna_restored": "frs", "product": None}
 LOAD_PHASES = {"load": ("fm", "hgvs"), "load_circular": ("fc", "lifted_hgvs"),
-               "restore": ("fms", "hgvs_restored"), "restore_circular": ("fcs", "lifted_hgvs_restored")}
+               "restore": ("fms", "hgvs_restored"), "restore_circular": ("fcs", "lifted_hgvs_restored"),
+               "load_rna": ("fr", "rna"), "restore_rna": ("frs", "rna_restored")}
 
 BASELINE_SQL = "SELECT 'TOTAL ' || current_bytes FROM duckvep_native_budget() WHERE owner = 'total';"
 
@@ -159,16 +215,14 @@ def run(extension, script, duckdb, env_extra=None, timeout=3600):
     env["LSAN_OPTIONS"] = "print_suppressions=0:exitcode=87"
     env["DUCKVEP_FAULT_TRACE"] = "1"
     env.update(env_extra or {})
-    text = ".bail off\nLOAD '%s';\n%s" % (extension, script)
-    with tempfile.NamedTemporaryFile("w", suffix=".sql", delete=False) as handle:
-        handle.write(text)
-        path = handle.name
-    try:
+    text = ".bail off\nLOAD '%s';\nSET threads=1;\n%s" % (extension, script)
+    with tempfile.TemporaryDirectory(prefix="duckvep-fault-sql-") as directory:
+        path = os.path.join(directory, "fixture.sql")
+        with open(path, "w") as handle:
+            handle.write(text)
         proc = subprocess.run([duckdb, "-unsigned", "-csv", "-noheader", "-f", path],
                               env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                               text=True, timeout=timeout)
-    finally:
-        os.unlink(path)
     return proc.returncode, proc.stdout
 
 
@@ -191,10 +245,15 @@ def iteration(args, phase, index, loads, base, allowed, golden):
                    "SELECT 'DROP ' || duckvep_model_drop('%s');" % model]
     else:
         model = MODEL_OF[phase]
-        script += [loads[model], "SELECT duckvep_fault_arm(%d);" % index, QUERIES[phase],
+        script += ([loads[model]] if model else []) + [PRODUCT_SOURCE.replace("SOURCE ", "BEFORE "),
+                   BASELINE_SQL.replace("TOTAL", "CHARGED"),
+                   "SELECT duckvep_fault_arm(%d);" % index, QUERIES[phase],
                    "SELECT 'FIRED ' || duckvep_fault_fired();", "SELECT duckvep_fault_arm(0);",
-                   QUERIES[phase].replace("RESULT ", "AGAIN "),  # the model must still answer
-                   "SELECT 'DROP ' || duckvep_model_drop('%s');" % model]
+                   QUERIES[phase].replace("RESULT ", "AGAIN "),
+                   PRODUCT_SOURCE.replace("SOURCE ", "AFTER "),
+                   BASELINE_SQL.replace("TOTAL", "CLEAN")]
+        if model:
+            script += ["SELECT 'DROP ' || duckvep_model_drop('%s');" % model]
     script += [BASELINE_SQL.replace("TOTAL", "END")]
     rc, out = run(args.extension, "\n".join(script), args.duckdb)
     tag = "%s#%d" % (phase, index)
@@ -235,6 +294,11 @@ def iteration(args, phase, index, loads, base, allowed, golden):
         elif "RESULT %s %s" % (probe, golden[probe]) not in out:
             problems.append("%s: tolerated failure produced a different model" % tag)
         return problems, (site, "load error" if errored else "load tolerated"), out
+    if value(out, "BEFORE ") != value(out, "AFTER "):
+        problems.append("%s: source input mutated" % tag)
+    if phase == "product" and value(out, "CHARGED ") != value(out, "CLEAN "):
+        problems.append("%s: charged bytes changed after failed operation and retry (%s -> %s)" % (
+            tag, value(out, "CHARGED "), value(out, "CLEAN ")))
     first = re.search(r"^RESULT %s (.*)$" % phase, out, re.M)
     again = re.search(r"^AGAIN %s (.*)$" % phase, out, re.M)
     if not again or again.group(1) != golden[phase]:
@@ -252,22 +316,30 @@ def main():
     parser.add_argument("--duckdb", default="duckdb")
     parser.add_argument("--fasta", default=os.path.join(ROOT, "test/data/duckvep/indel_translation.fa"))
     parser.add_argument("--limit", type=int, default=0, help="stop after this many failures per phase (debugging)")
-    parser.add_argument("--jobs", type=int, default=8)
+    parser.add_argument("--jobs", type=int, default=2)
+    parser.add_argument("--phase", action="append", choices=tuple(LOAD_PHASES) + tuple(QUERIES),
+                        help="run selected phases only; counting and positive fixtures remain mandatory")
     args = parser.parse_args()
-    loads = {"fm": LOAD.format(fasta=args.fasta), "fc": LOAD_CIRCULAR.format(fasta=args.fasta)}
-    snapshots = tempfile.mkdtemp(prefix="duckvep-fault-")
-    for source, restored in (("fm", "fms"), ("fc", "fcs")):
+    with tempfile.TemporaryDirectory(prefix="duckvep-fault-") as snapshots:
+        execute(args, snapshots)
+
+
+def execute(args, snapshots):
+    loads = {"fm": LOAD.format(fasta=args.fasta), "fc": LOAD_CIRCULAR.format(fasta=args.fasta),
+             "fr": LOAD_RNA}
+    for source, restored in (("fm", "fms"), ("fc", "fcs"), ("fr", "frs")):
         loads[restored] = RESTORE.format(model=restored, path=os.path.join(snapshots, source + ".dvsnap"))
 
     # Count pass: allocations per phase, golden results, and the bytes a pooled
     # annotation worker legitimately retains (idle limit 0 trims its buffers).
     script = [FIXTURE, "SELECT duckvep_worker_limits_set(6, 134217728, 67108864, 0);",
               BASELINE_SQL.replace("TOTAL", "BASE")]
-    for model, tag in (("fm", "NLOAD"), ("fc", "NLOADC")):
+    for model, tag in (("fm", "NLOAD"), ("fc", "NLOADC"), ("fr", "NLOADR")):
         script += ["SELECT duckvep_fault_arm(0);", loads[model],
                    "SELECT '%s ' || duckvep_fault_allocations();" % tag]
-    # Snapshots of both models, written once here and restored by every restore iteration.
-    for source, restored, tag in (("fm", "fms", "NRESTORE"), ("fc", "fcs", "NRESTOREC")):
+    # Snapshot paths persist for every fresh-process restore iteration.
+    for source, restored, tag in (("fm", "fms", "NRESTORE"), ("fc", "fcs", "NRESTOREC"),
+                                  ("fr", "frs", "NRESTORER")):
         script += ["SELECT duckvep_fault_arm(0);",
                    "SELECT duckvep_model_save('%s', '%s');" % (source, os.path.join(snapshots, source + ".dvsnap")),
                    "SELECT duckvep_fault_arm(0);", loads[restored],
@@ -276,16 +348,26 @@ def main():
     for name, query in QUERIES.items():
         script += [query, "SELECT 'NQUERY %s ' || duckvep_fault_allocations();" % name,
                    "SELECT duckvep_fault_arm(0);"]
-    script += ["SELECT duckvep_model_drop('fm');", "SELECT duckvep_model_drop('fc');",
+    script += [RNA_POSITIVE, PRODUCT_SOURCE, PRODUCT_POSITIVE, "SELECT duckvep_model_drop('fm');", "SELECT duckvep_model_drop('fc');",
                "SELECT duckvep_model_drop('fms');", "SELECT duckvep_model_drop('fcs');",
+               "SELECT duckvep_model_drop('fr');", "SELECT duckvep_model_drop('frs');",
                BASELINE_SQL.replace("TOTAL", "USED")]
     rc, out = run(args.extension, "\n".join(script), args.duckdb)
-    if rc not in (0, 1) or out.count("LOADED true") != 4:
+    if rc != 0 or re.search(r"(?im)^(?:parser|binder|catalog|invalid input) error:", out) or out.count("LOADED true") != 6 or value(out, "POSITIVE ") != (
+            "conditional_assumed_rna_programme assumed_rna_programme MF* MFQ*"):
         print(out[-4000:])
         raise SystemExit("count pass failed (exit %d)" % rc)
+    products = [line.removeprefix("PRODUCT ") for line in out.splitlines() if line.startswith("PRODUCT ")]
+    expected_products = ["include include hypothetical_assignment supplied_programme 2 2 2 0",
+                         "skip skip hypothetical_assignment supplied_programme 2 2 2 0"]
+    if products != expected_products:
+        raise SystemExit("product positive output differs: %s" % products)
+    print("positive RNA:", value(out, "POSITIVE "), "product:", products,
+          "source hash:", value(out, "SOURCE "))
     base = int(value(out, "BASE "))
     n_load = {"load": int(value(out, "NLOAD ")), "load_circular": int(value(out, "NLOADC ")),
-              "restore": int(value(out, "NRESTORE ")), "restore_circular": int(value(out, "NRESTOREC "))}
+              "restore": int(value(out, "NRESTORE ")), "restore_circular": int(value(out, "NRESTOREC ")),
+              "load_rna": int(value(out, "NLOADR ")), "restore_rna": int(value(out, "NRESTORER "))}
     golden = {name: value(out, "RESULT %s " % name) for name in QUERIES}
     for name, text in golden.items():
         if int(text.split()[0]) == 0:
@@ -303,10 +385,9 @@ def main():
         print("  golden %s: %s" % (name, text))
 
     plan = []
-    for name, count in n_load.items():
-        plan += [(name, i) for i in range(1, (min(count, args.limit) if args.limit else count) + 1)]
-    for name, count in n_query.items():
-        plan += [(name, i) for i in range(1, (min(count, args.limit) if args.limit else count) + 1)]
+    for name, count in list(n_load.items()) + list(n_query.items()):
+        if args.phase is None or name in args.phase:
+            plan += [(name, i) for i in range(1, (min(count, args.limit) if args.limit else count) + 1)]
     failures, sites, outcomes = [], collections.Counter(), collections.Counter()
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
         futures = [pool.submit(iteration, args, phase, index, loads, base, allowed, golden)
@@ -326,7 +407,15 @@ def main():
     # The new lifted-execution sites must actually have been failed.
     for needed in ("duckvep_lift.c", "duckvep_scalar_lift_resolve", "duckvep_scalar_lift_reserve", "duckvep_coding_calls.c",
                    "duckvep_core_discovery.c"):
-        if not args.limit and not any(needed in "%s %s" % (site[0], site[1]) for site in sites if site):
+        if not args.limit and args.phase is None and not any(needed in "%s %s" % (site[0], site[1]) for site in sites if site):
+            failures.append("no failed allocation at %s" % needed)
+    for needed, owner in (("duckvep_core_product_scenario.c", "product"),
+                          ("duckvep_core_products.c", "product"),
+                          ("duckvep_product_sql.c", "product"),
+                          ("duckvep_load_rna_edits", "load_rna"),
+                          ("duckvep_core_snapshot.c", "restore_rna")):
+        if not args.limit and (args.phase is None or owner in args.phase) and not any(
+                needed in "%s %s" % (site[0], site[1]) for site in sites if site):
             failures.append("no failed allocation at %s" % needed)
     if failures:
         print("FAILURES (%d):" % len(failures))

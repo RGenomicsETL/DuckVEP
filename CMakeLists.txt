@@ -57,6 +57,7 @@ set(EXTENSION_SOURCES
     src/duckvep_coding_calls.c
     src/duckvep_model.c
     src/duckvep_phase_sql.c
+    src/duckvep_product_sql.c
     src/duckvep_reference.c
     src/duckvep_sql.c
     third_party/cgranges/cgranges.c

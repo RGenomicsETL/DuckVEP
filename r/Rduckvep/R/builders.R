@@ -27,6 +27,10 @@
 #'   `min_intron_size`, `gerp_end_trunc_cutoff`, `check_complete_cds`).
 #'   Other builders accept no options. Each value must be a length-one string,
 #'   logical, integer, double or `NA`.
+#' @details Model receipts include nonempty original RNA coding authority in
+#'   their content hash. Absent or all-NULL authority preserves legacy receipt
+#'   identity. A receipt commits to supplied content, not independently verified
+#'   biological correctness.
 #' @return A length-one SQL string.
 #' @name rduckvep_builders
 NULL

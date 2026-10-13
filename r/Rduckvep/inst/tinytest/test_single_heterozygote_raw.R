@@ -25,7 +25,7 @@ local({
     "haplotype_consequences", "haplotype_impact", "nmd_rule", "nmd_prediction", "nmd_stop_position",
     "nmd_junction_position", "nmd_contributors", "nmd_exceptions", "prediction_reference_protein",
     "prediction_protein", "nominal_length_diff")
-  calls <- function(gt, strand, multiallelic = FALSE, reverse = FALSE, starts = c(4L, 13L, 7L)) {
+  calls <- function(gt, strand, multiallelic = FALSE, reverse = FALSE, starts = c(4L, 13L, 7L), swap_alts = FALSE, unused_alt = FALSE) {
     # Each column is one original record; each row is one sample.
     gt <- as.matrix(gt)
     rows <- character()
@@ -33,7 +33,8 @@ local({
       position <- if (strand == 1L) 99L + starts[j] else 118L - starts[j]
       ref <- if (strand == 1L) "G" else "C"
       alt <- if (j == 1L) "A" else if (j == 2L) "C" else "T"
-      alts <- if (j == 1L && multiallelic) c("T", "A") else alt
+      alts <- if (j == 1L && multiallelic) if (swap_alts) c("A", "T") else c("T", "A") else alt
+      if (j == 1L && multiallelic && unused_alt) alts <- c(alts, "C")
       if (strand == -1L) alts <- chartr("ACGT", "TGCA", alts)
       rows <- c(rows, sprintf("(%d,%d,%d,%s,[%s],%d,%d,%s,%s)", j,
         as.integer(strand == -1L), position, quote(ref), paste(quote(alts), collapse = ","),
@@ -60,12 +61,12 @@ local({
         reason = result$carrier_predictions[[i]]$prediction_reason)
     }))
   }
-  expected <- function(gt, multiallelic = FALSE, starts = c(4L, 13L, 7L)) {
+  expected <- function(gt, multiallelic = FALSE, starts = c(4L, 13L, 7L), swap_alts = FALSE) {
     # Apply original allele slots to the model, independently of emitted leaves.
     dna <- rep(reference, 2L)
     for (j in seq_along(gt)) {
       alleles <- as.integer(strsplit(gt[j], "[/|]")[[1L]])
-      alts <- if (j == 1L && multiallelic) c("T", "A") else
+      alts <- if (j == 1L && multiallelic) if (swap_alts) c("A", "T") else c("T", "A") else
         if (j == 1L) "A" else if (j == 2L) "C" else "T"
       for (lane in 1:2) if (alleles[lane] != 0L) {
         substr(dna[lane], starts[j], starts[j]) <- alts[alleles[lane]]
@@ -123,13 +124,58 @@ local({
     expect_true(all(refused$reason == "non_strict_phase_policy"))
   }
   for (strand in c(1L, -1L)) {
-    # 1/2 has two original ALT alleles, not an original REF/ALT heterozygote.
-    result <- run(calls(rbind(c("0/2", "1/1"), c("1/2", "1/1")), strand, TRUE))
-    check(result, expected(c("0/2", "1/1"), TRUE))
+    # Original ALT ordinals, not sorted output paths, determine real slots.
+    for (spelling in c("1/2", "2/1", "1|2", "2|1"))
+      for (swap in c(FALSE, TRUE)) for (unused in c(FALSE, TRUE)) {
+      remapped <- if (swap) chartr("12", "21", spelling) else spelling
+      gt <- c(remapped, "1/1", "0/0")
+      result <- run(calls(matrix(gt, nrow = 1L), strand, TRUE,
+        swap_alts = swap, unused_alt = unused))
+      dna <- expected(gt, TRUE, swap_alts = swap)
+      check(result, dna)
+      residue <- vapply(dna, function(x)
+        switch(substr(x, 4L, 6L), TCT = "Ser", ACT = "Thr"), "")
+      protein <- paste0("M", substr(residue, 1L, 1L), "AER*")
+      expect_equal(sort(result$protein), sort(unname(protein)))
+      expect_true(all(result$hgvsc_status == "unproven_cis" & is.na(result$hgvsc)))
+      expect_equal(sort(result$hgvsp), sort(paste0("p.[(Ala2", residue, ";Gly5Arg)]")))
+      expect_true(all(result$hgvsp_status == "ok"))
+      expect_true(all(result$nominal_length_diff == 0))
+      lanes <- copies(result)
+      expect_equal(lanes$cds[order(lanes$haplotype_lane)],
+        expected(c(spelling, "1/1", "0/0"), TRUE))
+      source_slots <- as.integer(strsplit(gt[1L], "[/|]")[[1L]])
+      for (i in seq_len(nrow(result))) {
+        source <- result$contributors[[i]]
+        lane <- result$carriers[[i]]$haplotype_lane
+        expect_equal(source$alt_index[source$event_index == 1L], source_slots[lane])
+        expect_equal(sort(source$event_index), c(1, 2))
+      }
+    }
+    for (spelling in c("1/2", "2/1")) {
+      gt <- c(spelling, "1/1")
+      starts <- c(13L, 4L)
+      check(run(calls(matrix(gt, nrow = 1L), strand, TRUE, reverse = TRUE,
+        starts = starts)), expected(gt, TRUE, starts = starts))
+    }
+    for (homo in c("1/1", "2/2", "3/3")) {
+      gt <- c(homo, "1/1")
+      result <- run(calls(matrix(gt, nrow = 1L), strand, TRUE, unused_alt = TRUE))
+      dna <- if (homo == "3/3") expected(c("1/1", "1/1"), TRUE) else expected(gt, TRUE)
+      if (homo == "3/3") substr(dna, 4L, 4L) <- "C"
+      check(result, dna)
+    }
+    # Pipes alone carry neither an original PS identity nor a cross-record slot proof.
+    phased <- run(calls(matrix(c("0|1", "0|1"), nrow = 1L), strand))
+    phased_lanes <- copies(phased)
+    expect_true(all(phased_lanes$status == "unsupported_context"))
+    expect_true(all(phased_lanes$reason == "non_strict_phase_policy"))
+    # One sample's refusal cannot censor a different sample's original copies.
+    result <- run(calls(rbind(c("1/2", "1/1"), c("1/2", "0/1")), strand, TRUE))
+    check(result, expected(c("1/2", "1/1"), TRUE))
     refused <- copies(result)
     refused <- refused[refused$sample_index == 1L, ]
     expect_true(all(refused$status == "unsupported_context"))
-    expect_true(all(refused$reason == "non_strict_phase_policy"))
     # An ALT-only leaf does not acquire a second ALT carrier for the absent REF lane.
     gt <- "0/1"
     result <- run(calls(matrix(gt, nrow = 1L), strand))
@@ -159,18 +205,18 @@ local({
     rows[order(names(rows))]
   }
   for (strand in c(1L, -1L)) {
-    query <- calls(matrix(c("0/1", "1/1"), nrow = 1L), strand)
+    query <- calls(matrix(c("1/2", "1/1"), nrow = 1L), strand, TRUE)
     alone <- run(query)
-    mixed <- run(calls(rbind(c("0/1", "1/1"), c("0/1", "0/1"), c("1/1", "1/1")), strand))
+    mixed <- run(calls(rbind(c("1/2", "1/1"), c("1/2", "0/1"), c("1/1", "1/1")), strand, TRUE))
     expect_identical(own(mixed, 0L), own(alone, 0L))
     expect_error(run(paste0("SELECT * REPLACE(1 AS event_index) FROM (", query, ")")),
       "inconsistent source record identity")
     expect_error(run(paste0("SELECT * FROM (", query, ") WHERE event_index=1 UNION ALL ",
-      "SELECT * REPLACE('1/0' AS gt) FROM (", query, ") WHERE event_index=1")),
+      "SELECT * REPLACE('2/1' AS gt) FROM (", query, ") WHERE event_index=1")),
       "inconsistent source record identity or source GT")
     expect_identical(run(query), alone)
   }
-  query <- calls(rbind(c("0/1", "1/1"), c("1/0", "1/1"), c("0/1", "0/1")), 1L)
+  query <- calls(rbind(c("1/2", "1/1"), c("2/1", "1/1"), c("0/1", "0/1")), 1L, TRUE)
   baseline <- run(query)
   limited <- paste0("SELECT * FROM duckvep_haplotypes(", quote(query), ", 'single_raw',",
     "phase_policy='vep_compat',input_mode='source_records',hgvs=true) LIMIT 1")

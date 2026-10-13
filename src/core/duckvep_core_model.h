@@ -71,6 +71,9 @@ typedef struct duckvep_owned_model {
 	uint64_t *cdna_sequence_offsets;
 	uint32_t *cdna_sequence_lengths;
 	uint8_t *codon_tables;
+	uint32_t *rna_cds_cdna_starts;
+	uint32_t *rna_cds_cdna_ends;
+	uint8_t *rna_codon_tables;
 	uint64_t *pre_cds_sequence_offsets;
 	uint32_t *pre_cds_sequence_lengths;
 	uint64_t *post_cds_sequence_offsets;
@@ -90,6 +93,18 @@ typedef struct duckvep_owned_model {
 	uint8_t *peptide_edit_alts;
 	uint8_t *peptide_edit_codes;
 	size_t peptide_edit_count;
+	/* Ensembl 116 transcript SeqEdits, original 1-based closed cDNA coordinates.
+	 * Presence: 0 unknown, 1 declared empty, 2 declared named programme.
+	 * The expected substrate is the corresponding slice of raw cdna_sequence_bytes. */
+	uint8_t *rna_presence;
+	uint8_t *rna_boundary_overrides; /* bit 0 _transl_start, bit 1 _transl_end */
+	uint32_t *rna_offsets;
+	uint32_t *rna_starts, *rna_ends;
+	uint8_t *rna_kinds;
+	uint64_t *rna_alt_offsets;
+	uint32_t *rna_alt_lengths;
+	uint8_t *rna_alt_bytes;
+	size_t rna_count, rna_alt_bytes_length;
 	uint8_t *cds_sequence_bytes;
 	size_t cds_sequence_length;
 	uint8_t *cdna_sequence_bytes;
@@ -259,7 +274,7 @@ int duckvep_col_string_wellformed(const duckvep_col_t *, size_t);
 
 typedef struct duckvep_model_sources {
 	duckvep_source_t *regions, *transcripts, *exons;
-	duckvep_source_t *mature_mirna, *peptide_edits, *interval_features; /* optional */
+	duckvep_source_t *mature_mirna, *peptide_edits, *interval_features, *rna_edits; /* optional */
 	const char *reference_fasta;
 	int transcript_coverage_complete;
 } duckvep_model_sources_t;
@@ -271,6 +286,8 @@ int duckvep_core_model_load_relations(duckvep_owned_model_t *model,
 /* Publishes, checks region references, lifts circular models and opens the
  * kernel. Destroys the model on failure. */
 int duckvep_core_model_finish(duckvep_owned_model_t *model, char *error, size_t error_size);
+int duckvep_core_model_validate_rna_coding_authority(const duckvep_owned_model_t *model,
+    char *error, size_t error_size);
 void duckvep_owned_model_destroy(duckvep_owned_model_t *model);
 duckvep_registry_t *duckvep_core_registry_create(void);
 int duckvep_core_model_install(duckvep_registry_t *registry, const char *name,

@@ -40,6 +40,17 @@ local({
     ref = c("GCTGCT", "GCT", "GCT", "GCT", "ATG", "TAA"),
     alt = c("AAA", "TTTCCC", "TAAGAA", "AA", "GCTCCC", "GGGCCC"),
     protein = c("MKEG*", "MFPAEG*", "M*", "MKLKV", "APAAEG*", "MAAEGGP"))
+  for (strand in c(1L, -1L)) for (reverse in c(FALSE, TRUE)) {
+    sources <- data.frame(event = 1:2, start = c(3L, 4L),
+      ref = c("G", "GCT"), alt = c("GCCC", "TTTCCC"))
+    result <- rduckvep_haplotypes(con, calls(sources, strand, reverse), "opaque_aliases", hgvs = TRUE)
+    expect_identical(result$prediction_status, "predicted")
+    expect_identical(result$cds, "ATGCCCTTTCCCGCTGAAGGTTAA")
+    expect_equal(result$nominal_length_diff, 6)
+    expect_equal(sort(unique(unlist(result$coding_blocks[[1L]]$event_indices))), 1:2)
+    expect_equal(result$contributors[[1L]]$position[order(result$contributors[[1L]]$event_index)],
+      if (strand == 1L) c(102, 103) else c(115, 112))
+  }
   for (strand in c(1L, -1L)) for (i in seq_len(nrow(witnesses))) {
     w <- witnesses[i, ]
     source <- data.frame(event = 1L, start = w$start, ref = w$ref, alt = w$alt)
@@ -169,13 +180,6 @@ local({
       ") v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,",
       "sample_index,alleles,phase_before,phase_set)")
     result <- rduckvep_haplotypes(con, input, "opaque_geometry", hgvs = TRUE)
-    if (terminal && count == 2L) {
-      # Every contributing source must lie in the same coding exon for overlap composition.
-      expect_identical(result$prediction_status, "unsupported_overlap")
-      expect_true(is.na(result$cds))
-      expect_true(is.na(result$hgvsc))
-      next
-    }
     expect_identical(result$cds, paste0("ATGTAAAAA", strrep("CTG", 25L), "TAA", if (terminal) "C" else ""))
     expect_identical(result$protein, "M*")
     expect_identical(result$prediction_status, "predicted")
@@ -187,7 +191,145 @@ local({
     expect_equal(sort(result$nmd_contributors[[1L]]), seq_len(count))
     roles <- result$contributor_provenance[[1L]]
     expect_identical(roles$role[order(roles$event_index)], c(rep("applied", count), rep("post_stop", 1L + terminal)))
-    if (count == 1L) control <- result else
+    if (count == 1L) control <- result else {
       expect_identical(result[c(biological, "hgvsc", "hgvsp")], control[c(biological, "hgvsc", "hgvsp")])
+      expect_equal(sort(unique(unlist(result$coding_blocks[[1L]]$event_indices))), ids)
+    }
+  }
+  extended_reference <- paste0("ATGAAA", strrep("CTG", 167L), "TAA")
+  tx <- paste0("SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,",
+    "100::UBIGINT transcript_start,609::UBIGINT transcript_end,(1-2*i)::TINYINT strand,",
+    "0::UINTEGER gene_index,3::UBIGINT transcript_flags,100::UBIGINT cds_start,",
+    "609::UBIGINT cds_end,", quote(extended_reference), "::BLOB cds_sequence,",
+    "1::UTINYINT codon_table,''::BLOB pre_cds_sequence,''::BLOB post_cds_sequence FROM range(2) t(i)")
+  ex <- paste("SELECT transcript_index::UINTEGER transcript_index,exon_start::UBIGINT exon_start,",
+    "exon_end::UBIGINT exon_end,exon_cdna_start::UBIGINT exon_cdna_start,",
+    "exon_cdna_end::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase FROM",
+    "(VALUES (0,100,159,1,60),(0,160,609,61,510),(1,550,609,1,60),(1,100,549,61,510))",
+    "v(transcript_index,exon_start,exon_end,exon_cdna_start,exon_cdna_end)")
+  expect_true(rduckvep_load_model(con, "opaque_long_exon",
+    "SELECT i::UINTEGER seq_region FROM range(2) t(i)", tx, ex))
+  for (strand in c(1L, -1L)) for (count in 1:2) {
+    ids <- seq_len(count + 1L)
+    starts <- c(rep(58L, count), 61L)
+    refs <- c(rep("CTG", count), "CTG")
+    alts <- c(rep("CTGAAA", count), "TAA")
+    positions <- if (strand == 1L) starts + 99L else 611L - starts - nchar(refs)
+    if (strand == -1L) {
+      refs <- vapply(refs, rc, "")
+      alts <- vapply(alts, rc, "")
+    }
+    rows <- sprintf("(%d,%d,%d,%s,%s,1,%d,0,[0,1],[false,true],77::BIGINT)",
+      ids, as.integer(strand == -1L), positions, quote(refs), quote(alts), as.integer(strand == -1L))
+    input <- paste0("SELECT * FROM (VALUES ", paste(rev(rows), collapse = ","),
+      ") v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,",
+      "sample_index,alleles,phase_before,phase_set)")
+    result <- rduckvep_haplotypes(con, input, "opaque_long_exon", hgvs = TRUE)
+    expect_identical(result$cds, paste0(substr(extended_reference, 1L, 60L), "AAA", "TAA",
+      substr(extended_reference, 64L, 510L)))
+    expect_identical(result$prediction_status, "predicted")
+    expect_identical(result$nmd_prediction, "escape")
+    expect_equal(result$nmd_stop_position, 66)
+    expect_equal(result$nmd_junction_position, 63)
+    expect_true(grepl("long_exon", result$nmd_exceptions[[1L]], fixed = TRUE))
+    if (count == 1L) long_control <- result else
+      expect_identical(result[c(biological, "hgvsc", "hgvsp")], long_control[c(biological, "hgvsc", "hgvsp")])
+  }
+  for (strand in c(1L, -1L)) for (reverse in c(FALSE, TRUE)) {
+    # Equal spliced insertion sites at a junction have different genomic anchors.
+    left <- substr(long_reference, 60L, 60L)
+    right <- substr(long_reference, 61L, 61L)
+    sources <- data.frame(event = 1:2, start = c(60L, 61L),
+      ref = c(left, right), alt = c(paste0(left, "CCC"), paste0("CCC", right)))
+    positions <- if (strand == 1L) 99L + sources$start else 190L - sources$start
+    refs <- if (strand == 1L) sources$ref else vapply(sources$ref, rc, "")
+    alts <- if (strand == 1L) sources$alt else vapply(sources$alt, rc, "")
+    rows <- sprintf("(%d,%d,%d,%s,%s,1,%d,0,[0,1],[false,true],77::BIGINT)",
+      sources$event, as.integer(strand == -1L), positions, quote(refs), quote(alts),
+      as.integer(strand == -1L))
+    input <- function(r) paste0("SELECT * FROM (VALUES ", paste(rows[r], collapse = ","),
+      ") v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,",
+      "sample_index,alleles,phase_before,phase_set)")
+    single <- rduckvep_haplotypes(con, input(1L), "opaque_geometry", hgvs = TRUE)
+    other <- rduckvep_haplotypes(con, input(2L), "opaque_geometry", hgvs = TRUE)
+    expect_identical(single$cds, other$cds)
+    expect_identical(single$cds, paste0(substr(long_reference, 1L, 60L), "CCC",
+      substr(long_reference, 61L, 90L)))
+    pair <- rduckvep_haplotypes(con, input(if (reverse) 2:1 else 1:2), "opaque_geometry", hgvs = TRUE)
+    if (strand == 1L) {
+      expect_identical(pair$nmd_prediction, "not_applicable")
+      expect_identical(pair$prediction_status, "predicted")
+      expect_identical(pair$cds, paste0(substr(long_reference, 1L, 60L), "CCCCCC",
+        substr(long_reference, 61L, 90L)))
+      expect_equal(pair$nominal_length_diff, 6)
+      expect_equal(sort(unique(unlist(pair$coding_blocks[[1L]]$event_indices))), 1:2)
+    } else {
+      expect_identical(pair$prediction_status, "unsupported_overlap")
+      expect_identical(pair$prediction_reason, "ambiguous_same_gap_insertions")
+      expect_true(is.na(pair$cds))
+    }
+    duplicate_rows <- rows
+    triple_rows <- c(rows, sub("^\\(1,", "(3,", rows[1L]))
+    triple <- rduckvep_haplotypes(con, paste0("SELECT * FROM (VALUES ",
+      paste(triple_rows, collapse = ","),
+      ") v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,",
+      "sample_index,alleles,phase_before,phase_set)"), "opaque_geometry", hgvs = TRUE)
+    if (strand == 1L) {
+      expect_identical(triple$cds, pair$cds)
+      expect_equal(sort(unique(unlist(triple$coding_blocks[[1L]]$event_indices))), 1:3)
+    } else expect_identical(triple$prediction_status, "unsupported_overlap")
+    duplicate_rows[2L] <- sprintf("(%d,%d,%d,%s,%s,1,%d,0,[0,1],[false,true],77::BIGINT)",
+      2L, as.integer(strand == -1L), positions[1L], quote(refs[1L]), quote(alts[1L]),
+      as.integer(strand == -1L))
+    duplicates <- rduckvep_haplotypes(con, paste0("SELECT * FROM (VALUES ",
+      paste(duplicate_rows[if (reverse) 2:1 else 1:2], collapse = ","),
+      ") v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,",
+      "sample_index,alleles,phase_before,phase_set)"), "opaque_geometry", hgvs = TRUE)
+    expect_identical(duplicates$cds, single$cds)
+    expect_identical(duplicates$prediction_status, "predicted")
+    expect_equal(sort(unique(unlist(duplicates$coding_blocks[[1L]]$event_indices))), 1:2)
+  }
+  for (strand in c(1L, -1L)) for (reverse in c(FALSE, TRUE)) {
+    # The c.60/61 junction is adjacent in the edited CDS but belongs to two exon-local edits.
+    ids <- 1:4
+    positions <- if (strand == 1L) c(103L, 157L, 157L, 160L) else c(181L, 130L, 130L, 129L)
+    refs <- c("AAAGCT", "CTG", "CTG", "C")
+    alts <- c("TAA", "AAAAAA", "AAAAAA", "T")
+    if (strand == -1L) {
+      refs <- vapply(refs, rc, "")
+      alts <- vapply(alts, rc, "")
+    }
+    rows <- sprintf("(%d,%d,%d,%s,%s,1,%d,0,[0,1],[false,true],77::BIGINT)",
+      ids, as.integer(strand == -1L), positions, quote(refs), quote(alts), as.integer(strand == -1L))
+    input <- function(r) paste0("SELECT * FROM (VALUES ", paste(rows[r], collapse = ","),
+      ") v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,",
+      "sample_index,alleles,phase_before,phase_set)")
+    baseline <- rduckvep_haplotypes(con, input(c(1L, 2L, 4L)), "opaque_geometry", hgvs = TRUE)
+    result <- rduckvep_haplotypes(con, input(if (reverse) rev(ids) else ids), "opaque_geometry", hgvs = TRUE)
+    expected <- paste0("ATGTAA", substr(long_reference, 10L, 57L), "AAAAAA", "T",
+      substr(long_reference, 62L, 90L))
+    expect_identical(result$cds, expected)
+    expect_identical(result$cds, baseline$cds)
+    expect_identical(result$protein, "M*")
+    expect_identical(result$prediction_status, "predicted")
+    expect_identical(result$nmd_prediction, "trigger")
+    expect_equal(result$nmd_stop_position, 6)
+    expect_equal(result$nmd_junction_position, 60)
+    expect_equal(result$nominal_length_diff, 0)
+    expect_identical(result[c(biological, "hgvsc", "hgvsp")], baseline[c(biological, "hgvsc", "hgvsp")])
+    expect_equal(sort(unique(unlist(result$coding_blocks[[1L]]$event_indices))), ids)
+    expect_identical(result$contributor_provenance[[1L]]$role[order(result$contributor_provenance[[1L]]$event_index)],
+      c("applied", "post_stop", "post_stop", "post_stop"))
+    bad_ref <- if (strand == 1L) "G" else rc("G")
+    bad_rows <- rows
+    bad_rows[4L] <- sprintf("(%d,%d,%d,%s,%s,1,%d,0,[0,1],[false,true],77::BIGINT)",
+      4L, as.integer(strand == -1L), positions[4L], quote(bad_ref), quote(alts[4L]),
+      as.integer(strand == -1L))
+    bad_input <- paste0("SELECT * FROM (VALUES ", paste(bad_rows, collapse = ","),
+      ") v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,",
+      "sample_index,alleles,phase_before,phase_set)")
+    mismatched <- rduckvep_haplotypes(con, bad_input, "opaque_geometry", hgvs = TRUE)
+    expect_identical(mismatched$prediction_reason, "reference_mismatch")
+    expect_true(is.na(mismatched$cds))
   }
 })
