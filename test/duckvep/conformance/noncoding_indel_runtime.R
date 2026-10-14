@@ -155,6 +155,13 @@ run_noncoding_indels <- function(connection, quote) {
       stopifnot(refused$cds == "ATGAAATAA", refused$protein == "MK*")
     DBI::dbGetQuery(connection, paste0("SELECT duckvep_model_drop(", quote(model), ")"))
   }
+  DBI::dbGetQuery(connection, paste0("SELECT loaded FROM duckvep_model_load('utr_rna_empty',",
+    quote("SELECT 0::UINTEGER seq_region"), ",", quote(paste0("SELECT *,", raw_cdna, " FROM (", transcripts, ")")),
+    ",", quote(exons), ",rna_edit_query := ", quote(paste0(programme, " WHERE FALSE")), ")"))
+  ordinary <- DBI::dbGetQuery(connection, paste0("SELECT * FROM duckvep_haplotypes(", quote(calls), ",'utr_nmd')"))
+  known_empty <- DBI::dbGetQuery(connection, paste0("SELECT * FROM duckvep_haplotypes(", quote(calls), ",'utr_rna_empty')"))
+  stopifnot(identical(known_empty, ordinary))
+  DBI::dbGetQuery(connection, "SELECT duckvep_model_drop('utr_rna_empty')")
   DBI::dbGetQuery(connection, "SELECT duckvep_model_drop('utr_nmd_unknown')")
   DBI::dbGetQuery(connection, "SELECT duckvep_model_drop('utr_nmd')")
   for (lower in c(FALSE, TRUE)) for (strand in c(1L, -1L)) {

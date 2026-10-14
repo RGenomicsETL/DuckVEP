@@ -1917,9 +1917,9 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
                 leaf->path_reason = DUCKVEP_REASON_NMD_GEOMETRY_UNAVAILABLE;
         }
     }
-    /* A supplied legacy CDS retains positional UTR classification. Explicit
+    /* A supplied legacy CDS retains positional UTR classification. Nonempty
      * programmes or withheld CDSs require conditional RNA qualification. */
-    if (noncoding == 1 && ((s->rna.presence && s->rna.presence[tx]) ||
+    if (noncoding == 1 && ((s->rna.presence && s->rna.presence[tx] > 1u) ||
         (s->carriers.model->flags && (s->carriers.model->flags[tx] & DUCKVEP_TX_RNA_EDIT) &&
          (!s->sequences->cds_length || !s->sequences->cds_length[tx])))) {
         int called = raw_called;
