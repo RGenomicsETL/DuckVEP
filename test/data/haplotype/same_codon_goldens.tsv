@@ -25,7 +25,7 @@ plus_1exon__del_inside_codons_pure	plus_1exon	del_inside_codons_pure	0	inframe_d
 plus_1exon__del_inside_codons_pure	plus_1exon	del_inside_codons_pure	1				3
 plus_1exon__delins_inframe	plus_1exon	delins_inframe	0	protein_altering_variant	MODERATE	MAGKRSGPFDHWTVSIQEYCLA*	3
 plus_1exon__delins_inframe	plus_1exon	delins_inframe	1				3
-plus_1exon__far_syn_and_missense	plus_1exon	far_syn_and_missense	0	missense_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
+plus_1exon__far_syn_and_missense	plus_1exon	far_syn_and_missense	0	missense_variant,synonymous_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
 plus_1exon__far_syn_and_missense	plus_1exon	far_syn_and_missense	1				3
 plus_1exon__far_syn_and_syn	plus_1exon	far_syn_and_syn	0	synonymous_variant	LOW	MAELKRSGPFDHWTVSIQEYCLA*	3
 plus_1exon__far_syn_and_syn	plus_1exon	far_syn_and_syn	1				3
@@ -71,7 +71,7 @@ plus_2exon__del_inside_codons_pure	plus_2exon	del_inside_codons_pure	0	inframe_d
 plus_2exon__del_inside_codons_pure	plus_2exon	del_inside_codons_pure	1				3
 plus_2exon__delins_inframe	plus_2exon	delins_inframe	0	protein_altering_variant	MODERATE	MAGKRSGPFDHWTVSIQEYCLA*	3
 plus_2exon__delins_inframe	plus_2exon	delins_inframe	1				3
-plus_2exon__far_syn_and_missense	plus_2exon	far_syn_and_missense	0	missense_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
+plus_2exon__far_syn_and_missense	plus_2exon	far_syn_and_missense	0	missense_variant,synonymous_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
 plus_2exon__far_syn_and_missense	plus_2exon	far_syn_and_missense	1				3
 plus_2exon__far_syn_and_syn	plus_2exon	far_syn_and_syn	0	synonymous_variant	LOW	MAELKRSGPFDHWTVSIQEYCLA*	3
 plus_2exon__far_syn_and_syn	plus_2exon	far_syn_and_syn	1				3
@@ -117,7 +117,7 @@ plus_3exon__del_inside_codons_pure	plus_3exon	del_inside_codons_pure	0	inframe_d
 plus_3exon__del_inside_codons_pure	plus_3exon	del_inside_codons_pure	1				3
 plus_3exon__delins_inframe	plus_3exon	delins_inframe	0	protein_altering_variant	MODERATE	MAGKRSGPFDHWTVSIQEYCLA*	3
 plus_3exon__delins_inframe	plus_3exon	delins_inframe	1				3
-plus_3exon__far_syn_and_missense	plus_3exon	far_syn_and_missense	0	missense_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
+plus_3exon__far_syn_and_missense	plus_3exon	far_syn_and_missense	0	missense_variant,synonymous_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
 plus_3exon__far_syn_and_missense	plus_3exon	far_syn_and_missense	1				3
 plus_3exon__far_syn_and_syn	plus_3exon	far_syn_and_syn	0	synonymous_variant	LOW	MAELKRSGPFDHWTVSIQEYCLA*	3
 plus_3exon__far_syn_and_syn	plus_3exon	far_syn_and_syn	1				3
@@ -163,7 +163,7 @@ minus_1exon__del_inside_codons_pure	minus_1exon	del_inside_codons_pure	0	inframe
 minus_1exon__del_inside_codons_pure	minus_1exon	del_inside_codons_pure	1				3
 minus_1exon__delins_inframe	minus_1exon	delins_inframe	0	protein_altering_variant	MODERATE	MAGKRSGPFDHWTVSIQEYCLA*	3
 minus_1exon__delins_inframe	minus_1exon	delins_inframe	1				3
-minus_1exon__far_syn_and_missense	minus_1exon	far_syn_and_missense	0	missense_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
+minus_1exon__far_syn_and_missense	minus_1exon	far_syn_and_missense	0	missense_variant,synonymous_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
 minus_1exon__far_syn_and_missense	minus_1exon	far_syn_and_missense	1				3
 minus_1exon__far_syn_and_syn	minus_1exon	far_syn_and_syn	0	synonymous_variant	LOW	MAELKRSGPFDHWTVSIQEYCLA*	3
 minus_1exon__far_syn_and_syn	minus_1exon	far_syn_and_syn	1				3
@@ -209,7 +209,7 @@ minus_2exon__del_inside_codons_pure	minus_2exon	del_inside_codons_pure	0	inframe
 minus_2exon__del_inside_codons_pure	minus_2exon	del_inside_codons_pure	1				3
 minus_2exon__delins_inframe	minus_2exon	delins_inframe	0	protein_altering_variant	MODERATE	MAGKRSGPFDHWTVSIQEYCLA*	3
 minus_2exon__delins_inframe	minus_2exon	delins_inframe	1				3
-minus_2exon__far_syn_and_missense	minus_2exon	far_syn_and_missense	0	missense_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
+minus_2exon__far_syn_and_missense	minus_2exon	far_syn_and_missense	0	missense_variant,synonymous_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
 minus_2exon__far_syn_and_missense	minus_2exon	far_syn_and_missense	1				3
 minus_2exon__far_syn_and_syn	minus_2exon	far_syn_and_syn	0	synonymous_variant	LOW	MAELKRSGPFDHWTVSIQEYCLA*	3
 minus_2exon__far_syn_and_syn	minus_2exon	far_syn_and_syn	1				3
@@ -255,7 +255,7 @@ minus_3exon__del_inside_codons_pure	minus_3exon	del_inside_codons_pure	0	inframe
 minus_3exon__del_inside_codons_pure	minus_3exon	del_inside_codons_pure	1				3
 minus_3exon__delins_inframe	minus_3exon	delins_inframe	0	protein_altering_variant	MODERATE	MAGKRSGPFDHWTVSIQEYCLA*	3
 minus_3exon__delins_inframe	minus_3exon	delins_inframe	1				3
-minus_3exon__far_syn_and_missense	minus_3exon	far_syn_and_missense	0	missense_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
+minus_3exon__far_syn_and_missense	minus_3exon	far_syn_and_missense	0	missense_variant,synonymous_variant	MODERATE	MGELKRSGPFDHWTVSIQEYCLA*	3
 minus_3exon__far_syn_and_missense	minus_3exon	far_syn_and_missense	1				3
 minus_3exon__far_syn_and_syn	minus_3exon	far_syn_and_syn	0	synonymous_variant	LOW	MAELKRSGPFDHWTVSIQEYCLA*	3
 minus_3exon__far_syn_and_syn	minus_3exon	far_syn_and_syn	1				3

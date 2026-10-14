@@ -1,0 +1,29 @@
+require duckvep
+
+# Declared programmes preserve the original, independent genomic source operands.
+query TTTIIIIT
+WITH scenarios AS (
+  SELECT unnest([
+    {id:'include', blocks:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:13::UBIGINT,end1:15::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],rna:'ATGAAACCCAAATTTCCCTAAATGAAATAAAAA'},
+    {id:'skip', blocks:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],rna:'ATGAAACCCTTTCCCTAAATGAAATAAAAA'},
+    {id:'retain',blocks:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:10::UBIGINT,end1:12::UBIGINT},{start1:13::UBIGINT,end1:15::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],rna:'ATGAAACCCGGGAAATTTCCCTAAATGAAATAAAAA'}
+  ]) AS s
+), products AS (
+  SELECT duckvep_product_scenario_v1({
+    reference:{start1:1::UBIGINT,dna:'ATGAAACCCGGGAAAGGGTTTCCCTAAGGGATGAAATAAGGGAAA',strand:1::TINYINT},
+    exons:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:13::UBIGINT,end1:15::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],
+    blocks:s.blocks,
+    sources:[{source_id:11::UBIGINT,start1:13::UBIGINT,reference:'A',alternate:'C'},
+             {source_id:22::UBIGINT,start1:29::UBIGINT,reference:'G',alternate:'C'}],
+    programme:{id:s.id,evidence_id:'declared',assumption_id:'splice',
+               expected_reference_rna:s.rna,annotated_start1:1::UINTEGER,
+               alternative_start1:0::UINTEGER,alternative_trigger_id:'',genetic_code:1::UTINYINT}
+  }) p FROM scenarios
+)
+SELECT p.programme_id,p.allele_evidence,p.product_evidence,
+       list_count(p.sources),list_count(p.source_effects),p.verified_sources,
+       p.source_effects[2].changed_rna_bases,p.conditional_nmd FROM products ORDER BY p.programme_id;
+----
+include	hypothetical_assignment	supplied_programme	2	2	2	0	unknown
+retain	hypothetical_assignment	supplied_programme	2	2	2	0	unknown
+skip	hypothetical_assignment	supplied_programme	2	2	2	0	unknown

@@ -32,4 +32,9 @@ extern const char duckvep_core_receipt_tables_required[];
 bool duckvep_core_receipt_sql(const char *const values[8], const char *option_table,
     duckvep_sql_text *out);
 
+/* Transcript-attached Ensembl 116 SeqEdit rows on the unedited cDNA in
+ * model_transcripts. Coordinates are original 1-based closed cDNA positions. */
+bool duckvep_core_ensembl_rna_sql(const char *core_schema, const char *model_table,
+    duckvep_sql_text *out);
+
 #endif

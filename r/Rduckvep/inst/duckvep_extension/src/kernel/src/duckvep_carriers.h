@@ -82,6 +82,8 @@ typedef struct {
 typedef struct {
     duckvep_carrier_key_t key;
     uint32_t transcript, leaf, next_transcript, next_leaf, previous_leaf, next_free;
+    uint64_t copy_het_record; /* Original record identity, outside the hash key. */
+    uint8_t copy_has_het;
 } duckvep_carrier_call_t;
 
 typedef struct {
@@ -147,6 +149,11 @@ duckvep_carriers_status_t duckvep_carriers_finish(
 duckvep_carriers_status_t duckvep_carriers_push(
     duckvep_carriers_t *stream, uint32_t transcript_index,
     const duckvep_carrier_key_t *key, uint8_t evidence_flags);
+
+/* Observe a complete REF/ALT original call after admitting its carrier slot.
+ * Repeated allele projections of one record consume one heterozygous site. */
+void duckvep_carriers_observe_copy_het(duckvep_carriers_t *stream,
+    uint32_t transcript_index, const duckvep_carrier_key_t *key, uint64_t record_id);
 
 /* Each distinct occupied prefix is emitted once, including a prefix that is
  * both a completed carrier path and an ancestor of a longer carrier path.

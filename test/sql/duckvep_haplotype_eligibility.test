@@ -80,7 +80,7 @@ CREATE TABLE hap_elig_calls AS SELECT e.event_index,e.seq_region,e.position,e.re
 # deletion, 8 contradictory SNVs, 9 two insertions in one gap, 10 duplicated record, 11 REF mismatch,
 # 12 intronic plus exonic, 13 deletion across an exon boundary, 14 a 51-base in-frame and 15 a 50-base frameshifting insertion,
 # 16 stop-creating MNV with a later SNV, 17 haploid call, 18 N allele, 30 MNV, 40 multiallelic ALT 2,
-# 21-26 transcripts 1-6 outside the CDS domain.
+# 21 has a complete declared CTG initiation; 22-26 exercise distinct unsupported CDS contexts.
 
 query ITITT
 SELECT c.sample_index,c.phase_set,c.haplotype_lane,c.prediction_status,c.prediction_reason
@@ -109,7 +109,7 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 16	NULL	1	predicted	supported_domain
 17	NULL	1	predicted	supported_domain
 18	NULL	1	unsupported_context	invalid_allele
-21	NULL	1	unsupported_context	noncanonical_start
+21	NULL	1	predicted	supported_domain
 22	NULL	1	unsupported_context	internal_stop
 23	NULL	1	unsupported_context	noncanonical_stop
 24	NULL	1	unsupported_context	untyped_curated_metadata
@@ -199,7 +199,7 @@ FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes(
 ----
 61	6	predicted	missense_variant	MODERATE	MAAWG*
 62	6	predicted	stop_gained	HIGH	MAA*
-63	6	predicted	synonymous_variant	LOW	MAAEG*
+63	6	predicted	start_retained_variant,synonymous_variant	LOW	MAAEG*
 64	6	predicted	stop_retained_variant	LOW	MAAEG*
 71	7	predicted	stop_gained	HIGH	MAA*
 72	7	predicted	missense_variant	MODERATE	MAARG*
@@ -262,10 +262,9 @@ FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index NOT IN 
 GROUP BY ALL ORDER BY ALL
 ----
 edit_conflict	contradictory_edits	edit_conflict	1
-predicted	supported_domain	ok	11
+predicted	supported_domain	ok	12
 unsupported_context	internal_stop	ok	1
 unsupported_context	invalid_allele	unavailable_projection	1
-unsupported_context	noncanonical_start	ok	1
 unsupported_context	noncanonical_stop	ok	1
 unsupported_context	outside_cds	unavailable_projection	2
 unsupported_context	reference_mismatch	unavailable_projection	1
@@ -321,7 +320,7 @@ GROUP BY ALL ORDER BY ALL
 15	1	NULL	predicted	14/1:applied
 16	1	NULL	predicted	3/1:post_stop 10/1:applied
 18	1	NULL	unsupported_context	15/1:omitted
-21	1	NULL	unsupported_context	101/1:applied
+21	1	NULL	predicted	101/1:applied
 22	1	NULL	unsupported_context	102/1:applied
 23	1	NULL	unsupported_context	103/1:applied
 24	1	NULL	unsupported_context	104/1:applied
@@ -399,9 +398,8 @@ FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index IN (1,1
 ----
 1	1	3
 
-# Source-record replay (vep_compat) is a compatibility interpretation, outside the strict v1 domain:
-# reference-only lanes (the 0|0 record, whose nonmutating REF contributor is not emitted) and shadowed/duplicate
-# sources keep provenance but get non_strict_phase_policy.
+# The single original heterozygote with homozygous REF background predicts its mutated copy.
+# Reference-only lanes and samples with multiple original heterozygous calls retain compatibility replay.
 
 statement ok
 CREATE TABLE hap_elig_raw AS SELECT * FROM (VALUES
@@ -419,7 +417,8 @@ SELECT prediction_status,prediction_reason,count(*),sum(len(contributors)),sum(l
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_raw','hap_elig',input_mode:='source_records',
  phase_policy:='vep_compat') GROUP BY ALL ORDER BY ALL
 ----
-unsupported_context	non_strict_phase_policy	6	5	5	0	3
+predicted	supported_domain	1	1	1	0	0
+unsupported_context	non_strict_phase_policy	5	4	4	0	3
 
 query IITTI
 SELECT x.event_index,x.alt_index,x.role,x.projection_status,x.evidence_flags
@@ -435,8 +434,8 @@ FROM (SELECT unnest(contributor_provenance) x FROM duckvep_haplotypes('SELECT * 
 statement ok
 DROP TABLE hap_elig_raw
 
-# Source records predict a carrier only when the original GTs prove both diploid copies are the path: every
-# call of the sample is complete homozygous ALT or diploid hom-REF and both file lanes end on the same path.
+# Complete original diploid calls prove mutated paths with at most one REF/ALT heterozygote and
+# homozygous background; original slots map to copies, whose paths may differ.
 # Sample 10 is that proof (103 G>A, 123 G>C: Ala2Thr and Gly5Arg) and 15 has 103 G>A alone. On the proof path
 # the unphased 0/1 pair (11, lane 2), triploid 1/1/0 (12) and one-slot haploid GT (13, lane 1) stay
 # compatibility lanes, listed in their own row of the same path; the missing slot (14) is conditional.

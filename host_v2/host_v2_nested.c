@@ -491,17 +491,17 @@ static void raw_gt_exec(duckdb_v2_scalar_function_exec_info_handle info,
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_vector_view views[2];
     duckdb_v2_vector_handle result = NULL;
-    duckdb_v2_vector_handle fields[7] = {0};
-    void *data[7] = {0};
-    uint64_t *validity[7] = {0};
+    duckdb_v2_vector_handle fields[8] = {0};
+    void *data[8] = {0};
+    uint64_t *validity[8] = {0};
     idx_t rows = 0;
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &rows, &detail));
     if (!load_views(info, 2, views, error) ||
-        !open_struct_result(info, rows, 7, &result, fields, data, validity, error)) {
+        !open_struct_result(info, rows, 8, &result, fields, data, validity, error)) {
         goto cleanup;
     }
     for (idx_t row = 0; row < rows; ++row) {
-        uint32_t values[7];
+        uint32_t values[8];
         duckdb_v2_str gt;
         if (!row_is_valid(&views[0], row) || !row_is_valid(&views[1], row)) {
             DUCKDB_CALL(duckdb_v2_vector_set_null(result, row, &detail));
@@ -510,7 +510,7 @@ static void raw_gt_exec(duckdb_v2_scalar_function_exec_info_handle info,
         gt = string_at(&views[0], row);
         duckvep_core_raw_gt(gt.ptr, gt.len, ((const uint32_t *)views[1].data)[physical_row(&views[1], row)],
                             values);
-        for (idx_t field = 0; field < 7; ++field) {
+        for (idx_t field = 0; field < 8; ++field) {
             ((uint32_t *)data[field])[row] = values[field];
         }
     }
@@ -588,7 +588,7 @@ bool host_v2_register_nested(duckdb_v2_extension_handle extension, duckdb_v2_con
            register_scalar(extension, context, "_duckvep_raw_gt", text_types, text_names, 2,
                            "STRUCT(status UINTEGER, allele0 UINTEGER, allele1 UINTEGER, "
                            "parsed_slots UINTEGER, source_ploidy UINTEGER, source_has_missing UINTEGER, "
-                           "disposition UINTEGER)",
+                           "disposition UINTEGER, source_leading_separator UINTEGER)",
                            raw_gt_exec, error) &&
            register_scalar(extension, context, "_duckvep_record_order", order_types, order_names, 2,
                            "UBIGINT", record_order_exec, error);

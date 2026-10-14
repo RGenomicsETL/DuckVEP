@@ -82,14 +82,12 @@ csq_so <- vapply(keys, function(k) paste(mapped(lane_terms[[k]]), collapse = ','
 policy_so <- vapply(gold$so_terms, function(x) paste(sort(strsplit(x, ',', fixed = TRUE)[[1L]]), collapse = ','),
                     character(1L))
 
-# Declared divergences between the reduced whole-protein policy and csq, keyed by scenario. csq
-# labels an inframe change by its length change alone and reports every codon's effect; the policy
-# uses the normalized edit path and one whole-protein category.
+# Divergences between mapped csq and the final-molecule policy are keyed by scenario.
+# Mixed-length edits retain their normalized edit-path classification.
 declared <- c(
   delins_inframe = 'csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement',
-  far_syn_and_missense = 'csq reports the synonymous and the missense codon; the policy reports one category',
   insertion_and_deletion_far = 'csq reports both inframe terms; the policy has mixed frame-preserving edits')
-csq_expected <- c(delins_inframe = 'inframe_deletion', far_syn_and_missense = 'missense_variant,synonymous_variant',
+csq_expected <- c(delins_inframe = 'inframe_deletion',
                   insertion_and_deletion_far = 'inframe_deletion,inframe_insertion')
 differs <- csq_so != policy_so
 divergent <- unique(gold$scenario[differs])
@@ -124,7 +122,7 @@ expected <- data.frame(case = gold$case, lane = gold$lane, csq_so_terms = unname
     declared_divergence = ifelse(differs, declared[gold$scenario], '.'), stringsAsFactors = FALSE)
 lines <- capture.output(write.table(expected, sep = '\t', row.names = FALSE, quote = FALSE, na = '.'))
 path <- paste0(root, 'same_codon_csq_expected.tsv')
-if (nzchar(Sys.getenv('HAPLOTYPE_CSQ_REFRESH'))) writeLines(lines, path)
+if (nzchar(Sys.getenv('HAPLOTYPE_EXPECTED_REFRESH'))) writeLines(lines, path)
 stopifnot(identical(readLines(path), lines))
 lanes3 <- gold$classifier_slice == 3L
 stopifnot(sum(lanes3) > 0L, all(csq_so[lanes3 & !differs] == policy_so[lanes3 & !differs]))

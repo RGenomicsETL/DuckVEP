@@ -667,8 +667,8 @@ local({
     "v(event_index,position,reference,alternates) CROSS JOIN mixed_tx CROSS JOIN range(5) s(i)")
   unmapped <- rduckvep_haplotypes(con, unmapped_calls, "mixed", "vep_compat",
     input_mode = "source_records", max_leaf_edits = 1)
-  # Qualification views keep distinct copy evidence without changing carrier replay.
-  expect_equal(nrow(unmapped), 14L)
+  # Complete single-heterozygote and homozygous samples share a qualified path view.
+  expect_equal(nrow(unmapped), 12L)
   expect_equal(sum(unmapped$carrier_count), 20L)
   expect_equal(sum(unmapped$carrier_count[unmapped$sequence_status == "conditional"]), 16L)
   expect_true(all(unmapped$projection_status == "ok" & unmapped$edit_count == 1))

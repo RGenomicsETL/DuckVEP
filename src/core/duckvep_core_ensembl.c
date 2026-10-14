@@ -117,7 +117,8 @@ static const char *const transcripts_sql[] = {
 		"t.version AS transcript_version, g.stable_id AS gene_stable_id, ",
 		"g.version AS gene_version, g.biotype AS gene_biotype, ",
 		"r.seq_region, r.seq_region_name, r.sequence_length, r.circular, ",
-		"try_cast(coalesce(ct.codon_table, 1) AS UTINYINT) AS codon_table ",
+		"try_cast(coalesce(ct.codon_table, 1) AS UTINYINT) AS codon_table, "
+		"ct.codon_table AS declared_codon_table ",
 		"FROM eligible_transcripts t JOIN query_table(core_schema || '.gene') g USING (gene_id) ",
 		"JOIN regions r ON r.source_seq_region_id = t.seq_region_id ",
 		"LEFT JOIN sequence_region_codon_tables ct ",
@@ -147,13 +148,14 @@ static const char *const transcripts_sql[] = {
 		"bool_or(aty.code = 'ccds_transcript') AS ccds, ",
 		"bool_or(aty.code = 'readthrough_tra') AS readthrough_transcript, ",
 		"bool_or(aty.code = 'upstream_ATG') AS upstream_atg, ",
-		"bool_or(aty.code = '_rna_edit') AS rna_edit ",
+		"bool_or(aty.code = '_rna_edit') AS rna_edit, "
+		"bool_or(aty.code IN ('_transl_start', '_transl_end')) AS rna_boundary_override ",
 		"FROM query_table(core_schema || '.transcript_attrib') ta ",
 		"JOIN query_table(core_schema || '.attrib_type') aty USING (attrib_type_id) ",
 		"JOIN source_transcripts t ON t.source_transcript_id = ta.transcript_id ",
 		"WHERE aty.code IN ('cds_start_NF','cds_end_NF','MANE_Select','MANE_Plus_Clinical',",
 		"'gencode_basic','gencode_primary','ccds_transcript','readthrough_tra','upstream_ATG',",
-		"'_rna_edit') ",
+		"'_rna_edit','_transl_start','_transl_end') ",
 		"GROUP BY ta.transcript_id",
 		"), mature_mirna_attributes AS MATERIALIZED (",
 		"SELECT ta.transcript_id AS source_transcript_id, CAST(ta.value AS VARCHAR) AS value, ",
@@ -202,7 +204,8 @@ static const char *const transcripts_sql[] = {
 		"tl.stable_id AS translation_stable_id, tl.version AS translation_version, ",
 		"tl.start_exon_id, tl.end_exon_id, tl.seq_start, tl.seq_end, ",
 		"ta.mane_select_refseq, ta.mane_plus_clinical_refseq, ",
-		"ta.mane_select_refseq_count, ta.mane_plus_clinical_refseq_count, ",
+		"ta.mane_select_refseq_count, ta.mane_plus_clinical_refseq_count, "
+		"ta.rna_boundary_override, ",
 		"tla.peptide_edits, tla.max_protein_position, ",
 		"CAST((CASE WHEN tl.translation_id IS NOT NULL THEN 1 ELSE 0 END) + ",
 		"(CASE WHEN t.transcript_biotype = 'protein_coding' THEN 2 ELSE 0 END) + ",
@@ -220,7 +223,8 @@ static const char *const transcripts_sql[] = {
 		"(CASE WHEN coalesce(ta.gencode_primary, false) THEN 8192 ELSE 0 END) + ",
 		"(CASE WHEN coalesce(ta.ccds, false) THEN 16384 ELSE 0 END) + ",
 		"(CASE WHEN coalesce(ta.readthrough_transcript, false) THEN 32768 ELSE 0 END) + ",
-		"(CASE WHEN coalesce(ta.upstream_atg, false) THEN 65536 ELSE 0 END) AS UBIGINT) AS transcript_flags, ",
+		"(CASE WHEN coalesce(ta.upstream_atg, false) THEN 65536 ELSE 0 END) + ",
+		"(CASE WHEN coalesce(tla.initial_methionine, false) THEN 131072 ELSE 0 END) AS UBIGINT) AS transcript_flags, "
 		"nullif(concat_ws(',', ",
 		"CASE WHEN coalesce(ta.rna_edit, false) THEN 'rna_edit' END, ",
 		"CASE WHEN coalesce(tla.invalid_peptide_edit, false) ",
@@ -311,7 +315,8 @@ static const char *const transcripts_sql[] = {
 		"), translation_geometry AS MATERIALIZED (",
 		"SELECT tf.*, sm.rank AS start_exon_rank, sm.exon_start AS start_exon_start, ",
 		"sm.exon_end AS start_exon_end, sm.exon_cdna_start AS start_exon_cdna_start, ",
-		"sm.phase AS start_phase, em.rank AS end_exon_rank, em.exon_start AS end_exon_start, ",
+		"sm.phase AS start_phase, em.end_phase AS end_phase, "
+		"em.rank AS end_exon_rank, em.exon_start AS end_exon_start, ",
 		"em.exon_end AS end_exon_end, em.exon_cdna_start AS end_exon_cdna_start, ",
 		"CASE WHEN tf.source_translation_id IS NULL THEN NULL ",
 		"WHEN tf.strand = 1 AND tf.circular THEN ",
@@ -487,6 +492,36 @@ static const char *const transcripts_sql[] = {
 		"ELSE CAST(p.raw_post_cds_sequence AS BLOB) END AS post_cds_sequence, ",
 		"CASE WHEN regexp_full_match(p.cdna_sequence, '[ACGTN]+') THEN ",
 		"CAST(p.cdna_sequence AS BLOB) ELSE NULL::BLOB END AS cdna_sequence, ",
+		"CASE WHEN p.source_translation_id IS NOT NULL AND p.cds_cdna_start > 0 "
+		"AND p.cds_cdna_end >= p.cds_cdna_start "
+		"AND p.cds_cdna_end <= length(p.cdna_sequence) "
+		"AND (p.cds_cdna_end - p.cds_cdna_start + 1) % 3 = 0 "
+		"AND p.start_phase IN (-1, 0) AND p.end_phase IN (-1, 0) "
+		"AND (p.transcript_flags & 48) = 0 "
+		"AND NOT coalesce(p.rna_boundary_override, false) "
+		"AND p.declared_codon_table IN (1, 2) "
+		"AND regexp_full_match(p.cdna_sequence, '[ACGTN]+') "
+		"THEN CAST(p.cds_cdna_start AS UBIGINT) END AS rna_cds_cdna_start, "
+		"CASE WHEN p.source_translation_id IS NOT NULL AND p.cds_cdna_start > 0 "
+		"AND p.cds_cdna_end >= p.cds_cdna_start "
+		"AND p.cds_cdna_end <= length(p.cdna_sequence) "
+		"AND (p.cds_cdna_end - p.cds_cdna_start + 1) % 3 = 0 "
+		"AND p.start_phase IN (-1, 0) AND p.end_phase IN (-1, 0) "
+		"AND (p.transcript_flags & 48) = 0 "
+		"AND NOT coalesce(p.rna_boundary_override, false) "
+		"AND p.declared_codon_table IN (1, 2) "
+		"AND regexp_full_match(p.cdna_sequence, '[ACGTN]+') "
+		"THEN CAST(p.cds_cdna_end AS UBIGINT) END AS rna_cds_cdna_end, "
+		"CASE WHEN p.source_translation_id IS NOT NULL AND p.cds_cdna_start > 0 "
+		"AND p.cds_cdna_end >= p.cds_cdna_start "
+		"AND p.cds_cdna_end <= length(p.cdna_sequence) "
+		"AND (p.cds_cdna_end - p.cds_cdna_start + 1) % 3 = 0 "
+		"AND p.start_phase IN (-1, 0) AND p.end_phase IN (-1, 0) "
+		"AND (p.transcript_flags & 48) = 0 "
+		"AND NOT coalesce(p.rna_boundary_override, false) "
+		"AND p.declared_codon_table IN (1, 2) "
+		"AND regexp_full_match(p.cdna_sequence, '[ACGTN]+') "
+		"THEN CAST(p.declared_codon_table AS UTINYINT) END AS rna_codon_table, "
 		"p.seq_region_name, p.sequence_length, p.source_seq_region_id, p.source_transcript_id, ",
 		"p.transcript_stable_id, p.transcript_version, p.transcript_biotype, ",
 		"p.mane_select_refseq, p.mane_plus_clinical_refseq, ",
@@ -779,7 +814,7 @@ static const char *const receipt_body[] = {
 		"source_seq_region_id := source_seq_region_id, source_coord_system_id := source_coord_system_id, ",
 		"coord_system_name := coord_system_name, coord_system_rank := coord_system_rank) AS VARCHAR)), ",
 		"'' ORDER BY seq_region)) AS region_sha256 FROM regions), ",
-		"row_hashes AS MATERIALIZED (SELECT transcript_index, sha256(CAST(struct_pack(",
+		"row_payloads AS (SELECT transcript_index, CAST(struct_pack(",
 		"transcript_index := transcript_index, seq_region := seq_region, transcript_start := transcript_start, ",
 		"transcript_end := transcript_end, strand := strand, gene_index := gene_index, ",
 		"transcript_flags := transcript_flags, cds_start := cds_start, cds_end := cds_end, ",
@@ -795,8 +830,18 @@ static const char *const receipt_body[] = {
 		"source_translation_id := source_translation_id, translation_stable_id := translation_stable_id, ",
 		"translation_version := translation_version, sequence_withheld_reason := sequence_withheld_reason, ",
 		"exons := exons, mature_mirna_regions := mature_mirna_regions, ",
-		"peptide_edits := peptide_edits) AS VARCHAR)) ",
-		"AS row_hash FROM model), ",
+		"peptide_edits := peptide_edits) AS VARCHAR) AS legacy_row, ",
+		"CAST(struct_pack(*COLUMNS(lambda c: lower(c) IN ('transcript_index', ",
+		"'rna_cds_cdna_start', 'rna_cds_cdna_end', 'rna_codon_table'))) AS STRUCT(",
+		"transcript_index UINTEGER, rna_cds_cdna_start UBIGINT, ",
+		"rna_cds_cdna_end UBIGINT, rna_codon_table UTINYINT)) AS authority FROM model), ",
+		"row_hashes AS MATERIALIZED (SELECT transcript_index, sha256(legacy_row || CASE WHEN ",
+		"authority.rna_cds_cdna_start IS NOT NULL OR authority.rna_cds_cdna_end IS NOT NULL ",
+		"OR authority.rna_codon_table IS NOT NULL THEN CAST(struct_pack(",
+		"rna_cds_cdna_start := authority.rna_cds_cdna_start, ",
+		"rna_cds_cdna_end := authority.rna_cds_cdna_end, ",
+		"rna_codon_table := authority.rna_codon_table) AS VARCHAR) ELSE '' END) ",
+		"AS row_hash FROM row_payloads), ",
 		"hash_blocks AS MATERIALIZED (SELECT transcript_index // 4096 AS block_index, ",
 		"sha256(string_agg(row_hash, '' ORDER BY transcript_index)) AS block_hash ",
 		"FROM row_hashes GROUP BY block_index), ",
@@ -858,6 +903,48 @@ static const char *const receipt_body[] = {
 		"FROM parameters CROSS JOIN summary CROSS JOIN regulation_summary CROSS JOIN fingerprint ",
 		"CROSS JOIN validation WHERE validation.valid"
 	};
+
+bool duckvep_core_ensembl_rna_sql(const char *core_schema, const char *model_table,
+    duckvep_sql_text *out)
+{
+    return duckvep_sql_append(out,
+        "WITH boundaries AS (SELECT bt.transcript_id, "
+        "CAST(bit_or(CASE WHEN bty.code = '_transl_start' THEN 1 ELSE 2 END) AS UTINYINT) "
+        "AS boundary_overrides FROM query_table(") && duckvep_sql_literal(out, core_schema) &&
+        duckvep_sql_append(out, " || '.transcript_attrib') bt JOIN query_table(") &&
+        duckvep_sql_literal(out, core_schema) &&
+        duckvep_sql_append(out, " || '.attrib_type') bty USING (attrib_type_id) "
+        "WHERE bty.code IN ('_transl_start','_transl_end') GROUP BY bt.transcript_id), "
+        "source AS (SELECT m.transcript_index, m.cdna_sequence, "
+        "coalesce(b.boundary_overrides, 0)::UTINYINT AS boundary_overrides, "
+        "trim(CAST(ta.value AS VARCHAR)) AS edit_value "
+        "FROM query_table(") && duckvep_sql_literal(out, core_schema) &&
+        duckvep_sql_append(out, " || '.transcript_attrib') ta "
+        "JOIN query_table(") && duckvep_sql_literal(out, core_schema) &&
+        duckvep_sql_append(out, " || '.attrib_type') aty USING (attrib_type_id) "
+        "JOIN query_table(") && duckvep_sql_identifier(out, model_table) &&
+        duckvep_sql_append(out,
+        ") m ON m.source_transcript_id = ta.transcript_id "
+        "LEFT JOIN boundaries b ON b.transcript_id = ta.transcript_id "
+        "WHERE aty.code = '_rna_edit'), parsed AS (SELECT transcript_index, cdna_sequence, boundary_overrides, "
+        "try_cast(regexp_extract(edit_value, "
+        "'^([0-9]+)[[:space:]]+([0-9]+)([[:space:]]+([^[:space:]]+))?$', 1) AS UINTEGER) AS cdna_start, "
+        "try_cast(regexp_extract(edit_value, "
+        "'^([0-9]+)[[:space:]]+([0-9]+)([[:space:]]+([^[:space:]]+))?$', 2) AS UINTEGER) AS cdna_end, "
+        "regexp_extract(edit_value, "
+        "'^([0-9]+)[[:space:]]+([0-9]+)([[:space:]]+([^[:space:]]+))?$', 4) AS alternate_sequence "
+        "FROM source) SELECT transcript_index, cdna_start, cdna_end, "
+        "CAST(CASE WHEN cdna_start = cdna_end + 1 THEN '' "
+        "ELSE substr(CAST(cdna_sequence AS VARCHAR), cdna_start, "
+        "cdna_end - cdna_start + 1) END AS VARCHAR) AS expected_substrate, "
+        "alternate_sequence, CASE WHEN cdna_start = cdna_end + 1 THEN 'insertion' "
+        "WHEN length(alternate_sequence) = 0 THEN 'deletion' "
+        "WHEN cdna_end - cdna_start + 1 = length(alternate_sequence) "
+        "THEN 'substitution' ELSE 'replacement' END AS operation_kind, "
+        "'Ensembl116:_rna_edit' AS programme_name, "
+        "'transcript_attrib:SeqEdit' AS evidence_name, boundary_overrides FROM parsed "
+        "ORDER BY transcript_index, cdna_start DESC, cdna_end DESC");
+}
 
 bool duckvep_core_receipt_sql(const char *const values[8], const char *option_table,
     duckvep_sql_text *out)

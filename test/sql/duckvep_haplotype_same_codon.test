@@ -108,7 +108,7 @@ SELECT count(*) FILTER (WHERE g.declared_divergence='.'),
 FROM sc_gold g JOIN sc_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
 WHERE g.classifier_slice=3 AND g.so_terms<>'';
 ----
-108	108	18	0
+114	114	12	0
 
 # Slice 4 transition: the stop_created_by_pair scenario (two SNVs making TAA in codon 10) was pending at
 # slice 3 and is now decided as stop_gained/HIGH, equal to the golden and to the mapped csq set, on every layout.
@@ -164,7 +164,8 @@ FROM sc_out WHERE prediction_status='predicted' GROUP BY ALL ORDER BY ALL;
 ----
 inframe_deletion	MODERATE	18
 inframe_insertion	MODERATE	24
-missense_variant	MODERATE	54
+missense_variant	MODERATE	48
+missense_variant,synonymous_variant	MODERATE	6
 protein_altering_variant	MODERATE	12
 start_lost	HIGH	6
 stop_gained	HIGH	6

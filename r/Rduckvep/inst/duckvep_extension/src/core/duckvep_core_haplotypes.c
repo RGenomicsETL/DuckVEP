@@ -172,7 +172,8 @@ void duckvep_hap_close(duckvep_hap_state_t *s) {
     duckvep_budget_free(b->joint_edits); duckvep_budget_free(b->joint_alt); duckvep_budget_free(b->joint_assigned);
     duckvep_budget_free(b->contributors); duckvep_budget_free(b->edits); duckvep_budget_free(b->blocks); duckvep_budget_free(b->cds); duckvep_budget_free(b->protein);
     duckvep_budget_free(b->noncoding);
-    duckvep_budget_free(b->edit_event_ids);
+    duckvep_budget_free(b->edit_event_ids); duckvep_budget_free(b->edit_source_index);
+    duckvep_budget_free(b->edit_source_cdna); duckvep_budget_free(b->edit_source_exon);
     duckvep_budget_free(s->difference_scratch.scores); duckvep_budget_free(s->difference_scratch.trace); duckvep_budget_free(s->differences);
     duckvep_budget_free(s->difference_reference); duckvep_budget_free(b->reference_protein);
     duckvep_budget_free(b->reference_coding_protein); duckvep_budget_free(b->prediction_protein);
@@ -241,7 +242,8 @@ static int workspace_prepare(duckvep_hap_state_t *s, const duckvep_hap_config_t 
     X(b->joint_edits, b->edit_capacity) X(b->joint_alt, b->joint_capacity) \
     X(b->joint_assigned, b->joint_capacity) \
     X(b->contributors, b->leaf_capacity) X(b->edits, b->edit_capacity) \
-    X(b->blocks, b->edit_capacity) X(b->edit_event_ids, b->edit_capacity) \
+    X(b->blocks, b->edit_capacity) X(b->edit_event_ids, b->edit_capacity) X(b->edit_source_index, b->edit_capacity) \
+    X(b->edit_source_cdna, b->edit_capacity) X(b->edit_source_exon, b->edit_capacity) \
     X(b->cds, b->cds_capacity) X(b->protein, b->protein_capacity) X(b->noncoding, b->noncoding_capacity) \
     X(s->difference_scratch.scores, s->difference_scratch.score_capacity) \
     X(s->difference_scratch.trace, s->difference_scratch.trace_capacity) \
@@ -617,6 +619,8 @@ static int append_hgvsp(duckvep_h_vector text, duckvep_h_vector status_vector, s
     const char *name = !bind->hgvs ? "not_requested" :
         leaf->path_status == DUCKVEP_PREDICTION_CONDITIONAL_RECODING
             ? "conditional_assumed_recoding" :
+        leaf->path_status == DUCKVEP_PREDICTION_CONDITIONAL_RNA
+            ? "conditional_assumed_rna_programme" :
         !leaf->cds || !leaf->protein ? "unavailable_sequence" :
         leaf->sequence_status != DUCKVEP_HAPLOTYPE_OK ? "incomplete_input" :
         !leaf->reference_protein || !leaf->reference_protein_length ? "missing_reference_protein" :
@@ -695,6 +699,7 @@ static const char *status_name(duckvep_prediction_status_t status) {
     case DUCKVEP_PREDICTION_ELIGIBLE: return "eligible_classifier_pending";
     case DUCKVEP_PREDICTION_PREDICTED: return "predicted";
     case DUCKVEP_PREDICTION_CONDITIONAL_RECODING: return "conditional_assumed_recoding";
+    case DUCKVEP_PREDICTION_CONDITIONAL_RNA: return "conditional_assumed_rna_programme";
     case DUCKVEP_PREDICTION_INCOMPLETE_INPUT: return "incomplete_input";
     case DUCKVEP_PREDICTION_EDIT_CONFLICT: return "edit_conflict";
     case DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP: return "unsupported_overlap";
@@ -725,6 +730,7 @@ static const char *reason_name(duckvep_prediction_reason_t reason, duckvep_cds_e
     case DUCKVEP_REASON_UNTYPED_CURATED_METADATA: return "untyped_curated_metadata";
     case DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT: return "unsupported_curated_edit";
     case DUCKVEP_REASON_ASSUMED_RECODING_PROGRAMME: return "assumed_recoding_programme";
+    case DUCKVEP_REASON_ASSUMED_RNA_PROGRAMME: return "assumed_rna_programme";
     case DUCKVEP_REASON_INCOMPLETE_CDS: return "incomplete_cds";
     case DUCKVEP_REASON_NONCANONICAL_START: return "noncanonical_start";
     case DUCKVEP_REASON_NONCANONICAL_STOP: return "noncanonical_stop";
@@ -1245,7 +1251,7 @@ static duckvep_haplotype_stream_status_t consume_call(duckvep_hap_state_t *s, ch
     if (bind->source_records) {
         duckvep_raw_gt_status_t parsed = (duckvep_raw_gt_status_t)r->raw[0];
         duckvep_raw_gt_t call = {{r->raw[1], r->raw[2]}, r->raw[3], (uint16_t)r->raw[4],
-            (uint8_t)r->raw[5], (duckvep_raw_gt_disposition_t)r->raw[6]};
+            (uint8_t)r->raw[5], (duckvep_raw_gt_disposition_t)r->raw[6], (uint8_t)r->raw[7]};
         if (parsed != DUCKVEP_RAW_GT_OK) {
             snprintf(error, error_size, "duckvep_haplotypes: raw GT status %u at event %llu, sample %u",
                 (unsigned)parsed, (unsigned long long)source.event_id, r->sample);
@@ -1343,6 +1349,14 @@ duckvep_hap_state_t *duckvep_hap_open(const duckvep_hap_config_t *config, char *
         &s->buffers) != DUCKVEP_HAPLOTYPE_STREAM_OK) {
         duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: invalid native model/workspace"); goto failed;
     }
+    s->stream.rna = (duckvep_rna_programme_view_t){
+        .presence = m->rna_presence, .boundary_overrides = m->rna_boundary_overrides,
+        .offsets = m->rna_offsets, .starts = m->rna_starts, .ends = m->rna_ends,
+        .kinds = m->rna_kinds, .alt_offsets = m->rna_alt_offsets,
+        .alt_lengths = m->rna_alt_lengths, .alt_bytes = m->rna_alt_bytes,
+        .edit_count = m->rna_count, .alt_bytes_length = m->rna_alt_bytes_length,
+        .cds_starts = m->rna_cds_cdna_starts, .cds_ends = m->rna_cds_cdna_ends,
+        .codon_tables = m->rna_codon_tables};
     return s;
 failed:
     duckvep_hap_close(s);
@@ -1412,6 +1426,14 @@ static int hap_reset(duckvep_hap_state_t *s, char *error, size_t error_size) {
         duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: invalid native model/workspace");
         return 0;
     }
+    s->stream.rna = (duckvep_rna_programme_view_t){
+        .presence = m->rna_presence, .boundary_overrides = m->rna_boundary_overrides,
+        .offsets = m->rna_offsets, .starts = m->rna_starts, .ends = m->rna_ends,
+        .kinds = m->rna_kinds, .alt_offsets = m->rna_alt_offsets,
+        .alt_lengths = m->rna_alt_lengths, .alt_bytes = m->rna_alt_bytes,
+        .edit_count = m->rna_count, .alt_bytes_length = m->rna_alt_bytes_length,
+        .cds_starts = m->rna_cds_cdna_starts, .cds_ends = m->rna_cds_cdna_ends,
+        .codon_tables = m->rna_codon_tables};
     return 1;
 }
 

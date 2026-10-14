@@ -119,7 +119,7 @@ bool host_v2_stage_peek_job(model_state *state, const char *job, const char *rel
 
 static void state_discard_model(model_state *state, const char *model) {
     stage *s;
-    for (size_t i = 0; i < 6; ++i) {
+    for (size_t i = 0; i < 7; ++i) {
         while ((s = host_v2_stage_take(state, model, duckvep_model_relations[i])) != NULL) {
             host_v2_stage_destroy(s);
         }
@@ -270,12 +270,12 @@ static void stage_bind_exec(duckdb_v2_copy_to_bind_info_handle info, duckdb_v2_c
         }
         {
             bool known = false;
-            for (size_t i = 0; i < 6; ++i) {
+            for (size_t i = 0; i < 7; ++i) {
                 known = known || strcmp(relation, duckvep_model_relations[i]) == 0;
             }
             if (!known) {
                 INPUT_ERROR("duckvep_stage: RELATION must be regions, transcripts, exons, mature_mirna, "
-                            "peptide_edits or interval_features");
+                            "peptide_edits, interval_features or rna_edits");
             }
         }
         if (model_exists(state, model)) {
@@ -602,7 +602,7 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
     uint64_t *output_validity = NULL;
     idx_t rows = 0;
     uint32_t argc = 0;
-    stage *staged[6] = {0};
+    stage *staged[7] = {0};
     char *name = NULL, *reference = NULL;
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_user_data(info, (void **)&state, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &rows, &detail));
@@ -622,8 +622,8 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
     for (idx_t row = 0; row < rows; ++row) {
         duckvep_cell_t cell;
         int coverage = 0;
-        staged_source sources[6];
-        duckvep_source_t source_views[6];
+        staged_source sources[7];
+        duckvep_source_t source_views[7];
         duckvep_model_sources_t model_sources;
         char message[DUCKVEP_SQL_ERROR_SIZE + 256];
         bool ok;
@@ -651,7 +651,7 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
             coverage = cell.boolean;
         }
         /* The staging is consumed by this call, whatever its outcome. */
-        for (size_t i = 0; i < 6; ++i) {
+        for (size_t i = 0; i < 7; ++i) {
             staged[i] = host_v2_stage_take(state, name, duckvep_model_relations[i]);
         }
         for (size_t i = 0; i < 3; ++i) {
@@ -664,7 +664,7 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
             }
         }
         memset(&model_sources, 0, sizeof(model_sources));
-        for (size_t i = 0; i < 6; ++i) {
+        for (size_t i = 0; i < 7; ++i) {
             if (staged[i]) {
                 staged_source_init(&sources[i], &source_views[i], staged[i], context);
             }
@@ -675,11 +675,12 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
         model_sources.mature_mirna = staged[3] ? &source_views[3] : NULL;
         model_sources.peptide_edits = staged[4] ? &source_views[4] : NULL;
         model_sources.interval_features = staged[5] ? &source_views[5] : NULL;
+        model_sources.rna_edits = staged[6] ? &source_views[6] : NULL;
         model_sources.reference_fasta = reference;
         model_sources.transcript_coverage_complete = coverage;
         ok = duckvep_core_model_install(state->registry, name, &model_sources, "duckvep_model_publish",
                                         message, sizeof message) != 0;
-        for (size_t i = 0; i < 6; ++i) {
+        for (size_t i = 0; i < 7; ++i) {
             host_v2_stage_destroy(staged[i]);
             staged[i] = NULL;
         }
@@ -693,7 +694,7 @@ static void publish_exec(duckdb_v2_scalar_function_exec_info_handle info, duckdb
         name = reference = NULL;
     }
 cleanup:
-    for (size_t i = 0; i < 6; ++i) {
+    for (size_t i = 0; i < 7; ++i) {
         host_v2_stage_destroy(staged[i]);
     }
     duckvep_budget_free(name);
@@ -885,7 +886,7 @@ cleanup:
  * duckvep_model_load_sql(name, regions_query, transcripts_query, exons_query [, options])
  *   -> VARCHAR[]: the statements to run, in order
  * options: mature_mirna_query, peptide_edit_query, interval_feature_query,
- * reference_fasta (VARCHAR) and transcript_coverage_complete (BOOLEAN)
+ * rna_edit_query, reference_fasta (VARCHAR) and transcript_coverage_complete (BOOLEAN)
  * ------------------------------------------------------------------------- */
 
 typedef struct {
@@ -906,10 +907,10 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
                           duckdb_v2_error_info_handle *error) {
     (void)context;
     static const char *const keys[] = {"mature_mirna_query", "peptide_edit_query", "interval_feature_query",
-                                       "reference_fasta", "transcript_coverage_complete"};
+                                       "rna_edit_query", "reference_fasta", "transcript_coverage_complete"};
     static const duckvep_core_option_kind_t kinds[] = {
         DUCKVEP_CORE_OPTION_TEXT, DUCKVEP_CORE_OPTION_TEXT, DUCKVEP_CORE_OPTION_TEXT,
-        DUCKVEP_CORE_OPTION_TEXT, DUCKVEP_CORE_OPTION_BOOLEAN};
+        DUCKVEP_CORE_OPTION_TEXT, DUCKVEP_CORE_OPTION_TEXT, DUCKVEP_CORE_OPTION_BOOLEAN};
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_vector_handle arguments[5] = {0};
     column strings[4];
@@ -932,7 +933,7 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
             goto cleanup;
         }
     }
-    if (!options_open(argc == 5 ? arguments[4] : NULL, keys, kinds, 5, &option, error)) {
+    if (!options_open(argc == 5 ? arguments[4] : NULL, keys, kinds, 6, &option, error)) {
         goto cleanup;
     }
     scripts = calloc(rows ? rows : 1, sizeof(*scripts));
@@ -942,9 +943,9 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
     }
     for (idx_t row = 0; row < rows; ++row) {
         char *values[4] = {0};
-        char *optional[3] = {0};
+        char *optional[4] = {0};
         char *reference = NULL;
-        const char *queries[6] = {0};
+        const char *queries[7] = {0};
         int coverage = -1;
         duckvep_cell_t cell;
         const char *failure = NULL;
@@ -958,7 +959,7 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
                 failure = "duckvep_model_load_sql: arguments must be non-empty strings";
             }
         }
-        for (size_t o = 0; !failure && o < 3; ++o) {
+        for (size_t o = 0; !failure && o < 4; ++o) {
             if (option_cell(&option, o, row, &cell) && cell.valid) {
                 optional[o] = duckvep_core_string_copy(cell.text, cell.text_length);
                 if (!optional[o] || !*optional[o]) {
@@ -966,13 +967,13 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
                 }
             }
         }
-        if (!failure && option_cell(&option, 3, row, &cell) && cell.valid) {
+        if (!failure && option_cell(&option, 4, row, &cell) && cell.valid) {
             reference = duckvep_core_string_copy(cell.text, cell.text_length);
             if (!reference || !*reference) {
                 failure = "duckvep_model_load_sql: reference_fasta must be a non-empty string";
             }
         }
-        if (!failure && option_cell(&option, 4, row, &cell)) {
+        if (!failure && option_cell(&option, 5, row, &cell)) {
             if (!cell.valid) {
                 failure = "duckvep_model_load_sql: transcript_coverage_complete cannot be NULL";
             } else {
@@ -986,6 +987,7 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
             queries[3] = optional[0];
             queries[4] = optional[1];
             queries[5] = optional[2];
+            queries[6] = optional[3];
             built = duckvep_core_model_script(values[0], queries, reference, coverage, scripts[row].statements,
                                               &scripts[row].count);
             if (!built) {
@@ -995,7 +997,7 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
         for (size_t i = 0; i < 4; ++i) {
             duckvep_budget_free(values[i]);
         }
-        for (size_t i = 0; i < 3; ++i) {
+        for (size_t i = 0; i < 4; ++i) {
             duckvep_budget_free(optional[i]);
         }
         duckvep_budget_free(reference);

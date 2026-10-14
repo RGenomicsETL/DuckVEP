@@ -113,6 +113,17 @@ duckvep_haplotype_status_t duckvep_haplotype_conditional_peptide(
     int complete_start, uint8_t *peptide, size_t capacity, size_t *length,
     size_t *first_stop_position1);
 
+/* Literal nonoverlapping replay with reference-relative codon ancestry. Edit ALT
+ * interiors have no ancestry. The caller supplies ascending source edits; no
+ * allocation or mutation of inputs. */
+duckvep_haplotype_status_t duckvep_haplotype_conditional_lift(
+    const uint8_t *ref, size_t ref_len, const uint8_t *alt, size_t alt_len,
+    const duckvep_haplotype_edit_t *edits, size_t edit_n, int8_t strand,
+    duckvep_codon_table_t table, const uint32_t *positions,
+    const uint8_t *amino, const uint8_t *codes, size_t count,
+    int complete_start, uint8_t *peptide, size_t capacity,
+    size_t *length, size_t *first_stop);
+
 /* Partition edits sorted by ascending original CDS coordinate. The caller has
  * already grouped them by model, transcript, sample, phase set, and haplotype.
  * Call with blocks=NULL/capacity=0 to obtain required_blocks. No partial block

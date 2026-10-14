@@ -19,6 +19,8 @@ bool host_v2_register_model(duckdb_v2_extension_handle extension, duckdb_v2_cont
                             duckdb_v2_error_info_handle *error);
 bool host_v2_register_nested(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
                              duckdb_v2_error_info_handle *error);
+bool host_v2_register_products(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
+                               duckdb_v2_error_info_handle *error);
 
 /* ---------------------------------------------------------------------------
  * duckvep_so_terms(): table function, resumable scan state.
@@ -316,6 +318,9 @@ DUCKDB_EXTENSION_ENTRYPOINT(duckdb_v2_extension_handle extension, duckdb_v2_cont
         return;
     }
     if (!host_v2_register_nested(extension, context, error)) {
+        return;
+    }
+    if (!host_v2_register_products(extension, context, error)) {
         return;
     }
     if (!host_v2_register_builders(extension, context, error)) {

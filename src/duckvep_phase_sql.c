@@ -196,9 +196,9 @@ static void raw_gt_scalar(duckdb_function_info info, duckdb_data_chunk input,
     duckdb_vector count_vector = duckdb_data_chunk_get_vector(input, 1u);
     duckdb_string_t *strings = duckdb_vector_get_data(text);
     uint32_t *counts = duckdb_vector_get_data(count_vector);
-    uint32_t *fields[7];
-    duckdb_vector children[7];
-    for (idx_t i = 0u; i < 7u; i++) {
+    uint32_t *fields[8];
+    duckdb_vector children[8];
+    for (idx_t i = 0u; i < 8u; i++) {
         children[i] = duckdb_struct_vector_get_child(output, i);
         fields[i] = duckdb_vector_get_data(children[i]);
         duckdb_vector_ensure_validity_writable(children[i]);
@@ -209,15 +209,15 @@ static void raw_gt_scalar(duckdb_function_info info, duckdb_data_chunk input,
             /* A NULL STRUCT row must null its children too, or field reads
              * and vector copies see uninitialized values. */
             duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
-            for (idx_t i = 0u; i < 7u; i++)
+            for (idx_t i = 0u; i < 8u; i++)
                 duckdb_validity_set_row_invalid(duckdb_vector_get_validity(children[i]), row);
             continue;
         }
         duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
-        uint32_t values[7];
+        uint32_t values[8];
         duckvep_core_raw_gt(duckdb_string_t_data(&strings[row]),
             duckdb_string_t_length(strings[row]), counts[row], values);
-        for (idx_t i = 0u; i < 7u; i++) fields[i][row] = values[i];
+        for (idx_t i = 0u; i < 8u; i++) fields[i][row] = values[i];
     }
 }
 
@@ -247,11 +247,11 @@ static bool register_raw_preparation(duckdb_connection connection) {
     duckdb_logical_type uinteger = duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER);
     duckdb_logical_type ubigint = duckdb_create_logical_type(DUCKDB_TYPE_UBIGINT);
     duckdb_logical_type varchar = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-    duckdb_logical_type fields[7];
-    for (idx_t i = 0u; i < 7u; i++) fields[i] = uinteger;
+    duckdb_logical_type fields[8];
+    for (idx_t i = 0u; i < 8u; i++) fields[i] = uinteger;
     const char *names[] = {"status", "allele0", "allele1", "parsed_slots", "source_ploidy",
-        "source_has_missing", "disposition"};
-    duckdb_logical_type result = duckdb_create_struct_type(fields, names, 7u);
+        "source_has_missing", "disposition", "source_leading_separator"};
+    duckdb_logical_type result = duckdb_create_struct_type(fields, names, 8u);
     duckdb_scalar_function function = duckdb_create_scalar_function();
     duckdb_scalar_function_set_name(function, "_duckvep_raw_gt");
     duckdb_scalar_function_add_parameter(function, varchar);

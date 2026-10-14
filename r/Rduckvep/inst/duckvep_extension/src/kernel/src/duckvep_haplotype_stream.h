@@ -91,7 +91,8 @@ typedef enum {
     DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT,
     DUCKVEP_PREDICTION_PREDICTED,
     /* Complete substitution-only CDS interpreted under typed reference recoding. */
-    DUCKVEP_PREDICTION_CONDITIONAL_RECODING
+    DUCKVEP_PREDICTION_CONDITIONAL_RECODING,
+    DUCKVEP_PREDICTION_CONDITIONAL_RNA
 } duckvep_prediction_status_t;
 
 typedef enum {
@@ -123,7 +124,8 @@ typedef enum {
     /* No longer emitted since slice 5 (every eligible path is decided); kept so the numbering is stable. */
     DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING,
     DUCKVEP_REASON_NMD_GEOMETRY_UNAVAILABLE,
-    DUCKVEP_REASON_SEQUENCE_CAPACITY
+    DUCKVEP_REASON_SEQUENCE_CAPACITY,
+    DUCKVEP_REASON_ASSUMED_RNA_PROGRAMME
 } duckvep_prediction_reason_t;
 
 /* Whole-haplotype NMD prediction under rule ejc50. An EJC-distance heuristic on the
@@ -223,6 +225,9 @@ typedef struct {
     uint8_t *joint_alt, *joint_assigned;
     size_t joint_capacity;
     uint64_t *edit_event_ids; /* Edit payloads, compacted to applied source IDs for ordered replay. */
+    size_t *edit_source_index; /* Contributor index for each edit; reordered with edits. */
+    uint64_t *edit_source_cdna; /* Original first REF base in cDNA coordinates. */
+    uint32_t *edit_source_exon; /* Original exon index; valid on strict-union paths. */
     duckvep_haplotype_block_t *blocks; /* At most edit_capacity interaction blocks. */
     size_t leaf_capacity, edit_capacity;
     uint8_t *cds, *protein, *reference_protein, *reference_coding_protein;
@@ -310,16 +315,24 @@ typedef struct {
 
 /* Keyed result of one carrier of a completed leaf: unresolved cross-PS phase
  * and non-diploid calls are properties of the sample/phase/lane, not of the shared path.
- * A predicted source-record path is predicted only for a carrier whose sibling
- * file lane ends on the same path and whose routed calls were all complete
- * diploid homozygous ALT; other carriers keep non_strict_phase_policy.
+ * A predicted source-record path requires complete original diploid calls and
+ * a real sibling lane, with at most one original REF/ALT or ALT/ALT heterozygous record.
+ * Incomplete evidence or another independent heterozygote keeps non_strict_phase_policy.
  * carriers is the stream's index while the leaf's transcript is draining. */
 void duckvep_haplotype_carrier_prediction(const duckvep_carriers_t *carriers,
     const duckvep_haplotype_leaf_t *leaf, const duckvep_carrier_call_t *call,
     duckvep_prediction_status_t *status, duckvep_prediction_reason_t *reason);
 
 typedef struct {
+    const uint8_t *presence, *boundary_overrides, *kinds, *alt_bytes, *codon_tables;
+    const uint32_t *offsets, *starts, *ends, *alt_lengths, *cds_starts, *cds_ends;
+    const uint64_t *alt_offsets;
+    size_t edit_count, alt_bytes_length;
+} duckvep_rna_programme_view_t;
+
+typedef struct {
     duckvep_carriers_t carriers;
+    duckvep_rna_programme_view_t rna;
     const duckvep_exon_model_t *exons;
     const duckvep_sequence_pool_t *sequences;
     duckvep_haplotype_stream_buffers_t buffers;

@@ -66,10 +66,10 @@ true	true	true	true	true	true	true
 statement ok
 UPDATE ov_multi_calls SET position=CASE WHEN event_index=3 THEN 107 ELSE 103 END,reference=CASE event_index WHEN 1 THEN 'GCTGA' WHEN 2 THEN 'GCT' ELSE 'A' END,alternate=CASE event_index WHEN 1 THEN 'TAAGC' WHEN 2 THEN 'TAA' ELSE 'C' END
 
-query IIIIII
-SELECT cds='ATGTAAGCATTTTAA',protein='M*',list_sort(nmd_contributors)=[1,2],nmd_prediction='escape',list_transform(list_sort(contributor_provenance),lambda c: c.role)=['applied','applied','post_stop'],list_sort(coding_blocks[2].event_indices)=[1,3] FROM duckvep_haplotypes('SELECT * FROM ov_multi_calls','ov_multi',hgvs:=true)
+query IIIIIIIII
+SELECT cds='ATGTAAGCATTTTAA',protein='M*',list_sort(nmd_contributors)=[1,2],nmd_prediction='escape',nmd_stop_position=6,nmd_junction_position IS NULL,nmd_exceptions='start_proximal',list_transform(list_sort(contributor_provenance),lambda c: c.role)=['applied','applied','post_stop'],list_sort(coding_blocks[2].event_indices)=[1,3] FROM duckvep_haplotypes('SELECT * FROM ov_multi_calls','ov_multi',hgvs:=true)
 ----
-true	true	true	true	true	true
+true	true	true	true	true	true	true	true	true
 
 # Intersecting literal indel islands on ATG GCT GAA TAA. One sample per witness; samples 6 and 7
 # repeat witnesses 0 and 3 on the reverse-strand transcript.

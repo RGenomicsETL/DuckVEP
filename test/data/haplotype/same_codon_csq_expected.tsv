@@ -25,7 +25,7 @@ plus_1exon__del_inside_codons_pure	0	inframe_deletion	.
 plus_1exon__del_inside_codons_pure	1		.
 plus_1exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
 plus_1exon__delins_inframe	1		.
-plus_1exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+plus_1exon__far_syn_and_missense	0	missense_variant,synonymous_variant	.
 plus_1exon__far_syn_and_missense	1		.
 plus_1exon__far_syn_and_syn	0	synonymous_variant	.
 plus_1exon__far_syn_and_syn	1		.
@@ -71,7 +71,7 @@ plus_2exon__del_inside_codons_pure	0	inframe_deletion	.
 plus_2exon__del_inside_codons_pure	1		.
 plus_2exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
 plus_2exon__delins_inframe	1		.
-plus_2exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+plus_2exon__far_syn_and_missense	0	missense_variant,synonymous_variant	.
 plus_2exon__far_syn_and_missense	1		.
 plus_2exon__far_syn_and_syn	0	synonymous_variant	.
 plus_2exon__far_syn_and_syn	1		.
@@ -117,7 +117,7 @@ plus_3exon__del_inside_codons_pure	0	inframe_deletion	.
 plus_3exon__del_inside_codons_pure	1		.
 plus_3exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
 plus_3exon__delins_inframe	1		.
-plus_3exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+plus_3exon__far_syn_and_missense	0	missense_variant,synonymous_variant	.
 plus_3exon__far_syn_and_missense	1		.
 plus_3exon__far_syn_and_syn	0	synonymous_variant	.
 plus_3exon__far_syn_and_syn	1		.
@@ -163,7 +163,7 @@ minus_1exon__del_inside_codons_pure	0	inframe_deletion	.
 minus_1exon__del_inside_codons_pure	1		.
 minus_1exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
 minus_1exon__delins_inframe	1		.
-minus_1exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+minus_1exon__far_syn_and_missense	0	missense_variant,synonymous_variant	.
 minus_1exon__far_syn_and_missense	1		.
 minus_1exon__far_syn_and_syn	0	synonymous_variant	.
 minus_1exon__far_syn_and_syn	1		.
@@ -209,7 +209,7 @@ minus_2exon__del_inside_codons_pure	0	inframe_deletion	.
 minus_2exon__del_inside_codons_pure	1		.
 minus_2exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
 minus_2exon__delins_inframe	1		.
-minus_2exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+minus_2exon__far_syn_and_missense	0	missense_variant,synonymous_variant	.
 minus_2exon__far_syn_and_missense	1		.
 minus_2exon__far_syn_and_syn	0	synonymous_variant	.
 minus_2exon__far_syn_and_syn	1		.
@@ -255,7 +255,7 @@ minus_3exon__del_inside_codons_pure	0	inframe_deletion	.
 minus_3exon__del_inside_codons_pure	1		.
 minus_3exon__delins_inframe	0	inframe_deletion	csq labels the 6>3 replacement inframe_deletion by length; the policy has a mixed replacement
 minus_3exon__delins_inframe	1		.
-minus_3exon__far_syn_and_missense	0	missense_variant,synonymous_variant	csq reports the synonymous and the missense codon; the policy reports one category
+minus_3exon__far_syn_and_missense	0	missense_variant,synonymous_variant	.
 minus_3exon__far_syn_and_missense	1		.
 minus_3exon__far_syn_and_syn	0	synonymous_variant	.
 minus_3exon__far_syn_and_syn	1		.

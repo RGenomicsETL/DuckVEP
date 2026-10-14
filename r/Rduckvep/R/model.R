@@ -19,25 +19,27 @@
 #'   SELECT statements for the optional relations.
 #' @param reference_fasta Optional path of an indexed reference FASTA.
 #' @param transcript_coverage_complete Optional logical (`NA` is an error).
+#' @param rna_edit_query Optional SELECT statement for typed transcript RNA edits.
 #' @return `TRUE`, invisibly, when the model is loaded.
 #' @export
 rduckvep_load_model <- function(con, name, regions_query, transcripts_query, exons_query,
                                 mature_mirna_query = NULL, peptide_edit_query = NULL,
                                 interval_feature_query = NULL, reference_fasta = NULL,
-                                transcript_coverage_complete = NULL) {
+                                transcript_coverage_complete = NULL, rna_edit_query = NULL) {
   required <- list(name, regions_query, transcripts_query, exons_query)
   if (!all(vapply(required, function(x) is.character(x) && length(x) == 1L && !is.na(x) && nzchar(x), NA))) {
     stop("name and the three queries must be non-empty strings", call. = FALSE)
   }
   optional <- list(mature_mirna_query = mature_mirna_query, peptide_edit_query = peptide_edit_query,
                    interval_feature_query = interval_feature_query, reference_fasta = reference_fasta,
-                   transcript_coverage_complete = transcript_coverage_complete)
+                   transcript_coverage_complete = transcript_coverage_complete,
+                   rna_edit_query = rna_edit_query)
   optional <- optional[!vapply(optional, is.null, NA)]
   v2 <- nrow(DBI::dbGetQuery(con, "SELECT 1 FROM duckdb_functions()
     WHERE function_name = 'duckvep_model_publish' LIMIT 1")) > 0L
   if (v2) {
     args <- vapply(required, function(value) .duckvep_builder_literal(con, value), "")
-    if (length(optional)) {
+    if (length(optional) > 0L) {
       fields <- paste0(as.character(DBI::dbQuoteIdentifier(con, names(optional))), " := ",
                        vapply(optional, function(value) .duckvep_builder_literal(con, value), ""))
       args <- c(args, paste0("struct_pack(", paste(fields, collapse = ", "), ")"))

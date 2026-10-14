@@ -141,7 +141,7 @@ void duckvep_core_revcomp(const char *sequence, size_t length, char *reversed)
     }
 }
 
-void duckvep_core_raw_gt(const char *gt, size_t length, uint32_t source_alt_count, uint32_t fields[7])
+void duckvep_core_raw_gt(const char *gt, size_t length, uint32_t source_alt_count, uint32_t fields[8])
 {
     duckvep_raw_gt_t call = {0};
     duckvep_raw_gt_status_t status = duckvep_phase_parse_vep_raw(
@@ -150,6 +150,7 @@ void duckvep_core_raw_gt(const char *gt, size_t length, uint32_t source_alt_coun
     fields[1] = call.allele_index[0]; fields[2] = call.allele_index[1];
     fields[3] = call.parsed_slots; fields[4] = call.source_ploidy;
     fields[5] = call.source_has_missing; fields[6] = (uint32_t)call.disposition;
+    fields[7] = call.source_leading_separator;
 }
 
 uint64_t duckvep_core_record_order(uint64_t count, uint64_t ordinal)

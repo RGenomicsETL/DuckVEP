@@ -20,7 +20,7 @@ cases <- Filter(function(case) !is.null(case$expected_normalized_description), c
 case_ids <- vapply(cases, `[[`, "", "case_id")
 reference_ids <- vapply(cases, `[[`, "", "reference_id")
 transcript_ids <- vapply(cases, `[[`, "", "transcript_id")
-stopifnot(length(cases) == 6L, !anyDuplicated(case_ids),
+stopifnot(length(cases) == 8L, !anyDuplicated(case_ids),
   all(vapply(cases, function(x) length(x$edits) == 2L, logical(1L))),
   all(vapply(cases, function(x) x$strand %in% c("+", "-"), logical(1L))))
 edits <- unlist(lapply(cases, `[[`, "edits"), recursive = FALSE)

@@ -259,6 +259,7 @@ duckvep_register_projection_code(duckdb_connection connection)
 bool
 register_duckvep_sql_kernels(duckhts_registration_t *registration)
 {
+    extern bool duckvep_register_product_scenario(duckdb_connection connection);
 	if (!duckvep_register_so_terms(registration->connection)) {
 		return duckhts_registration_error(registration,
 		    "DuckHTS could not register duckvep_so_terms");
@@ -267,6 +268,10 @@ register_duckvep_sql_kernels(duckhts_registration_t *registration)
 		return duckhts_registration_error(registration,
 		    "DuckHTS could not register __duckvep_projection_code");
 	}
+    if (!duckvep_register_product_scenario(registration->connection)) {
+        return duckhts_registration_error(registration,
+            "DuckHTS could not register product scenario");
+    }
 	if (!duckvep_register_phase_kernels(registration->connection)) {
 		return duckhts_registration_error(registration,
 		    "DuckHTS could not register DuckVEP phase kernels");

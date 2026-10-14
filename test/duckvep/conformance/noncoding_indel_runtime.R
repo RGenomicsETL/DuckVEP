@@ -120,6 +120,48 @@ run_noncoding_indels <- function(connection, quote) {
     ",", quote(unknown_transcripts), ",", quote(exons), ")"))
   unknown <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status,prediction_reason,nmd_prediction FROM duckvep_haplotypes(", quote(calls), ",'utr_nmd_unknown')"))
   stopifnot(unknown$prediction_status == "predicted", unknown$nmd_prediction == "unknown", unknown$prediction_reason == "nmd_geometry_unavailable")
+  positional <- DBI::dbGetQuery(connection, paste0("SELECT cds,protein,array_to_string(haplotype_consequences,',') terms,",
+    "prediction_reference_protein,prediction_protein FROM duckvep_haplotypes(", quote(calls), ",'utr_nmd_unknown')"))
+  stopifnot(positional$cds == "ATGAAATAA", positional$protein == "MK*",
+    positional$terms == "3_prime_UTR_variant", is.na(positional$prediction_reference_protein),
+    is.na(positional$prediction_protein))
+  raw_cdna <- paste0("'AAAAAAATGAAATAA", strrep("C", 115L), "'::BLOB cdna_sequence")
+  withheld <- paste0("SELECT * REPLACE (NULL::UBIGINT AS cds_start,NULL::UBIGINT AS cds_end,",
+    "NULL::BLOB AS cds_sequence,NULL::UTINYINT AS codon_table,",
+    "NULL::BLOB AS pre_cds_sequence,NULL::BLOB AS post_cds_sequence),", raw_cdna,
+    " FROM (", unknown_transcripts, ")")
+  supplied <- paste0("SELECT *,", raw_cdna, ",7::UBIGINT rna_cds_cdna_start,",
+    "15::UBIGINT rna_cds_cdna_end,1::UTINYINT rna_codon_table FROM (", unknown_transcripts, ")")
+  programme <- paste0("SELECT 0::UINTEGER transcript_index,10::UINTEGER cdna_start,10::UINTEGER cdna_end,",
+    "'A'::VARCHAR expected_substrate,'G'::VARCHAR alternate_sequence,'substitution'::VARCHAR operation_kind,",
+    "'Ensembl116:_rna_edit'::VARCHAR programme_name,'transcript_attrib:SeqEdit'::VARCHAR evidence_name,",
+    "0::UTINYINT boundary_overrides")
+  for (kind in c("withheld", "supplied")) {
+    rna_calls <- paste0("SELECT * REPLACE (",
+      if (kind == "withheld") "109::UBIGINT AS position,'A'::VARCHAR AS reference,'G'::VARCHAR AS alternate" else
+        "'C'::VARCHAR AS reference,'T'::VARCHAR AS alternate", ") FROM (", calls, ")")
+    model <- paste0("utr_rna_", kind)
+    transcript_query <- if (kind == "withheld") withheld else supplied
+    DBI::dbGetQuery(connection, paste0("SELECT loaded FROM duckvep_model_load(", quote(model), ",",
+      quote("SELECT 0::UINTEGER seq_region"), ",", quote(transcript_query), ",", quote(exons),
+      if (kind == "supplied") paste0(",rna_edit_query := ", quote(programme)), ")"))
+    refused <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status,prediction_reason,nmd_prediction,",
+      "haplotype_consequences IS NULL AS no_terms,prediction_reference_protein,prediction_protein,cds,protein ",
+      "FROM duckvep_haplotypes(", quote(rna_calls), ",", quote(model), ")"))
+    stopifnot(refused$prediction_status == "unsupported_context",
+      refused$prediction_reason == "unsupported_curated_edit", refused$nmd_prediction == "unknown",
+      refused$no_terms, is.na(refused$prediction_reference_protein), is.na(refused$prediction_protein))
+    if (kind == "withheld") stopifnot(is.na(refused$cds), is.na(refused$protein)) else
+      stopifnot(refused$cds == "ATGAAATAA", refused$protein == "MK*")
+    DBI::dbGetQuery(connection, paste0("SELECT duckvep_model_drop(", quote(model), ")"))
+  }
+  DBI::dbGetQuery(connection, paste0("SELECT loaded FROM duckvep_model_load('utr_rna_empty',",
+    quote("SELECT 0::UINTEGER seq_region"), ",", quote(paste0("SELECT *,", raw_cdna, " FROM (", transcripts, ")")),
+    ",", quote(exons), ",rna_edit_query := ", quote(paste0(programme, " WHERE FALSE")), ")"))
+  ordinary <- DBI::dbGetQuery(connection, paste0("SELECT * FROM duckvep_haplotypes(", quote(calls), ",'utr_nmd')"))
+  known_empty <- DBI::dbGetQuery(connection, paste0("SELECT * FROM duckvep_haplotypes(", quote(calls), ",'utr_rna_empty')"))
+  stopifnot(identical(known_empty, ordinary))
+  DBI::dbGetQuery(connection, "SELECT duckvep_model_drop('utr_rna_empty')")
   DBI::dbGetQuery(connection, "SELECT duckvep_model_drop('utr_nmd_unknown')")
   DBI::dbGetQuery(connection, "SELECT duckvep_model_drop('utr_nmd')")
   for (lower in c(FALSE, TRUE)) for (strand in c(1L, -1L)) {

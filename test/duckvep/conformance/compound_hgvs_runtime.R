@@ -98,11 +98,16 @@ main <- function(repo) {
     result <- DBI::dbGetQuery(connection, paste0("SELECT cds,protein,hgvsc,hgvsc_status,hgvsp,",
       "list_sort(list_transform(contributors,lambda c: c.event_index))::VARCHAR source_ids ",
       "FROM ", relation))
+    stopifnot(identical(substring(reference, edits$position,
+      edits$position + nchar(edits$reference) - 1L), edits$reference))
+    molecular <- case$molecular_edits
+    if (is.null(molecular)) molecular <- edits else
+      stopifnot(nrow(molecular) == 1L, identical(unique(edits), molecular))
     replay_cds <- function(sequence) {
-      for (index in order(edits$position, decreasing = TRUE)) {
-        position <- edits$position[[index]]
-        ref <- edits$reference[[index]]
-        alt <- edits$alternate[[index]]
+      for (index in order(molecular$position, decreasing = TRUE)) {
+        position <- molecular$position[[index]]
+        ref <- molecular$reference[[index]]
+        alt <- molecular$alternate[[index]]
         observed <- substr(sequence, position, position + nchar(ref) - 1L)
         if (!identical(observed, ref)) {
           stop(case$case_id, ": expected ", ref, " at c.", position, ", got ", observed,

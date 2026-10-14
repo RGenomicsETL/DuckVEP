@@ -504,7 +504,7 @@ static int input_next(void *context, duckvep_hap_row_t *out, char *error, size_t
     out->versions = ((int64_t *)duckdb_vector_get_data(v[13]))[row];
     out->ploidies = ((int64_t *)duckdb_vector_get_data(v[14]))[row];
     if (source_records) {
-        for (unsigned i = 0u; i < 7u; i++)
+        for (unsigned i = 0u; i < 8u; i++)
             out->raw[i] = ((uint32_t *)duckdb_vector_get_data(duckdb_struct_vector_get_child(v[8], i)))[row];
         out->replay_order = ((uint64_t *)duckdb_vector_get_data(v[15]))[row];
         out->source_selected = ((bool *)duckdb_vector_get_data(v[16]))[row];

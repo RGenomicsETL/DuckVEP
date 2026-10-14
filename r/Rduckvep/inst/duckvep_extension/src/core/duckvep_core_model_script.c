@@ -1,16 +1,16 @@
 #include "duckvep_core_model_script.h"
 
-const char *const duckvep_model_relations[6] = {
-    "regions", "transcripts", "exons", "mature_mirna", "peptide_edits", "interval_features"};
+const char *const duckvep_model_relations[7] = {
+    "regions", "transcripts", "exons", "mature_mirna", "peptide_edits", "interval_features", "rna_edits"};
 
-bool duckvep_core_model_script(const char *name, const char *const queries[6],
+bool duckvep_core_model_script(const char *name, const char *const queries[7],
     const char *reference_fasta, int coverage, duckvep_sql_text out[DUCKVEP_MODEL_SCRIPT_MAX],
     size_t *count)
 {
     bool ok = true;
     size_t n = 0;
 
-    for (size_t i = 0; ok && i < 6; i++) {
+    for (size_t i = 0; ok && i < 7; i++) {
         if (!queries[i]) continue;
         duckvep_sql_text *sql = &out[n++];
         /* The newlines keep a trailing line comment in a query from swallowing the parenthesis. */

@@ -367,6 +367,21 @@ duckvep_carriers_status_t duckvep_carriers_push(
     return DUCKVEP_CARRIERS_OK;
 }
 
+void duckvep_carriers_observe_copy_het(duckvep_carriers_t *s,
+    uint32_t tx_index, const duckvep_carrier_key_t *key, uint64_t record_id) {
+    uint32_t at;
+    uint32_t tx_id = find_transcript(s, tx_index, &at);
+    uint32_t id = tx_id ? find_call(s, tx_id, key, &at) : 0u;
+    if (!id) return;
+    duckvep_carrier_call_t *call = &s->buffers.calls[id - 1u];
+    if (call->copy_has_het && call->copy_het_record != record_id)
+        call->key.copy_unproven = 1u;
+    else {
+        call->copy_has_het = 1u;
+        call->copy_het_record = record_id;
+    }
+}
+
 duckvep_carriers_status_t duckvep_carriers_next_leaf(
     duckvep_carriers_t *s, duckvep_carrier_leaf_t *leaf) {
     if (leaf) memset(leaf, 0, sizeof(*leaf));

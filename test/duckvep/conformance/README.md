@@ -2,6 +2,14 @@
 
 Ensembl VEP 116 is the behavioral oracle. Other reimplementations are not.
 
+## Bounded product contracts
+
+The reviewed raw prediction profile preserves complete original one-record REF/ALT or ALT/ALT copy proof with homozygous background without inventing inter-record phase sets. A one-record ALT/ALT heterozygote requires both sibling lanes in the stream; a lone projected ALT is refused as `non_strict_phase_policy`. Private raw-GT transport uses eight cells; public haplotypes, scalar calls and arrangements retain their 36/32/26-field shapes. Reached effects and the aggregate use the same determinate peptide facts: case-insensitive bases are compared, but X/B/Z are not synonyms, local source masks are not unioned and opaque ALT bases receive no invented ancestry. Compatible source-local edit islands can lie in different coding exons, with each source contained in one coding exon; genomic-gap ownership remains distinct even at equal cDNA coordinates. The coding-edit cache charges 20 bytes per edit island and workspace charges depend on configured capacities.
+
+Typed peptide programmes lift intact reference codons through bounded indels and restored frame, not opaque interiors; changed codons translate ordinarily. Typed transcript SeqEdit capture and optional `rna_edit_query` use all-or-none original raw-cDNA coding start/end (`UBIGINT`) and explicit code (`UTINYINT`), checked into owned 32-bit arrays. Provisional V3 snapshot/contract coexist with V1/V2 migration and fingerprints. Fixed-map, nonoverlapping equal-length RNA operations and substitutions admit conditional paired first-stop peptides; changed-substrate collisions, boundary shifts, unknown/untyped or coexisting programmes are refused. The MF*/MFQ* and ML*/MS* producer positives exercise both hosts and restore. Neither conditional lane supplies unconditional SO or NMD. Complete code-1 CTG/TTG starts use the original coding coordinate and existing nonempty CDS/code authority; the chr20 ENST00000336066.8/ENSP00000477229.2 positive is not a regional-code observation. Nuclear ATG start loss does not imply a downstream-start scan.
+
+Experimental `duckvep_product_scenario_v1(STRUCT)` and `rduckvep_product_scenario_v1` accept explicitly supplied disjoint fixed-length substitutions and product/start hypotheses with variable typed lists, full unsigned 64-bit coordinates and source IDs (including zero), plus explicit source operands and per-source effects. `hypothetical_assignment` and `supplied_programme` are not observed phase or inferred splice/alternative-start products; conditional NMD remains unknown. Broader phase transport, interacting opaque replacements, mixed/regulatory/product domains and conditional NMD remain open in #11/#50. #48, release, publication and model hosting are separate. These bounded profiles do not establish full qualification.
+
 `data/so_consequences.tsv` is generated directly from VEP 116's
 `%OVERLAP_CONSEQUENCES` table. `make duckvep-so-spec` verifies the pinned
 `Constants.pm` checksum before replacing it; `make duckvep-so-spec-check` proves the
@@ -296,9 +304,13 @@ models from those checked-in files in the run directory. The receipt records SHA
 for the fixture, adapter, lock, and generated reference-model files.
 
 `cases.jsonl` stores each compound allele as two `{position, reference, alternate}`
-records. The R runner serializes both source edits inside one `c.[edit1;edit2]`
-description and calls the Mutalyzer normalizer once; it never joins independently
-normalized HGVS names. The adapter input JSONL contains
+records. The R runner serializes source edits inside one `c.[edit1;edit2]`
+description unless an explicit molecular `input_description` is supplied. The eight
+external cases include two opaque-alias controls: their single delins description
+checks joint molecular nomenclature, not cis or duplicate-source semantics.
+`molecular_edits` supplies the single reference-relative replacement for native replay;
+its identity with the distinct source assertions is checked separately. The normalizer
+is called once per description; independently normalized HGVS names are not joined. The adapter input JSONL contains
 `case_id` and `description`. Each output JSONL record contains the input and normalized
 description, `protein.description`, `protein.reference`, `protein.predicted`, Mutalyzer
 error codes, and the pinned runtime versions. Compare `normalized_description` only for
@@ -308,7 +320,11 @@ context, not additional HGVS descriptions, and may be absent when no protein pre
 is returned. Compare the protein description only when the transcript/protein selector
 and coding model match. These pinned outputs are regression expectations for this
 Mutalyzer version; they do not establish cross-tool equivalence or complete HGVS
-conformance.
+conformance. For the negative-strand opaque control, Mutalyzer renders
+`c.[4delinsTTTC;6T>C]`: the retained c.5C gives `TTTC + C + C = TTTCCC`, the same
+molecule as native `c.4_6delinsTTTCCC`. The native form follows the same-codon
+one-unchanged-nucleotide delins rule. The normalizer's decomposition does not establish
+which ALT base descended from that reference C.
 
 The loaded-extension runtime gate uses the same FASTA/GFF3 resources and separate
 `expected_native_hgvsc`/`expected_native_hgvsp` expectations:
@@ -318,7 +334,8 @@ make test_compound_hgvs_runtime
 ```
 
 The native profile covers observed-cis, bounded nonoverlapping grouped literal DNA edits,
-including compound insertions and deletions, on both transcript strands. It checks
+including compound insertions and deletions, plus identical opaque-delins aliases on
+both transcript strands. It checks
 final-CDS replay, protein bytes, contributor identities and rejects cis not established
 by the observed calls. HGVS DNA delins guidance combines adjacent changes and changes
 separated by one unchanged nucleotide in the same codon. HGVS protein guidance keeps
@@ -327,8 +344,8 @@ protein delins and same-codon DNA member list differ from these rules; the tool-
 receipt expectations remain separate from the native standards expectations. See the
 [DNA](https://hgvs-nomenclature.org/stable/recommendations/DNA/delins/) and
 [protein](https://hgvs-nomenclature.org/main/recommendations/protein/delins/)
-recommendations. Overlapping edits, ambiguous same-gap insertions and general shifted or
-overlap nomenclature remain outside this bounded profile.
+recommendations. Distinct interacting delins, ambiguous same-gap insertions and general
+shifted or overlap nomenclature remain outside this bounded profile.
 
 From the repository root, these runtime checks build/use the default v1 release host;
 `make test_*_runtime` targets build it as needed:

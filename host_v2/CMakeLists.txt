@@ -23,6 +23,7 @@ file(GLOB CORE_SOURCES CONFIGURE_DEPENDS "${DUCKVEP_ROOT}/src/core/*.c")
 add_library(duckvep SHARED
     host_v2.c
     host_v2_nested.c
+    host_v2_products.c
     host_v2_builders.c
     host_v2_model.c
     host_v2_annotate.c

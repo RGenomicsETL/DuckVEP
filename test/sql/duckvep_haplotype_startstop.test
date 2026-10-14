@@ -110,7 +110,7 @@ FROM ss_gold g LEFT JOIN ss_out o ON o.transcript_index=g.transcript_index AND o
 ----
 312	0
 
-# Gate (ii): the pinned csq output mapped through csq_so_map_v1 agrees on every lane outside the 38 declared
+# Gate (ii): the pinned csq output mapped through csq_so_map_v1 agrees on every lane outside the 36 declared
 # divergences (README.md), on both strands and every exon layout; each divergent lane equals the declared csq set on
 # the csq side and the golden on the DuckVEP side.
 
@@ -124,7 +124,7 @@ SELECT count(*) FILTER (WHERE g.declared_divergence='.'),
 FROM ss_gold g JOIN ss_out o ON o.transcript_index=g.transcript_index AND o.lane=g.lane
 WHERE g.so_terms<>'';
 ----
-180	180	204	204
+192	192	192	192
 
 # Start codon. The edited CDS must begin with ATG. Any loss is start_lost alone: initiation and NMD are unknown, so
 # other predictions are suppressed (a missense, a frame opening, an early stop and an abolished terminator elsewhere
@@ -171,7 +171,7 @@ run_off_insertion_plus2	frameshift_variant,stop_lost	HIGH	6
 run_off_inside_codon_35	frameshift_variant,stop_lost	HIGH	6
 run_off_trans_control	frameshift_variant,stop_lost	HIGH	6
 run_off_trans_control	missense_variant	MODERATE	6
-stop_lost_and_missense	stop_lost	HIGH	6
+stop_lost_and_missense	missense_variant,stop_lost	HIGH	6
 stop_lost_deletion_partial	frameshift_variant,stop_lost	HIGH	6
 stop_lost_hom_alt	stop_lost	HIGH	6
 stop_lost_insertion_before_plus1	frameshift_variant,stop_lost	HIGH	6
@@ -199,9 +199,9 @@ stop_inserted_before_terminator	stop_retained_variant	LOW	6
 stop_retained_after_frame_pair	protein_altering_variant	MODERATE	6
 stop_retained_displaced_insertion	frameshift_variant	HIGH	6
 stop_retained_hom_alt	stop_retained_variant	LOW	6
-stop_retained_plus_inframe_insertion	protein_altering_variant	MODERATE	6
+stop_retained_plus_inframe_insertion	inframe_insertion,protein_altering_variant	MODERATE	6
 stop_retained_plus_missense	missense_variant	MODERATE	6
-stop_retained_plus_synonymous	stop_retained_variant	LOW	6
+stop_retained_plus_synonymous	stop_retained_variant,synonymous_variant	LOW	6
 stop_retained_tag	stop_retained_variant	LOW	6
 stop_retained_tga	stop_retained_variant	LOW	6
 stop_retained_trans_control	missense_variant	MODERATE	6
@@ -243,12 +243,15 @@ frameshift_variant,stop_gained	HIGH	36
 frameshift_variant,stop_lost	HIGH	42
 inframe_deletion	MODERATE	6
 inframe_insertion	MODERATE	24
+inframe_insertion,protein_altering_variant	MODERATE	6
 missense_variant	MODERATE	24
-protein_altering_variant	MODERATE	18
+missense_variant,stop_lost	HIGH	6
+protein_altering_variant	MODERATE	12
 start_lost	HIGH	90
 stop_gained	HIGH	24
-stop_lost	HIGH	72
-stop_retained_variant	LOW	42
+stop_lost	HIGH	66
+stop_retained_variant	LOW	36
+stop_retained_variant,synonymous_variant	LOW	6
 
 # Smallest complete CDS (ATGTAA, one exon): deletions leave edited CDSs of 3, 2 and 1 bases. An edited CDS too short
 # to hold ATG is start_lost; the three bases ATG with the terminator deleted are stop_lost (no extension invented);

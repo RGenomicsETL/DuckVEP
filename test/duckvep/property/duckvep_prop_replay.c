@@ -661,6 +661,146 @@ TEST conditional_curated_peptide_is_codon_identity_bound(void) {
     PASS();
 }
 
+TEST conditional_lift_uses_literal_source_ancestry(void) {
+    const uint8_t ref[] = "ATGGCTTGAGCATAA";
+    const uint8_t inserted[] = "ATGGCTCCTTGAGCATAA";
+    const uint8_t deleted[] = "ATGTGAGCATAA";
+    uint32_t positions[] = {3u};
+    uint8_t amino[] = {'U'};
+    uint8_t codes[] = {DUCKVEP_PEPTIDE_EDIT_SELENOCYSTEINE};
+    duckvep_haplotype_edit_t insert = {7u, 0u, NULL, 3u, (const uint8_t *)"CCT", 1};
+    duckvep_haplotype_edit_t deletion = {4u, 3u, (const uint8_t *)"GCT", 0u, NULL, 1};
+    uint8_t peptide[32];
+    size_t length, stop;
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+        ref, 15u, inserted, 18u, &insert, 1u, 1, STD, positions, amino, codes,
+        1u, 1, peptide, sizeof(peptide), &length, &stop));
+    ASSERT_STR_EQ("MAPUA*", (const char *)peptide);
+    ASSERT_EQ(6u, length); ASSERT_EQ(6u, stop);
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+        ref, 15u, deleted, 12u, &deletion, 1u, 1, STD, positions, amino, codes,
+        1u, 1, peptide, sizeof(peptide), &length, &stop));
+    ASSERT_STR_EQ("MUA*", (const char *)peptide);
+    ASSERT_EQ(4u, length);
+    memset(peptide, 0xa5, sizeof(peptide));
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_BUFFER_TOO_SMALL, duckvep_haplotype_conditional_lift(
+        ref, 15u, inserted, 18u, &insert, 1u, 1, STD, positions, amino, codes,
+        1u, 1, peptide, 6u, &length, &stop));
+    ASSERT_EQ(0xa5u, peptide[0]); ASSERT_EQ(0u, length);
+    insert.cds_start = 8u;
+    ASSERT_EQ(DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED, duckvep_haplotype_conditional_lift(
+        ref, 15u, inserted, 18u, &insert, 1u, 1, STD, positions, amino, codes,
+        1u, 1, peptide, sizeof(peptide), &length, &stop));
+    ASSERT_EQ(0xa5u, peptide[0]); ASSERT_EQ(0u, length);
+    {
+        duckvep_haplotype_edit_t unchanged = {7u, 3u, (const uint8_t *)"TGA",
+            3u, (const uint8_t *)"TGA", 1};
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            ref, 15u, ref, 15u, &unchanged, 1u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, sizeof(peptide), &length, &stop));
+        ASSERT_STR_EQ("MAUA*", (const char *)peptide);
+        ASSERT_EQ(5u, length);
+        duckvep_haplotype_edit_t padded = {7u, 6u, (const uint8_t *)"TGAGCA",
+            6u, (const uint8_t *)"TGATCA", 1};
+        const uint8_t changed[] = "ATGGCTTGATCATAA";
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            ref, 15u, changed, 15u, &padded, 1u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, 6u, &length, &stop));
+        ASSERT_STR_EQ("MAUS*", (const char *)peptide);
+        padded.cds_start = 10u; padded.ref_len = padded.alt_len = 1u;
+        padded.ref = (const uint8_t *)"G"; padded.alt = (const uint8_t *)"T";
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            ref, 15u, changed, 15u, &padded, 1u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, 6u, &length, &stop));
+        ASSERT_STR_EQ("MAUS*", (const char *)peptide);
+        duckvep_haplotype_edit_t padded_insert = {6u, 4u,
+            (const uint8_t *)"TTGA", 7u, (const uint8_t *)"TCCTTGA", 1};
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            ref, 15u, inserted, 18u, &padded_insert, 1u, 1, STD,
+            positions, amino, codes, 1u, 1, peptide, 7u, &length, &stop));
+        ASSERT_STR_EQ("MAPUA*", (const char *)peptide);
+        padded_insert.variant_strand = -1;
+        padded_insert.ref = (const uint8_t *)"TCAA";
+        padded_insert.alt = (const uint8_t *)"TCAAGGA";
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            ref, 15u, inserted, 18u, &padded_insert, 1u, 1, STD,
+            positions, amino, codes, 1u, 1, peptide, 7u, &length, &stop));
+        ASSERT_STR_EQ("MAPUA*", (const char *)peptide);
+        duckvep_haplotype_edit_t replaced[2] = {
+            {7u, 1u, (const uint8_t *)"T", 0u, NULL, 1},
+            {8u, 0u, NULL, 1u, (const uint8_t *)"T", 1}
+        };
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            ref, 15u, ref, 15u, replaced, 2u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, 6u, &length, &stop));
+        ASSERT_STR_EQ("MA*A*", (const char *)peptide);
+        duckvep_haplotype_edit_t repeated[2] = {
+            {7u, 0u, NULL, 3u, (const uint8_t *)"CCT", 1},
+            {7u, 0u, NULL, 3u, (const uint8_t *)"CCT", 1}
+        };
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED, duckvep_haplotype_conditional_lift(
+            ref, 15u, inserted, 18u, repeated, 2u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, sizeof(peptide), &length, &stop));
+        ASSERT_EQ(0u, length);
+        repeated[0].cds_start = 9u;
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED, duckvep_haplotype_conditional_lift(
+            ref, 15u, inserted, 18u, repeated, 2u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, sizeof(peptide), &length, &stop));
+    }
+    {
+        const uint8_t anchor_alt[] = "ATGGCTTGATAA";
+        duckvep_haplotype_edit_t anchor = {9u, 4u, (const uint8_t *)"AGCA",
+            1u, (const uint8_t *)"A", 1};
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            ref, 15u, anchor_alt, 12u, &anchor, 1u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, 5u, &length, &stop));
+        ASSERT_STR_EQ("MAU*", (const char *)peptide);
+        duckvep_haplotype_edit_t right_anchor = {4u, 3u, (const uint8_t *)"AGC",
+            0u, NULL, -1};
+        const uint8_t right_alt[] = "ATGTGAGCATAA";
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            ref, 15u, right_alt, 12u, &right_anchor, 1u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, 5u, &length, &stop));
+        ASSERT_STR_EQ("MUA*", (const char *)peptide);
+        /* Invalid overlap is rejected before touching output scalars or inputs. */
+        size_t preserved_stop = 17u;
+        uint8_t preserved_ref[sizeof(ref)];
+        memcpy(preserved_ref, ref, sizeof(ref));
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_INVALID_ARG, duckvep_haplotype_conditional_lift(
+            ref, 15u, anchor_alt, 12u, &anchor, 1u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, 5u, (size_t *)(void *)ref, &preserved_stop));
+        ASSERT_EQ(0, memcmp(ref, preserved_ref, sizeof(ref)));
+        ASSERT_EQ(17u, preserved_stop);
+        size_t preserved_length = 19u;
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_INVALID_ARG, duckvep_haplotype_conditional_lift(
+            ref, 15u, anchor_alt, 12u, &anchor, 1u, 1, STD, positions, amino, codes,
+            1u, 1, (uint8_t *)(void *)positions, sizeof(peptide),
+            &preserved_length, &preserved_stop));
+        ASSERT_EQ(19u, preserved_length);
+        ASSERT_EQ(17u, preserved_stop);
+        const uint8_t invalid_alt[] = "ATGGCTTGA?CATAA";
+        duckvep_haplotype_edit_t invalid = {10u, 1u, (const uint8_t *)"G",
+            1u, (const uint8_t *)"?", 1};
+        memset(peptide, 0xa5, sizeof(peptide));
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_INVALID_BASE, duckvep_haplotype_conditional_lift(
+            ref, 15u, invalid_alt, 15u, &invalid, 1u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, 6u, &preserved_length, &preserved_stop));
+        ASSERT_EQ(0xa5u, peptide[0]);
+        ASSERT_EQ(0u, preserved_length);
+    }
+    {
+        const uint8_t start_ref[] = "CTGGCCTAA";
+        const uint8_t shifted[] = "ATGCTGGCCTAA";
+        duckvep_haplotype_edit_t before = {1u, 0u, NULL, 3u, (const uint8_t *)"ATG", 1};
+        positions[0] = 1u; amino[0] = 'M'; codes[0] = DUCKVEP_PEPTIDE_EDIT_INITIAL_MET;
+        ASSERT_EQ(DUCKVEP_HAPLOTYPE_OK, duckvep_haplotype_conditional_lift(
+            start_ref, 9u, shifted, 12u, &before, 1u, 1, STD, positions, amino, codes,
+            1u, 1, peptide, sizeof(peptide), &length, &stop));
+        ASSERT_STR_EQ("MLA*", (const char *)peptide);
+    }
+    PASS();
+}
+
 TEST reference_translation_result_aliases_preserve_all_storage(void) {
     union aligned_reference_storage {
         duckvep_translation_t alignment;

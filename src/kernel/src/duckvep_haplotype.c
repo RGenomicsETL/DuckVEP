@@ -329,6 +329,175 @@ duckvep_haplotype_conditional_peptide(const uint8_t *reference_cds,
     return DUCKVEP_HAPLOTYPE_OK;
 }
 
+/* Verify the literal replay and derive ancestry only for untouched reference spans.
+ * An edit's ALT interior is opaque even when its bytes happen to equal REF. */
+/* Map a reference base only through position-bearing substitutions or validated
+ * common context. A length-changing payload supplies no interior ancestry. */
+static size_t haplo_lift_base(size_t off, const uint8_t *ref, const uint8_t *alt,
+    const duckvep_haplotype_edit_t *edits, size_t edit_n)
+{
+    size_t r = 0u, a = 0u;
+    for (size_t i = 0u; i < edit_n; i++) {
+        const duckvep_haplotype_edit_t *e = &edits[i];
+        size_t start = (size_t)e->cds_start - 1u;
+        if (off < start) return a + off - r;
+        a += start - r;
+        r = start;
+        if (off < r + e->ref_len) {
+            size_t local = off - r;
+            if (e->ref_len == e->alt_len) return a + local;
+            size_t prefix = 0u, suffix = 0u;
+            while (prefix < e->ref_len && prefix < e->alt_len &&
+                haplo_norm_cds_base(ref[r + prefix]) == haplo_norm_cds_base(alt[a + prefix]))
+                prefix++;
+            while (suffix < e->ref_len - prefix && suffix < e->alt_len - prefix &&
+                haplo_norm_cds_base(ref[r + e->ref_len - suffix - 1u]) ==
+                haplo_norm_cds_base(alt[a + e->alt_len - suffix - 1u]))
+                suffix++;
+            if (local < prefix) return a + local;
+            if (local >= e->ref_len - suffix)
+                return a + e->alt_len - (e->ref_len - local);
+            return SIZE_MAX;
+        }
+        r += e->ref_len;
+        a += e->alt_len;
+    }
+    return a + off - r;
+}
+
+duckvep_haplotype_status_t duckvep_haplotype_conditional_lift(
+    const uint8_t *ref, size_t ref_len, const uint8_t *alt, size_t alt_len,
+    const duckvep_haplotype_edit_t *edits, size_t edit_n, int8_t strand,
+    duckvep_codon_table_t table, const uint32_t *positions,
+    const uint8_t *amino, const uint8_t *codes, size_t count,
+    int complete_start, uint8_t *peptide, size_t capacity,
+    size_t *length, size_t *first_stop)
+{
+    size_t r = 0u, a = 0u;
+    duckvep_translation_t translated;
+    if (edit_n > SIZE_MAX / sizeof(*edits) || count > SIZE_MAX / sizeof(*positions))
+        return DUCKVEP_HAPLOTYPE_INVALID_ARG;
+    size_t edit_bytes = edit_n * sizeof(*edits), position_bytes = count * sizeof(*positions);
+    if (!ref || !alt || !edits || !edit_n || !positions || !amino || !codes ||
+        !peptide || !length || !first_stop || (strand != 1 && strand != -1) ||
+        !duckvep_codon_table_supported(table) || (complete_start != 0 && complete_start != 1) ||
+        (ref_len > UINTPTR_MAX - (uintptr_t)ref) ||
+        (alt_len > UINTPTR_MAX - (uintptr_t)alt) ||
+        (capacity > UINTPTR_MAX - (uintptr_t)peptide) ||
+        (edit_bytes > UINTPTR_MAX - (uintptr_t)edits) ||
+        (position_bytes > UINTPTR_MAX - (uintptr_t)positions) ||
+        (count > UINTPTR_MAX - (uintptr_t)amino) ||
+        (count > UINTPTR_MAX - (uintptr_t)codes) ||
+        (sizeof(*length) > UINTPTR_MAX - (uintptr_t)length) ||
+        (sizeof(*first_stop) > UINTPTR_MAX - (uintptr_t)first_stop) ||
+        haplo_overlaps_output(ref, ref_len, peptide, capacity) ||
+        haplo_overlaps_output(alt, alt_len, peptide, capacity) ||
+        haplo_overlaps_output(edits, edit_bytes, peptide, capacity) ||
+        haplo_overlaps_output(positions, position_bytes, peptide, capacity) ||
+        haplo_overlaps_output(amino, count, peptide, capacity) ||
+        haplo_overlaps_output(codes, count, peptide, capacity) ||
+        haplo_overlaps_output(length, sizeof(*length), first_stop, sizeof(*first_stop)) ||
+        haplo_overlaps_output(length, sizeof(*length), peptide, capacity) ||
+        haplo_overlaps_output(first_stop, sizeof(*first_stop), peptide, capacity))
+        return DUCKVEP_HAPLOTYPE_INVALID_ARG;
+    const void *inputs[] = {ref, alt, edits, positions, amino, codes};
+    size_t widths[] = {ref_len, alt_len, edit_bytes, position_bytes, count, count};
+    for (size_t i = 0u; i < 6u; i++)
+        if (haplo_overlaps_output(inputs[i], widths[i], length, sizeof(*length)) ||
+            haplo_overlaps_output(inputs[i], widths[i], first_stop, sizeof(*first_stop)))
+            return DUCKVEP_HAPLOTYPE_INVALID_ARG;
+    for (size_t i = 0u; i < edit_n; i++) {
+        const duckvep_haplotype_edit_t *e = &edits[i];
+        if ((e->ref && e->ref_len > UINTPTR_MAX - (uintptr_t)e->ref) ||
+            (e->alt && e->alt_len > UINTPTR_MAX - (uintptr_t)e->alt) ||
+            haplo_overlaps_output(e->ref, e->ref_len, peptide, capacity) ||
+            haplo_overlaps_output(e->alt, e->alt_len, peptide, capacity) ||
+            haplo_overlaps_output(e->ref, e->ref_len, length, sizeof(*length)) ||
+            haplo_overlaps_output(e->alt, e->alt_len, length, sizeof(*length)) ||
+            haplo_overlaps_output(e->ref, e->ref_len, first_stop, sizeof(*first_stop)) ||
+            haplo_overlaps_output(e->alt, e->alt_len, first_stop, sizeof(*first_stop)))
+            return DUCKVEP_HAPLOTYPE_INVALID_ARG;
+    }
+    *length = *first_stop = 0u;
+    if (!ref_len || ref_len % 3u || !alt_len || alt_len % 3u)
+        return DUCKVEP_HAPLOTYPE_INPUT_INCOMPLETE;
+    if (capacity <= alt_len / 3u) return DUCKVEP_HAPLOTYPE_BUFFER_TOO_SMALL;
+    for (size_t i = 0u; i < edit_n; i++) {
+        const duckvep_haplotype_edit_t *e = &edits[i];
+        if (!e->cds_start || (i && e->cds_start <= edits[i - 1u].cds_start) ||
+            e->cds_start - 1u < r || e->cds_start - 1u > ref_len ||
+            e->ref_len > ref_len - (e->cds_start - 1u) ||
+            (e->ref_len && !e->ref) || (e->alt_len && !e->alt) ||
+            (e->variant_strand != 1 && e->variant_strand != -1))
+            return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+        size_t gap = (size_t)e->cds_start - 1u - r;
+        if (gap > alt_len - a || memcmp(ref + r, alt + a, gap))
+            return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+        r += gap; a += gap;
+        if (e->alt_len > alt_len - a) return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+        int reverse = e->variant_strand != strand;
+        for (size_t j = 0u; j < e->ref_len; j++)
+            if (haplo_norm_cds_base(ref[r + j]) !=
+                haplo_norm_cds_base((uint8_t)haplo_oriented_base(e->ref, e->ref_len, j, reverse, 0)))
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+        for (size_t j = 0u; j < e->alt_len; j++)
+            if (haplo_norm_cds_base(alt[a + j]) !=
+                haplo_norm_cds_base((uint8_t)haplo_oriented_base(e->alt, e->alt_len, j, reverse, 0)))
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+        r += e->ref_len; a += e->alt_len;
+    }
+    if (ref_len - r != alt_len - a || memcmp(ref + r, alt + a, ref_len - r))
+        return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+    for (size_t i = 0u; i < count; i++) {
+        size_t p = positions[i], off;
+        uint8_t codon_peptide[2];
+        duckvep_translation_t one;
+        if (!p || p > ref_len / 3u || (i && p <= positions[i - 1u]) ||
+            !haplo_peptide_alt_valid(amino[i])) return DUCKVEP_HAPLOTYPE_INVALID_ARG;
+        off = (p - 1u) * 3u;
+        if (duckvep_translate_cds(ref + off, 3u, table, codon_peptide,
+            sizeof(codon_peptide), &one) != DUCKVEP_TRANSLATION_OK)
+            return DUCKVEP_HAPLOTYPE_INVALID_BASE;
+        switch (codes[i]) {
+        case DUCKVEP_PEPTIDE_EDIT_SELENOCYSTEINE:
+            if (!haplo_reference_is_tga(ref + off) || amino[i] != 'U')
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+            break;
+        case DUCKVEP_PEPTIDE_EDIT_STOP_CODON_RT:
+            if (codon_peptide[0] != '*' || amino[i] == '*')
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+            break;
+        case DUCKVEP_PEPTIDE_EDIT_INITIAL_MET:
+            if (!complete_start || p != 1u || amino[i] != 'M')
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+            break;
+        case DUCKVEP_PEPTIDE_EDIT_AMINO_ACID_SUB:
+            if (p == 1u && amino[i] == 'M' && !duckvep_codon_is_start(ref, table))
+                return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+            break;
+        default: return DUCKVEP_HAPLOTYPE_UNSUPPORTED_CURATED;
+        }
+    }
+    for (size_t i = 0u; i < alt_len; i++)
+        if (!haplo_norm_cds_base(alt[i])) return DUCKVEP_HAPLOTYPE_INVALID_BASE;
+    if (duckvep_translate_cds(alt, alt_len, table, peptide, capacity, &translated) !=
+        DUCKVEP_TRANSLATION_OK) return DUCKVEP_HAPLOTYPE_INVALID_BASE;
+    for (size_t i = 0u; i < count; i++) {
+        size_t off = ((size_t)positions[i] - 1u) * 3u;
+        size_t target = haplo_lift_base(off, ref, alt, edits, edit_n);
+        if (target == SIZE_MAX || target % 3u || target > alt_len - 3u ||
+            (off == 0u && target != 0u)) continue;
+        if (haplo_lift_base(off + 1u, ref, alt, edits, edit_n) != target + 1u ||
+            haplo_lift_base(off + 2u, ref, alt, edits, edit_n) != target + 2u) continue;
+        if (memcmp(ref + off, alt + target, 3u) == 0)
+            peptide[target / 3u] = amino[i];
+    }
+    for (size_t i = 0u; i < translated.length; i++)
+        if (peptide[i] == '*') { *first_stop = i + 1u; break; }
+    *length = *first_stop ? *first_stop : translated.length;
+    return DUCKVEP_HAPLOTYPE_OK;
+}
+
 duckvep_haplotype_status_t duckvep_haplotype_reference_proteins(
     const uint8_t *cds, size_t cds_length, duckvep_codon_table_t table,
     const uint32_t *edit_positions1, const uint8_t *edit_alternates, size_t edit_count,

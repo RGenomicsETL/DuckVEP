@@ -169,7 +169,7 @@ impact_of <- function(terms) {
     order <- c('HIGH', 'MODERATE', 'LOW')
     order[min(match(levels[terms], order))]
 }
-# Returns the reduced whole-protein term set of the edited cDNA (contract section 2), in this order:
+# Classifies the edited cDNA and reached, reference-mapped pure codon tracts, in this order:
 # the edited CDS not beginning with ATG is start_lost alone; no stop is stop_lost (plus frameshift when
 # the length is not a multiple of three, i.e. the frame is displaced when the CDS runs out; nothing is
 # ever extended downstream); a first stop starting before the terminator's window that truncates the reference
@@ -200,6 +200,37 @@ classify <- function(edits, lane) {
                 if (all(w$kinds == 'sub')) 'missense_variant' else if (all(w$kinds == 'ins')) 'inframe_insertion' else
                 if (all(w$kinds == 'del')) 'inframe_deletion' else 'protein_altering_variant'
         }
+    }
+    # Only substitution-only paths have an unambiguous one-to-one reference codon map.
+    # The first stop bounds the reached coding tract; the initiator and terminator
+    # have their own consequence classes.
+    if (all(w$kinds == 'sub') && L == nchar(cds) &&
+        (identical(terms, 'stop_lost') || identical(terms, 'stop_retained_variant'))) {
+        reached <- seq.int(2L, if (is.na(first)) length(ref_protein) - 1L else first - 1L)
+        changed <- reached[vapply(reached, function(k)
+            sub_at(cds, 3L * k - 2L, 3L) != sub_at(alt, 3L * k - 2L, 3L), logical(1L))]
+        effects <- ifelse(ref_protein[changed] == protein[changed],
+                          'synonymous_variant', 'missense_variant')
+        terms <- c(terms, c('missense_variant', 'synonymous_variant')[
+            c('missense_variant', 'synonymous_variant') %in% effects])
+    }
+    # A three-base insertion at a codon boundary is independently mapped by its
+    # source anchor. If the other edit only changes the terminal stop to another
+    # stop, that inserted amino acid is reached before termination.
+    if (identical(terms, 'protein_altering_variant') && length(w$kinds) == 2L &&
+        identical(sort(w$kinds), c('ins', 'sub'))) {
+        mine <- Filter(function(e) lane %in% e$lane, edits)
+        islands <- lapply(mine, island)
+        inserted <- Filter(function(e) e$ref_len == 0L && nchar(e$alt) == 3L &&
+            e$start %% 3L == 1L && e$start < nchar(cds) - 2L, islands)
+        terminal <- Filter(function(e) e$start >= nchar(cds) - 2L &&
+            e$ref_len == nchar(e$alt) && e$ref_len > 0L, islands)
+        if (length(inserted) == 1L && length(terminal) == 1L &&
+            identical(sub_at(alt, inserted[[1L]]$start, 3L), inserted[[1L]]$alt) &&
+            unname(code[inserted[[1L]]$alt]) != '*' &&
+            !is.na(first) && 3L * first > inserted[[1L]]$start + 2L &&
+            sub_at(alt, 3L * first - 2L, 3L) %in% names(code)[code == '*'])
+            terms <- c('inframe_insertion', terms)
     }
     list(terms = terms, protein = text)
 }
@@ -267,6 +298,16 @@ records <- do.call(rbind, records)
 golden <- do.call(rbind, gold)
 stopifnot(!anyDuplicated(contigs), nrow(golden) == 2L * length(contigs))
 
+# Two mapped substitution codons precede the terminal stop; the third path
+# inserts one complete reached GGG codon after reference base 60.
+stopifnot(sub_at(cds, 49L, 3L) == 'GTC', sub_at(cds, 106L, 3L) == 'TAA',
+          sub_at(cds, 7L, 3L) == 'CCC',
+          sub_at(walk(scenarios$stop_lost_and_missense$edits, 0L)$alt, 49L, 3L) == 'GAC',
+          sub_at(walk(scenarios$stop_lost_and_missense$edits, 0L)$alt, 106L, 3L) == 'CAA',
+          sub_at(walk(scenarios$stop_retained_plus_synonymous$edits, 0L)$alt, 7L, 3L) == 'CCA',
+          sub_at(walk(scenarios$stop_retained_plus_synonymous$edits, 0L)$alt, 106L, 3L) == 'TGA',
+          sub_at(walk(scenarios$stop_retained_plus_inframe_insertion$edits, 0L)$alt, 61L, 3L) == 'GGG',
+          sub_at(walk(scenarios$stop_retained_plus_inframe_insertion$edits, 0L)$alt, 109L, 3L) == 'TAG')
 verified_write <- function(lines, path) {
     lines <- unname(lines)
     if (file.exists(path) && !identical(readLines(path, warn = FALSE), lines))

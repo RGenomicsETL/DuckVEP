@@ -487,7 +487,8 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
     if (!s || !s->initialized) return DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG;
     if (s->error) return s->error;
     if (!s->have_current || s->closing || s->carriers.pending || s->carriers.finished ||
-        !call || !call->source_ploidy || call->source_has_missing > 1u || source_selected > 1u ||
+        !call || !call->source_ploidy || call->source_has_missing > 1u ||
+        call->source_leading_separator > 1u || source_selected > 1u ||
         call->disposition < DUCKVEP_RAW_GT_OMITTED_REFERENCE ||
         call->disposition > DUCKVEP_RAW_GT_RETAINED ||
         (s->have_phase_policy && s->phase_policy != DUCKVEP_PHASE_VEP_RAW))
@@ -521,12 +522,12 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
         duckvep_carriers_status_t status = duckvep_carriers_push(&s->carriers, tx, &key, 0u);
         return status == DUCKVEP_CARRIERS_OK ? DUCKVEP_HAPLOTYPE_STREAM_OK : carrier_fail(s, status);
     }
-    /* Only a complete diploid homozygous ALT call proves both file lanes are
-     * observed copies: its file slots are its original atoms, and a leading
-     * separator coerces the first slot to REF, so no prefixed spelling passes. */
+    /* Compare original slots before projection: two ALT ordinals from one
+     * record distinguish one copy pair, not two independent heterozygotes. */
+    const uint8_t het = call->allele_index[0] != call->allele_index[1];
     const uint8_t unproven = call->disposition != DUCKVEP_RAW_GT_RETAINED ||
         call->source_ploidy != 2u || call->parsed_slots != 2u || call->source_has_missing ||
-        !call->allele_index[0] || call->allele_index[0] != call->allele_index[1];
+        call->source_leading_separator;
     for (uint16_t lane = 1u; lane <= 2u; lane++) {
         uint8_t evidence = 0u;
         if (call->disposition == DUCKVEP_RAW_GT_OMITTED_EMPTY) {
@@ -545,6 +546,8 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_push_raw_call(
         duckvep_carrier_key_t key = {sample, 0, lane, 2u, 0u, 0u, unproven};
         duckvep_carriers_status_t status = duckvep_carriers_push(&s->carriers, tx, &key, evidence);
         if (status != DUCKVEP_CARRIERS_OK) return carrier_fail(s, status);
+        if (het && !unproven)
+            duckvep_carriers_observe_copy_het(&s->carriers, tx, &key, event->source.event_id);
     }
     return DUCKVEP_HAPLOTYPE_STREAM_OK;
 }
@@ -654,12 +657,13 @@ static int stop_codon(const uint8_t *c) {
     return a == 'T' && ((b == 'A' && (d == 'A' || d == 'G')) || (b == 'G' && d == 'A'));
 }
 
-/* Start and stop codons under the transcript's genetic code. The standard code requires the
- * canonical ATG start; another code has no single canonical start, so any start codon of that code
- * counts (vertebrate mitochondrial transcripts begin with ATA, ATT or GTG as well as ATG). */
-static int start_codon_of(const uint8_t *c, duckvep_codon_table_t table) {
-    if (table == DUCKVEP_CODON_TABLE_STANDARD)
-        return (c[0] & 0xDFu) == 'A' && (c[1] & 0xDFu) == 'T' && (c[2] & 0xDFu) == 'G';
+/* The validated CDS/code pair supplies the genetic code for annotated initiation. */
+static int start_codon_of(const uint8_t *c, duckvep_codon_table_t table, int declared) {
+    if ((c[0] & 0xDFu) == 'A' && (c[1] & 0xDFu) == 'T' && (c[2] & 0xDFu) == 'G') return 1;
+    if (!declared) return 0;
+    for (unsigned i = 0u; i < 3u; i++)
+        if ((c[i] & 0xDFu) != 'A' && (c[i] & 0xDFu) != 'C' &&
+            (c[i] & 0xDFu) != 'G' && (c[i] & 0xDFu) != 'T') return 0;
     return duckvep_codon_is_start(c, table);
 }
 
@@ -710,7 +714,7 @@ static duckvep_prediction_reason_t transcript_domain(duckvep_haplotype_stream_t 
         duckvep_codon_table_t table = seq->codon_table
             ? (duckvep_codon_table_t)seq->codon_table[tx] : DUCKVEP_CODON_TABLE_STANDARD;
         size_t codons = length / 3u, open_end = (flags & DUCKVEP_TX_CDS_END_NF) != 0u;
-        if (!(flags & DUCKVEP_TX_CDS_START_NF) && !start_codon_of(c, table)) r = DUCKVEP_REASON_NONCANONICAL_START;
+        if (!(flags & DUCKVEP_TX_CDS_START_NF) && !start_codon_of(c, table, seq->codon_table != NULL)) r = DUCKVEP_REASON_NONCANONICAL_START;
         else if (!open_end && !stop_codon_of(c + length - 3u, table)) r = DUCKVEP_REASON_NONCANONICAL_STOP;
         else for (size_t i = 1u; i + (open_end ? 0u : 1u) < codons; i++)
             if (stop_codon_of(c + 3u * i, table)) { r = DUCKVEP_REASON_INTERNAL_STOP; break; }
@@ -847,11 +851,97 @@ static int same_peptide(const duckvep_haplotype_stream_t *s, const duckvep_haplo
         !memcmp(leaf->reference_coding_protein + skip, s->buffers.protein + skip, ref_n - skip);
 }
 
+/* Biological base comparison leaves source and output spelling intact. */
+static int same_bases(const uint8_t *a, const uint8_t *b, size_t length) {
+    for (size_t i = 0u; i < length; i++)
+        if ((a[i] & 0xDFu) != (b[i] & 0xDFu)) return 0;
+    return 1;
+}
+
+/* Three consecutive ancestral bases from one reference codon establish a comparable
+ * final codon. New bases in length-changing edits have no source-codon ancestry. */
+static uint64_t reached_codon_effects(const duckvep_haplotype_stream_t *s,
+                                      const duckvep_haplotype_leaf_t *leaf,
+                                      const duckvep_haplotype_edit_t *edits, size_t edit_count,
+                                      size_t first_stop, int open_start, int open_end) {
+    size_t ref_length = s->sequences->cds_length[leaf->carriers.transcript_index];
+    size_t end = first_stop ? first_stop - 1u : leaf->cds_length / 3u;
+    size_t ref_at = 0u, alt_at = 0u, i = 0u;
+    uint64_t effects = 0u;
+    for (size_t codon = 0u; codon < end; codon++) {
+        size_t mapped[3];
+        for (size_t base = 0u; base < 3u; base++) {
+            size_t position = codon * 3u + base;
+            while (i < edit_count) {
+                const duckvep_haplotype_edit_t *e = edits + i;
+                size_t r0 = (size_t)e->cds_start - 1u;
+                size_t before = r0 - ref_at;
+                if (position < alt_at + before) break;
+                ref_at = r0;
+                alt_at += before;
+                if (position < alt_at + e->alt_len) break;
+                alt_at += e->alt_len;
+                ref_at += e->ref_len;
+                i++;
+            }
+            if (i < edit_count) {
+                const duckvep_haplotype_edit_t *e = edits + i;
+                if (ref_at == (size_t)e->cds_start - 1u &&
+                    position >= alt_at && position < alt_at + e->alt_len) {
+                    mapped[base] = e->ref_len == e->alt_len ? ref_at + position - alt_at : SIZE_MAX;
+                    continue;
+                }
+            }
+            mapped[base] = ref_at + position - alt_at;
+        }
+        const uint8_t *alt = leaf->cds + codon * 3u;
+        if (mapped[0] == SIZE_MAX || mapped[0] % 3u || mapped[0] + 3u > ref_length ||
+            mapped[1] != mapped[0] + 1u || mapped[2] != mapped[1] + 1u ||
+            (!open_start && codon == 0u)) {
+            char after = (char)leaf->protein[codon];
+            if (after == 'X' || after == 'B' || after == 'Z')
+                effects |= DUCKVEP_SO(DUCKVEP_SO_CODING_SEQUENCE);
+            continue;
+        }
+        const uint8_t *ref = leaf->reference_cds + mapped[0];
+        if (same_bases(ref, alt, 3u)) continue;
+        size_t reference_codon = mapped[0] / 3u;
+        if (!open_end && reference_codon + 1u == ref_length / 3u) continue;
+        char before = (char)leaf->reference_coding_protein[reference_codon];
+        char after = (char)leaf->protein[codon];
+        if (before == '*' || after == '*') continue;
+        if (before == 'X' || after == 'X' || before == 'B' || after == 'B' ||
+            before == 'Z' || after == 'Z') {
+            effects |= DUCKVEP_SO(DUCKVEP_SO_CODING_SEQUENCE);
+            continue;
+        }
+        effects |= DUCKVEP_SO(before == after ? DUCKVEP_SO_SYNONYMOUS : DUCKVEP_SO_MISSENSE);
+    }
+    return effects;
+}
+
+static int same_island(const duckvep_haplotype_edit_t *a, const duckvep_haplotype_edit_t *b, int8_t strand);
+
+static int source_edit_geometry(const duckvep_haplotype_stream_t *s, uint32_t tx,
+    const duckvep_haplotype_leaf_t *leaf, size_t edit, uint64_t *q,
+    uint32_t *ref_len, uint32_t *alt_len) {
+    const duckvep_transcript_model_t *m = s->carriers.model;
+    const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
+    (void)m; (void)tx;
+    if (!b->edit_source_index || !b->edit_source_cdna || !b->edit_source_exon ||
+        edit >= leaf->edit_count || b->edit_source_index[edit] >= leaf->contributor_count)
+        return 0;
+    const duckvep_haplotype_source_t *a = &b->contributors[b->edit_source_index[edit]].source;
+    *q = b->edit_source_cdna[edit]; *ref_len = a->ref_len; *alt_len = a->alt_len;
+    return 1;
+}
+
 /* ejc50, decided on the edited spliced transcript of the shared path and never per
  * allele. The 5' UTR is not edited (only CDS edits are applied), so the edited stop sits at the CDS cDNA origin
  * plus its edited CDS offset, and the penultimate exon's last base moves by the length change of every edit
  * that starts at or before it: indels upstream and inside that exon shift J, indels after it (the last exon)
- * do not, and an insertion between the two exons belongs to the last exon. Edits after the stop are part of
+ * do not. A source-anchored insertion at a junction belongs to its original anchor exon;
+ * an unanchored projected interbase insertion belongs to the downstream exon. Edits after the stop are part of
  * the edited transcript, so a post-stop indel before J shifts J (S never moves); one at or after J leaves the
  * prediction unchanged. Unresolvable exon topology is unknown, never a guess. */
 static void nmd_ejc50(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf, uint64_t mask,
@@ -864,7 +954,7 @@ static void nmd_ejc50(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *l
         return; /* incomplete or curated CDS: termination geometry is not established */
     /* Geometry follows the disjoint joint difference when source islands intersect; junction
      * attribution still follows each source's own islands. */
-    const size_t edit_count = rna_edits ? rna_edits :
+    size_t edit_count = rna_edits ? rna_edits :
         leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count;
     const duckvep_haplotype_edit_t *edits = !rna_edits && leaf->joint_edits ? leaf->joint_edits : s->buffers.edits;
     if (mask & DUCKVEP_SO(DUCKVEP_SO_START_LOST)) return;          /* lost initiation */
@@ -924,6 +1014,47 @@ static void nmd_ejc50(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *l
     leaf->nmd_stop_valid = 1u;
     if ((uint64_t)first_stop * 3u - padding <= DUCKVEP_HAPLOTYPE_NMD_START_PROXIMAL_BASES)
         leaf->nmd_exceptions |= DUCKVEP_HAPLOTYPE_NMD_EXCEPTION_START_PROXIMAL;
+    /* A joint HGVS difference can merge adjacent edits across a splice boundary. For exon
+     * geometry use each uniquely asserted source island only when its original span belongs
+     * to one exon and all distinct islands are disjoint. Aliases within one original exon count once. */
+    int atomic_geometry = !rna_edits && leaf->joint_edits;
+    size_t geometry_count = leaf->edit_count;
+    int64_t atomic_delta = 0;
+    for (size_t j = 0u; atomic_geometry && j < geometry_count; j++) {
+        const duckvep_haplotype_edit_t *e = &eb->edits[j];
+        uint64_t q;
+        uint32_t ref_len, alt_len;
+        if (!source_edit_geometry(s, tx, leaf, j, &q, &ref_len, &alt_len)) {
+            atomic_geometry = 0; break;
+        }
+        int duplicate = 0;
+        for (size_t k = 0u; k < j; k++) {
+            const duckvep_haplotype_edit_t *p = &eb->edits[k];
+            if (same_island(p, e, m->strand[tx]) && eb->edit_source_exon[k] == eb->edit_source_exon[j]) {
+                duplicate = 1; break;
+            }
+            uint64_t r;
+            uint32_t p_ref, p_alt;
+            if (!source_edit_geometry(s, tx, leaf, k, &r, &p_ref, &p_alt) ||
+                (q < r + p_ref && r < q + ref_len)) {
+                atomic_geometry = 0; break;
+            }
+        }
+        if (!duplicate) atomic_delta += (int64_t)alt_len - (int64_t)ref_len;
+    }
+    if (atomic_geometry && atomic_delta != leaf->nominal_length_diff) atomic_geometry = 0;
+    int unchanged_geometry = leaf->joint_edits != NULL;
+    int common_exon = leaf->joint_edits && geometry_count != 0u;
+    uint32_t owner_exon = common_exon ? eb->edit_source_exon[0] : 0u;
+    for (size_t j = 0u; j < geometry_count && leaf->joint_edits; j++) {
+        /* Primitive assertions, not the net difference of a coalesced HGVS block. */
+        if (eb->edits[j].ref_len != eb->edits[j].alt_len) unchanged_geometry = 0;
+        if (eb->edit_source_exon[j] != owner_exon) common_exon = 0;
+    }
+    if (leaf->joint_edits && !atomic_geometry && !unchanged_geometry && !common_exon && n != 1u)
+        return; /* the stop is proved by the RNA; its distance to an exon junction is not */
+    if (atomic_geometry) { edits = eb->edits; edit_count = geometry_count; }
+    else if (leaf->joint_edits) edit_count = 0u; /* union length belongs once to the proved exon */
     /* The exon of the edited transcript that holds the stop. Exons are stored in cDNA order. */
     uint64_t edited_end = 0u, previous_end = 0u;
     for (size_t i = first; i < first + n; i++) {
@@ -931,11 +1062,20 @@ static void nmd_ejc50(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *l
         if (a != previous_end + 1u) break;                           /* not in cDNA order: no statement */
         previous_end = z;
         int64_t size = (int64_t)(z - a + 1u);
+        if (leaf->joint_edits && !atomic_geometry && !unchanged_geometry &&
+            (n == 1u || (common_exon && owner_exon == i))) size += leaf->nominal_length_diff;
         for (size_t j = 0u; j < edit_count; j++) {
+            int duplicate = 0;
+            for (size_t k = 0u; atomic_geometry && k < j; k++)
+                if (same_island(&edits[k], &edits[j], m->strand[tx]) &&
+                    eb->edit_source_exon[k] == eb->edit_source_exon[j]) { duplicate = 1; break; }
+            if (duplicate) continue;
             uint64_t q0 = rna_edits ? edits[j].cds_start :
                 origin + (uint64_t)edits[j].cds_start - 1u - padding;
-            if (q0 >= a && (q0 <= z || (!edits[j].ref_len && z == total && q0 == total + 1u)))
-                size += (int64_t)edits[j].alt_len - (int64_t)edits[j].ref_len;
+            uint32_t ref_len = edits[j].ref_len, alt_len = edits[j].alt_len;
+            if (atomic_geometry) source_edit_geometry(s, tx, leaf, j, &q0, &ref_len, &alt_len);
+            if (q0 >= a && (q0 <= z || (!ref_len && z == total && q0 == total + 1u)))
+                size += (int64_t)alt_len - (int64_t)ref_len;
         }
         if (size <= 0) break;
         if (stop <= edited_end + (uint64_t)size) {
@@ -955,23 +1095,39 @@ static void nmd_ejc50(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *l
     const int joint = !rna_edits && leaf->joint_edits;
     for (size_t i = 0u; joint && i < leaf->edit_count; i++) {
         const duckvep_haplotype_edit_t *e = &b->edits[i];
-        if (e->alt_len != e->ref_len && origin + (uint64_t)e->cds_start - 1u - padding <= pen_end)
+        uint64_t q0 = origin + (uint64_t)e->cds_start - 1u - padding;
+        uint32_t ref_len = e->ref_len, alt_len = e->alt_len;
+        if (atomic_geometry) source_edit_geometry(s, tx, leaf, i, &q0, &ref_len, &alt_len);
+        if (alt_len != ref_len && q0 <= pen_end)
             for (size_t j = 0u; j < leaf->contributor_count; j++)
                 if (b->contributors[j].source.event_id == b->edit_event_ids[i]) b->contributors[j].nmd_moved_junction = 1u;
     }
+    if (joint && !atomic_geometry && common_exon && !unchanged_geometry) {
+        if (owner_exon < first || owner_exon >= first + n) { leaf->nmd_stop_valid = 0u; return; }
+        if (owner_exon < first + n - 1u) junction += leaf->nominal_length_diff;
+        if (owner_exon == first + n - 2u) pen_size += leaf->nominal_length_diff;
+        if (owner_exon == first + n - 1u) last_size += leaf->nominal_length_diff;
+    }
     for (size_t i = 0u; i < edit_count; i++) {
         const duckvep_haplotype_edit_t *e = &edits[i];
+        int duplicate = 0;
+        for (size_t k = 0u; atomic_geometry && k < i; k++)
+            if (same_island(&edits[k], e, m->strand[tx]) &&
+                eb->edit_source_exon[k] == eb->edit_source_exon[i]) { duplicate = 1; break; }
+        if (duplicate) continue;
         uint64_t q0 = rna_edits ? e->cds_start : origin + (uint64_t)e->cds_start - 1u - padding;
-        int64_t change = (int64_t)e->alt_len - (int64_t)e->ref_len;
+        uint32_t ref_len = e->ref_len, alt_len = e->alt_len;
+        if (atomic_geometry) source_edit_geometry(s, tx, leaf, i, &q0, &ref_len, &alt_len);
+        int64_t change = (int64_t)alt_len - (int64_t)ref_len;
         if (q0 <= pen_end) {
-            if (e->ref_len && q0 + e->ref_len - 1u > pen_end) { leaf->nmd_stop_valid = 0u; return; } /* an edit may not span the junction */
+            if (change && ref_len && q0 + ref_len - 1u > pen_end) { leaf->nmd_stop_valid = 0u; return; } /* length-changing edit may not span the junction */
             junction += change;
             if (change && !joint)
                 for (size_t j = 0u; j < leaf->contributor_count; j++)
                     if (b->contributors[j].source.event_id == b->edit_event_ids[i]) b->contributors[j].nmd_moved_junction = 1u;
             if (q0 >= pen_start) pen_size += change;
         } else if (q0 >= last_start) {
-            if (e->ref_len && q0 + e->ref_len - 1u > last_end) { leaf->nmd_stop_valid = 0u; return; }
+            if (ref_len && q0 + ref_len - 1u > last_end) { leaf->nmd_stop_valid = 0u; return; }
             last_size += change;
         }
     }
@@ -1013,13 +1169,126 @@ static void extend_past_cds(duckvep_haplotype_stream_t *s, duckvep_haplotype_lea
     leaf->flags |= DUCKVEP_HAPLOTYPE_FLAG_EXTENDED;
 }
 
+/* The programme view borrows model arrays. Both peptide buffers are leaf-scoped
+ * stream workspace; callers copy their bytes before the next leaf is visited. */
+static int conditional_rna_prediction(duckvep_haplotype_stream_t *s,
+                                      duckvep_haplotype_leaf_t *leaf, size_t genomic_edits) {
+    const duckvep_rna_programme_view_t *r = &s->rna;
+    const duckvep_sequence_pool_t *seq = s->sequences;
+    const duckvep_transcript_model_t *m = s->carriers.model;
+    const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
+    uint32_t tx = leaf->carriers.transcript_index;
+    uint64_t flags = m->flags ? m->flags[tx] : 0u;
+    if ((flags & (DUCKVEP_TX_CDS_START_NF | DUCKVEP_TX_CDS_END_NF |
+                  DUCKVEP_TX_AMINO_ACID_SUB | DUCKVEP_TX_SELENOCYSTEINE |
+                  DUCKVEP_TX_STOP_CODON_READTHROUGH | DUCKVEP_TX_INITIAL_METHIONINE)) ||
+        !r->presence || r->presence[tx] != 2u || !r->boundary_overrides ||
+        r->boundary_overrides[tx] || !r->offsets || !r->starts || !r->ends ||
+        !r->kinds || !r->alt_offsets || !r->alt_lengths || !r->alt_bytes ||
+        !r->cds_starts || !r->cds_ends || !r->codon_tables ||
+        !seq->cdna_provided || !seq->cdna_bytes || !seq->cdna_length ||
+        !seq->cdna_offset || !m->cds_start1 || !m->cds_end1 ||
+        ((m->cds_start1[tx] || m->cds_end1[tx]) &&
+         seq->cds_length && seq->cds_length[tx]) || !genomic_edits ||
+        !b->reference_protein || !b->prediction_protein || !b->noncoding ||
+        (seq->peptide_edit_offset &&
+         seq->peptide_edit_offset[tx] != seq->peptide_edit_offset[tx + 1u])) return 0;
+    size_t total = seq->cdna_length[tx];
+    uint32_t begin = r->cds_starts[tx], end = r->cds_ends[tx];
+    duckvep_codon_table_t table = (duckvep_codon_table_t)r->codon_tables[tx];
+    if (!begin || end < begin || end > total || (end - begin + 1u) % 3u ||
+        !duckvep_codon_table_supported(table) ||
+        seq->cdna_offset[tx] > seq->cdna_bytes_len ||
+        total > seq->cdna_bytes_len - seq->cdna_offset[tx] ||
+        total > b->noncoding_capacity / 2u ||
+        r->offsets[tx] >= r->offsets[tx + 1u] ||
+        r->offsets[tx + 1u] > r->edit_count) return 0;
+    size_t codons = (total - begin + 1u) / 3u;
+    if (codons + 1u > b->reference_protein_capacity ||
+        codons + 1u > b->prediction_protein_capacity) return 0;
+    const uint8_t *raw = seq->cdna_bytes + seq->cdna_offset[tx];
+    const uint8_t *variant = b->noncoding + total;
+    for (size_t i = 0u; i < genomic_edits; i++) {
+        const duckvep_haplotype_edit_t *edit = &b->edits[i];
+        if (!edit->ref_len || edit->ref_len != edit->alt_len ||
+            edit->cds_start < begin || edit->cds_start > end ||
+            edit->ref_len > end - edit->cds_start + 1u ||
+            (i && b->edits[i - 1u].cds_start <= edit->cds_start + edit->ref_len - 1u))
+            return 0;
+    }
+    /* The noncoding projection applied the genomic alleles to the immutable
+     * raw transcript. Only actual changed bases establish a codon collision. */
+    int changed_programme = 0;
+    for (size_t j = r->offsets[tx]; j < r->offsets[tx + 1u]; j++) {
+        uint32_t a = r->starts[j], z = r->ends[j];
+        uint64_t off = r->alt_offsets[j];
+        if (r->kinds[j] != 1u || a < begin || z < a || z > end ||
+            r->alt_lengths[j] != z - a + 1u ||
+            off > r->alt_bytes_length || r->alt_lengths[j] > r->alt_bytes_length - off ||
+            (j > r->offsets[tx] && r->starts[j - 1u] <= z)) return 0;
+        for (size_t p = a; p <= z; p++) {
+            uint8_t original = (uint8_t)duckvep_dna_normalize((char)raw[p - 1u], 0);
+            uint8_t edited = (uint8_t)duckvep_dna_normalize((char)r->alt_bytes[off + p - a], 0);
+            if (!original || !edited || original == 'N' || edited == 'N' ||
+                (b->noncoding[p - 1u] & 0xDFu) != original) return 0;
+            if (original != edited) {
+                changed_programme = 1;
+                size_t codon_start = begin + 3u * ((p - begin) / 3u);
+                for (size_t h = 0u; h < 3u; h++)
+                    if ((variant[codon_start + h - 1u] & 0xDFu) !=
+                        (raw[codon_start + h - 1u] & 0xDFu)) return 0;
+            }
+        }
+    }
+    if (!changed_programme) return 0;
+    /* A peptide is built codon-by-codon, not by materializing another CDS. */
+    size_t nr = 0u, nv = 0u, j = r->offsets[tx + 1u];
+    for (size_t k = 0u; k < codons; k++) {
+        uint8_t reference[3], allele[3];
+        for (size_t h = 0u; h < 3u; h++) {
+            size_t p = (size_t)begin + k * 3u + h;
+            reference[h] = (uint8_t)duckvep_dna_normalize((char)raw[p - 1u], 0);
+            allele[h] = (uint8_t)duckvep_dna_normalize((char)variant[p - 1u], 0);
+            if (!reference[h] || !allele[h] || reference[h] == 'N' || allele[h] == 'N') return 0;
+            while (j > r->offsets[tx] && p > r->ends[j - 1u]) j--;
+            if (j > r->offsets[tx] && p >= r->starts[j - 1u]) {
+                size_t operation = j - 1u;
+                uint8_t edited = (uint8_t)duckvep_dna_normalize(
+                    (char)r->alt_bytes[r->alt_offsets[operation] + p - r->starts[operation]], 0);
+                reference[h] = allele[h] = edited;
+            }
+        }
+        if (k == 0u && (!duckvep_codon_is_start(reference, table) ||
+                        !duckvep_codon_is_start(allele, table))) return 0;
+        char aa = duckvep_translate_codon((const char *)reference, table);
+        char av = duckvep_translate_codon((const char *)allele, table);
+        if (k == 0u) aa = av = 'M';
+        if (!nr || b->reference_protein[nr - 1u] != '*') b->reference_protein[nr++] = (uint8_t)aa;
+        if (!nv || b->prediction_protein[nv - 1u] != '*') b->prediction_protein[nv++] = (uint8_t)av;
+        if (nr && nv && b->reference_protein[nr - 1u] == '*' &&
+            b->prediction_protein[nv - 1u] == '*') break;
+    }
+    b->reference_protein[nr] = b->prediction_protein[nv] = 0u;
+    leaf->prediction_reference_protein = b->reference_protein;
+    leaf->prediction_reference_protein_length = nr;
+    leaf->prediction_protein = b->prediction_protein;
+    leaf->prediction_protein_length = nv;
+    leaf->path_status = DUCKVEP_PREDICTION_CONDITIONAL_RNA;
+    leaf->path_reason = DUCKVEP_REASON_ASSUMED_RNA_PROGRAMME;
+    leaf->haplotype_so_mask = 0u;
+    leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_UNKNOWN;
+    leaf->nmd_stop_valid = leaf->nmd_junction_valid = 0u;
+    leaf->nmd_exceptions = leaf->nmd_stop_position1 = leaf->nmd_junction_position1 = 0u;
+    return 1;
+}
+
 static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf) {
     if (leaf->path_status != DUCKVEP_PREDICTION_ELIGIBLE || !leaf->cds || leaf->ordered_replacements) return;
     const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
     uint32_t tx = leaf->carriers.transcript_index;
     size_t ref_length = s->sequences->cds_length[tx], alt_length = leaf->cds_length;
     if (!leaf->edit_count) {
-        if (alt_length != ref_length || memcmp(leaf->cds, leaf->reference_cds, ref_length)) return;
+        if (alt_length != ref_length || !same_bases(leaf->cds, leaf->reference_cds, ref_length)) return;
         leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
         leaf->haplotype_so_mask = 0u;
         leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE; /* a reference lane has no termination change */
@@ -1074,10 +1343,22 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
         unknown_first |= edits[i].cds_start <= 3u;
     const size_t window_end = (size_t)((int64_t)alt_length - after_change);
     const size_t first_stop = leaf->translation.first_stop_position1;
+    int unknown_product = 0;
+    for (size_t i = 0u; i < leaf->reference_coding_translation.length; i++)
+        unknown_product |= leaf->reference_coding_protein[i] == 'X' ||
+            leaf->reference_coding_protein[i] == 'B' || leaf->reference_coding_protein[i] == 'Z';
     uint64_t mask;
     const duckvep_codon_table_t table = s->sequences->codon_table
         ? (duckvep_codon_table_t)s->sequences->codon_table[tx] : DUCKVEP_CODON_TABLE_STANDARD;
-    if (!open_start && (alt_length < 3u || !start_codon_of(leaf->cds, table))) {
+    /* The declared alternative initiator belongs to the annotated reference boundary.
+     * An edit of an annotated ATG does not declare a new alternative initiation site. */
+    const int annotated_alternative_start = ref_length >= 3u &&
+        !((leaf->reference_cds[0] & 0xDFu) == 'A' &&
+          (leaf->reference_cds[1] & 0xDFu) == 'T' &&
+          (leaf->reference_cds[2] & 0xDFu) == 'G') && s->sequences->codon_table != NULL;
+    const int alt_start_declared = annotated_alternative_start ||
+        (table != DUCKVEP_CODON_TABLE_STANDARD && s->sequences->codon_table != NULL);
+    if (!open_start && (alt_length < 3u || !start_codon_of(leaf->cds, table, alt_start_declared))) {
         mask = DUCKVEP_SO(DUCKVEP_SO_START_LOST);
     } else if (open_end) {
         /* The reference has no annotated termination, so nothing can be lost or retained: a stop is new, a
@@ -1093,8 +1374,8 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
             int partial_only = (ref_length % 3u) != 0u;
             for (size_t i = 0u; i < edit_count && partial_only; i++)
                 partial_only = (size_t)edits[i].cds_start - 1u >= ref_length - ref_length % 3u;
-            mask = DUCKVEP_SO(partial_only ? DUCKVEP_SO_INCOMPLETE_TERMINAL_CODON :
-                              unknown_first ? DUCKVEP_SO_CODING_SEQUENCE : DUCKVEP_SO_SYNONYMOUS);
+            mask = partial_only ? DUCKVEP_SO(DUCKVEP_SO_INCOMPLETE_TERMINAL_CODON) :
+                (unknown_first || unknown_product) ? 0u : DUCKVEP_SO(DUCKVEP_SO_SYNONYMOUS);
         }
         else if (frame) mask = DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING);
         else if (substitutions) mask = DUCKVEP_SO(DUCKVEP_SO_MISSENSE);
@@ -1122,13 +1403,56 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
         for (size_t k = 0u; k < 3u && !terminal_changed; k++)
             terminal_changed = (leaf->cds[stop0 + k] & 0xDFu) != (leaf->reference_cds[terminator0 + k] & 0xDFu);
         if (leaf->stop_in_displaced_frame) mask = DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT);
-        else if (same) mask = DUCKVEP_SO(terminal_changed ? DUCKVEP_SO_STOP_RETAINED :
-                                         unknown_first ? DUCKVEP_SO_CODING_SEQUENCE : DUCKVEP_SO_SYNONYMOUS);
+        else if (same) mask = terminal_changed ? DUCKVEP_SO(DUCKVEP_SO_STOP_RETAINED) :
+            (unknown_first || unknown_product) ? 0u : DUCKVEP_SO(DUCKVEP_SO_SYNONYMOUS);
         else if (frame) mask = DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING);
         else if (substitutions) mask = DUCKVEP_SO(DUCKVEP_SO_MISSENSE);
         else if (insertions) mask = DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION);
         else if (deletions) mask = DUCKVEP_SO(DUCKVEP_SO_INFRAME_DELETION);
         else mask = DUCKVEP_SO(DUCKVEP_SO_PROTEIN_ALTERING);
+    }
+    /* Dominant start loss has no established translation. Else derive subeffects from the final
+     * product, never by OR-ing source or intermediate consequence masks. */
+    if (!(mask & DUCKVEP_SO(DUCKVEP_SO_START_LOST))) {
+        mask |= reached_codon_effects(s, leaf, edits, edit_count, first_stop, open_start, open_end);
+        /* A pure codon-sized insertion/deletion can coexist with a new stop or a changed
+         * ancestral codon. Require the whole inserted tract (or deletion junction) to be
+         * reached in the final product, and never infer an in-frame effect from a temporary
+         * displacement that a later edit repairs. */
+        if (!frame && alt_length != ref_length) {
+            size_t stop0 = first_stop ? (first_stop - 1u) * 3u : alt_length;
+            int64_t shift = 0;
+            for (size_t j = 0u; j < edit_count; j++) {
+                const duckvep_haplotype_edit_t *e = edits + j;
+                size_t r0 = (size_t)e->cds_start - 1u;
+                size_t a0 = (size_t)((int64_t)r0 + shift);
+                shift += (int64_t)e->alt_len - (int64_t)e->ref_len;
+                size_t common = e->ref_len < e->alt_len ? e->ref_len : e->alt_len;
+                if ((!open_start && r0 < 3u) ||
+                    (!open_end && r0 >= ref_length - 3u) ||
+                    a0 + e->alt_len > stop0 ||
+                    (e->ref_len && r0 + e->ref_len > ref_length)) continue;
+                int preserved = !common ||
+                    same_bases(leaf->reference_cds + r0, leaf->cds + a0, common) ||
+                    same_bases(leaf->reference_cds + r0 + e->ref_len - common,
+                               leaf->cds + a0 + e->alt_len - common, common);
+                if (!preserved) continue;
+                if (e->alt_len > e->ref_len && (e->alt_len - e->ref_len) % 3u == 0u)
+                    mask |= DUCKVEP_SO(DUCKVEP_SO_INFRAME_INSERTION);
+                if (e->ref_len > e->alt_len && (e->ref_len - e->alt_len) % 3u == 0u &&
+                    r0 + e->ref_len <= ref_length - (open_end ? 0u : 3u))
+                    mask |= DUCKVEP_SO(DUCKVEP_SO_INFRAME_DELETION);
+            }
+        }
+        /* Initiator retention requires a changed base and two annotated initiators. */
+        if (!open_start && ref_length >= 3u && alt_length >= 3u &&
+            !same_bases(leaf->cds, leaf->reference_cds, 3u) &&
+            start_codon_of(leaf->reference_cds, table, s->sequences->codon_table != NULL) &&
+            start_codon_of(leaf->cds, table, alt_start_declared))
+            mask |= DUCKVEP_SO(DUCKVEP_SO_START_RETAINED);
+        if (alt_length == ref_length &&
+            same_bases(leaf->cds, leaf->reference_cds, ref_length))
+            mask = 0u;
     }
     leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
     leaf->haplotype_so_mask = mask;
@@ -1160,11 +1484,17 @@ static int noncoding_haplotype_mask(duckvep_haplotype_stream_t *s,
     if (!leaf->contributor_count || tx >= seq->transcript_count || !m->cds_start1 ||
         !m->cds_end1)
         return 0;
+    transcript_noncoding = (m->cds_start1[tx] == 0u && m->cds_end1[tx] == 0u) ||
+        (s->rna.presence && s->rna.presence[tx] == 2u && seq->cds_length &&
+         !seq->cds_length[tx] && seq->cdna_provided);
     for (size_t i = 0u; i < leaf->contributor_count; i++)
         if (leaf->contributors[i].projection_status != DUCKVEP_CDS_EDIT_OUT_OF_CDS &&
-            leaf->contributors[i].projection_status != DUCKVEP_CDS_EDIT_NON_CONTIGUOUS)
+            leaf->contributors[i].projection_status != DUCKVEP_CDS_EDIT_NON_CONTIGUOUS &&
+            !(transcript_noncoding &&
+              (leaf->contributors[i].projection_status == DUCKVEP_CDS_EDIT_OK ||
+               (!seq->cds_length[tx] &&
+                leaf->contributors[i].projection_status == DUCKVEP_CDS_EDIT_INVALID_ARG))))
             return 0;
-    transcript_noncoding = m->cds_start1[tx] == 0u && m->cds_end1[tx] == 0u;
     if (!transcript_noncoding && (leaf->projection_status != DUCKVEP_CDS_EDIT_OK ||
         leaf->sequence_status != DUCKVEP_HAPLOTYPE_OK)) return 0;
     if (!b->noncoding)
@@ -1341,26 +1671,18 @@ static int conditional_reference_is_closed(const duckvep_haplotype_leaf_t *leaf)
     return 1;
 }
 
-static int conditional_contributors_are_cds_substitutions(
+static int conditional_contributors_are_cds_edits(
     const duckvep_haplotype_leaf_t *leaf)
 {
     size_t i;
 
-    if (!leaf->contributor_count || leaf->ordered_replacements || !leaf->edit_count)
-        return 0;
+    if (!leaf->contributor_count || leaf->ordered_replacements || !leaf->edit_count ||
+        leaf->joint_edits) return 0;
     for (i = 0u; i < leaf->contributor_count; i++) {
         const duckvep_haplotype_contributor_t *contributor = &leaf->contributors[i];
-        const duckvep_haplotype_edit_t *edit = contributor->projected;
-
-        if (contributor->projection_status != DUCKVEP_CDS_EDIT_OK || !edit ||
-            !contributor->edit_count || edit->ref_len == 0u ||
-            edit->ref_len != edit->alt_len)
-            return 0;
+        if (contributor->projection_status != DUCKVEP_CDS_EDIT_OK ||
+            !contributor->projected || !contributor->edit_count) return 0;
     }
-    for (i = 0u; i < leaf->block_count; i++)
-        if (leaf->blocks[i].ref_len == 0u ||
-            leaf->blocks[i].ref_len != leaf->blocks[i].alt_len)
-            return 0;
     return 1;
 }
 
@@ -1386,9 +1708,9 @@ static void conditional_prediction(duckvep_haplotype_stream_t *s,
     flags = s->carriers.model->flags ? s->carriers.model->flags[tx] : 0u;
     if ((flags & DUCKVEP_TX_RNA_EDIT) ||
         !leaf->cds || !leaf->reference_cds || !s->reference_protein_known ||
-        leaf->cds_length != seq->cds_length[tx] || leaf->cds_length % 3u ||
+        leaf->cds_length % 3u ||
         !conditional_reference_is_closed(leaf) ||
-        !conditional_contributors_are_cds_substitutions(leaf)) {
+        !conditional_contributors_are_cds_edits(leaf)) {
         leaf->path_status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
         leaf->path_reason = DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT;
         return;
@@ -1398,18 +1720,19 @@ static void conditional_prediction(duckvep_haplotype_stream_t *s,
     end = seq->peptide_edit_offset[tx + 1u];
     table = seq->codon_table ? (duckvep_codon_table_t)seq->codon_table[tx] :
         DUCKVEP_CODON_TABLE_STANDARD;
-    if (offset > seq->cds_bytes_len || leaf->cds_length > seq->cds_bytes_len - offset ||
+    if (offset > seq->cds_bytes_len || seq->cds_length[tx] > seq->cds_bytes_len - offset ||
         begin >= end || end > seq->peptide_edit_count) {
         leaf->path_status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
         leaf->path_reason = DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT;
         return;
     }
-    status = duckvep_haplotype_conditional_peptide(leaf->reference_cds, leaf->cds,
-        leaf->cds_length, table, seq->peptide_edit_position1 + begin,
-        seq->peptide_edit_alt + begin, seq->peptide_edit_code + begin, end - begin,
-        (flags & (DUCKVEP_TX_CDS_START_NF | DUCKVEP_TX_CDS_END_NF)) == 0u,
-        b->prediction_protein, b->prediction_protein_capacity, &prediction_length,
-        &first_stop);
+    status = duckvep_haplotype_conditional_lift(leaf->reference_cds, seq->cds_length[tx],
+            leaf->cds, leaf->cds_length, b->edits, leaf->edit_count,
+            s->carriers.model->strand[tx], table, seq->peptide_edit_position1 + begin,
+            seq->peptide_edit_alt + begin, seq->peptide_edit_code + begin, end - begin,
+            (flags & (DUCKVEP_TX_CDS_START_NF | DUCKVEP_TX_CDS_END_NF)) == 0u,
+            b->prediction_protein, b->prediction_protein_capacity, &prediction_length,
+            &first_stop);
     if (status != DUCKVEP_HAPLOTYPE_OK) {
         leaf->path_status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
         leaf->path_reason = DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT;
@@ -1430,8 +1753,8 @@ static void conditional_prediction(duckvep_haplotype_stream_t *s,
     leaf->nmd_junction_position1 = 0u;
 }
 
-/* raw_called: every retained source-record event of the path was pushed as
- * CALLED alone, before private REF-replay evidence was folded. */
+/* raw_called: retained source events have only CALLED or private REF replay
+ * evidence before folding. Original-call qualification is checked per carrier. */
 static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf,
     int raw_called) {
     const duckvep_haplotype_stream_buffers_t *b = &s->buffers;
@@ -1444,7 +1767,8 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
      * found more than one placement is never re-read as a contradiction of its literal spans. */
     if (!raw && !leaf->cds && leaf->edit_count) {
         sort_edits_descending(b->edits, b->edit_event_ids, leaf->edit_count, NULL);
-        if (relation != DUCKVEP_REASON_CONTRADICTORY_EDITS) {
+        if (relation != DUCKVEP_REASON_CONTRADICTORY_EDITS &&
+            leaf->path_reason != DUCKVEP_REASON_REFERENCE_MISMATCH) {
             relation = edit_relation(b->edits, leaf->edit_count);
             if (relation == DUCKVEP_REASON_CONTRADICTORY_EDITS && leaf->path_reason == DUCKVEP_REASON_OVERLAPPING_EDITS)
                 relation = DUCKVEP_REASON_OVERLAPPING_EDITS;
@@ -1593,6 +1917,26 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
                 leaf->path_reason = DUCKVEP_REASON_NMD_GEOMETRY_UNAVAILABLE;
         }
     }
+    /* A supplied legacy CDS retains positional UTR classification. Nonempty
+     * programmes or withheld CDSs require conditional RNA qualification. */
+    if (noncoding == 1 && ((s->rna.presence && s->rna.presence[tx] > 1u) ||
+        (s->carriers.model->flags && (s->carriers.model->flags[tx] & DUCKVEP_TX_RNA_EDIT) &&
+         (!s->sequences->cds_length || !s->sequences->cds_length[tx])))) {
+        int called = raw_called;
+        for (size_t i = 0u; i < leaf->contributor_count; i++)
+            called &= leaf->contributors[i].evidence_flags == DUCKVEP_CARRIER_CALLED;
+        int supported = !rna_length_changing && called &&
+            !leaf->ordered_replacements && !leaf->joint_edits &&
+            (leaf->sequence_status == DUCKVEP_HAPLOTYPE_OK ||
+             (leaf->sequence_status == DUCKVEP_HAPLOTYPE_INVALID_ARG && !leaf->cds)) &&
+            conditional_rna_prediction(s, leaf, rna_edits);
+        if (!supported && leaf->path_status == DUCKVEP_PREDICTION_PREDICTED) {
+            leaf->path_status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
+            leaf->path_reason = DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT;
+            leaf->haplotype_so_mask = 0u;
+            leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_UNKNOWN;
+        }
+    }
     leaf->prediction_status = leaf->path_status;
     leaf->prediction_reason = leaf->path_reason;
     uint32_t id = leaf->carriers.first_call;
@@ -1621,18 +1965,19 @@ void duckvep_haplotype_carrier_prediction(const duckvep_carriers_t *carriers,
         *status = DUCKVEP_PREDICTION_INCOMPLETE_INPUT;
         *reason = DUCKVEP_REASON_CROSS_PS_UNRESOLVED;
     }
-    /* A raw file lane is one observed haplotype only when both lanes of the
-     * sample end on this same path and every call routed to either lane was a
-     * complete diploid homozygous ALT; then the two copies are this sequence
-     * whatever the phase. Otherwise lane order is compatibility, not cis proof. */
+    /* One complete original heterozygous record identifies both real lanes;
+     * homozygous background cannot change the pair. Require its sibling lane
+     * and qualify independently of other samples sharing the leaf. */
     if (leaf->contributor_count && leaf->contributors[0].source.source_record &&
-        leaf->path_status == DUCKVEP_PREDICTION_PREDICTED) {
+        (leaf->path_status == DUCKVEP_PREDICTION_PREDICTED ||
+         leaf->path_status == DUCKVEP_PREDICTION_CONDITIONAL_RNA)) {
         duckvep_carrier_key_t other = call->key;
         other.lane = (uint16_t)(3u - call->key.lane);
         const duckvep_carrier_call_t *sibling = call->key.ploidy == 2u
             ? duckvep_carriers_find_call(carriers, call, &other) : NULL;
-        if (call->key.copy_unproven || !sibling || sibling->leaf != call->leaf ||
-            sibling->key.copy_unproven) {
+        if (call->key.copy_unproven || !sibling || !sibling->leaf ||
+            sibling->key.copy_unproven || sibling->copy_has_het != call->copy_has_het ||
+            (call->copy_has_het && sibling->copy_het_record != call->copy_het_record)) {
             *status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
             *reason = DUCKVEP_REASON_NON_STRICT_PHASE_POLICY;
         }
@@ -1695,8 +2040,9 @@ static int island_relation(const uint8_t *ref, size_t length, const duckvep_hapl
 
 /* Reference-coordinate composition for intersecting literal CDS islands.
  * joint_alt holds substituted bases; joint_assigned marks bit 0 substituted,
- * bit 1 deleted, bit 2 an insertion before that base and bit 3 a base that
- * shares an island with the previous base. Islands arrive in
+ * bit 1 consumed, bit 2 an insertion or opaque replacement payload before that
+ * base and bit 3 a base that shares an island with the previous base. Opaque
+ * replacements may coincide exactly, never acquire interior base ancestry. Islands arrive in
  * descending CDS order. Storage belongs to the stream caller; ingestion owns
  * ordering and identity. */
 static duckvep_haplotype_stream_status_t strict_literal_union(
@@ -1707,7 +2053,6 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
         leaf->evidence_flags != DUCKVEP_CARRIER_CALLED || leaf->contributor_count < 2u ||
         !b->joint_edits || transcript_domain(s, tx) != DUCKVEP_REASON_SUPPORTED_DOMAIN)
         return DUCKVEP_HAPLOTYPE_STREAM_OK;
-    uint32_t exon = UINT32_MAX;
     for (size_t i = 0u; i < leaf->contributor_count; i++) {
         const duckvep_haplotype_source_t *a = &b->contributors[i].source;
         duckvep_coding_projection_t first, last;
@@ -1717,9 +2062,8 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
             b->contributors[i].projection_status != DUCKVEP_CDS_EDIT_OK ||
             !duckvep_project_coding_base(m, s->exons, tx, (uint32_t)a->pos1, &first) ||
             !duckvep_project_coding_base(m, s->exons, tx, (uint32_t)(a->pos1 + a->ref_len - 1u), &last) ||
-            first.exon_idx != last.exon_idx || (exon != UINT32_MAX && exon != first.exon_idx))
+            first.exon_idx != last.exon_idx)
             return DUCKVEP_HAPLOTYPE_STREAM_OK;
-        exon = first.exon_idx;
     }
     uint32_t id = leaf->carriers.first_call;
     for (uint32_t i = 0u; i < leaf->carriers.call_count; i++) {
@@ -1736,25 +2080,79 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
         return fail(s, DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL);
     const uint8_t *reference = s->sequences->cds_bytes + (size_t)offset;
     const int8_t strand = m->strand[tx];
-    int relation = UNION_COMPATIBLE;
+    int relation = UNION_COMPATIBLE, check_full_ref = 0;
     uint32_t widest = 0u;
+    if (!b->edit_source_index || !b->edit_source_cdna || !b->edit_source_exon)
+        return fail(s, DUCKVEP_HAPLOTYPE_STREAM_EDIT_FULL);
+    for (size_t i = 0u; i < leaf->edit_count; i++) {
+        size_t c = 0u;
+        while (c < leaf->contributor_count &&
+               b->contributors[c].source.event_id != b->edit_event_ids[i]) c++;
+        if (c == leaf->contributor_count) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INTERNAL_ERROR);
+        const duckvep_haplotype_source_t *a = &b->contributors[c].source;
+        duckvep_coding_projection_t first, last;
+        uint32_t first_pos = (uint32_t)(strand > 0 ? a->pos1 : a->pos1 + a->ref_len - 1u);
+        uint32_t last_pos = (uint32_t)(strand > 0 ? a->pos1 + a->ref_len - 1u : a->pos1);
+        if (!duckvep_project_coding_base(m, s->exons, tx, first_pos, &first) ||
+            !duckvep_project_coding_base(m, s->exons, tx, last_pos, &last) ||
+            first.exon_idx != last.exon_idx || last.cdna_pos - first.cdna_pos != a->ref_len - 1u)
+            return DUCKVEP_HAPLOTYPE_STREAM_OK;
+        b->edit_source_index[i] = c;
+        b->edit_source_cdna[i] = first.cdna_pos;
+        b->edit_source_exon[i] = first.exon_idx;
+    }
     for (size_t i = 0u; i < leaf->edit_count; i++) {
         const duckvep_haplotype_edit_t *e = &b->edits[i];
         if (!e->cds_start || e->cds_start - 1u > length || e->ref_len > length - (e->cds_start - 1u))
             return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
-        /* A delins island and an insertion at the CDS end have no reference-indexed state. */
-        if ((e->ref_len && e->alt_len && e->ref_len != e->alt_len) ||
-            (!e->ref_len && e->cds_start - 1u == length))
-            return DUCKVEP_HAPLOTYPE_STREAM_OK;
+        check_full_ref |= (e->ref_len && e->alt_len && e->ref_len != e->alt_len) ||
+            (!e->ref_len && e->cds_start - 1u == length);
         if (e->ref_len > widest) widest = e->ref_len;
+    }
+    /* Opaque replacements and terminal gaps retain their original REF context, including padding. */
+    if (check_full_ref) for (size_t i = 0u; i < leaf->contributor_count; i++) {
+        const duckvep_haplotype_contributor_t *c = &b->contributors[i];
+        const duckvep_haplotype_source_t *a = &c->source;
+        duckvep_coding_projection_t start;
+        uint32_t pos = strand > 0 ? (uint32_t)a->pos1 : (uint32_t)(a->pos1 + a->ref_len - 1u);
+        if (!duckvep_project_coding_base(m, s->exons, tx, pos, &start) ||
+            !start.cds_pos || start.cds_pos - 1u > length || a->ref_len > length - (start.cds_pos - 1u))
+            return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
+        for (uint32_t j = 0u; j < a->ref_len; j++) {
+            uint8_t base = strand > 0 ? a->ref[j] :
+                (uint8_t)duckvep_dna_complement((char)a->ref[a->ref_len - 1u - j]);
+            if ((reference[start.cds_pos - 1u + j] & 0xDFu) != (base & 0xDFu)) {
+                leaf->sequence_status = DUCKVEP_HAPLOTYPE_REF_MISMATCH;
+                leaf->path_reason = DUCKVEP_REASON_REFERENCE_MISMATCH;
+                return DUCKVEP_HAPLOTYPE_STREAM_OK;
+            }
+        }
     }
     /* Pairs are checked only inside the widest island's reach, and a repeat of the preceding
      * island has that island's relations, so duplicate sources stay linear. */
     for (size_t i = 0u; i < leaf->edit_count; i++) {
         const duckvep_haplotype_edit_t *e = &b->edits[i];
-        if (i && same_island(e, &b->edits[i - 1u], strand)) continue;
-        for (size_t j = i + 1u; j < leaf->edit_count && b->edits[j].cds_start + widest >= e->cds_start; j++) {
-            int r = island_relation(reference, length, e, &b->edits[j], strand);
+        if (i && same_island(e, &b->edits[i - 1u], strand) &&
+            b->edit_source_exon[i] == b->edit_source_exon[i - 1u]) continue;
+        for (size_t j = i + 1u; j < leaf->edit_count && (uint64_t)b->edits[j].cds_start + widest >= e->cds_start; j++) {
+            const duckvep_haplotype_edit_t *other = &b->edits[j];
+            int r = same_island(e, other, strand) &&
+                b->edit_source_exon[i] != b->edit_source_exon[j] ? UNION_AMBIGUOUS :
+                island_relation(reference, length, e, other, strand);
+            const duckvep_haplotype_edit_t *replacement = e->ref_len ? e : other;
+            const duckvep_haplotype_edit_t *insertion = e->ref_len ? other : e;
+            size_t ri = e->ref_len ? i : j, ii = e->ref_len ? j : i;
+            size_t site = replacement->cds_start - 1u;
+            if (r == UNION_AMBIGUOUS && replacement->ref_len && replacement->alt_len &&
+                replacement->ref_len != replacement->alt_len && !insertion->ref_len &&
+                insertion->alt_len && insertion->cds_start == replacement->cds_start &&
+                site && site < length && b->edit_source_exon[ri] == b->edit_source_exon[ii] &&
+                b->edit_source_cdna[ii] +
+                    b->contributors[b->edit_source_index[ii]].source.ref_len == b->edit_source_cdna[ri] &&
+                island_base(insertion, insertion->alt, insertion->alt_len, 0u, strand) !=
+                    (reference[site] & 0xDFu) &&
+                island_base(insertion, insertion->alt, insertion->alt_len, insertion->alt_len - 1u, strand) !=
+                    (reference[site - 1u] & 0xDFu)) r = UNION_COMPATIBLE;
             if (r > relation) relation = r;
         }
     }
@@ -1774,13 +2172,14 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
     for (size_t i = 0u; i < leaf->edit_count; i++) {
         const duckvep_haplotype_edit_t *e = &b->edits[i];
         size_t start0 = (size_t)e->cds_start - 1u;
-        if (!e->ref_len) { b->joint_assigned[start0] |= 4u; continue; }
+        if (start0 < length && e->alt_len && e->ref_len != e->alt_len) b->joint_assigned[start0] |= 4u;
+        if (!e->ref_len) continue;
         for (uint32_t j = 0u; j < e->ref_len; j++) {
             size_t at = start0 + j;
             if (j) b->joint_assigned[at] |= 8u;
             uint8_t r = island_base(e, e->ref, e->ref_len, j, strand);
             mismatch |= (reference[at] & 0xDFu) != r;
-            if (!e->alt_len) { b->joint_assigned[at] |= 2u; continue; }
+            if (e->ref_len != e->alt_len) { b->joint_assigned[at] |= 2u; continue; }
             uint8_t v = island_base(e, e->alt, e->alt_len, j, strand);
             if (r == v) continue;
             conflict |= (b->joint_assigned[at] & 1u) && b->joint_alt[at] != v;
@@ -1803,7 +2202,8 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
     for (size_t at = 0u; at <= length; at++) {
         size_t group = k;
         while (group && b->edits[group - 1u].cds_start - 1u == at) group--;
-        int touched = at < length && (b->joint_assigned[at] & 4u);
+        /* The terminal interbase site is represented by its edit group, not a reference byte. */
+        int touched = at < length ? (b->joint_assigned[at] & 4u) != 0u : group < k;
         for (int item = 0; item < 2; item++) {
             if (item) touched = at < length && (b->joint_assigned[at] & 3u);
             int joined = item && touched && (b->joint_assigned[at] & 12u);
@@ -1819,14 +2219,17 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
                 open = 0;
             }
             if (touched && !open) { open = 1; start = end = at; alt_start = out; }
-            if (at == length) break;
+            if (item && at == length) break;
             if (!item) {
-                for (size_t i = group; touched && i < k; i++) {
-                    const duckvep_haplotype_edit_t *e = &b->edits[i];
-                    if (e->ref_len) continue;
-                    if (e->alt_len > b->cds_capacity - out) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL);
-                    for (uint32_t j = 0u; j < e->alt_len; j++) b->cds[out++] = island_base(e, e->alt, e->alt_len, j, strand);
-                    break;
+                for (unsigned kind = 0u; kind < 2u; kind++) {
+                    for (size_t i = group; touched && i < k; i++) {
+                        const duckvep_haplotype_edit_t *e = &b->edits[i];
+                        if (!e->alt_len || e->ref_len == e->alt_len || (e->ref_len != 0u) != (kind != 0u)) continue;
+                        if (e->alt_len > b->cds_capacity - out) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL);
+                        for (uint32_t j = 0u; j < e->alt_len; j++)
+                            b->cds[out++] = island_base(e, e->alt, e->alt_len, j, strand);
+                        break;
+                    }
                 }
                 continue;
             }
@@ -1861,19 +2264,21 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
         displaced |= (uint8_t)intersects;
     }
     /* An island is post-stop when its own site in the edited CDS follows the first stop codon. */
-    for (size_t at = 0u, alt = 0u, k = leaf->edit_count; first_stop && at < length; at++) {
-        size_t group = k, inserted = 0u;
+    for (size_t at = 0u, alt = 0u, k = leaf->edit_count; first_stop && at <= length; at++) {
+        size_t group = k, inserted = 0u, replaced = 0u;
         while (group && b->edits[group - 1u].cds_start - 1u == at) group--;
         for (int item = 0; item < 2; item++)
             for (size_t i = group; i < k; i++) {
                 if (!b->edits[i].ref_len != !item) continue;
                 if (!item) inserted = b->edits[i].alt_len;
+                else if (b->edits[i].ref_len != b->edits[i].alt_len)
+                    replaced = b->edits[i].alt_len;
                 if (alt + (item ? inserted : 0u) < first_stop * 3u) continue;
                 for (size_t c = 0u; c < leaf->contributor_count; c++)
                     if (b->contributors[c].source.event_id == b->edit_event_ids[i])
                         b->contributors[c].post_stop_edits++;
             }
-        alt += inserted + !(b->joint_assigned[at] & 2u);
+        if (at < length) alt += inserted + replaced + !(b->joint_assigned[at] & 2u);
         k = group;
     }
     for (size_t i = 0u; i < leaf->edit_count / 2u; i++) {
@@ -1882,6 +2287,12 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
         uint64_t event = b->edit_event_ids[i];
         b->edits[i] = b->edits[j]; b->edits[j] = edit;
         b->edit_event_ids[i] = b->edit_event_ids[j]; b->edit_event_ids[j] = event;
+        size_t source = b->edit_source_index[i];
+        b->edit_source_index[i] = b->edit_source_index[j]; b->edit_source_index[j] = source;
+        uint64_t cdna = b->edit_source_cdna[i];
+        b->edit_source_cdna[i] = b->edit_source_cdna[j]; b->edit_source_cdna[j] = cdna;
+        uint32_t exon = b->edit_source_exon[i];
+        b->edit_source_exon[i] = b->edit_source_exon[j]; b->edit_source_exon[j] = exon;
     }
     leaf->sequence_status = DUCKVEP_HAPLOTYPE_OK;
     leaf->joint_edits = b->joint_edits; leaf->joint_edit_count = count;
@@ -1927,7 +2338,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_next(
         const duckvep_haplotype_projection_t *p = e ? find_projection(s, e, tx) : NULL;
         if (!p) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INTERNAL_ERROR);
         uint8_t evidence = b->leaf_events[i].evidence_flags;
-        raw_called &= evidence == DUCKVEP_CARRIER_CALLED;
+        raw_called &= evidence == DUCKVEP_CARRIER_CALLED || evidence == DUCKVEP_CARRIER_REFERENCE_REPLAY;
         if (!i) raw_records = e->source.source_record;
         if (raw_records != e->source.source_record)
             return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);

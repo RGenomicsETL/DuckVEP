@@ -1,0 +1,120 @@
+require duckvep
+
+# A padded stop assertion in a 420-base intronless molecule retains both exceptions.
+statement ok
+SELECT * FROM duckvep_model_load('overlap_nmd_long',
+ 'SELECT i::UINTEGER seq_region FROM range(2) t(i)',
+ 'SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,1001::UBIGINT transcript_start,1420::UBIGINT transcript_end,(1-2*i)::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,1001::UBIGINT cds_start,1420::UBIGINT cds_end,(''ATGAAAGCT''||repeat(''CTG'',136)||''TAA'')::BLOB cds_sequence,1::UTINYINT codon_table FROM range(2) t(i)',
+ 'SELECT i::UINTEGER transcript_index,1001::UBIGINT exon_start,1420::UBIGINT exon_end,1::UBIGINT exon_cdna_start,420::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase FROM range(2) t(i)')
+
+statement ok
+CREATE TABLE ong_long_calls AS SELECT (i*10+k)::INTEGER event_index,i::UINTEGER seq_region,
+ (CASE WHEN i=1 THEN 1412 ELSE 1000+CASE WHEN k=2 THEN 6 ELSE 7 END END)::INTEGER AS "position",
+ (CASE WHEN k=2 THEN 'AGCT' WHEN i=1 THEN 'AGC' ELSE 'GCT' END) reference,
+ (CASE WHEN k=2 THEN CASE WHEN i=1 THEN 'TTAT' ELSE 'ATAA' END WHEN i=1 THEN 'TTA' ELSE 'TAA' END) alternate,
+ 1 alt_index,i::UINTEGER transcript_index,0 sample_index,[0,1] alleles,[false,true] phase_before,77::BIGINT phase_set
+ FROM range(2) t(i) CROSS JOIN range(1,4) s(k)
+
+query IIII
+SELECT bool_and(nmd_prediction='escape'),bool_and(nmd_stop_position=9),
+ bool_and(nmd_exceptions='start_proximal,long_exon'),
+ bool_and(cds='ATGAAATAA'||repeat('CTG',136)||'TAA')
+ FROM duckvep_haplotypes('SELECT * FROM ong_long_calls','overlap_nmd_long',phase_policy:='strict',hgvs:=true)
+----
+true	true	true	true
+
+# Each transcript has 90 coding bases, with a junction 49, 50, or 51 bases after the new stop.
+# The second triplet repeats the experiment with an overlapping three-base insertion in exon 1.
+statement ok
+CREATE TABLE ong_tx AS SELECT i::UINTEGER transcript_index,i::UINTEGER seq_region,
+ (i % 6 >= 3) AS growing, (i / 6)::INTEGER AS reverse,
+ (58 + i % 3 - CASE WHEN i % 6 >= 3 THEN 3 ELSE 0 END)::UBIGINT AS first_length
+ FROM range(12) t(i)
+
+statement ok
+SELECT * FROM duckvep_model_load('overlap_nmd_geometry',
+ 'SELECT seq_region FROM ong_tx',
+ 'SELECT transcript_index,seq_region,1001::UBIGINT transcript_start, (CASE WHEN reverse=1 THEN 2000+first_length ELSE 2090-first_length END)::UBIGINT transcript_end, (CASE WHEN reverse=1 THEN -1 ELSE 1 END)::TINYINT strand, 0::UINTEGER gene_index,3::UBIGINT transcript_flags,(CASE WHEN reverse=1 THEN 1001 ELSE 1001 END)::UBIGINT cds_start,(CASE WHEN reverse=1 THEN 2000+first_length ELSE 2090-first_length END)::UBIGINT cds_end,(''ATGAAAGCTGAA''||repeat(''CTG'',25)||''TAA'')::BLOB cds_sequence,1::UTINYINT codon_table FROM ong_tx',
+ 'SELECT transcript_index, (CASE WHEN reverse=1 THEN 2001 ELSE 1001 END)::UBIGINT exon_start,(CASE WHEN reverse=1 THEN 2000+first_length ELSE 1000+first_length END)::UBIGINT exon_end,1::UBIGINT exon_cdna_start,first_length exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase FROM ong_tx UNION ALL SELECT transcript_index, (CASE WHEN reverse=1 THEN 1001 ELSE 2001 END)::UBIGINT,(CASE WHEN reverse=1 THEN 1090-first_length ELSE 2090-first_length END)::UBIGINT,(first_length+1)::UBIGINT,90::UBIGINT,0::TINYINT,0::TINYINT FROM ong_tx')
+
+statement ok
+CREATE TABLE ong_calls AS SELECT (transcript_index*10+k)::INTEGER event_index,seq_region,
+ (CASE WHEN reverse=1 THEN 2000+first_length-(CASE WHEN k=1 THEN 8 WHEN k=2 THEN 8 WHEN k=3 THEN 8 WHEN k=4 THEN 9 ELSE 9 END) ELSE 1000+(CASE WHEN k=1 THEN 7 WHEN k=2 THEN 6 WHEN k=3 THEN 7 WHEN k=4 THEN 10 ELSE 9 END) END)::INTEGER AS "position",
+ CASE WHEN reverse=1 THEN CASE k WHEN 1 THEN 'AGC' WHEN 2 THEN 'AGCT' WHEN 3 THEN 'AGC' WHEN 4 THEN 'C' ELSE 'CA' END ELSE CASE k WHEN 1 THEN 'GCT' WHEN 2 THEN 'AGCT' WHEN 3 THEN 'GCT' WHEN 4 THEN 'G' ELSE 'TG' END END reference,
+ CASE WHEN reverse=1 THEN CASE k WHEN 1 THEN 'TTA' WHEN 2 THEN 'TTAT' WHEN 3 THEN 'TTA' WHEN 4 THEN 'GGGC' ELSE 'GGGCA' END ELSE CASE k WHEN 1 THEN 'TAA' WHEN 2 THEN 'ATAA' WHEN 3 THEN 'TAA' WHEN 4 THEN 'GCCC' ELSE 'TGCCC' END END alternate,
+ 1 alt_index,transcript_index,0 sample_index,[0,1] alleles,[false,true] phase_before,77::BIGINT phase_set
+ FROM ong_tx CROSS JOIN range(1,6) t(k) WHERE k<=3 OR growing
+
+# A second length-changing source in the other exon removes the common-exon proof.
+statement ok
+CREATE TABLE ong_bad_calls AS SELECT * FROM ong_calls WHERE transcript_index IN (3,9)
+ UNION ALL SELECT (1000+transcript_index)::INTEGER,seq_region,
+ (CASE WHEN reverse=1 THEN 1035 ELSE 2001 END)::INTEGER,
+ (CASE WHEN reverse=1 THEN 'A' ELSE 'T' END),
+ (CASE WHEN reverse=1 THEN 'TTTA' ELSE 'TAAA' END),
+ 1,transcript_index,0,[0,1],[false,true],77::BIGINT
+ FROM ong_tx WHERE transcript_index IN (3,9)
+
+# The insertion is anchored at the last original base of exon 1. Its padded alias
+# still belongs to exon 1 although its normalized site is the exon boundary.
+statement ok
+CREATE TABLE ong_edge_calls AS SELECT * FROM ong_calls WHERE transcript_index IN (3,9) AND event_index % 10 <= 3
+ UNION ALL SELECT (transcript_index*10+k)::INTEGER,seq_region,
+ (CASE WHEN reverse=1 THEN 2001 ELSE 1055-(k-4) END)::INTEGER,
+ CASE WHEN reverse=1 THEN CASE WHEN k=4 THEN 'G' ELSE 'GC' END ELSE CASE WHEN k=4 THEN 'C' ELSE 'GC' END END,
+ CASE WHEN reverse=1 THEN CASE WHEN k=4 THEN 'GGGG' ELSE 'GGGGC' END ELSE CASE WHEN k=4 THEN 'CCCC' ELSE 'GCCCC' END END,
+ 1,transcript_index,0,[0,1],[false,true],77::BIGINT
+ FROM ong_tx CROSS JOIN range(4,6) t(k) WHERE transcript_index IN (3,9)
+
+query IIIIII
+SELECT h.contributors[1].event_index // 10,h.nmd_prediction,h.nmd_stop_position,h.nmd_junction_position,
+ h.cds=('ATGAAATAAGAA'||repeat('CTG',14)||'CCCCTG'||repeat('CTG',10)||'TAA'),length(h.cds)-h.nmd_junction_position
+ FROM duckvep_haplotypes('SELECT * FROM ong_edge_calls ORDER BY event_index DESC','overlap_nmd_geometry',phase_policy:='strict',hgvs:=true) h ORDER BY 1
+----
+3	escape	9	58	true	35
+9	escape	9	58	true	35
+
+query I
+SELECT count(*) FROM duckvep_haplotypes('SELECT * FROM ong_calls ORDER BY event_index DESC','overlap_nmd_geometry',phase_policy:='strict',hgvs:=true)
+----
+12
+
+query IIIIIIIIII
+SELECT h.contributors[1].event_index // 10,h.prediction_status,h.nmd_prediction,
+ h.nmd_stop_position,h.nmd_junction_position IS NULL,length(h.cds),h.nmd_exceptions='start_proximal',
+ h.cds=('ATGAAATAAGCCCAA'||repeat('CTG',14)||'CTAAAG'||repeat('CTG',10)||'TAA'),
+ length(h.cds)-58, length(h.contributors)
+ FROM duckvep_haplotypes('SELECT * FROM ong_bad_calls ORDER BY event_index DESC','overlap_nmd_geometry',phase_policy:='strict',hgvs:=true) h ORDER BY 1
+----
+3	predicted	unknown	9	true	96	true	true	38	6
+9	predicted	unknown	9	true	96	true	true	38	6
+
+# Post-stop aliases that extend exon 1 also move the junction; stop sources retain attribution.
+query I
+SELECT bool_and(list_sort(h.nmd_contributors)=CASE WHEN tx % 6 >= 3
+ THEN [tx*10+1,tx*10+2,tx*10+3,tx*10+4,tx*10+5]
+ ELSE [tx*10+1,tx*10+2,tx*10+3] END)
+ FROM (SELECT *,contributors[1].event_index // 10 tx FROM duckvep_haplotypes(
+ 'SELECT * FROM ong_calls ORDER BY event_index DESC','overlap_nmd_geometry',phase_policy:='strict',hgvs:=true)) h
+----
+true
+
+# The complete transcript is coding, so CDS bytes are also exact final spliced RNA/cDNA bytes.
+query IIIIIIIIII
+SELECT h.contributors[1].event_index // 10,h.prediction_status,h.nmd_prediction,h.nmd_stop_position,h.nmd_junction_position,length(h.cds),length(h.protein),
+ h.nmd_exceptions='start_proximal',length(h.cds)-h.nmd_junction_position,
+ h.cds=(CASE WHEN h.contributors[1].event_index // 10 % 6 >= 3 THEN 'ATGAAATAAGCCCAA' ELSE 'ATGAAATAAGAA' END || repeat('CTG',25) || 'TAA')
+ FROM duckvep_haplotypes('SELECT * FROM ong_calls ORDER BY event_index DESC','overlap_nmd_geometry',phase_policy:='strict',hgvs:=true) h ORDER BY 1
+----
+0	predicted	escape	9	58	90	3	true	32	true
+1	predicted	escape	9	59	90	3	true	31	true
+2	predicted	trigger	9	60	90	3	true	30	true
+3	predicted	escape	9	58	93	3	true	35	true
+4	predicted	escape	9	59	93	3	true	34	true
+5	predicted	trigger	9	60	93	3	true	33	true
+6	predicted	escape	9	58	90	3	true	32	true
+7	predicted	escape	9	59	90	3	true	31	true
+8	predicted	trigger	9	60	90	3	true	30	true
+9	predicted	escape	9	58	93	3	true	35	true
+10	predicted	escape	9	59	93	3	true	34	true
+11	predicted	trigger	9	60	93	3	true	33	true

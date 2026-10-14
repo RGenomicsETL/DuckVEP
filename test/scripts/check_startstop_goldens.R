@@ -145,8 +145,6 @@ declared <- list(
   stop_lost_terminator_deleted = d(0L, 'inframe_deletion,stop_lost', 'in_frame_edit'),
   stop_lost_last_codon_and_terminator_deleted = d(0L, 'inframe_deletion,stop_lost', 'in_frame_edit'),
   stop_lost_insertion_inside = d(0L, 'inframe_insertion,stop_lost', 'in_frame_edit'),
-  stop_lost_and_missense = d(0L, 'missense_variant,stop_lost', 'lower'),
-  stop_retained_plus_synonymous = d(0L, 'stop_retained_variant,synonymous_variant', 'lower'),
   stop_retained_plus_missense = d(0L, 'missense_variant,stop_retained_variant', 'retained_added'),
   stop_retained_plus_inframe_insertion = d(0L, 'inframe_insertion,stop_retained_variant', 'retained_added'),
   stop_retained_after_frame_pair = d(0L, 'missense_variant,protein_altering_variant,stop_retained_variant', 'retained_added'),
@@ -224,7 +222,7 @@ expected <- data.frame(case = gold$case, lane = gold$lane, csq_so_terms = unname
     declared_divergence = declared_text, stringsAsFactors = FALSE)
 lines <- capture.output(write.table(expected, sep = '\t', row.names = FALSE, quote = FALSE, na = '.'))
 path <- paste0(root, 'startstop_csq_expected.tsv')
-if (nzchar(Sys.getenv('HAPLOTYPE_CSQ_REFRESH'))) writeLines(lines, path)
+if (nzchar(Sys.getenv('HAPLOTYPE_EXPECTED_REFRESH'))) writeLines(lines, path)
 stopifnot(identical(readLines(path), lines))
 decided <- gold$classifier_slice %in% 4:5 & gold$so_terms != ''
 stopifnot(sum(decided) > 0L, all(csq_so[decided & !differs] == policy_so[decided & !differs]))

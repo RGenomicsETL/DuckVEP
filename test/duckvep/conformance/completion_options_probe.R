@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-# Study of phase identifiability and current raw/decoded admission, not a new policy.
+# Study of original-call copy identifiability and raw/decoded admission.
 main <- function() {
   extension <- normalizePath(Sys.getenv("DUCKVEP_EXTENSION"), mustWork = TRUE)
   con <- Rduckvep::rduckvep_connect(extension_path = extension)
@@ -64,6 +64,10 @@ main <- function() {
       stopifnot(count == length(unique(pairs)))
     }
     stopifnot(nrow(raw) > 0L, nrow(decoded) > 0L)
+    if (length(heterozygous) <= 1L) {
+      stopifnot(all(raw$prediction_status == "predicted"),
+        identical(paste(sort(rep(raw$cds, raw$carrier_count)), collapse = "/"), unique(pairs)))
+    }
     data.frame(case = name, independent_pairs = length(unique(pairs)),
       native_arrangements = count,
       raw_status = paste(sort(unique(raw$prediction_status)), collapse = ";"),
@@ -73,7 +77,7 @@ main <- function() {
   })
   result <- do.call(rbind, observed)
   stopifnot(identical(result$independent_pairs, c(1L, 1L, 2L)),
-    identical(result$raw_status, c("predicted", "unsupported_context", "unsupported_context")),
+    identical(result$raw_status, c("predicted", "predicted", "unsupported_context")),
     identical(result$decoded_status, c("predicted", "predicted", "incomplete_input")),
     identical(result$hypothetical, c(NA, NA, TRUE)))
   write.csv(result, stdout(), row.names = FALSE)
@@ -89,11 +93,10 @@ main <- function() {
   stopifnot(nrow(effects) == 1L,
     identical(effects$cds, paste0(alternate, collapse = "")),
     identical(effects$protein, "MTA*"),
-    identical(effects$haplotype_consequences[[1L]], "stop_gained"),
+    identical(effects$haplotype_consequences[[1L]], c("stop_gained", "missense_variant")),
     identical(effects$contributor_provenance[[1L]]$role, c("applied", "applied", "post_stop")))
-  message("Subeffect witness: MAAEG* -> MTA*; current terms=stop_gained; ",
-    "roles=applied/applied/post_stop. Ala2Thr is upstream of termination; ",
-    "the Gly5Arg DNA change is downstream and is not a translated subeffect.")
+  message("Subeffect witness: MAAEG* -> MTA*; stop_gained and reached Ala2Thr; ",
+    "roles=applied/applied/post_stop.")
 
   delins_sql <- paste("SELECT event_index,0 seq_region,103 AS position,'GCTGCT' reference,",
     "'AAA' alternate,1 alt_index,0 transcript_index,0 sample_index,[1,1] alleles,",
@@ -104,9 +107,12 @@ main <- function() {
   stopifnot(nrow(single) == 1L, nrow(duplicate) == 1L,
     identical(single$cds, joint), identical(single$protein, "MKEG*"),
     identical(single$prediction_status, "predicted"),
-    identical(duplicate$prediction_status, "unsupported_overlap"))
+    identical(duplicate$prediction_status, "predicted"),
+    identical(duplicate$cds, single$cds), identical(duplicate$protein, single$protein),
+    identical(duplicate$nominal_length_diff, single$nominal_length_diff),
+    identical(as.integer(duplicate$contributor_provenance[[1L]]$event_index), 1:2))
   message("Delins witness: c.4_9delinsAAA gives ", joint,
-    " / MKEG* once; duplicate identical assertions currently yield unsupported_overlap.")
+    " / MKEG*; duplicate identical assertions apply once and retain both sources.")
 }
 
 main()
