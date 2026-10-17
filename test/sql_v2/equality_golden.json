@@ -52260,12 +52260,12 @@
  },
  "haplotypes vt hgvs full-row hash": {
   "rows": [
-   "{\"n\":14,\"total\":145219385519699948891,\"x\":9588493213079606685}"
+   "{\"n\":14,\"total\":132439057424750543103,\"x\":6319694005187778617}"
   ]
  },
  "haplotypes vt hgvs rows": {
   "rows": [
-   "{\"transcript_index\":0,\"hgvsp\":\"p.(=)\",\"hgvsp_status\":\"ok\"}",
+   "{\"transcript_index\":0,\"hgvsp\":\"p.(Ser2=)\",\"hgvsp_status\":\"ok\"}",
    "{\"transcript_index\":1,\"hgvsp\":\"p.(Ser2Thr)\",\"hgvsp_status\":\"ok\"}",
    "{\"transcript_index\":1,\"hgvsp\":\"p.(Ser2Cys)\",\"hgvsp_status\":\"ok\"}",
    "{\"transcript_index\":2,\"hgvsp\":null,\"hgvsp_status\":\"missing_reference\"}",
