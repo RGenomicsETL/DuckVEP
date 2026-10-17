@@ -67,7 +67,7 @@ main <- function() {
   stopifnot(!is.na(opt$seed), !is.na(opt$quota), opt$quota >= 1L, opt$quota <= 32768L %/% 360L)
   root <- normalizePath('.')
   revision <- duckvep_evidence_revision(root)
-  extension <- normalizePath('build/release/duckhts.duckdb_extension')
+  extension <- normalizePath('build/release/duckvep.duckdb_extension')
   binding <- 'diagnostic_unbound'
   if (!is.null(opt$extension_receipt)) {
     duckvep_evidence_assert_checkout(root, revision)

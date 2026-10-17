@@ -215,9 +215,9 @@ Reproduce from a clean source revision with an extension build receipt:
 ```{r reproduce, eval=FALSE, echo=TRUE}
 source("scripts/benchmark_duckvep_projection.R")
 benchmark_duckvep_projection(
-  normalizePath("."), "build/release/duckhts.duckdb_extension",
+  normalizePath("."), "build/release/duckvep.duckdb_extension",
   "benchmarks/data/duckvep_projection.csv",
-  extension_receipt = Sys.getenv("DUCKHTS_EXTENSION_RECEIPT")
+  extension_receipt = Sys.getenv("DUCKVEP_EXTENSION_RECEIPT")
 )
 rmarkdown::render("benchmarks/benchmark_duckvep_projection.Rmd",
   knit_root_dir = normalizePath("."))
@@ -226,7 +226,7 @@ rmarkdown::render("benchmarks/benchmark_duckvep_projection.Rmd",
 For each reported seed and maximum length, record conformance separately:
 
 ```bash
-make test-duckvep-projection ARGS="--seed 173 --random-cases 1000 --max-random-length 10 --extension-receipt $DUCKHTS_EXTENSION_RECEIPT --summary-output benchmarks/data/duckvep_projection_conformance.csv"
+make test-duckvep-projection ARGS="--seed 173 --random-cases 1000 --max-random-length 10 --extension-receipt $DUCKVEP_EXTENSION_RECEIPT --summary-output benchmarks/data/duckvep_projection_conformance.csv"
 ```
 
 `VEP_PREFIX` names the environment matching the checked-in package lock.

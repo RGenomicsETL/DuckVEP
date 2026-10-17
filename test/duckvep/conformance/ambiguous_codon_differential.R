@@ -340,7 +340,7 @@ codon_native_partition <- function(con, events, expected, partition, indel, fast
 main <- function() {
   suppressPackageStartupMessages(library(DBI))
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
-    optparse::make_option('--extension', default = 'build/release/duckhts.duckdb_extension'),
+    optparse::make_option('--extension', default = 'build/release/duckvep.duckdb_extension'),
     optparse::make_option('--evidence-out', dest = 'evidence_out', default = '',
       help = 'Retain a compact complete comparison bundle in a new directory'),
     optparse::make_option('--variant-family', dest = 'variant_family', default = 'snv',

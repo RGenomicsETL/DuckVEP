@@ -54,11 +54,17 @@ main <- function() {
   run('bgzip', file.path(out, 'model.gff3'), 'bgzip')
   run('tabix', c('-p', 'gff', file.path(out, 'model.gff3.gz')), 'tabix')
   libs <- paste(c(file.path(mirrors, 'modules'), file.path(prefix, 'share/ensembl-vep-116.0-0')), collapse = ':')
-  extension <- normalizePath('build/release/duckhts.duckdb_extension')
+  extension <- normalizePath('build/release/duckvep.duckdb_extension')
   con <- DBI::dbConnect(duckdb::duckdb(config = list(allow_unsigned_extensions = 'true')))
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
   q <- function(x) as.character(DBI::dbQuoteString(con, x))
   DBI::dbExecute(con, paste('LOAD', q(extension)))
+  # The source VCF is read with DuckHTS table functions. DuckVEP no longer ships
+  # inside DuckHTS, so the DuckHTS reader extension loads next to it.
+  reader_extension <- Sys.getenv('DUCKVEP_READER_EXT', file.path(
+    Sys.getenv('DUCKHTS_REPO_ROOT', file.path(Sys.getenv('HOME'), 'duckhts')),
+    'build', 'release', 'duckhts.duckdb_extension'))
+  DBI::dbExecute(con, paste('LOAD', q(normalizePath(reader_extension, mustWork = TRUE))))
   DBI::dbExecute(con, 'SET threads=1')
   DBI::dbWriteTable(con, 'grouped_exons', data.frame(spans,
     cs = offsets + 1L, ce = offsets + lengths,

@@ -491,7 +491,7 @@ model_history_row <- function(directory, attestation_bundle = NULL) {
     geometry_sha256 = 'test/duckvep/conformance/haplotype_model_geometry.R',
     comparator_sha256 = 'test/duckvep/conformance/haplotype_observations.R')
   for (name in names(sources)) row[[name]] <- unname(artifact$hashes[[normalizePath(sources[[name]])]])
-  extension <- artifact$hashes[grepl('/duckhts[.]duckdb_extension$', names(artifact$hashes))]
+  extension <- artifact$hashes[grepl('/duckvep[.]duckdb_extension$', names(artifact$hashes))]
   stopifnot(length(extension) == 1L)
   row$extension_sha256 <- unname(extension)
   as.data.frame(row, stringsAsFactors = FALSE)
@@ -544,7 +544,7 @@ main <- function() {
   seed <- opt$seed
   stopifnot(!is.na(opt$max_alignment_cells), opt$max_alignment_cells > 0L)
   revision <- duckvep_evidence_revision(root)
-  extension <- normalizePath('build/release/duckhts.duckdb_extension')
+  extension <- normalizePath('build/release/duckvep.duckdb_extension')
   extension_sha256 <- duckvep_evidence_sha256(extension)
   binding <- 'diagnostic_unbound'
   if (!is.null(opt$extension_receipt)) {
@@ -562,8 +562,8 @@ main <- function() {
     normalizePath(results)), grepl('^[A-Za-z0-9][A-Za-z0-9_.-]*$', basename(out)),
     !file.exists(out))
   out <- file.path(results, basename(out))
-  stopifnot(dir.create(out), file.copy(extension, file.path(out, 'duckhts.duckdb_extension')))
-  extension <- file.path(out, 'duckhts.duckdb_extension')
+  stopifnot(dir.create(out), file.copy(extension, file.path(out, 'duckvep.duckdb_extension')))
+  extension <- file.path(out, 'duckvep.duckdb_extension')
   stopifnot(identical(extension_sha256, duckvep_evidence_sha256(extension)))
   if (!is.null(opt$extension_receipt)) stopifnot(
     file.copy(opt$extension_receipt, file.path(out, 'extension.tsv')))

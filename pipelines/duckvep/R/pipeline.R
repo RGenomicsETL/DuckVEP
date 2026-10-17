@@ -275,7 +275,7 @@ duckvep_targets_build_extension <- function(
     root,
     "build",
     "release",
-    "duckhts.duckdb_extension"
+    "duckvep.duckdb_extension"
   )
   built <- environment$duckvep_evidence_build_extension(
     root,
@@ -512,7 +512,7 @@ duckvep_targets_campaign_args <- function(
 duckvep_targets_extension_paths <- function(extension_bundle) {
   extension <- extension_bundle[endsWith(
     extension_bundle,
-    "duckhts.duckdb_extension"
+    "duckvep.duckdb_extension"
   )]
   receipt <- extension_bundle[endsWith(extension_bundle, "extension.tsv")]
   if (length(extension) != 1L || length(receipt) != 1L) {

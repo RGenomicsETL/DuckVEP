@@ -64,8 +64,8 @@ op <- add_option(
   op,
   "--ext",
   default = Sys.getenv(
-    "DUCKHTS_EXT",
-    file.path(root, "build/release/duckhts.duckdb_extension")
+    "DUCKVEP_EXT",
+    file.path(root, "build/release/duckvep.duckdb_extension")
   )
 )
 op <- add_option(
