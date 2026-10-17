@@ -45,17 +45,17 @@ transcript-variation allele. Unioning independent labels or applying the plugin 
 rebuilt stop position does not reproduce a whole-haplotype upstream method.
 See the [haplotype follow-up](https://github.com/RGenomicsETL/duckhts/issues/92).
 
-Compound HGVS also has unresolved presentation comparisons. In the
+Compound HGVS now names the unchanged residue for cis synonymous substitutions. In the
 [internal-codon differential](test/duckvep/conformance/hgvs_cis_codon_differential.R),
-two cis SNVs changing `AGA` to `CGC` reconstruct the same protein as one MNV.
-The compound path emits `p.(=)`; VEP's original MNV emits `p.Arg2=`.
-Whole-protein equality and equality at a named residue are different assertions.
-The 320 disagreements among 26,352 cis-SNV/MNV comparisons remain failures, not evidence
-that VEP is wrong or permission to merge source identities.
+two cis SNVs changing `AGA` to `CGC` reconstruct the same protein as one MNV, and both the
+compound path and VEP's original MNV name the residue as `p.Arg2=`. Whole-protein `p.(=)`
+is kept only when the composed CDS is restored to the reference or a run of adjacent
+unchanged codons cannot be named as a single residue. The unmodified build reported 320
+cis-SNV/MNV disagreements, all `p.(=)` against a named residue; the fixed build reports 0.
 These counts come from an unsigned, build-unbound local diagnostic outside release
-conformance history. Its untracked receipt is
-`test/duckvep/conformance/results/hgvs_cis_codon_3e62f43d481358/receipt.json`;
-the linked R file is the comparison driver, not a published result.
+conformance history and do not certify compound HGVS. The linked R file is the comparison
+driver, not a published result; the `p.Arg2=` regression case in
+`test/sql/duckvep_haplotypes.test` is the tracked check.
 
 The [retained indel comparison](test/duckvep/conformance/data/ambiguous_indel_translation/summary.csv)
 contains 168,000 original records and 1,344,000 HGVSp comparisons. Independent and

@@ -332,7 +332,7 @@ main <- function() {
   Sys.setenv(DUCKHTSBENCH_REGISTRY = file.path(root, "r/duckhtsbench/inst/benchmark_registry.tsv"))
   paths <- duckhtsbench::duckhts_bench_stage_repository_fixtures(root, "duckvep-haplotypes")
   input <- fixture(paths)
-  extension <- file.path(root, "build/release/duckhts.duckdb_extension")
+  extension <- file.path(root, "build/release/duckvep.duckdb_extension")
   binding <- "diagnostic_unbound"
   if (!options$diagnostic) {
     duckvep_evidence_assert_checkout(root, revision)
