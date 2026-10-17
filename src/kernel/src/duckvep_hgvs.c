@@ -3750,6 +3750,41 @@ duckvep_hgvs_status_t duckvep_hgvs_protein_haplotype_build(
     size_t used = 0u;
     size_t ref_cursor = 0u, alt_cursor = 0u;
     ref_end0 = alt_end0 = 0u;
+    /* A pure-substitution compound whose DNA changed but whose peptide did not
+     * names the unchanged residues (p.Arg2=) rather than collapsing to p.(=).
+     * Any indel, or a CDS restored to the reference, keeps whole-protein
+     * equality. */
+    int name_synonymous = context->cds_changed != 0u && context->length_diff == 0 &&
+        tail.equal_length == tail.ref_length && tail.equal_length == tail.alt_length;
+    for (size_t i = 0u; name_synonymous && i < edit_count; i++) {
+        if (edits[i].ref_len == 0u || edits[i].ref_len != edits[i].alt_len)
+            name_synonymous = 0;
+    }
+    if (name_synonymous) {
+        int single_residue = 1;
+        for (size_t i = 0u; i < block_count; i++) {
+            duckvep_coding_peptide_window_t window;
+            duckvep_hgvs_status_t status;
+            if (!duckvep_coding_context_block_window_open(context, blocks + i, &window))
+                return DUCKVEP_HGVS_INVALID_PROJECTION;
+            status = hgvs_protein_haplotype_push(context, reference, edits, edit_count,
+                transcript_flags, blocks[i], window, operations, operation_capacity, &used);
+            if (status != DUCKVEP_HGVS_OK) return status;
+        }
+        /* Only a single body residue carries the residue-level meaning here; a
+         * run of adjacent unchanged codons (ref_length > 1), a stop, or an
+         * unknown residue keeps whole-protein equality so no spelling-less
+         * concatenation or stop-equality is emitted. */
+        for (size_t i = 0u; i < used; i++) {
+            const duckvep_hgvs_protein_fact_t *fact = &operations[i].fact;
+            if (fact->shape != DUCKVEP_HGVS_PROTEIN_EQUAL || fact->ref_length != 1u ||
+                fact->reference_first == 0u || fact->reference_first == (uint8_t)'*' ||
+                fact->reference_first == (uint8_t)'X') single_residue = 0;
+        }
+        if (used && single_residue)
+            return hgvs_protein_split_runs(operations, used, operation_capacity, operation_count);
+        return DUCKVEP_HGVS_OK;
+    }
     /* A coding block can join a codon-aligned deletion to an edit in the
      * following alternate codon. That physical grouping must not turn an
      * earlier in-frame protein deletion into a later frameshift. Start with
@@ -4512,12 +4547,11 @@ duckvep_hgvs_status_t duckvep_hgvs_protein_haplotype_render(
     if (count > 1u && predicted && !hgvs_writer_char(&writer, '(')) return DUCKVEP_HGVS_OUT_OF_RANGE;
     for (size_t i = 0u; i < count; i++) {
         const duckvep_hgvs_protein_fact_t *fact = &operations[i].fact;
-        if (fact->shape == DUCKVEP_HGVS_PROTEIN_EQUAL ||
-            (i && (fact->context != operations[0].fact.context ||
+        if (i && (fact->context != operations[0].fact.context ||
                 fact->reference.bases != operations[0].fact.reference.bases ||
                 fact->reference.length != operations[0].fact.reference.length ||
                 fact->compatibility_profile != operations[0].fact.compatibility_profile ||
-                hgvs_protein_operations_touch(&operations[i - 1u].fact, fact)))) {
+                hgvs_protein_operations_touch(&operations[i - 1u].fact, fact))) {
             if (buffer && capacity) buffer[0] = '\0';
             return DUCKVEP_HGVS_INVALID_ARG;
         }

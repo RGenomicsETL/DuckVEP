@@ -509,6 +509,75 @@ SELECT transcript_index,hgvsp FROM duckvep_haplotypes('SELECT * FROM hap_n_codon
 
 endloop
 
+# Two cis synonymous substitutions (AGA>CGC) keep the protein. The compound path
+# names the unchanged residue, matching the equivalent single MNV, rather than
+# collapsing to whole-protein p.(=).
+query I
+SELECT loaded FROM duckvep_model_load('hap_syn_codon',
+ 'SELECT 0::UINTEGER seq_region',
+ 'SELECT 0::UINTEGER transcript_index,0::UINTEGER seq_region,100::UBIGINT transcript_start,
+  111::UBIGINT transcript_end,1::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,
+  100::UBIGINT cds_start,111::UBIGINT cds_end,''ATGAGAGCCTAA''::BLOB cds_sequence,
+  1::UTINYINT codon_table',
+ 'SELECT 0::UINTEGER transcript_index,100::UBIGINT exon_start,111::UBIGINT exon_end,
+  1::UBIGINT exon_cdna_start,12::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase');
+----
+1
+
+statement ok
+CREATE TABLE hap_syn_codon_calls AS SELECT * FROM (VALUES
+ (1,0,103,'A','C',1,0,0),(2,0,105,'A','C',1,0,0))
+ v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index);
+
+query TTT
+SELECT cds,protein,hgvsp FROM duckvep_haplotypes('SELECT *,[0,1] alleles,[false,true]
+ phase_before,77::BIGINT phase_set FROM hap_syn_codon_calls','hap_syn_codon',
+ phase_policy:='strict',hgvs:=true);
+----
+ATGCGCGCCTAA	MRA*	p.(Arg2=)
+
+statement ok
+DROP TABLE hap_syn_codon_calls;
+
+query I
+SELECT duckvep_model_drop('hap_syn_codon');
+----
+1
+
+# Two cis substitutions (GTA>GCG) in one codon compose to a single missense
+# call, p.(Val2Ala); on their own one is missense and the other synonymous.
+query I
+SELECT loaded FROM duckvep_model_load('hap_mis_codon',
+ 'SELECT 0::UINTEGER seq_region',
+ 'SELECT 0::UINTEGER transcript_index,0::UINTEGER seq_region,100::UBIGINT transcript_start,
+  111::UBIGINT transcript_end,1::TINYINT strand,0::UINTEGER gene_index,3::UBIGINT transcript_flags,
+  100::UBIGINT cds_start,111::UBIGINT cds_end,''ATGGTACCCTAA''::BLOB cds_sequence,
+  1::UTINYINT codon_table',
+ 'SELECT 0::UINTEGER transcript_index,100::UBIGINT exon_start,111::UBIGINT exon_end,
+  1::UBIGINT exon_cdna_start,12::UBIGINT exon_cdna_end,0::TINYINT phase,0::TINYINT end_phase');
+----
+1
+
+statement ok
+CREATE TABLE hap_mis_codon_calls AS SELECT * FROM (VALUES
+ (1,0,104,'T','C',1,0,0),(2,0,105,'A','G',1,0,0))
+ v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index);
+
+query TTT
+SELECT cds,protein,hgvsp FROM duckvep_haplotypes('SELECT *,[0,1] alleles,[false,true]
+ phase_before,77::BIGINT phase_set FROM hap_mis_codon_calls','hap_mis_codon',
+ phase_policy:='strict',hgvs:=true);
+----
+ATGGCGCCCTAA	MAP*	p.(Val2Ala)
+
+statement ok
+DROP TABLE hap_mis_codon_calls;
+
+query I
+SELECT duckvep_model_drop('hap_mis_codon');
+----
+1
+
 statement ok
 CREATE TABLE hap_n_indel_source AS SELECT * FROM (VALUES
  (0,'ATGGCNGCCTAA',4,'G','GGCC'),(1,'ATGAANGCCTAA',4,'A','AGCC'),
