@@ -25,7 +25,7 @@ op <- OptionParser()
 op <- add_option(
   op,
   "--extension",
-  default = file.path(root, "build", "release", "duckhts.duckdb_extension")
+  default = file.path(root, "build", "release", "duckvep.duckdb_extension")
 )
 op <- add_option(
   op,

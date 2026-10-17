@@ -603,13 +603,14 @@ contract for haplotype-resolved or pangenome paths: each model declares its exac
 or path set and sequence hashes; contig aliases and mapping confidence remain explicit
 relations rather than being guessed from chromosome spelling.
 
-Caller preparation may use `duckhts_contig_key(...)` on both an input contig and the model
-region name to construct that explicit relation. The key removes one non-empty leading
-`chr` prefix and normalizes only mitochondrial `M`/`MT` spellings to `MT`; it does not map
-numeric sex chromosomes, accessions, patches, or alternate loci. Callers must reject a
-model-side key collision before joining. The Ensembl model compiler continues to require
-an exact same-name, same-length reference-region match, so a convenience join key cannot
-silently substitute sequence from another assembly or region.
+Caller preparation constructs that explicit relation in SQL, for example by joining on
+`CASE WHEN CHROM IN ('chrM', 'M') THEN 'MT' ELSE regexp_replace(CHROM, '^chr', '') END`.
+That expression removes one non-empty leading `chr` prefix and normalizes only
+mitochondrial `M`/`MT` spellings to `MT`; it does not map numeric sex chromosomes,
+accessions, patches, or alternate loci. Callers must reject a model-side key collision
+before joining. The Ensembl model compiler continues to require an exact same-name,
+same-length reference-region match, so a convenience join key cannot silently substitute
+sequence from another assembly or region.
 
 The transcript query accepts 11 CDS-only columns or the complete 13-column form ending in
 `pre_cds_sequence` and `post_cds_sequence`. The CDS-only form represents unavailable

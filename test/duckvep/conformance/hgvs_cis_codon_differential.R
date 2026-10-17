@@ -192,7 +192,7 @@ cis_codon_controls <- function(actual, records, models, expected) {
 cis_codon_main <- function() {
   suppressPackageStartupMessages({ library(DBI); library(duckdb) })
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
-    optparse::make_option('--extension', default = 'build/release/duckhts.duckdb_extension'),
+    optparse::make_option('--extension', default = 'build/release/duckvep.duckdb_extension'),
     optparse::make_option('--vep-prefix', dest = 'vep_prefix', default = Sys.getenv('VEP_PREFIX')),
     optparse::make_option('--out', default = '')
   )))
@@ -220,7 +220,7 @@ cis_codon_main <- function() {
       full.names = TRUE, pattern = '\\.[ch]$')))
   hashes <- vapply(sources, sha, '')
   extension_hash <- sha(extension)
-  stopifnot(file.copy(extension, file.path(out, 'duckhts.duckdb_extension')))
+  stopifnot(file.copy(extension, file.path(out, 'duckvep.duckdb_extension')))
   command <- function(exe, args, label) {
     status <- system2(exe, shQuote(args), stdout = file.path(out, paste0(label, '.stdout')),
       stderr = file.path(out, paste0(label, '.stderr')))
@@ -270,7 +270,7 @@ cis_codon_main <- function() {
   con <- dbConnect(duckdb(config = list(allow_unsigned_extensions = 'true')))
   on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
   q <- function(x) as.character(dbQuoteString(con, x))
-  dbExecute(con, paste('LOAD', q(file.path(out, 'duckhts.duckdb_extension'))))
+  dbExecute(con, paste('LOAD', q(file.path(out, 'duckvep.duckdb_extension'))))
   dbWriteTable(con, 'models', models)
   for (name in c('mnv', 'snv')) dbWriteTable(con, name, inputs[[name]])
   tx <- paste('SELECT transcript_index::UINTEGER transcript_index,seq_region::UINTEGER seq_region,',
@@ -350,7 +350,7 @@ cis_codon_main <- function() {
     comparisons[c('route', 'threads')], sum)
   write.csv(summary, file.path(out, 'summary.csv'), row.names = FALSE)
   stopifnot(identical(hashes, vapply(sources, sha, '')), sha(extension) == extension_hash,
-    sha(file.path(out, 'duckhts.duckdb_extension')) == extension_hash,
+    sha(file.path(out, 'duckvep.duckdb_extension')) == extension_hash,
     revision == duckvep_evidence_revision('.'))
   for (path in sources) {
     destination <- file.path(out, 'source', path)

@@ -76,7 +76,7 @@ list(
           duckvep_root,
           "build",
           "release",
-          "duckhts.duckdb_extension"
+          "duckvep.duckdb_extension"
         ),
         extension_receipt
       ),

@@ -604,7 +604,7 @@ duckvep_evidence_build_extension <- function(
   allowed_outputs = character()
 ) {
   expected <- normalizePath(
-    file.path(root, "build", "release", "duckhts.duckdb_extension"),
+    file.path(root, "build", "release", "duckvep.duckdb_extension"),
     mustWork = FALSE
   )
   requested <- normalizePath(extension, mustWork = FALSE)
@@ -857,7 +857,7 @@ duckvep_evidence_read_extension_receipt <- function(
     stop("extension receipt belongs to another source revision", call. = FALSE)
   }
   expected <- normalizePath(
-    file.path(root, "build", "release", "duckhts.duckdb_extension"),
+    file.path(root, "build", "release", "duckvep.duckdb_extension"),
     mustWork = FALSE
   )
   requested <- normalizePath(extension, mustWork = FALSE)

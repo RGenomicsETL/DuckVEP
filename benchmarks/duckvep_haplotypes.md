@@ -262,7 +262,7 @@ source("scripts/duckvep_evidence.R")
 root <- normalizePath(".")
 revision <- duckvep_evidence_revision(root)
 extension <- duckvep_evidence_build_extension(root,
-  "build/release/duckhts.duckdb_extension", revision)
+  "build/release/duckvep.duckdb_extension", revision)
 duckvep_evidence_write_extension_receipt("/tmp/haplotype-extension.tsv", revision, extension)
 ```
 
