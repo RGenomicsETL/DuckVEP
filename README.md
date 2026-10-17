@@ -155,7 +155,7 @@ Per-corpus consequence counts
 
 ## Whole haplotypes
 
-VEP 116 does not define whole-haplotype consequences. The [`duckvep-coding` contract](design/duckvep_haplotype_contract.md) uses pinned `bcftools csq` where transcript models and phase semantics are comparable. Independent base-R goldens and hand-derived checks cover supported cases outside csq’s domain: non-diploid calls, alleles over 50 bases, nonstandard genetic codes, and incomplete CDS starts or ends. Unsupported inputs retain explicit statuses and reasons.
+VEP 116 annotates each record independently; whole-haplotype consequences come from Haplosaurus, which reports haplotype sequences, differences, carriers and flags but no normative SO/IMPACT contract. The [`duckvep-coding` contract](design/duckvep_haplotype_contract.md) therefore treats pinned `bcftools csq` as the executable authority where transcript models and phase semantics are comparable, and Haplosaurus as an independent comparison only. Independent base-R goldens and hand-derived checks cover supported cases outside csq’s domain: non-diploid calls, alleles over 50 bases, nonstandard genetic codes, and incomplete CDS starts or ends. Unsupported inputs retain explicit statuses and reasons.
 
 Replay composes one admissible edit set per haplotype and reports what it settled and what it did not:
 
