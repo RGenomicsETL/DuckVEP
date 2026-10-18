@@ -61,7 +61,7 @@ Independent-event consequences and HGVS are compared with executable Ensembl VEP
 
 ## Install
 
-DuckVEP is written in C against the stable DuckDB C API v1, which is the default build. Validation covers all 36 SQL test files on DuckDB 1.5.6 (source `069cc9f9b5`) and package checks with R `duckdb` 1.5.5. Community submission is on hold pending completion of outstanding implementation and qualification work and owner approval. `INSTALL duckvep FROM community` is not available yet. Build from source and load the unsigned extension:
+DuckVEP is written in C against the stable DuckDB C API v1, which is the default build. Validation covers all 36 SQL test files on DuckDB 1.5.6 (source `069cc9f9b5`) and package checks with R `duckdb` 1.5.5. Community submission is held for owner approval and coordinated CRAN publication; it is scoped to the bounded profile in [docs/v2-host.md](docs/v2-host.md), not to the open #11/#50 domain remainders. `INSTALL duckvep FROM community` is not available yet. Build from source and load the unsigned extension:
 
 ```sh
 git clone --recurse-submodules https://github.com/RGenomicsETL/DuckVEP
