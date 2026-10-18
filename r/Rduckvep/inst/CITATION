@@ -1,0 +1,22 @@
+citHeader("To cite DuckVEP/Rduckvep in publications use:")
+
+bibentry(
+  bibtype = "Manual",
+  title = "DuckVEP: relation-first variant consequence and haplotype annotation in DuckDB",
+  author = person("Sounkou Mahamane", "Toure"),
+  year = "2026",
+  note = "R package Rduckvep version 0.1.0",
+  url = "https://github.com/RGenomicsETL/DuckVEP"
+)
+
+# Cite the accompanying preprint once it is posted. Replace the placeholder DOI
+# after the bioRxiv/Zenodo record is minted:
+#
+# bibentry(
+#   bibtype = "Article",
+#   title = "DuckVEP: ...",
+#   author = c(person("Sounkou Mahamane", "Toure")),
+#   year = "2026",
+#   journal = "bioRxiv",
+#   doi = "10.1101/XXXXXXX"
+# )

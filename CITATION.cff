@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use DuckVEP or Rduckvep, please cite the software and the accompanying preprint."
+title: "DuckVEP: relation-first variant consequence and haplotype annotation in DuckDB"
+type: software
+authors:
+  - family-names: Toure
+    given-names: Sounkou Mahamane
+    email: sounkoutoure@gmail.com
+repository-code: "https://github.com/RGenomicsETL/DuckVEP"
+url: "https://rgenomicsetl.github.io/DuckVEP/"
+license: GPL-2.0-or-later
+version: 0.1.0
+keywords:
+  - variant annotation
+  - consequence prediction
+  - haplotype
+  - DuckDB
+  - Ensembl VEP
+abstract: >-
+  DuckVEP is a DuckDB extension, and Rduckvep its R front end, for
+  relation-first variant consequence and phased whole-haplotype annotation
+  against Ensembl transcript models, with executable conformance against
+  Ensembl VEP 116, bcftools csq, Haplosaurus and Mutalyzer.
+# Add once the Zenodo record is minted:
+# identifiers:
+#   - type: doi
+#     value: 10.5281/zenodo.XXXXXXX

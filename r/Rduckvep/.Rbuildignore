@@ -2,3 +2,4 @@
 ^README\.md$
 ^docs$
 ^bootstrap\.R$
+^cran-comments\.md$
