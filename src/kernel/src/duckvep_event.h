@@ -439,11 +439,16 @@ static inline void duckvep_event_load(
                event->kind == (uint8_t)DUCKVEP_KIND_SV) {
         duckvep_event_load_raw_interval(batch, idx, event);
         if (event->kind == (uint8_t)DUCKVEP_KIND_SV &&
-            event->sv_type == (uint8_t)DUCKVEP_SV_INSERTION) {
+            event->sv_type == (uint8_t)DUCKVEP_SV_INSERTION &&
+            event->raw_end1 == event->raw_start1) {
             /* VEP represents a symbolic insertion at boundary P as the
              * reversed feature interval P+1,P after removing the VCF anchor.
              * The public structural adapter stores P as a valid point interval
-             * for sorting; reconstruct the interbase geometry once here. */
+             * for sorting; reconstruct the interbase geometry once here.
+             * A wider interval is VEP's reading of an insertion carrying
+             * SVLEN (Parser::VCF leaves END = POS + SVLEN): the raw span
+             * stays the feature interval and the insertion class still
+             * drives feature_elongation. */
             event->feature_start1 = event->raw_start1 == UINT32_MAX
                 ? UINT32_MAX : event->raw_start1 + 1u;
             event->feature_end1 = event->raw_start1;

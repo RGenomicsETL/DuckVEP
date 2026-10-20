@@ -954,6 +954,53 @@ SELECT _duckvep_annotate_structural_rich(
 ----
 structural type contradicts copy change
 
+# A symbolic insertion with start = end is the interbase site after that base.
+# VEP's Parser::VCF reads an insertion that carries SVLEN as a feature span of
+# SVLEN bases from POS + 1 (END is ignored), so a wider INS interval is that
+# span. Predicates follow VariationEffect.pm: feature_elongation needs the
+# insertion class within the feature, transcript_amplification needs a copy
+# gain, and an insertion that covers the whole transcript keeps the bare
+# transcript term. The DUP span is the already-pinned oracle for the shared
+# overlap terms.
+statement ok
+CREATE TABLE insertion_span_lanes AS
+WITH lanes(ord, label, start1, end1, structural_type, copy_change) AS (
+  VALUES
+    (1, 'ins_point', 130::UBIGINT, 130::UBIGINT, 'INS', 'UNKNOWN'),
+    (2, 'ins_span',  130::UBIGINT, 210::UBIGINT, 'INS', 'UNKNOWN'),
+    (3, 'dup_span',  130::UBIGINT, 210::UBIGINT, 'DUP', 'GAIN'),
+    (4, 'ins_cover',  90::UBIGINT, 260::UBIGINT, 'INS', 'UNKNOWN'),
+    (5, 'dup_cover',  90::UBIGINT, 260::UBIGINT, 'DUP', 'GAIN')
+)
+SELECT ord, label,
+       list_sort(string_split(annotation.consequence, '&')) AS terms,
+       annotation.status
+FROM lanes,
+LATERAL unnest(_duckvep_annotate_structural_rich(
+  'structural', 1::UINTEGER, start1, end1, structural_type, copy_change,
+  0::UBIGINT
+)) AS u(annotation);
+
+query TTT
+SELECT label, array_to_string(terms, ','), status
+FROM insertion_span_lanes WHERE label IN ('ins_point', 'ins_cover', 'dup_cover')
+ORDER BY ord;
+----
+ins_point	coding_sequence_variant,feature_elongation	supported
+ins_cover	coding_transcript_variant	supported
+dup_cover	transcript_amplification	supported
+
+query III
+SELECT (SELECT terms FROM insertion_span_lanes WHERE label = 'ins_span') =
+       (SELECT terms FROM insertion_span_lanes WHERE label = 'dup_span'),
+       list_contains((SELECT terms FROM insertion_span_lanes WHERE label = 'ins_span'), 'feature_elongation'),
+       list_contains((SELECT terms FROM insertion_span_lanes WHERE label = 'ins_span'), 'transcript_amplification');
+----
+true	true	false
+
+statement ok
+DROP TABLE insertion_span_lanes;
+
 # One BND input carries both raw VCF endpoints. VEP shifts the local POS by one
 # for ordinary transcript topology, retains the mate coordinate verbatim, and
 # may create two internal overlap alleles. DuckVEP returns their transcript-level

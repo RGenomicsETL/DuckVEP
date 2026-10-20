@@ -1,5 +1,17 @@
 # DuckVEP
 
+## Symbolic insertions carrying SVLEN annotate as VEP's span
+
+- An `INS` event whose `end_position` exceeds its `position` is VEP's reading of a
+  symbolic insertion that carries SVLEN: `Parser::VCF` leaves the feature as a span
+  of SVLEN reference bases from POS + 1 and ignores END. DuckVEP now annotates that
+  span with the insertion class instead of refusing the geometry, so overlap terms
+  come from the span, `feature_elongation` applies within a feature and an insertion
+  that covers a whole transcript keeps the bare transcript term rather than
+  `transcript_amplification`. `end_position = position` keeps the interbase meaning.
+  On vep-rs's bundled GRCh38 golden corpus the 33 span insertions went from 89 to
+  534 of 534 Ensembl VEP 116.2 tuples matched.
+
 ## Strict handling of a single unphased heterozygote (issue #12)
 
 - Under `phase_policy := 'strict'`, an unphased heterozygous call that is the sample's only heterozygous or missing call on a transcript is read in slot order: one haplotype carries the allele and the other does not. Two or more such sites, or an unphased site beside a phased one, produce `incomplete_input`. In the HG002 measurement, 782 of 1,110 such paths were resolved and 157,343 of 158,137 paths were predicted.
