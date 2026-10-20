@@ -789,18 +789,28 @@ static int delta_feature_boundary_edit_fill(
             &coding_end_cdna, NULL, NULL)) {
         return 0;
     }
-    crosses_start = edit->cdna_start < coding_start_cdna &&
-                    edit->cdna_end >= coding_start_cdna &&
-                    (uint64_t)edit->cdna_start <=
-                        (uint64_t)coding_start_cdna + 2u;
+    /* VariationEffect.pm (release 116): _overlaps_start_codon and
+     * _overlaps_stop_codon test the feature's cDNA span against the first and
+     * the last codon of the translateable sequence. The transcript-string
+     * helpers (_ins_del_start_altered, _snp_start_altered, _inv_start_altered,
+     * _ins_del_stop_altered, _overlaps_stop_codon_cil) decide the start and
+     * stop terms whenever peptide alleles are unavailable, which is every
+     * outer cDNA edit that leaves the CDS on at least one side. VEP evaluates
+     * each helper on its own, so a feature that reaches both codons takes both
+     * answers; nothing couples them. */
+    crosses_start = (uint64_t)edit->cdna_start <=
+                        (uint64_t)coding_start_cdna + 2u &&
+                    edit->cdna_end >= coding_start_cdna;
     crosses_stop = edit->cdna_start <= coding_end_cdna &&
-                   edit->cdna_end > coding_end_cdna &&
                    (uint64_t)edit->cdna_end + 2u >=
                        (uint64_t)coding_end_cdna;
+    if (edit->cdna_start >= coding_start_cdna &&
+        edit->cdna_end <= coding_end_cdna) {
+        /* Both cds_start and cds_end map, so VEP has codon and peptide
+         * alleles; this is the ordinary CDS edit, not a mapper-gap shape. */
+        return 0;
+    }
     if (!crosses_start && !crosses_stop) return 0;
-    /* A feature spanning both ends needs the general transcript edit-set path;
-     * neither VEP helper alone defines all of its interactions. */
-    if (crosses_start && crosses_stop) return 0;
 
     memset(delta, 0, sizeof *delta);
     delta->cdna_pos = -1;
@@ -857,33 +867,34 @@ static int delta_feature_boundary_edit_fill(
         delta->sequence_status = (uint8_t)DUCKVEP_SEQUENCE_RESOLVED;
         return 1;
     }
-    /*
-     * stop_lost::_ins_del_stop_altered and stop_retained both require VEP's
-     * increase_length/decrease_length pre-predicate. A substitution whose
-     * outer cDNA edit reaches the stop therefore falls through to
-     * coding_unknown when its ordinary peptide is unavailable.
-     */
-    if (crosses_stop && substitution_class) {
-        delta->coding_unknown = 1u;
-        delta->valid = 1u;
-        delta->sequence_status = (uint8_t)DUCKVEP_SEQUENCE_RESOLVED;
-        return 1;
-    }
-
     if (crosses_start) {
+        size_t start_reference_len;
+        size_t start_edit_ref_len;
         int altered;
         int inversion_helper_altered;
 
+        /* The helpers edit UTR+translateable with Perl substr, which replaces
+         * up to the end of the string when the cDNA span runs past it. */
+        start_reference_len = transcript_sequence.pre_cds_len +
+                              transcript_sequence.cds_len;
+        if (edit->edit_start0 > start_reference_len) return 1;
+        start_edit_ref_len = (size_t)edit->ref_len;
+        if (start_edit_ref_len > start_reference_len - edit->edit_start0) {
+            start_edit_ref_len = start_reference_len - edit->edit_start0;
+        }
         if (!delta_sequence_edit_view_open(
                 transcript_sequence.pre_cds,
                 transcript_sequence.pre_cds_len,
                 transcript_sequence.cds,
                 transcript_sequence.cds_len,
-                edit->alt, (size_t)edit->alt_len, (size_t)edit->ref_len,
+                edit->alt, (size_t)edit->alt_len, start_edit_ref_len,
                 edit->edit_start0, strand, &sequence_edit)) {
             return 1;
         }
+        /* _inv_start_altered returns false when cdna_end lies beyond
+         * UTR+translateable; the other two helpers have no such bound. */
         inversion_helper_altered =
+            (uint64_t)edit->cdna_end <= (uint64_t)start_reference_len &&
             delta_sequence_start_offset_altered(&sequence_edit);
         if (substitution_class) {
             delta->start_retained =
@@ -897,38 +908,54 @@ static int delta_feature_boundary_edit_fill(
             delta->start_lost =
                 (uint8_t)(altered || inversion_helper_altered);
         }
-        if (!delta->start_lost && !delta->start_retained) {
-            delta->coding_unknown = 1u;
-        }
-    } else {
-        size_t edit_start;
-        int altered;
-        duckvep_codon_table_t codon_table;
-        duckvep_coding_projection_t feature_start;
+    }
 
-        if (edit->cdna_start < transcript_sequence.coding_start_cdna ||
-            seq == NULL || seq->codon_table == NULL) {
-            return 1;
+    /*
+     * stop_lost::_ins_del_stop_altered and stop_retained both require VEP's
+     * increase_length/decrease_length pre-predicate, so a substitution whose
+     * outer cDNA edit reaches the stop contributes no stop term. With
+     * cds_start defined, _ins_del_stop_altered edits CDS+UTR at VEP's feature
+     * CDS start, after the full transcript REF was validated at physical
+     * positions. Without it (the feature starts before the CDS) that helper is
+     * false, and _overlaps_stop_codon_cil alone yields stop_retained_variant.
+     */
+    if (crosses_stop && !substitution_class) {
+        if (edit->cdna_start < transcript_sequence.coding_start_cdna) {
+            delta->stop_retained = 1u;
+        } else {
+            size_t edit_start;
+            int altered;
+            duckvep_codon_table_t codon_table;
+            duckvep_coding_projection_t feature_start;
+
+            if (seq == NULL || seq->codon_table == NULL) return 1;
+            if (!duckvep_project_feature_translation_start(
+                    transcripts, exons, tx_idx, event, &feature_start)) {
+                return 1;
+            }
+            edit_start = (size_t)feature_start.cds_pos - 1u;
+            if (!delta_sequence_edit_view_open(
+                    transcript_sequence.cds, transcript_sequence.cds_len,
+                    transcript_sequence.post_cds,
+                    transcript_sequence.post_cds_len,
+                    edit->alt, (size_t)edit->alt_len, (size_t)edit->ref_len,
+                    edit_start, strand, &sequence_edit) ||
+                !duckvep_codon_table_supported(
+                    (duckvep_codon_table_t)seq->codon_table[tx_idx])) {
+                return 1;
+            }
+            codon_table = (duckvep_codon_table_t)seq->codon_table[tx_idx];
+            altered = delta_sequence_stop_altered(&sequence_edit, codon_table);
+            delta->stop_lost = (uint8_t)altered;
+            delta->stop_retained = (uint8_t)!altered;
         }
-        if (!duckvep_project_feature_translation_start(
-                transcripts, exons, tx_idx, event, &feature_start)) return 1;
-        /* _ins_del_stop_altered edits CDS+UTR at VEP's feature CDS start,
-         * after the full transcript REF was validated at physical positions. */
-        edit_start = (size_t)feature_start.cds_pos - 1u;
-        if (!delta_sequence_edit_view_open(
-                transcript_sequence.cds, transcript_sequence.cds_len,
-                transcript_sequence.post_cds,
-                transcript_sequence.post_cds_len,
-                edit->alt, (size_t)edit->alt_len, (size_t)edit->ref_len,
-                edit_start, strand, &sequence_edit) ||
-            !duckvep_codon_table_supported(
-                (duckvep_codon_table_t)seq->codon_table[tx_idx])) {
-            return 1;
-        }
-        codon_table = (duckvep_codon_table_t)seq->codon_table[tx_idx];
-        altered = delta_sequence_stop_altered(&sequence_edit, codon_table);
-        delta->stop_lost = (uint8_t)altered;
-        delta->stop_retained = (uint8_t)!altered;
+    }
+
+    /* coding_unknown: within_cds without peptide alleles and without any of
+     * the start or stop terms above. */
+    if (!delta->start_lost && !delta->start_retained &&
+        !delta->stop_lost && !delta->stop_retained) {
+        delta->coding_unknown = 1u;
     }
 
     delta->valid = 1u;

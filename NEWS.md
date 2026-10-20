@@ -1,5 +1,24 @@
 # DuckVEP
 
+## Outer cDNA edits that reach both the start and the stop codon
+
+- A literal allele whose outer cDNA edit leaves the CDS on at least one side has no
+  peptide alleles in Ensembl VEP 116, which then decides the start and stop terms with
+  independent transcript-string helpers. DuckVEP evaluated one side and declined a
+  feature that reached both codons (`non_contiguous_cds_edit`), or missed the second
+  side's term when the feature overlapped a codon without crossing it. The mapper-gap
+  path now follows `VariationEffect.pm` on both sides: `_overlaps_start_codon` and
+  `_overlaps_stop_codon` select the sides, `_ins_del_start_altered` and
+  `_snp_start_altered` decide the start on UTR+CDS with Perl's substr clipping and
+  `_inv_start_altered`'s length bound, `_ins_del_stop_altered` decides the stop on
+  CDS+UTR when `cds_start` is defined and `_overlaps_stop_codon_cil` alone yields
+  `stop_retained_variant` when the feature starts before the CDS, and
+  `coding_sequence_variant` stays only when no start or stop term applies. The
+  state-exploration campaign that surfaced the gap (seed 29, 300-base cap: 116
+  discordant and 128 unresolved pairs of 20,268) and four more campaigns (seeds 71 and
+  211 at 300 bases, seeds 197 and 29 at 600) are exact on every pair against executable
+  VEP 116. On vep-rs's golden corpora the literal multi-exon deletions now match VEP.
+
 ## Symbolic insertions carrying SVLEN annotate as VEP's span
 
 - An `INS` event whose `end_position` exceeds its `position` is VEP's reading of a

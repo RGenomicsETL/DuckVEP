@@ -2088,6 +2088,45 @@ SELECT * FROM duckvep_model_load(
 ----
 duckvep_model_load: model name already exists
 
+
+# Outer cDNA edits that reach both the start and the stop codon. VEP 116 has no
+# peptide alleles for a mapper-gap shape, so VariationEffect.pm decides each term
+# with its own transcript-string helper: _ins_del_start_altered on UTR+CDS,
+# _ins_del_stop_altered on CDS+UTR when cds_start is defined, and
+# _overlaps_stop_codon_cil alone when the feature starts before the CDS. Each
+# helper is independent, so one feature can lose the start and retain the stop.
+# Witnesses and their expected sets come from executable Ensembl VEP 116 through
+# the state-exploration campaign (seed 29, 300-base cap) that found them
+# unresolved or discordant; the sets are VEP's output, not DuckVEP's.
+statement ok
+CREATE TABLE both_ends_witnesses AS
+SELECT event_index, witness, 1::UINTEGER AS seq_region, position, reference, alternate,
+       NULL::UBIGINT AS end_position, NULL::VARCHAR AS structural_type,
+       NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region,
+       NULL::UBIGINT AS mate_position
+FROM (VALUES
+    (1::UBIGINT, 'both_ends_deletion', 100::UBIGINT, 'TACGTACGTACGTACGTACGATGGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACTGGTAAACGTAC', 'T'),
+    (2::UBIGINT, 'both_ends_insertion_like', 100::UBIGINT, 'TACGTACGTACGTACGTACGATGGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACTGGTAAACGTACG', 'TTCAAGTTGATGGGAGCATCCGTTAAGACTAGTGTCGCAAGCAAACGTTCTTGCGACGACAGTGGCTAGCACACAAAGCCGGTAGACTTGTCGAGGACAAGTTTTCATAGAGCACCGTGGACATAGATTCCCAACAGTGGCAATAAGCTAGTAACCATAGGACCTTGTTTGGTCCAGCGTCGGTAGCATTAATCAGTCCTTCACC'),
+    (3::UBIGINT, 'both_ends_substitution', 100::UBIGINT, 'TACGTACGTACGTACGTACGATGGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACTGGTAAACGT', 'TTTCACAACATGTACCTGAAGCGCTCATAAGGCGGTCAGCCCGTTTAAGTCAGCAGTCTTGCAAACATAGTTTTGCGTCGAATACGGTGCTTATGGTTCCTTGCTGAGATTTCTCGTGATAAATACCCCTCAATAACAGCCTGGC'),
+    (4::UBIGINT, 'utr_to_stop_codon_deletion', 115::UBIGINT, 'GTACGATGGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACTGGT', 'G'),
+    (5::UBIGINT, 'cds_start_to_utr_deletion', 119::UBIGINT, 'GATGGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACTGGTAAA', 'G')
+) v(event_index, witness, position, reference, alternate);
+
+query TTT
+SELECT w.witness, array_to_string(list_sort(string_split(a.consequence, '&')), ','), a.duckvep_status
+FROM query(duckvep_annotate_sql('both_ends_witnesses', 'fixture', struct_pack(rich := true))) a
+JOIN both_ends_witnesses w USING (event_index)
+ORDER BY w.event_index;
+----
+both_ends_deletion	3_prime_UTR_variant,5_prime_UTR_variant,intron_variant,splice_acceptor_variant,splice_donor_5th_base_variant,splice_donor_variant,start_lost,stop_retained_variant	supported
+both_ends_insertion_like	3_prime_UTR_variant,5_prime_UTR_variant,intron_variant,splice_acceptor_variant,splice_donor_5th_base_variant,splice_donor_variant,start_lost,stop_retained_variant	supported
+both_ends_substitution	3_prime_UTR_variant,5_prime_UTR_variant,coding_sequence_variant,intron_variant,splice_acceptor_variant,splice_donor_region_variant,splice_donor_variant	supported
+utr_to_stop_codon_deletion	5_prime_UTR_variant,intron_variant,splice_acceptor_variant,splice_donor_5th_base_variant,splice_donor_variant,start_lost,stop_retained_variant	supported
+cds_start_to_utr_deletion	3_prime_UTR_variant,intron_variant,splice_acceptor_variant,splice_donor_5th_base_variant,splice_donor_variant,start_lost,stop_lost	supported
+
+statement ok
+DROP TABLE both_ends_witnesses;
+
 query IIIIIIIII
 SELECT duckvep_model_drop('fixture'), duckvep_model_drop('fixture2'),
        duckvep_model_drop('structural'), duckvep_model_drop('nmd'),
