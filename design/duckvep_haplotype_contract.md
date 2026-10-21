@@ -21,6 +21,7 @@ The [#11/#50 completion proposal](issue-11-50-completion.md) studies remaining o
 - **Model parity.** csq reads GFF3 and DuckVEP reads its Ensembl model. Restrict comparisons to transcripts whose exon/CDS geometry is identical in both, and record the rest as model disagreements, never as consequence disagreements.
 - **Phase semantics.** Compare only on inputs where csq's pinned `-p` mode and DuckVEP's strict phase contract agree: complete calls with unambiguous phase. Cases where they differ stay keyed disagreements.
 - **Not covered by csq:** NMD uses `ejc50` and has independent tests; compound HGVS is tracked in [#11](https://github.com/RGenomicsETL/DuckVEP/issues/11); reconstructed sequence bytes are covered by replay and sequence regression tests. Haplosaurus supplies no oracle authority.
+- **Singleton source-record HGVSp:** VEP's independent event is authoritative. Raw Haplosaurus replay can retain an ambiguous ALT as `source_allele_skipped` without mutation while HGVSp describes the independently normalized ALT. The raw CDS, protein, evidence and prediction status remain container-owned; this rule does not apply to compound paths.
 - Independent base-R checks, without DuckVEP helpers, cover mapping-table edge cases and frame-restoration counterexamples, including restoration before versus after an earlier stop.
 
 ## 2. Supported domain

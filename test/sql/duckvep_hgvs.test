@@ -163,8 +163,8 @@ ORDER BY event_index;
 13	p.Thr2SerfsTer?	frameshift_variant
 14	p.Ala3ProfsTer?	frameshift_variant
 
-# Raw source replay skips a complete N-bearing ALT rather than applying the
-# independent-event permission to erase matching N padding before eligibility.
+# Raw source replay skips a complete N-bearing ALT. Singleton HGVSp keeps the
+# independent-event presentation while raw sequence and provenance stay conditional.
 query ITTTTTTIII
 SELECT contributors[1].event_index, cds, protein, hgvsp, projection_status, sequence_status,
   contributors[1].projection_status, edit_count, len(coding_blocks), carrier_count
@@ -175,8 +175,8 @@ FROM duckvep_haplotypes(
   'hgvs-padding', hgvs := true, input_mode := 'source_records', phase_policy := 'vep_compat')
 ORDER BY transcript_index;
 ----
-1	ATGACNGCCTAA	MTA*	NULL	ok	conditional	source_allele_skipped	0	0	2
-8	ATGNCNGCCTAA	MXA*	NULL	ok	conditional	source_allele_skipped	0	0	2
+1	ATGACNGCCTAA	MTA*	p.(Thr2IlefsTer?)	ok	conditional	source_allele_skipped	0	0	2
+8	ATGNCNGCCTAA	MXA*	p.(Ala3Ter)	ok	conditional	source_allele_skipped	0	0	2
 
 query I
 SELECT duckvep_model_drop('hgvs-padding');
@@ -333,8 +333,8 @@ CREATE TABLE hgvs_residual_raw AS SELECT * FROM duckvep_haplotypes(
    seq_region transcript_index, 0 sample_index, ''1|1'' gt FROM hgvs_residual_events',
   'hgvs-residual', hgvs := true, input_mode := 'source_records', phase_policy := 'vep_compat');
 
-# Source-record replay skips N-bearing ALTs while retaining conditional evidence.
-# It does not acquire independent TVA eligibility by erasing their shared anchor.
+# Source-record sequence replay skips N-bearing ALTs and retains conditional evidence.
+# Singleton HGVSp uses the independently normalized event.
 query TITT
 SELECT route, event_index, regexp_replace(hgvsp, '^p\.\((.*)\)$', 'p.\1'), projection_status
 FROM (
@@ -363,11 +363,11 @@ raw	4067	p.Ter2_Ala3insArgTer	ok
 raw	4069	p.Ala3Ter	ok
 raw	13533	p.Ala3Ter	ok
 raw	13684	p.Arg2dup	ok
-raw	32276	NULL	ok
+raw	32276	p.Xaa2dup	ok
 raw	71881	p.Ter2_Ala3insTer	ok
 raw	89760	p.Ala2_Ala3insAla	ok
 raw	110256	p.Ala2dup	ok
-raw	146516	NULL	ok
+raw	146516	p.Ter2_Ala3insPro	ok
 
 query IIIIII
 WITH observed AS (
@@ -399,8 +399,8 @@ SELECT contributors[1].event_index,cds,protein,hgvsp_status,contributors[1].proj
   evidence_flags & 8 = 8 AND contributors[1].evidence_flags & 8 = 8
 FROM hgvs_residual_raw WHERE transcript_index IN (7,11) ORDER BY transcript_index;
 ----
-32276	ATGNNAGCCTAA	MXA*	incomplete_input	source_allele_skipped	0	0	0	0	1
-146516	ATGNCNGCCTAA	MXA*	incomplete_input	source_allele_skipped	0	0	0	0	1
+32276	ATGNNAGCCTAA	MXA*	ok	source_allele_skipped	0	0	0	0	1
+146516	ATGNCNGCCTAA	MXA*	ok	source_allele_skipped	0	0	0	0	1
 
 query I
 SELECT duckvep_model_drop('hgvs-residual');

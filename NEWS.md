@@ -1,5 +1,9 @@
 # DuckVEP
 
+## Singleton source-record HGVSp with ambiguous alleles
+
+- One-contributor `source_records` paths render protein HGVS from the independently normalized ALT when raw Haplosaurus replay marks an ambiguous ALT as `source_allele_skipped`. Raw CDS, protein, evidence and prediction status remain container-owned.
+
 ## Alleles on reference peptides that carry a translation SeqEdit
 
 - Cache-mode Ensembl VEP 116 applies a translation SeqEdit (`initial_met`,

@@ -1050,11 +1050,10 @@ local({
         phase_policy = policy, input_mode = if (raw) "source_records" else "alt_events")
       singletons <- singletons[order(singletons$transcript_index), ]
       expect_equal(singletons$transcript_index, n_indel_source$i)
-      # Raw N-bearing ALTs are skipped with conditional source evidence.
-      # Independent and decoded calls still use their existing allele contract.
+      # Raw N-bearing ALTs retain conditional source evidence without mutation.
+      # Singleton HGVSp remains the independent-event VEP presentation.
       expected_hgvs <- n_indel_expected_hgvs
       skipped_raw <- raw & grepl("N", n_indel_source$alternate, fixed = TRUE)
-      expected_hgvs[skipped_raw] <- NA_character_
       expect_identical(sub("^p\\.\\((.*)\\)$", "p.\\1", singletons$hgvsp), expected_hgvs)
       expect_identical(singletons$projection_status, rep("ok", 8L))
       expect_false(anyNA(singletons$cds))
@@ -1071,7 +1070,8 @@ local({
       expect_identical(contributors$projection_status,
         ifelse(skipped_raw, "source_allele_skipped", "ok"))
       if (raw) {
-        expect_identical(singletons$hgvsp_status[skipped_raw], rep("incomplete_input", 3L))
+        expect_identical(singletons$hgvsp_status[skipped_raw],
+          c("ok", "ok", "not_applicable"))
         expect_identical(singletons$cds[skipped_raw], n_indel_source$cds[skipped_raw])
         expect_identical(singletons$protein[skipped_raw], c("MAA*", "MXA*", "MXA*"))
         expect_equal(singletons$edit_count[skipped_raw], rep(0L, 3L))
@@ -1109,7 +1109,10 @@ local({
     mixed_slots <- mixed_slots[order(mixed_slots$transcript_index, lanes), ]
     expect_equal(mixed_slots$transcript_index, c(4L, 4L, 5L, 5L))
     expect_identical(mixed_slots$sequence_status, rep(c("ok", "conditional"), 2L))
-    expect_identical(mixed_slots$hgvsp, rep(c("p.(=)", NA_character_), 2L))
+    expected_mixed_hgvsp <- if (selected_alt == "alternate")
+      c("p.(=)", "p.(Ala2dup)", "p.(=)", "p.(Ala2_Ala3insPro)") else
+      c("p.(=)", NA_character_, "p.(=)", NA_character_)
+    expect_identical(mixed_slots$hgvsp, expected_mixed_hgvsp)
     expect_equal(mixed_slots$edit_count, rep(0L, 4L))
     expect_equal(mixed_slots$carrier_count, rep(1L, 4L))
     expect_equal(vapply(mixed_slots$contributors, nrow, 0L), c(0L, 1L, 0L, 1L))

@@ -620,18 +620,45 @@ static int append_hgvsp(duckvep_h_vector text, duckvep_h_vector status_vector, s
         leaf->path_status == DUCKVEP_PREDICTION_CONDITIONAL_RECODING
             ? "conditional_assumed_recoding" :
         leaf->path_status == DUCKVEP_PREDICTION_CONDITIONAL_RNA
-            ? "conditional_assumed_rna_programme" :
-        !leaf->cds || !leaf->protein ? "unavailable_sequence" :
-        leaf->sequence_status != DUCKVEP_HAPLOTYPE_OK ? "incomplete_input" :
-        !leaf->reference_protein || !leaf->reference_protein_length ? "missing_reference_protein" :
-        leaf->ordered_replacements ? "unsupported_ordered_replacements" : NULL;
-    /* A singleton source allele uses the independent-event VEP presentation,
-     * including its original anchor and cached predicates. Physical MNV islands
-     * do not turn that one source into a compound event. */
+            ? "conditional_assumed_rna_programme" : NULL;
+    /* A singleton source ALT owns the independent-event VEP presentation.
+     * Raw replay can retain its provenance without mutation when ambiguous
+     * source bytes make the container sequence conditional. */
     if (!name && leaf->contributor_count == 1u) {
         const duckvep_haplotype_contributor_t *c = &leaf->contributors[0];
-        if ((!c->source.source_record || (c->source.allele_index && c->source.allele_index != UINT32_MAX)) &&
-            (c->projection_status == DUCKVEP_CDS_EDIT_OK || c->projection_status == DUCKVEP_CDS_EDIT_OUT_OF_CDS))
+        if (c->source.source_record && c->source.allele_index &&
+            c->source.allele_index != UINT32_MAX) {
+            int source_changes_allele = c->source.ref_len != c->source.alt_len;
+            size_t source_base;
+            for (source_base = 0u;
+                 !source_changes_allele && source_base < c->source.ref_len;
+                 source_base++) {
+                source_changes_allele =
+                    duckvep_event_ascii_upper(c->source.ref[source_base]) !=
+                    duckvep_event_ascii_upper(c->source.alt[source_base]);
+            }
+            if (source_changes_allele &&
+                (c->projection_status == DUCKVEP_CDS_EDIT_OK ||
+                 c->projection_status == DUCKVEP_CDS_EDIT_OUT_OF_CDS ||
+                 c->projection_status == DUCKVEP_CDS_EDIT_SOURCE_ALLELE_SKIPPED)) {
+                return append_single_event_hgvsp(
+                    text, status_vector, row, s, bind, leaf, error, error_size);
+            }
+        }
+    }
+    if (!name) {
+        name = !leaf->cds || !leaf->protein ? "unavailable_sequence" :
+            leaf->sequence_status != DUCKVEP_HAPLOTYPE_OK ? "incomplete_input" :
+            !leaf->reference_protein || !leaf->reference_protein_length ? "missing_reference_protein" :
+            leaf->ordered_replacements ? "unsupported_ordered_replacements" : NULL;
+    }
+    /* A prepared singleton event also uses independent-event presentation.
+     * Physical MNV islands do not turn that event into a compound operation. */
+    if (!name && leaf->contributor_count == 1u) {
+        const duckvep_haplotype_contributor_t *c = &leaf->contributors[0];
+        if (!c->source.source_record &&
+            (c->projection_status == DUCKVEP_CDS_EDIT_OK ||
+             c->projection_status == DUCKVEP_CDS_EDIT_OUT_OF_CDS))
             return append_single_event_hgvsp(text, status_vector, row, s, bind, leaf, error, error_size);
     }
     size_t count = 0u;

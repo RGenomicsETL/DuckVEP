@@ -651,8 +651,8 @@ SELECT transcript_index,hgvsp FROM duckvep_haplotypes('SELECT * FROM hap_n_indel
 
 endloop
 
-# Raw N-bearing ALTs are skipped with conditional source evidence. The full
-# source record remains a contributor; independent and decoded calls differ.
+# Raw N-bearing ALTs retain conditional source evidence without mutation.
+# Singleton HGVSp remains the independent-event VEP presentation.
 statement ok
 CREATE TABLE hap_n_indel_raw AS SELECT * FROM duckvep_haplotypes(
  'SELECT event_index,seq_region,position,reference,[alternate] alternates,
@@ -667,9 +667,9 @@ FROM hap_n_indel_raw ORDER BY transcript_index;
 1	p.(Met1_Ter2insSer)	ok	ok
 2	p.(Ala2_Ala3insPro)	ok	ok
 3	p.(Ter2delinsLysPro)	ok	ok
-4	NULL	ok	conditional
+4	p.(Ala2dup)	ok	conditional
 5	p.(Ala2dup)	ok	ok
-6	NULL	ok	conditional
+6	p.(Ter2_Ala3insPro)	ok	conditional
 7	NULL	ok	conditional
 
 query III
@@ -687,15 +687,16 @@ FROM hap_n_indel_raw WHERE transcript_index IN (4,6,7) ORDER BY transcript_index
 6	ATGNCNGCCTAA	MXA*	0	0	0	0	source_allele_skipped	1
 7	ATGNCNGCCTAA	MXA*	0	0	0	0	source_allele_skipped	1
 
-query III
-SELECT count(*),count(*) FILTER(WHERE hgvsp IS NULL AND hgvsp_status='incomplete_input'),
+query IIII
+SELECT count(*),count(*) FILTER(WHERE hgvsp_status='ok'),
+  count(*) FILTER(WHERE hgvsp IS NULL AND hgvsp_status='not_applicable'),
   count(*) FILTER(WHERE contributors[1].event_index=s.i
     AND contributors[1].position=s.pos+10 AND contributors[1].reference=s.ref
     AND contributors[1].alternate=s.alt AND contributors[1].alt_index=1)
 FROM hap_n_indel_raw JOIN hap_n_indel_source s ON transcript_index=s.i
 WHERE transcript_index IN (4,6,7);
 ----
-3	3	3
+3	2	1	3
 
 statement ok
 CREATE TABLE hap_ref_slot_source AS SELECT i event_index,i seq_region,pos AS position,
@@ -716,17 +717,17 @@ ORDER BY transcript_index;
 4	ATGGCNGCCTAA	MAA*	ok	p.(=)	2	0	0
 5	ATGGCTGCCTAA	MAA*	ok	p.(=)	2	0	0
 
-query IITIIIT
+query IITIII
 SELECT transcript_index,carriers[1].haplotype_lane,sequence_status,edit_count,
- len(contributors),contributors[1].alt_index,hgvsp FROM duckvep_haplotypes(
+ len(contributors),contributors[1].alt_index FROM duckvep_haplotypes(
  'SELECT * EXCLUDE(alternate),[${selected_alt}] alternates,''0|1'' gt FROM hap_ref_slot_source',
  'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
 ORDER BY transcript_index,carriers[1].haplotype_lane;
 ----
-4	1	ok	0	0	NULL	p.(=)
-4	2	conditional	0	1	1	NULL
-5	1	ok	0	0	NULL	p.(=)
-5	2	conditional	0	1	1	NULL
+4	1	ok	0	0	NULL
+4	2	conditional	0	1	1
+5	1	ok	0	0	NULL
+5	2	conditional	0	1	1
 
 query IIII
 SELECT count(*),sum(carrier_count),count(*) FILTER(WHERE sequence_status='conditional'),
@@ -746,6 +747,28 @@ SELECT count(*) FROM duckvep_haplotypes(
 0
 
 endloop
+
+query IIT
+SELECT transcript_index,carriers[1].haplotype_lane,hgvsp FROM duckvep_haplotypes(
+ 'SELECT * EXCLUDE(alternate),[alternate] alternates,''0|1'' gt FROM hap_ref_slot_source',
+ 'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
+ORDER BY transcript_index,carriers[1].haplotype_lane;
+----
+4	1	p.(=)
+4	2	p.(Ala2dup)
+5	1	p.(=)
+5	2	p.(Ala2_Ala3insPro)
+
+query IIT
+SELECT transcript_index,carriers[1].haplotype_lane,hgvsp FROM duckvep_haplotypes(
+ 'SELECT * EXCLUDE(alternate),[reference] alternates,''0|1'' gt FROM hap_ref_slot_source',
+ 'hap_n_indels',phase_policy:='vep_compat',input_mode:='source_records',hgvs:=true)
+ORDER BY transcript_index,carriers[1].haplotype_lane;
+----
+4	1	p.(=)
+4	2	NULL
+5	1	p.(=)
+5	2	NULL
 
 # Raw GT 1 has an undefined second file slot; it is not decoded haploidy.
 # Pinned raw_indel_143856 observes a skipped ALT and a full-REF deletion.

@@ -1473,8 +1473,8 @@ local({
   expect_identical(raw_naa$sequence_status, "conditional")
   expect_equal(raw_naa$carrier_count, 2L)
   expect_equal(raw_naa$edit_count, 0L)
-  expect_true(is.na(raw_naa$hgvsp))
-  expect_identical(raw_naa$hgvsp_status, "incomplete_input")
+  expect_identical(raw_naa$hgvsp, "p.(Ala3del)")
+  expect_identical(raw_naa$hgvsp_status, "ok")
   expect_equal(nrow(raw_naa$coding_blocks[[1L]]), 0L)
   expect_equal(nrow(raw_naa$contributors[[1L]]), 1L)
   expect_equal(raw_naa$contributors[[1L]]$event_index, 5400L)
@@ -1487,8 +1487,8 @@ local({
     "SELECT duckvep_model_drop('r-hgvs-alternate-table') dropped")$dropped)
 
   # Pinned VEP 116 original records in indel_translation_witnesses.jsonl.gz:
-  # shared suffix N is erased just like a prefix, including genuine C/GT
-  # delins. Equal-length and changed REF N do not gain HGVSp availability.
+  # Shared suffix N is erased like a prefix, including genuine C/GT delins.
+  # Raw replay keeps source evidence while singleton HGVSp uses normalized events.
   hgvs_padding_sources <- data.frame(
     event_index = 1:14, seq_region = c(rep(0L, 7L), rep(1L, 3L), rep(2L, 4L)),
     position = c(14L, 15L, 14L, 14L, 14L, 14L, 16L, 14L, 14L, 14L, 14L, 15L, 14L, 14L),
@@ -1549,8 +1549,8 @@ local({
     "WHERE event_index IN (1, 8)"
   ), "r-hgvs-padding", hgvs = TRUE, input_mode = "source_records", phase_policy = "vep_compat")
   padding_replay <- padding_replay[order(padding_replay$transcript_index), ]
-  expect_identical(padding_replay$hgvsp, rep(NA_character_, 2L))
-  expect_identical(padding_replay$hgvsp_status, rep("incomplete_input", 2L))
+  expect_identical(padding_replay$hgvsp, c("p.(Thr2IlefsTer?)", "p.(Ala3Ter)"))
+  expect_identical(padding_replay$hgvsp_status, rep("ok", 2L))
   expect_identical(padding_replay$projection_status, rep("ok", 2L))
   expect_identical(padding_replay$sequence_status, rep("conditional", 2L))
   expect_identical(padding_replay$cds, c("ATGACNGCCTAA", "ATGNCNGCCTAA"))
@@ -1707,11 +1707,10 @@ local({
       phase_policy = "vep_compat", input_mode = if (raw) "source_records" else "alt_events")
     replay <- replay[order(replay$transcript_index), ]
     expect_equal(replay$transcript_index, hgvs_residual_sources$i)
-    # Raw ALT N is skipped even when TVA can erase its shared anchor.
+    # Raw ALT N is skipped for sequence replay. Singleton HGVSp uses the normalized event.
     skipped_raw <- raw & hgvs_residual_sources$event_index %in% c(32276L, 146516L)
-    expected <- hgvs_residual_expected
-    expected[skipped_raw] <- NA_character_
-    expect_identical(sub("^p\\.\\((.*)\\)$", "p.\\1", replay$hgvsp), expected)
+    expect_identical(sub("^p\\.\\((.*)\\)$", "p.\\1", replay$hgvsp),
+      hgvs_residual_expected)
     expect_identical(replay$projection_status, rep("ok", 12L))
     expect_identical(replay$sequence_status, ifelse(skipped_raw, "conditional", "ok"))
     expect_false(anyNA(replay$cds))
@@ -1727,7 +1726,7 @@ local({
     expect_identical(contributors$projection_status,
       ifelse(skipped_raw, "source_allele_skipped", "ok"))
     if (raw) {
-      expect_identical(replay$hgvsp_status[skipped_raw], rep("incomplete_input", 2L))
+      expect_identical(replay$hgvsp_status[skipped_raw], rep("ok", 2L))
       expect_identical(replay$cds[skipped_raw], hgvs_residual_sources$cds[skipped_raw])
       expect_identical(replay$protein[skipped_raw], c("MXA*", "MXA*"))
       expect_equal(replay$edit_count[skipped_raw], c(0L, 0L))

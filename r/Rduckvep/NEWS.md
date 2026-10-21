@@ -1,5 +1,6 @@
 # Rduckvep
 
+- The bundled extension renders singleton source-record protein HGVS independently when raw Haplosaurus replay retains an ambiguous ALT only as `source_allele_skipped` evidence.
 - The bundled extension applies Ensembl translation SeqEdits to overlapping literal alleles and matches VEP protein HGVS for start-codon insertions, exhausted frameshifts and stop-bearing 3-prime shifts.
 - The bundled extension accepts symbolic insertion spans derived from `SVLEN` and retains insertion-specific overlap consequences.
 - `rduckvep_haplotypes()` predicts consequences for phased whole-coding haplotypes under `duckvep-coding`. It accepts complete phased calls of any ploidy, literal alleles of any length, and transcripts using supported genetic codes. The phase policy is `vep_compat`; the NMD rule is `ejc50`.
