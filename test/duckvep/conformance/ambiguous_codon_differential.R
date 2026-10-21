@@ -207,7 +207,11 @@ codon_expected <- function(oracle, events, indel) {
         last <- row$parser_end
         stopifnot(is.numeric(first), is.numeric(last), length(first) == 1L, length(last) == 1L,
           is.finite(first), is.finite(last), first == floor(first), last == floor(last),
-          first >= source$position + 1L,
+          # Parser::VCF removes a shared first base only when the alleles differ in
+          # length ($is_indel); SNVs and equal-length replacements keep their span.
+          first >= source$position +
+            (substr(source$reference, 1L, 1L) == substr(source$alternate, 1L, 1L) &&
+             nchar(source$reference) != nchar(source$alternate)),
           last <= source$position + nchar(source$reference) - 1L,
           first <= last + 1L, nchar(parsed[1L]) == last - first + 1L)
         # VEP also minimises some complex indels without --minimal. Check the
@@ -356,7 +360,7 @@ main <- function() {
     'test/duckvep/conformance/raw_indel_observations.R',
     'test/duckvep/conformance/contributor_identity.R',
     'test/duckvep/conformance/reference_translation_oracle.pl', 'scripts/duckvep_evidence.R',
-    list.files('src/duckvep', recursive = TRUE, full.names = TRUE, pattern = '\\.[ch]$'))
+    list.files('src/kernel', recursive = TRUE, full.names = TRUE, pattern = '\\.[ch]$'))
   source_hashes <- vapply(sources, duckvep_evidence_sha256, '')
   extension_hash <- duckvep_evidence_sha256(extension)
   pins <- c(vep = '57ea5c52340acc1f156267f810ad162e26597082',

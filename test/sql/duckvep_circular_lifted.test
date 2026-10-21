@@ -7730,7 +7730,7 @@ SELECT count(*), count(DISTINCT event_index), count(*) FILTER (WHERE protein_hgv
   count(DISTINCT object), count(*) FILTER (WHERE object = 'none')
 FROM res_0;
 ----
-28349	6963	2015	1815	2078	15	2200
+28349	6963	2024	1815	2078	15	2200
 
 query III
 SELECT (SELECT count(*) FROM (SELECT * FROM res_0 EXCEPT SELECT * FROM res_611)),

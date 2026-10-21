@@ -3911,17 +3911,31 @@ static int delta_context_start_peptide_altered(
         ctx, view, view->alt_length);
 }
 
+/* The start-codon facts VEP derives from a length-changing edit of the
+ * UTR+CDS string. `evaluated` is clear when the edit does not overlap the
+ * start codon in VEP's sense; the three altered flags then stay zero. */
+typedef struct delta_start_state {
+    int evaluated;
+    int altered;         /* _ins_del_start_altered                      */
+    int offset_altered;  /* _inv_start_altered: ATG at the original offset */
+    int peptide_altered; /* alternate peptide keeps neither ref edge     */
+} delta_start_state_t;
+
 /* Layer VEP's independent start predicates on a length-changing edit. VEP
  * evaluates two different views of the same edited UTR+CDS string: retained
  * compares the original CDS with the edited suffix, while its inversion helper
  * checks ATG at the original start offset. They can deliberately disagree and
- * emit both start_lost and start_retained_variant. */
+ * emit both start_lost and start_retained_variant. start_lost itself is
+ * decided by the caller: VariationEffect::start_lost consults
+ * inframe_insertion while its own cache entry is still 0, so the in-frame
+ * insertion candidate must be known before the generic test can conclude. */
 static duckvep_context_delta_status_t delta_context_start_facts(
     const duckvep_coding_context_t *ctx,
     const duckvep_coding_peptide_window_t *view,
     const delta_coding_span_t       *span,
     uint64_t                        tx_flags,
-    duckvep_sequence_delta_t       *delta) {
+    duckvep_sequence_delta_t       *delta,
+    delta_start_state_t            *state) {
 
     delta_sequence_edit_view_t sequence_edit;
     size_t edit_start0;
@@ -3930,9 +3944,11 @@ static duckvep_context_delta_status_t delta_context_start_facts(
     int offset_altered;
     int peptide_altered;
 
-    if (ctx == NULL || view == NULL || span == NULL || delta == NULL) {
+    if (ctx == NULL || view == NULL || span == NULL || delta == NULL ||
+        state == NULL) {
         return DUCKVEP_CONTEXT_DELTA_INVALID_ARG;
     }
+    memset(state, 0, sizeof *state);
     if ((tx_flags & (uint64_t)DUCKVEP_TX_CDS_START_NF) != 0u ||
         span->unpadded_start1 == 0u || span->unpadded_start1 > 3u ||
         (span->ref_len == 0u && span->unpadded_start1 == 1u)) {
@@ -3974,10 +3990,10 @@ static duckvep_context_delta_status_t delta_context_start_facts(
         : (uint8_t)!altered;
 
     peptide_altered = delta_context_start_peptide_altered(ctx, view);
-    if ((altered && !delta->inframe_insertion &&
-         !delta->inframe_deletion) || offset_altered || peptide_altered) {
-        delta->start_lost = 1u;
-    }
+    state->evaluated = 1;
+    state->altered = altered;
+    state->offset_altered = offset_altered;
+    state->peptide_altered = peptide_altered;
     return DUCKVEP_CONTEXT_DELTA_OK;
 }
 
@@ -4179,8 +4195,10 @@ static duckvep_context_delta_status_t delta_context_length_change_window(
     int alt_has_x;
     int frameshift;
     int inframe_deletion = 0;
+    int inframe_insertion_candidate;
     int preserves_ref;
     int terminal_complete;
+    delta_start_state_t start_state;
     uint32_t unpadded_start1 = span->unpadded_start1;
     int overlaps_terminal = 0;
     int overlaps_terminal_cil = 0;
@@ -4319,9 +4337,15 @@ static duckvep_context_delta_status_t delta_context_length_change_window(
     }
 
     status = delta_context_start_facts(
-        ctx, &view, span, tx_flags, delta);
+        ctx, &view, span, tx_flags, delta, &start_state);
     if (status != DUCKVEP_CONTEXT_DELTA_OK) return status;
 
+    /* VariationEffect::inframe_insertion as start_lost sees it: its own
+     * start_lost guard reads the cache entry start_lost initialised to 0, so
+     * an alternate peptide that keeps the reference start residue at an edge
+     * is in-frame there. The independent predicate is suppressed below once
+     * start_lost is decided. */
+    inframe_insertion_candidate = 0;
     if (peptide_pair_available && !frameshift && view.alt_nt_length > view.ref_nt_length &&
         !(view.ref_length == 1u && view.alt_length == 1u &&
           duckvep_coding_context_peptide_window_base(
@@ -4332,15 +4356,22 @@ static duckvep_context_delta_status_t delta_context_length_change_window(
         if (alt_has_stop && alt_scan.first_stop + 1u < alt_shape_length) {
             alt_shape_length = alt_scan.first_stop + 1u;
         }
-        preserves_ref = delta_context_vep_alt_preserves_ref_edge(
+        inframe_insertion_candidate = delta_context_vep_alt_preserves_ref_edge(
             ctx, &view, alt_shape_length);
-        if (delta->start_lost ||
-            (delta->start_retained &&
-             delta_context_vep_alt_has_ref_suffix(
-                 ctx, &view, view.alt_length))) {
-            preserves_ref = 0;
+        if (delta->start_retained &&
+            delta_context_vep_alt_has_ref_suffix(
+                ctx, &view, view.alt_length)) {
+            inframe_insertion_candidate = 0;
         }
-        if (preserves_ref) delta->inframe_insertion = 1u;
+    }
+    if (start_state.evaluated &&
+        ((start_state.altered && !inframe_insertion_candidate &&
+          !delta->inframe_deletion) ||
+         start_state.offset_altered || start_state.peptide_altered)) {
+        delta->start_lost = 1u;
+    }
+    if (inframe_insertion_candidate && !delta->start_lost) {
+        delta->inframe_insertion = 1u;
     }
 
     preserves_ref = delta_context_vep_alt_preserves_ref_edge(
@@ -5481,6 +5512,7 @@ static void sequence_delta_fill_snv(
 
     int partial_codon = duckvep_cds_position_is_partial_codon(cds_len, proj.cds_pos);
     int ambiguous_codon = 0;
+    int unknown_reference = 0;
     if (!partial_codon) {
         status = duckvep_coding_snv_from_cds(cds_seq, cds_len, &proj,
             physical.cds_pos, gref, galt, strand, table, &res);
@@ -5488,11 +5520,20 @@ static void sequence_delta_fill_snv(
         if (status != DUCKVEP_CODING_SNV_OK) return;
         ambiguous_codon = res.ref_codon[0] == 'N' || res.ref_codon[1] == 'N' ||
                           res.ref_codon[2] == 'N';
+        /* A translation SeqEdit can replace the reference residue by X
+         * (Ensembl stop-codon readthrough). TVA::peptide then presents an
+         * X-bearing reference allele beside a plainly translated alternate,
+         * so coding_unknown coexists with missense_variant or stop_gained
+         * exactly as it does for an N-bearing codon. */
+        unknown_reference = !ambiguous_codon &&
+            delta_sequence_reference_peptide_base(seq, tx_idx, proj.protein_pos,
+                (uint8_t)res.aa_ref, NULL) == (uint8_t)'X';
     }
-    /* Partial and N-bearing codons need VEP's independent peptide predicates:
-     * an X-bearing peptide can still be missense. A terminal partial REF codon
-     * can also borrow a complete ALT codon from the 3-prime UTR. */
-    if (partial_codon || ambiguous_codon) {
+    /* Partial, N-bearing and X-edited codons need VEP's independent peptide
+     * predicates: an X-bearing peptide can still be missense. A terminal
+     * partial REF codon can also borrow a complete ALT codon from the 3-prime
+     * UTR. */
+    if (partial_codon || ambiguous_codon || unknown_reference) {
         duckvep_coding_context_t ctx;
         duckvep_haplotype_edit_t edit;
         duckvep_coding_context_status_t coding_status;

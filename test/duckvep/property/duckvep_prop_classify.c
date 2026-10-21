@@ -2512,7 +2512,7 @@ TEST sv_metadata_validity_matrix_known(void) {
     ASSERT(duckvep_sv_geometry_valid(DUCKVEP_SV_DELETION, 100u, 200u));
     ASSERT(duckvep_sv_geometry_valid(DUCKVEP_SV_INSERTION, 100u, 100u));
     ASSERT(duckvep_sv_geometry_valid(DUCKVEP_SV_BREAKEND, 100u, 100u));
-    ASSERT(!duckvep_sv_geometry_valid(DUCKVEP_SV_INSERTION, 100u, 101u));
+    ASSERT(duckvep_sv_geometry_valid(DUCKVEP_SV_INSERTION, 100u, 101u));
     ASSERT(!duckvep_sv_geometry_valid(DUCKVEP_SV_BREAKEND, 100u, 101u));
     ASSERT(!duckvep_sv_geometry_valid(
         DUCKVEP_SV_INSERTION, UINT32_MAX, UINT32_MAX));

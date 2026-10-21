@@ -508,7 +508,10 @@ TEST hgvs_haplotype_start_contrast_uses_unpadded_cds(void) {
             duckvep_sequence_delta_t delta;
             ASSERT_EQ(DUCKVEP_CONTEXT_DELTA_OK,
                 duckvep_coding_context_block_delta_fill(&ctx, edits, 2u, blocks, 0u, &delta));
-            ASSERT(delta.start_lost);
+            /* VEP's cached start_lost -> inframe_insertion recursion preserves
+             * the phase-zero G anchor as an in-frame insertion. */
+            ASSERT_EQ(delta.start_lost, phase != 0u || base != 2u);
+            ASSERT_EQ(delta.inframe_insertion, phase == 0u && base == 2u);
             ASSERT_EQ(DUCKVEP_HGVS_OK, duckvep_hgvs_protein_haplotype_build(
                 &ctx, NULL, edits, 2u, blocks, block_count, 0u,
                 operations, 4u, &operation_count));
