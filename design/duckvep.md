@@ -1236,8 +1236,12 @@ tandem-DUP, tandem-repeat (`STR`), INV, INS, CNV, or unknown operation and an ex
 loss/neutral/gain/unknown copy direction. Span operations use one-based inclusive start/end
 coordinates. An insertion uses `start = end = P` for the interbase site after reference base
 `P`; preparing symbolic VCF therefore removes the left anchor, maps a span to
-`start = POS + 1, end = INFO/END`, and maps an insertion to `P = POS`. The dispatcher rejects
-contradictory operation/direction pairs. A BND row supplies both mate coordinates and never
+`start = POS + 1, end = INFO/END`, and maps an insertion to `P = POS`. VEP's `Parser::VCF`
+reads a symbolic insertion that carries SVLEN as a feature span of SVLEN bases from `POS + 1`
+and ignores END; an `INS` event with `end > start` is that reading, annotated as the span
+with the insertion class (`feature_elongation` within a feature, the bare transcript term when
+it covers one, never `transcript_amplification`). The dispatcher rejects contradictory
+operation/direction pairs. A BND row supplies both mate coordinates and never
 pretends that its two loci are one single-locus span.
 
 VEP expands a bounded `<CNV:TR>` from `RN` plus `RUS`/`RUC` or `RB` into literal alleles

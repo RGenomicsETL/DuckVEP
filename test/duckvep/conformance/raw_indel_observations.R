@@ -27,7 +27,7 @@ raw_indel_ids <- function(x) {
 }
 
 raw_indel_masks <- function() {
-  lines <- readLines('src/duckvep/kernel/src/duckvep_haplotype.h')
+  lines <- readLines('src/kernel/src/duckvep_haplotype.h')
   vapply(c(indel = 'INDEL', frameshift = 'FRAMESHIFT'), function(name) {
     pattern <- paste0('^ *DUCKVEP_HAPLOTYPE_FLAG_', name, ' += 1u << ([0-9]+), *$')
     definition <- grep(pattern, lines, value = TRUE)

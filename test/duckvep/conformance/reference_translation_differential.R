@@ -41,7 +41,7 @@ main <- function() {
   binding <- if (length(changed)) "diagnostic_unbound" else "clean_checkout"
   shared <- file.path(out, paste0("reference_translation_probe", .Platform$dynlib.ext))
   stopifnot(system2(Sys.getenv("CC", "cc"), shQuote(c("-std=c99", "-O1", "-g", "-Wall", "-Wextra",
-    "-fPIC", "-shared", "-I", "src/kernel/src", sources, "-o", shared)),
+    "-fPIC", "-shared", "-I", "src/kernel/src", "-I", "src/kernel/include", sources, "-o", shared)),
     stdout = file.path(out, "compiler.log"), stderr = file.path(out, "compiler.log")) == 0L)
   dll <- dyn.load(shared)
   on.exit(dyn.unload(shared), add = TRUE)

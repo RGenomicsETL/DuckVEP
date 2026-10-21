@@ -1,5 +1,78 @@
 # DuckVEP
 
+## Singleton source-record HGVSp with ambiguous alleles
+
+- One-contributor `source_records` paths render protein HGVS from the independently normalized ALT when raw Haplosaurus replay marks an ambiguous ALT as `source_allele_skipped`. Raw CDS, protein, evidence and prediction status remain container-owned.
+
+## Alleles on reference peptides that carry a translation SeqEdit
+
+- Cache-mode Ensembl VEP 116 applies a translation SeqEdit (`initial_met`,
+  `_selenocysteine`, `amino_acid_sub`, `_stop_codon_rt`) to the reference
+  TranscriptVariationAllele peptide only, and only when the allele's translation window
+  covers the edited residue. A readthrough stop edited to X therefore gives every SNV in
+  that codon an X-bearing reference allele: VEP writes `coding_sequence_variant` beside
+  `missense_variant`, or beside `stop_gained` when the new codon is another stop. DuckVEP
+  declined those alleles as `unsupported_compound_consequence`; the SNV path now hands an
+  X-edited reference codon to the same peptide interpreter as an N-bearing codon. On the
+  vep-rs GRCh38 golden corpus this was the last literal-allele disagreement
+  (`1:161305878 G` on ENST00000672602).
+- An insertion inside the start codon whose alternate peptide keeps the reference start
+  residue at an edge is `inframe_insertion`, not `start_lost`: `VariationEffect::start_lost`
+  consults `inframe_insertion` while its own cache entry is still 0. DuckVEP decided
+  start_lost first and then suppressed the insertion. The start facts now report the
+  edited-string tests and the window decides start_lost after the in-frame candidate.
+- Three protein-HGVS spellings now follow `TranscriptVariationAllele` exactly: a
+  frameshift deletion whose alternate translation ends before the first changed residue
+  keeps the clipped end and reference peptide (`p.Thr8_Ter9del`, `p.Thr8_Ter9delextTer?`
+  instead of `p.Thr8del`); the `_get_fs_peptides` loop that exhausts the alternate
+  translation with every residue equal formats the last equal pair one position later
+  (`p.His8HisfsTer?`, previously no HGVS); and the protein-level 3-prime shift compares the
+  first stop of the inserted or deleted peptide as X, so an inserted stop shifts across a
+  reference residue edited to X (`p.Ter5_Glu6insTer`).
+- New lane `test/duckvep/conformance/peptide_edit_differential.R`: seeded single-exon models
+  with one edit each (readthrough X and W, selenocysteine, initial methionine, curated
+  substitution), every SNV in the edited and adjacent codons and twelve indels around the
+  edited codon, compared on SO terms and HGVSp with the pinned Perl oracle, which now stores
+  the SeqEdits in the transcript's variation-effect cache exactly as cache-mode VEP does.
+  Two 300-model campaigns (seed 173: 11,019 alleles, seed 29: 11,047 alleles) are exact on
+  every pair at one and four threads. `test/sql/duckvep_peptide_edit.test` pins twelve of
+  those witnesses. The mitochondrial fingerprint and the lifted-circular HGVS count moved
+  only on the rows of these three HGVS classes (seven and seventeen rows, enumerated by a
+  cross-revision diff; no consequence changed outside the start-codon insertion class).
+- The reference-translation and ambiguous-indel lanes referenced the kernel at its old
+  `src/duckvep` path and could not run; they use `src/kernel` again.
+
+## Outer cDNA edits that reach both the start and the stop codon
+
+- A literal allele whose outer cDNA edit leaves the CDS on at least one side has no
+  peptide alleles in Ensembl VEP 116, which then decides the start and stop terms with
+  independent transcript-string helpers. DuckVEP evaluated one side and declined a
+  feature that reached both codons (`non_contiguous_cds_edit`), or missed the second
+  side's term when the feature overlapped a codon without crossing it. The mapper-gap
+  path now follows `VariationEffect.pm` on both sides: `_overlaps_start_codon` and
+  `_overlaps_stop_codon` select the sides, `_ins_del_start_altered` and
+  `_snp_start_altered` decide the start on UTR+CDS with Perl's substr clipping and
+  `_inv_start_altered`'s length bound, `_ins_del_stop_altered` decides the stop on
+  CDS+UTR when `cds_start` is defined and `_overlaps_stop_codon_cil` alone yields
+  `stop_retained_variant` when the feature starts before the CDS, and
+  `coding_sequence_variant` stays only when no start or stop term applies. The
+  state-exploration campaign that surfaced the gap (seed 29, 300-base cap: 116
+  discordant and 128 unresolved pairs of 20,268) and four more campaigns (seeds 71 and
+  211 at 300 bases, seeds 197 and 29 at 600) are exact on every pair against executable
+  VEP 116. On vep-rs's golden corpora the literal multi-exon deletions now match VEP.
+
+## Symbolic insertions carrying SVLEN annotate as VEP's span
+
+- An `INS` event whose `end_position` exceeds its `position` is VEP's reading of a
+  symbolic insertion that carries SVLEN: `Parser::VCF` leaves the feature as a span
+  of SVLEN reference bases from POS + 1 and ignores END. DuckVEP now annotates that
+  span with the insertion class instead of refusing the geometry, so overlap terms
+  come from the span, `feature_elongation` applies within a feature and an insertion
+  that covers a whole transcript keeps the bare transcript term rather than
+  `transcript_amplification`. `end_position = position` keeps the interbase meaning.
+  On vep-rs's bundled GRCh38 golden corpus the 33 span insertions went from 89 to
+  534 of 534 Ensembl VEP 116.2 tuples matched.
+
 ## Strict handling of a single unphased heterozygote (issue #12)
 
 - Under `phase_policy := 'strict'`, an unphased heterozygous call that is the sample's only heterozygous or missing call on a transcript is read in slot order: one haplotype carries the allele and the other does not. Two or more such sites, or an unphased site beside a phased one, produce `incomplete_input`. In the HG002 measurement, 782 of 1,110 such paths were resolved and 157,343 of 158,137 paths were predicted.

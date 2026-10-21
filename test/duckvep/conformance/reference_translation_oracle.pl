@@ -158,6 +158,13 @@ while (my $line = <$input>) {
         $translation->add_Attributes(Bio::EnsEMBL::Attribute->new(-CODE => $edit->{code},
             -VALUE => join(' ', $edit->{position1}, $edit->{position1}, $edit->{alternate})));
     }
+    # Cache-mode VEP carries the translation SeqEdits in the transcript's
+    # variation-effect cache (AnnotationSource::Database::Transcript::
+    # prefetch_translation_data, `$vep_cache->{seq_edits} = $tl->get_all_SeqEdits()`),
+    # and BaseTranscriptVariation::_seq_edits reads only that cache without a
+    # database adaptor. Store the same object list so the reference
+    # TranscriptVariationAllele peptide applies the declared edits as VEP does.
+    $transcript->{_variation_effect_feature_cache}->{seq_edits} = $translation->get_all_SeqEdits();
     if ($raw_records) {
         # Fixed raw GT 1|1 gives two literal ALT slots. Construct the same VF
         # and SGF fields as Haplo::AnnotationType::Transcript, without ordinary

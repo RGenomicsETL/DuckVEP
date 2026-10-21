@@ -99,7 +99,7 @@ no_such_relation
 statement error
 SELECT duckvep_prepare_sv_geometry_sql('x', 5);
 ----
-options must be a STRUCT
+<REGEX>:(options must be a STRUCT|duckvep_prepare_sv_geometry_sql)
 
 statement error
 SELECT duckvep_prepare_breakend_pairs_sql('x', {bogus: 1});

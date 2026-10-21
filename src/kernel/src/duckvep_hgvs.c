@@ -2605,16 +2605,27 @@ static duckvep_hgvs_status_t hgvs_protein_frameshift_fact(
         return DUCKVEP_HGVS_OUT_OF_RANGE;
     alternate_position0 = (size_t)alternate_start;
     if (alternate_position0 >= alt_length) {
+        /* _get_fs_peptides "deletion of stop, no further AA in alt seq"
+         * rewrites only alt and type. start is the unclipped
+         * translation_start it just assigned; end and the reference peptide
+         * keep the values _clip_alleles left in the HGVS hash, so the
+         * formatter prints a range whenever that clipped reference peptide
+         * has more than one residue. An empty clipped reference instead
+         * takes _get_del_peptides, which this fact does not model. */
+        uint8_t last;
         if (position0 > ref_length) return DUCKVEP_HGVS_OUT_OF_RANGE;
-        reference = position0 < ref_length
-            ? hgvs_protein_reference_base(context, &fact->reference, position0)
-            : (uint8_t)'*';
-        if (reference == 0u) return DUCKVEP_HGVS_MISSING_PEPTIDE;
+        if (fact->ref_length == 0u) return DUCKVEP_HGVS_UNSUPPORTED_PROTEIN;
+        reference = hgvs_protein_window_base(
+            context, &fact->reference, &fact->window, 0, fact->ref_offset);
+        last = hgvs_protein_window_base(
+            context, &fact->reference, &fact->window, 0,
+            fact->ref_offset + fact->ref_length - 1u);
+        if (reference == 0u || last == 0u) return DUCKVEP_HGVS_MISSING_PEPTIDE;
         fact->shape = (uint8_t)DUCKVEP_HGVS_PROTEIN_DELETION;
         fact->first_position1 = start_position1;
-        fact->last_position1 = start_position1;
+        if (fact->ref_length == 1u) fact->last_position1 = start_position1;
         fact->reference_first = reference;
-        fact->reference_last = reference;
+        fact->reference_last = last;
         return DUCKVEP_HGVS_OK;
     }
     while (alternate_position0 < alt_length) {
@@ -2640,8 +2651,17 @@ static duckvep_hgvs_status_t hgvs_protein_frameshift_fact(
         if (position0 >= UINT32_MAX || alternate_position0 >= UINT32_MAX)
             return DUCKVEP_HGVS_OUT_OF_RANGE;
     }
-    if (alternate_position0 >= alt_length || reference == 0u) {
-        return DUCKVEP_HGVS_UNSUPPORTED_PROTEIN;
+    if (reference == 0u) return DUCKVEP_HGVS_UNSUPPORTED_PROTEIN;
+    if (alternate_position0 >= alt_length) {
+        /* The loop in _get_fs_peptides leaves start one past the alternate
+         * translation when every compared residue was equal, while ref and
+         * alt keep the last compared pair. VEP then formats that equal pair
+         * at the advanced start, for example p.His8HisfsTer?. */
+        if (position0 == 0u) return DUCKVEP_HGVS_UNSUPPORTED_PROTEIN;
+        reference = hgvs_protein_reference_base(
+            context, &fact->reference, position0 - 1u);
+        if (reference == 0u) return DUCKVEP_HGVS_MISSING_PEPTIDE;
+        alternate = reference;
     }
     fact->first_position1 = (uint32_t)position0 + 1u;
     fact->last_position1 = fact->first_position1;
@@ -2673,6 +2693,7 @@ static duckvep_hgvs_status_t hgvs_protein_shift_simple(
     size_t available;
     size_t limit;
     size_t shift = 0u;
+    size_t first_stop;
     int alternate;
 
     if (fact == NULL || fact->context == NULL) {
@@ -2707,12 +2728,34 @@ static duckvep_hgvs_status_t hgvs_protein_shift_simple(
      * no rotation at all even if their first residues match. */
     limit = available < pattern_length
         ? 0u : available - pattern_length + 1u;
+    /* _get_hgvs_protein_type rewrites the first stop of the alt and ref
+     * strings as X before _shift_3prime rotates them, while the following
+     * residues come from the unconverted (SeqEdit-bearing) _peptide. An
+     * inserted stop therefore shifts across a reference residue edited to X,
+     * never across a raw stop. Find that first stop in the unrotated string. */
+    first_stop = pattern_length;
+    for (shift = 0u; shift < pattern_length; shift++) {
+        uint8_t residue = hgvs_protein_window_base(
+            context, &fact->reference, &fact->window, alternate,
+            (alternate ? fact->alt_offset : fact->ref_offset) + shift);
+        if (residue == 0u) return DUCKVEP_HGVS_MISSING_PEPTIDE;
+        if (residue == (uint8_t)'*') {
+            first_stop = shift;
+            break;
+        }
+    }
+    shift = 0u;
     while (shift < limit) {
         uint8_t pattern;
         uint8_t following;
+        size_t rotation = alternate ? fact->alt_rotation : fact->ref_rotation;
         duckvep_hgvs_status_t status = duckvep_hgvs_protein_base(
             fact, alternate, 0u, &pattern);
         if (status != DUCKVEP_HGVS_OK) return status;
+        if (rotation % pattern_length == first_stop) {
+            pattern = hgvs_protein_type_residue(
+                pattern, (duckvep_compat_profile_t)fact->compatibility_profile);
+        }
         following = hgvs_protein_reference_base(
             context, &fact->reference, post_start0 + shift);
         if (following == 0u) return DUCKVEP_HGVS_MISSING_PEPTIDE;

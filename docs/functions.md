@@ -312,7 +312,7 @@ Annotation runs as SQL emitted by a builder and executed with `query()`. The eve
 | `seq_region` | Model-local region ordinal. |
 | `position` | One-based position. |
 | `reference`, `alternate` | Literal REF and ALT alleles. |
-| `end_position`, `structural_type`, `copy_change` | Nullable single-locus structural span, type and copy direction. |
+| `end_position`, `structural_type`, `copy_change` | Nullable single-locus structural span, type and copy direction. An `INS` row with `end_position = position` is the interbase site after that base; an `INS` row with a wider interval is VEP's reading of a symbolic insertion that carries SVLEN (a span of SVLEN reference bases from POS + 1, END ignored), annotated as that span with the insertion class. |
 | `mate_seq_region`, `mate_position` | Nullable mate coordinates for a paired breakend. |
 
 The relation is classified as a small variant, an exact structural event or a paired breakend, and dispatched to the matching native lane. Wide provenance (genotypes, raw ALT, confidence intervals) stays in the caller's table and is joined back by `event_index`.

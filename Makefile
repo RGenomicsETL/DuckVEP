@@ -36,6 +36,10 @@ check_configure: configure
 build_extension_with_metadata_debug build_extension_with_metadata_release: extension_version
 debug: build_extension_library_debug build_extension_with_metadata_debug
 release: build_extension_library_release build_extension_with_metadata_release
+
+# The evidence runner (scripts/duckvep_evidence.R) rebuilds the extension from a clean
+# revision with `make clean` then `make release`; both build trees go.
+clean: clean_build clean_cmake
 # CI builds in its container and then runs test_release on the host against those
 # artifacts, so the test targets must not rebuild. Local `make test` builds first.
 test: debug

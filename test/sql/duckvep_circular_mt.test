@@ -5,8 +5,13 @@
 # The MT region of the committed GRCh38 fixture is flagged circular here, as in Ensembl, but
 # no transcript, exon or feature crosses the origin, so the model runs on the ordinary linear
 # kernel. The fingerprint below was recorded with the extension built from 5b6d195, the
-# revision before lifted-interval execution, and must not change. It does not exercise a wrapped
-# transcript and is not evidence for circular support; duckvep_circular_lifted.test is.
+# revision before lifted-interval execution, and must not change for a lifting reason. It was
+# re-recorded once after the protein-HGVS corrections pinned by test/sql/duckvep_peptide_edit.test:
+# of 248,673 rows exactly seven moved, all frameshift deletions reaching the terminal codons
+# (five ranges such as p.Gln67delextTer? -> p.Gln67_Ter69delextTer?, two previously
+# unresolved p.Met512MetfsTer? and p.Leu97LeufsTer?); no consequence changed. It does not
+# exercise a wrapped transcript and is not evidence for circular support;
+# duckvep_circular_lifted.test is.
 
 require duckvep
 
@@ -144,7 +149,7 @@ SELECT count(*) AS result_rows, count(*) FILTER (WHERE transcript_hgvs IS NOT NU
     coalesce(protein_hgvs_status, '~')), chr(10) ORDER BY event_index, transcript_index NULLS FIRST, regulation_feature_index NULLS FIRST)) AS fingerprint
 FROM mt_result;
 ----
-248673	11027	64ed032e28ff0316a0a8c0ccb2411b0e
+248673	11027	23fb908008ad0466ddde958af60bcc2e
 
 # A snapshot of the model restores to the same arrays and the same annotation, reference FASTA included.
 query I
@@ -184,7 +189,7 @@ SELECT count(*) AS result_rows, count(*) FILTER (WHERE transcript_hgvs IS NOT NU
     coalesce(protein_hgvs_status, '~')), chr(10) ORDER BY event_index, transcript_index NULLS FIRST, regulation_feature_index NULLS FIRST)) AS fingerprint
 FROM mt_result;
 ----
-248673	11027	64ed032e28ff0316a0a8c0ccb2411b0e
+248673	11027	23fb908008ad0466ddde958af60bcc2e
 
 statement error
 SELECT duckvep_model_restore('mt_snapshot', '__TEST_DIR__/mt.dvsnap');

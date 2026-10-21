@@ -1310,9 +1310,12 @@ hashes, package lock, source identity and missing/extra/sequence corruption
 controls, and fails if any native reference or alternate comparison differs.
 Original Haplosaurus inputs and expectations are not changed. This
 lane does not certify public protein differences, compound SO or HGVS.
-The models have phase zero. Core reference peptide edits are exercised, but the
-observer does not populate the variation model's `_seq_edits` cache. Its six
-independent HGVS observations do not certify allele-local peptide-edit behavior.
+The models have phase zero. The oracle stores the declared translation SeqEdits
+in the transcript's variation-effect cache exactly as cache-mode VEP does
+(`AnnotationSource::Database::Transcript::prefetch_translation_data`), so the
+reference TranscriptVariationAllele peptide carries them; its six independent
+HGVS observations sit on unedited residues and do not certify allele-local
+peptide-edit behavior, which `peptide_edit_differential.R` below does.
 The complete [reference-translation bundle](data/reference_translation_consensus)
 retains raw cases, oracle observations, all pair fields, controls and source hashes.
 Use `--evidence-out NEW_DIRECTORY` to export a run; existing directories are not
@@ -1381,6 +1384,27 @@ source identities, reconstructed oracle expectations and route-qualified keys
 must match, and no previously passing HGVSp or SO comparison may fail. Controls
 exchange failures while preserving every aggregate stratum. Explicit directory
 and digest arguments audit individual bundles without asserting cross-run improvement.
+
+`Rscript test/duckvep/conformance/peptide_edit_differential.R --models 300 --seed 173`
+compares original alleles on transcripts whose reference peptide carries one Ensembl
+translation SeqEdit. Each seeded model is a forward single-exon CDS of seven to thirteen
+codons with ten-base genomic flanks and exactly one edit, cycling through a readthrough
+stop edited to X, a readthrough stop edited to W, a selenocysteine TGA, a non-ATG
+initial methionine and a curated `amino_acid_sub` residue. Every SNV in the edited
+codon and in the adjacent codons, plus twelve seeded insertions, deletions and
+replacements anchored in a window around the edited codon, go through the pinned
+`reference_translation_oracle.pl` in VCF mode. The oracle stores the declared edits in
+the transcript's variation-effect cache as cache-mode VEP's
+`prefetch_translation_data` does, so the reference TranscriptVariationAllele peptide is
+edited and the alternate is not. SO terms and HGVSp are compared on every retained pair
+through `duckvep_annotate_sql` with `peptide_edit_query`, at one and four threads, with
+the ambiguous-codon comparator and its corruption controls. Pairs are stratified by edit
+family, variant family and whether the uploaded span touches the edited codon; the
+unedited neighbours are same-transcript controls. Receipts retain sources, oracle
+output, pairs, summaries, module and binary hashes; the supplied extension is
+diagnostic. `--evidence-out` retains a compact bundle. The lane surfaced the X-edited
+SNV class, the start-codon insertion ordering and three protein-HGVS spellings recorded
+in `NEWS.md`; seeds 173 and 29 (11,019 and 11,047 alleles) are exact on every pair.
 
 `compound_coding_audit.R --artifacts results/<haplotype-run>` observes the native
 coding-context evaluator on every original edit set, including reference lanes.

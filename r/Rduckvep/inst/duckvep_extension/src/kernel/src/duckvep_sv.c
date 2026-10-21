@@ -248,7 +248,10 @@ int duckvep_sv_geometry_valid(duckvep_sv_type_t sv_type,
                               uint32_t start1, uint32_t end1) {
     if (start1 == 0u || end1 < start1) return 0;
     if (sv_type == DUCKVEP_SV_INSERTION) {
-        return start1 == end1 && start1 != UINT32_MAX;
+        /* start1 == end1 is the interbase site after that base. A wider
+         * interval is VEP's reading of a symbolic insertion that carries
+         * SVLEN: a feature span of SVLEN reference bases from POS + 1. */
+        return start1 != UINT32_MAX;
     }
     if (sv_type == DUCKVEP_SV_BREAKEND) {
         return start1 == end1;

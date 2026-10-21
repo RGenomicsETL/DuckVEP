@@ -151,10 +151,13 @@ int duckvep_sv_metadata_valid(duckvep_sv_type_t sv_type,
                               duckvep_copy_change_t copy_change);
 
 /* Validate the geometry accepted by the borrowed SV batch. Ordinary operations
- * use an exact inclusive span. INSERTION uses start1=end1 as the interbase
+ * use an exact inclusive span. INSERTION with start1=end1 is the interbase
  * boundary after that reference base; event preparation turns it into VEP's
- * reversed P+1,P feature interval. BND uses start1=end1 for its local VCF
- * endpoint and additionally requires mate_chrom_id/mate_pos1. */
+ * reversed P+1,P feature interval. INSERTION with end1 > start1 is VEP's
+ * reading of a symbolic insertion carrying SVLEN, a feature span of SVLEN
+ * reference bases from POS + 1 that keeps the insertion class. BND uses
+ * start1=end1 for its local VCF endpoint and additionally requires
+ * mate_chrom_id/mate_pos1. */
 int duckvep_sv_geometry_valid(duckvep_sv_type_t sv_type,
                               uint32_t start1, uint32_t end1);
 

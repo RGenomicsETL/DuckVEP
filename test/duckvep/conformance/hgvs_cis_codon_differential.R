@@ -216,7 +216,7 @@ cis_codon_main <- function() {
   revision <- duckvep_evidence_revision('.')
   sources <- unique(c('test/duckvep/conformance/hgvs_cis_codon_differential.R',
     'test/duckvep/conformance/contributor_identity.R',
-    'scripts/duckvep_evidence.R', list.files('src/duckvep', recursive = TRUE,
+    'scripts/duckvep_evidence.R', list.files('src/kernel', recursive = TRUE,
       full.names = TRUE, pattern = '\\.[ch]$')))
   hashes <- vapply(sources, sha, '')
   extension_hash <- sha(extension)
