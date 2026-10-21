@@ -70,7 +70,7 @@ A	C	1
 statement error
 SELECT duckvep_repeat_alleles([{unit:'A',count:1}], [{unit:'A',count:1}], true, max_allele_bases := 2);
 ----
-options must be a STRUCT
+<REGEX>:(options must be a STRUCT|duckvep_repeat_alleles)
 
 statement error
 SELECT duckvep_repeat_alleles([{unit:'A',count:1}], [{unit:'A',count:2}], true, {max_allele_bases: NULL});

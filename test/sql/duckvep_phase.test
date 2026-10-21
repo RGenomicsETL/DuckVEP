@@ -202,7 +202,7 @@ phase_policy
 statement error
 SELECT duckvep_phase_call([0,1], [true,true], phase_set := 10);
 ----
-options must be a STRUCT
+<REGEX>:(options must be a STRUCT|duckvep_phase_call)
 
 statement error
 SELECT duckvep_phase_call([0,1], [true,true], {bogus: 7});

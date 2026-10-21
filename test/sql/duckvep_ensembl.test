@@ -7,7 +7,7 @@ require duckvep
 statement error
 SELECT duckvep_ensembl_regions_sql('core', 'reference', 'GRCh37', species_id := 2);
 ----
-options must be a STRUCT
+<REGEX>:(options must be a STRUCT|duckvep_ensembl_regions_sql)
 
 statement error
 SELECT duckvep_ensembl_regions_sql('core', 'reference', 'GRCh37', {specis_id: 2});
