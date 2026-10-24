@@ -1,6 +1,6 @@
 # Reached-effect equality audit
 
-`test/sql_v2/equality_golden.json` is a cross-implementation baseline, not an effect oracle. Of its 636 cases, 628 are unchanged and eight differ in the qualified reached-effect candidate. All 636 current v1/v2 outcomes agree, including 198 expected errors. The JSON baseline is not rewritten by this audit.
+`test/sql_v2/equality_golden.json.gz` (gzip) is a cross-implementation baseline, not an effect oracle. Of its 636 cases, 628 are unchanged and eight differ in the qualified reached-effect candidate. All 636 current v1/v2 outcomes agree, including 198 expected errors. The JSON baseline is not rewritten by this audit.
 
 Candidate binary SHA256 values:
 

@@ -365,7 +365,7 @@ SELECT c.prediction_status,c.prediction_reason,c.nmd_prediction,h.nmd_prediction
  FROM (SELECT *,unnest(carrier_predictions) c FROM duckvep_haplotypes(
   'SELECT * FROM nm_calls WHERE transcript_index=(SELECT transcript_index FROM nm_ix)','nm',phase_policy:='vep_compat')) h;
 ----
-unsupported_context	non_strict_phase_policy	unknown	unknown	ejc50
+predicted	supported_domain	trigger	trigger	ejc50
 
 # Reference lanes: an ALT-free lane carries no carrier in strict decoded output, so it has no row to label (222 golden lanes
 # above); the goldens record it as not_applicable, and a lane whose path has no edits gets not_applicable in the kernel

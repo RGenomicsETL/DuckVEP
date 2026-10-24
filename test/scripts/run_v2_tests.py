@@ -13,11 +13,12 @@ table), so this runner refuses an engine whose source id differs.
                       golden file live. Skipped when absent.
 
 Checks: 1. LOAD (read-only, twice, no DDL, no database change); 2. v2-only SQL
-assertions; 3. every equality case against test/sql_v2/equality_golden.json, the
+assertions; 3. every equality case against test/sql_v2/equality_golden.json.gz, the
 recorded v1-host results; 4. with --v1-extension, the golden against the live v1 host.
 Use --record to regenerate the golden file from the v1 host.
 """
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -32,7 +33,7 @@ CASES = ROOT / "test/sql_v2/equality_cases.sql"
 NATIVE = ROOT / "test/sql_v2/v2_native.sql"
 MODEL = ROOT / "test/sql_v2/v2_model.sql"
 BUDGET = ROOT / "test/sql_v2/v2_budget.sql"
-GOLDEN = ROOT / "test/sql_v2/equality_golden.json"
+GOLDEN = ROOT / "test/sql_v2/equality_golden.json.gz"
 PIN = json.loads((ROOT / "duckvep-package.json").read_text())["v2_host"]
 MESSAGE = re.compile(r"(?:duckvep_\w+|_duckvep_\w+|DuckVEP builder): [^\n]*")
 
@@ -284,14 +285,14 @@ def main():
     if args.record:
         outcomes = v1_outcomes(args.v1_extension, parse_cases())
         check_case_shape(outcomes)
-        GOLDEN.write_text(json.dumps(outcomes, indent=1, sort_keys=True) + "\n")
+        GOLDEN.write_bytes(gzip.compress((json.dumps(outcomes, indent=1, sort_keys=True) + "\n").encode(), mtime=0))
         print(f"recorded {len(outcomes)} cases from the v1 host into {GOLDEN.relative_to(ROOT)}")
         return
     if not args.v2_duckdb:
         raise SystemExit("set DUCKVEP_V2_DUCKDB or --v2-duckdb to a DuckDB CLI built at the pinned revision")
     host = V2Host(args.v2_duckdb, args.v2_extension)
     check_engine(host)
-    golden = json.loads(GOLDEN.read_text())
+    golden = json.loads(gzip.decompress(GOLDEN.read_bytes()))
     if args.only:
         for name, query in parse_cases():
             if args.only in name:

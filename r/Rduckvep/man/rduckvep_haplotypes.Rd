@@ -134,9 +134,11 @@ any ploidy (a haploid call has one lane), one unambiguous heterozygous phase
 domain per transcript and sample (an unphased heterozygous call that is the
 sample's only heterozygous call on the transcript needs no phase), literal ACGT SNVs, MNVs and indels of any
 length, non-overlapping and inside coding exons of CDSs in a supported genetic
-code with no curated RNA or peptide edits. A complete CDS needs a start codon
+code, including typed curated peptide programmes. A complete CDS needs a start codon
 (ATG in the standard code) and a terminal stop; a CDS whose start or end is not
-annotated is predicted without the test for the missing end. Statuses: `incomplete_input` (reasons
+annotated, or whose sequence lacks one, is predicted without the test for that end.
+Under `vep_compat`, decoded calls are read in GT slot order, as VEP's haplotype mode
+does, and classified like strict ones. Statuses: `incomplete_input` (reasons
 `missing_call`, `unphased_heterozygous`, `unresolved_cross_ps_phase`),
 `edit_conflict` (`contradictory_edits`), `unsupported_overlap`
 (`overlapping_edits`, `duplicate_edits`, `ambiguous_same_gap_insertions`) and

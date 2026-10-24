@@ -3328,9 +3328,9 @@ TEST haplotype_stream_prediction_is_keyed_and_retains_every_contributor(void) {
         ASSERT_EQ((int)DUCKVEP_ROLE_APPLIED, (int)leaf.contributors[0].role);
         ASSERT_EQ(1u, leaf.contributors[0].edit_count);
         ASSERT_EQ(1u, leaf.listed_edit_count);
-        /* The scene CDS has no ATG start, so the path is outside the v1 domain. */
-        ASSERT_EQ((int)DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, (int)leaf.path_status);
-        ASSERT_EQ((int)DUCKVEP_REASON_NONCANONICAL_START, (int)leaf.path_reason);
+        /* The scene CDS has no start codon, so it is read as if its start were not annotated. */
+        ASSERT_EQ((int)DUCKVEP_PREDICTION_PREDICTED, (int)leaf.path_status);
+        ASSERT_EQ((int)DUCKVEP_REASON_SUPPORTED_DOMAIN, (int)leaf.path_reason);
         const duckvep_carrier_call_t *c = duckvep_carriers_call(&s->carriers, leaf.carriers.first_call);
         duckvep_prediction_status_t status;
         duckvep_prediction_reason_t reason;
@@ -3515,10 +3515,12 @@ TEST haplotype_annotated_non_atg_start_retains_source_and_product_effects(void) 
         {"CTG", "T", 7u, 1u, 0u, DUCKVEP_PREDICTION_PREDICTED, DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED)},
         {"CTG", "C", 2u, 1u, 0u, DUCKVEP_PREDICTION_PREDICTED, DUCKVEP_SO(DUCKVEP_SO_START_LOST)},
         {"CTG", "A", 4u, 1u, 0u, DUCKVEP_PREDICTION_PREDICTED, DUCKVEP_SO(DUCKVEP_SO_MISSENSE)},
-        {"CTG", "A", 4u, 0u, 0u, DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, 0u},
+        /* Without a declared code CTG is not a start, so the start is read as not annotated. */
+        {"CTG", "A", 4u, 0u, 0u, DUCKVEP_PREDICTION_PREDICTED, DUCKVEP_SO(DUCKVEP_SO_MISSENSE)},
         {"CTG", "A", 4u, 1u, 1u, DUCKVEP_PREDICTION_PREDICTED, DUCKVEP_SO(DUCKVEP_SO_MISSENSE)},
         {"NTG", "A", 4u, 1u, 0u, DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, 0u},
-        {"CCG", "A", 4u, 1u, 0u, DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, 0u},
+        /* CCG is no start codon: the start is read as not annotated. */
+        {"CCG", "A", 4u, 1u, 0u, DUCKVEP_PREDICTION_PREDICTED, DUCKVEP_SO(DUCKVEP_SO_MISSENSE)},
         {"CTG", "T", 1u, 1u, 0u, DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT, 0u}
     };
     for (int reverse = 0; reverse < 2; reverse++) for (size_t n = 0u; n < sizeof(cases)/sizeof(cases[0]); n++) {

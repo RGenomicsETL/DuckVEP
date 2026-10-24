@@ -76,12 +76,12 @@ local({
     haplotype_lane = c(1, 1, 2, 1, 2, 2, 1, 1, rep(1, 14)),
     prediction_status = unname(status[c("predicted", "predicted", "predicted", "predicted", "incomplete",
       "predicted", "incomplete", "incomplete", "conflict", "conflict", "context",
-      "predicted", "predicted", "predicted", rep("context", 3), "predicted", "predicted", "predicted", "predicted", "predicted")]),
+      "predicted", "predicted", "predicted", "context", "predicted", "context", "predicted", "predicted", "predicted", "predicted", "predicted")]),
     prediction_reason = c("supported_domain", "supported_domain", "supported_domain",
       "supported_domain", "missing_call", "supported_domain",
       "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "contradictory_edits",
       "contradictory_edits", "outside_cds", "supported_domain", "supported_domain",
-      "supported_domain", "internal_stop", "noncanonical_stop", "untyped_curated_metadata",
+      "supported_domain", "internal_stop", "supported_domain", "untyped_curated_metadata",
       "supported_domain", "supported_domain", "supported_domain", "supported_domain",
       "supported_domain"),
     stringsAsFactors = FALSE)
@@ -192,11 +192,11 @@ local({
   same <- which(result$cds == "ATGATTGCTGAAGGTTAA")
   expect_equal(sort(vapply(same, function(i) nrow(result$contributor_provenance[[i]]), 0L)), c(1L, 2L))
 
-  # Decoded vep_compat replay has no original-call copy proof.
+  # Decoded vep_compat reads GT slots in order, as VEP's haplotype mode does, and classifies like strict.
   compat <- rduckvep_haplotypes(con, "SELECT * FROM elig_calls WHERE sample_index IN (1,2,3,4)",
     "elig", phase_policy = "vep_compat")
   ck <- do.call(rbind, compat$carrier_predictions)
-  expect_true(all(ck$prediction_reason[ck$sample_index %in% c(1, 2, 4)] == "non_strict_phase_policy"))
+  expect_true(all(ck$prediction_status[ck$sample_index %in% c(1, 2, 4)] == "predicted"))
   expect_true(all(ck$prediction_reason[ck$sample_index == 3] == "missing_call"))
   dbExecute(con, "CREATE TABLE elig_raw AS SELECT 1::UBIGINT event_index,0::UINTEGER seq_region,103::UBIGINT AS position,'G' AS reference,['A'] AS alternates,0::UINTEGER transcript_index,0::UINTEGER sample_index,'1|0' AS gt")
   rawres <- rduckvep_haplotypes(con, "SELECT * FROM elig_raw", "elig",

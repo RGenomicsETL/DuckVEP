@@ -687,7 +687,10 @@ static int phase_padding_ok(const uint8_t *cds, unsigned phase, int open_start) 
 /* CDS in a supported genetic code, stored in frame (see phase_padding_ok), with no curated RNA/peptide edit
  * or recoding. A complete CDS has a start codon, a terminal stop and no internal stop. A CDS whose start is
  * not annotated (cds_start_NF) need not begin with a start codon; one whose end is not annotated (cds_end_NF)
- * has no stop at all and may end in a partial codon. Cached per transcript. */
+ * has no stop at all and may end in a partial codon. A CDS whose sequence lacks a start codon, a terminal
+ * stop or a whole last codon is read as if that end were not annotated, as VEP translates it: the flag the
+ * sequence implies is added to domain_flags. An in-frame stop before the end leaves no whole product to
+ * compare. Cached per transcript. */
 static duckvep_prediction_reason_t transcript_domain(duckvep_haplotype_stream_t *s, uint32_t tx) {
     if (s->have_domain && s->domain_transcript == tx) return s->domain_reason;
     const duckvep_transcript_model_t *m = s->carriers.model;
@@ -705,17 +708,19 @@ static duckvep_prediction_reason_t transcript_domain(duckvep_haplotype_stream_t 
     else if ((flags & curated) || (seq->peptide_edit_offset &&
              seq->peptide_edit_offset[tx + 1u] != seq->peptide_edit_offset[tx]))
         r = DUCKVEP_REASON_CURATED_TRANSCRIPT;
-    else if (length < 6u || (length % 3u && !(flags & DUCKVEP_TX_CDS_END_NF)) ||
-             !phase_padding_ok(seq->cds_bytes + (size_t)offset, m->cds_phase_offset ? m->cds_phase_offset[tx] : 0u,
-                               (flags & DUCKVEP_TX_CDS_START_NF) != 0u))
-        r = DUCKVEP_REASON_INCOMPLETE_CDS; /* too short, truncated without the flag, or an unpadded later phase */
+    else if (length < 6u) r = DUCKVEP_REASON_INCOMPLETE_CDS;
     else {
         const uint8_t *c = seq->cds_bytes + (size_t)offset;
         duckvep_codon_table_t table = seq->codon_table
             ? (duckvep_codon_table_t)seq->codon_table[tx] : DUCKVEP_CODON_TABLE_STANDARD;
+        if (!(flags & DUCKVEP_TX_CDS_START_NF) && !start_codon_of(c, table, seq->codon_table != NULL))
+            flags |= DUCKVEP_TX_CDS_START_NF;
+        if (!(flags & DUCKVEP_TX_CDS_END_NF) && (length % 3u || !stop_codon_of(c + length - 3u, table)))
+            flags |= DUCKVEP_TX_CDS_END_NF;
         size_t codons = length / 3u, open_end = (flags & DUCKVEP_TX_CDS_END_NF) != 0u;
-        if (!(flags & DUCKVEP_TX_CDS_START_NF) && !start_codon_of(c, table, seq->codon_table != NULL)) r = DUCKVEP_REASON_NONCANONICAL_START;
-        else if (!open_end && !stop_codon_of(c + length - 3u, table)) r = DUCKVEP_REASON_NONCANONICAL_STOP;
+        if (!phase_padding_ok(c, m->cds_phase_offset ? m->cds_phase_offset[tx] : 0u,
+                              (flags & DUCKVEP_TX_CDS_START_NF) != 0u))
+            r = DUCKVEP_REASON_INCOMPLETE_CDS; /* an unpadded later phase */
         else for (size_t i = 1u; i + (open_end ? 0u : 1u) < codons; i++)
             if (stop_codon_of(c + 3u * i, table)) { r = DUCKVEP_REASON_INTERNAL_STOP; break; }
         if (r == DUCKVEP_REASON_SUPPORTED_DOMAIN && open_end && stop_codon_of(c, table))
@@ -724,7 +729,14 @@ static duckvep_prediction_reason_t transcript_domain(duckvep_haplotype_stream_t 
     s->have_domain = 1u;
     s->domain_transcript = tx;
     s->domain_reason = r;
+    s->domain_flags = flags;
     return r;
+}
+
+/* Transcript flags with the open ends transcript_domain inferred, once it has run for tx. */
+static uint64_t domain_flags(const duckvep_haplotype_stream_t *s, uint32_t tx) {
+    if (s->have_domain && s->domain_transcript == tx) return s->domain_flags;
+    return s->carriers.model->flags ? s->carriers.model->flags[tx] : 0u;
 }
 
 /* The reference lane has no source event or carrier evidence. It reuses the
@@ -835,7 +847,7 @@ static duckvep_prediction_reason_t edit_relation(const duckvep_haplotype_edit_t 
 static int same_peptide(const duckvep_haplotype_stream_t *s, const duckvep_haplotype_leaf_t *leaf,
                         size_t first_stop) {
     uint32_t tx = leaf->carriers.transcript_index;
-    uint64_t flags = s->carriers.model->flags ? s->carriers.model->flags[tx] : 0u;
+    uint64_t flags = domain_flags(s, tx);
     /* Without an annotated start the first residue is an ordinary one, and without an annotated end the
      * reference peptide is every complete codon and the edited one must have as many, with no stop. */
     size_t skip = (flags & DUCKVEP_TX_CDS_START_NF) ? 0u : 1u;
@@ -848,7 +860,7 @@ static int same_peptide(const duckvep_haplotype_stream_t *s, const duckvep_haplo
         alt_n = first_stop ? first_stop - 1u : SIZE_MAX;
     }
     return ref_n == alt_n && ref_n >= skip &&
-        !memcmp(leaf->reference_coding_protein + skip, s->buffers.protein + skip, ref_n - skip);
+        !memcmp(leaf->reference_coding_protein + skip, leaf->protein + skip, ref_n - skip);
 }
 
 /* Biological base comparison leaves source and output spelling intact. */
@@ -958,7 +970,7 @@ static void nmd_ejc50(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *l
         leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count;
     const duckvep_haplotype_edit_t *edits = !rna_edits && leaf->joint_edits ? leaf->joint_edits : s->buffers.edits;
     if (mask & DUCKVEP_SO(DUCKVEP_SO_START_LOST)) return;          /* lost initiation */
-    const int open_end = m && m->flags && (m->flags[leaf->carriers.transcript_index] & DUCKVEP_TX_CDS_END_NF);
+    const int open_end = m && (domain_flags(s, leaf->carriers.transcript_index) & DUCKVEP_TX_CDS_END_NF);
     if (open_end && !(mask & (DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED) | DUCKVEP_SO(DUCKVEP_SO_FRAMESHIFT)))) {
         leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE;          /* termination was not annotated and is not changed */
         return;
@@ -1294,7 +1306,7 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
         leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_NOT_APPLICABLE; /* a reference lane has no termination change */
         return;
     }
-    const uint64_t tx_flags = s->carriers.model->flags ? s->carriers.model->flags[tx] : 0u;
+    const uint64_t tx_flags = domain_flags(s, tx);
     const int open_start = (tx_flags & DUCKVEP_TX_CDS_START_NF) != 0u, open_end = (tx_flags & DUCKVEP_TX_CDS_END_NF) != 0u;
     if (!leaf->reference_coding_protein || !leaf->reference_cds || ref_length < 6u ||
         (!open_end && (ref_length % 3u || leaf->reference_coding_translation.first_stop_position1 != ref_length / 3u)) ||
@@ -1358,7 +1370,11 @@ static void classify_haplotype(duckvep_haplotype_stream_t *s, duckvep_haplotype_
           (leaf->reference_cds[2] & 0xDFu) == 'G') && s->sequences->codon_table != NULL;
     const int alt_start_declared = annotated_alternative_start ||
         (table != DUCKVEP_CODON_TABLE_STANDARD && s->sequences->codon_table != NULL);
-    if (!open_start && (alt_length < 3u || !start_codon_of(leaf->cds, table, alt_start_declared))) {
+    /* A curated initiator (an initial_met programme) still initiates while its codon is unchanged. */
+    const int curated_start = s->curated_initiator && alt_length >= 3u &&
+        same_bases(leaf->cds, leaf->reference_cds, 3u);
+    if (!open_start && !curated_start &&
+        (alt_length < 3u || !start_codon_of(leaf->cds, table, alt_start_declared))) {
         mask = DUCKVEP_SO(DUCKVEP_SO_START_LOST);
     } else if (open_end) {
         /* The reference has no annotated termination, so nothing can be lost or retained: a stop is new, a
@@ -1753,6 +1769,48 @@ static void conditional_prediction(duckvep_haplotype_stream_t *s,
     leaf->nmd_junction_position1 = 0u;
 }
 
+/* Ensembl's curated translation is the reference product, as it is for VEP: an unchanged curated codon
+ * keeps its programme and a changed codon translates ordinarily (the lifted pair built above). The
+ * whole-product classifier reads that pair in place of the raw translation, which stays the replay
+ * output in `cds`/`protein`. */
+static void classify_curated(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf) {
+    if (leaf->path_status != DUCKVEP_PREDICTION_CONDITIONAL_RECODING || !leaf->prediction_protein ||
+        !leaf->prediction_reference_protein)
+        return;
+    const size_t ref_n = leaf->prediction_reference_protein_length, alt_n = leaf->prediction_protein_length;
+    if (ref_n != s->sequences->cds_length[leaf->carriers.transcript_index] / 3u) return;
+    const uint8_t *protein = leaf->protein, *reference = leaf->reference_coding_protein;
+    const duckvep_translation_t translation = leaf->translation;
+    const duckvep_translation_t reference_translation = leaf->reference_coding_translation;
+    const size_t protein_length = leaf->protein_length;
+    size_t first_stop = 0u;
+    for (size_t i = 0u; i < alt_n && !first_stop; i++)
+        if (leaf->prediction_protein[i] == '*') first_stop = i + 1u;
+    leaf->protein = leaf->prediction_protein;
+    leaf->protein_length = alt_n;
+    leaf->translation.length = alt_n;
+    leaf->translation.first_stop_position1 = first_stop;
+    leaf->reference_coding_protein = leaf->prediction_reference_protein;
+    leaf->reference_coding_translation.length = ref_n;
+    leaf->reference_coding_translation.first_stop_position1 = ref_n;
+    leaf->path_status = DUCKVEP_PREDICTION_ELIGIBLE;
+    leaf->path_reason = DUCKVEP_REASON_SUPPORTED_DOMAIN;
+    s->curated_initiator = 1u;
+    classify_haplotype(s, leaf);
+    s->curated_initiator = 0u;
+    leaf->protein = protein;
+    leaf->protein_length = protein_length;
+    leaf->translation = translation;
+    leaf->reference_coding_protein = reference;
+    leaf->reference_coding_translation = reference_translation;
+    if (leaf->path_status != DUCKVEP_PREDICTION_PREDICTED) {
+        leaf->path_status = DUCKVEP_PREDICTION_CONDITIONAL_RECODING;
+        leaf->path_reason = DUCKVEP_REASON_ASSUMED_RECODING_PROGRAMME;
+        leaf->haplotype_so_mask = 0u;
+        leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_UNKNOWN;
+    }
+}
+
 /* raw_called: retained source events have only CALLED or private REF replay
  * evidence before folding. Original-call qualification is checked per carrier. */
 static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf,
@@ -1828,7 +1886,8 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
         reason = (leaf->evidence_flags & DUCKVEP_CARRIER_MISSING) || !(leaf->evidence_flags & DUCKVEP_CARRIER_UNPHASED)
             ? DUCKVEP_REASON_MISSING_CALL : DUCKVEP_REASON_UNPHASED_HETEROZYGOUS;
     } else if (raw ? !raw_admissible :
-               !s->have_phase_policy || s->phase_policy != DUCKVEP_PHASE_STRICT) {
+               !s->have_phase_policy || (s->phase_policy != DUCKVEP_PHASE_STRICT &&
+                                         s->phase_policy != DUCKVEP_PHASE_VEP_COMPAT)) {
         reason = DUCKVEP_REASON_NON_STRICT_PHASE_POLICY;
     } else {
         duckvep_prediction_reason_t domain = noncoding == 1 ?
@@ -1903,6 +1962,7 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
         }
     }
     conditional_prediction(s, leaf);
+    classify_curated(s, leaf);
     if (noncoding == 1 && (leaf->path_status == DUCKVEP_PREDICTION_ELIGIBLE ||
                            leaf->path_status == DUCKVEP_PREDICTION_PREDICTED)) {
         leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
@@ -2062,7 +2122,8 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
     duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf, uint32_t tx) {
     duckvep_haplotype_stream_buffers_t *b = &s->buffers;
     const duckvep_transcript_model_t *m = s->carriers.model;
-    if (!s->have_phase_policy || s->phase_policy != DUCKVEP_PHASE_STRICT ||
+    if (!s->have_phase_policy || (s->phase_policy != DUCKVEP_PHASE_STRICT &&
+                                  s->phase_policy != DUCKVEP_PHASE_VEP_COMPAT) ||
         leaf->evidence_flags != DUCKVEP_CARRIER_CALLED || leaf->contributor_count < 2u ||
         !b->joint_edits || transcript_domain(s, tx) != DUCKVEP_REASON_SUPPORTED_DOMAIN)
         return DUCKVEP_HAPLOTYPE_STREAM_OK;

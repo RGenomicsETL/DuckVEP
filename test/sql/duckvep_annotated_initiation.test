@@ -43,7 +43,7 @@ ORDER BY transcript_index,c.sample_index
 1	2	predicted	supported_domain	start_retained_variant,synonymous_variant
 1	4	predicted	supported_domain	missense_variant
 2	6	predicted	supported_domain	missense_variant
-3	7	unsupported_context	noncanonical_start	NULL
+3	7	unsupported_context	invalid_base	NULL
 
 query IITTTTT
 SELECT transcript_index,c.sample_index,cds,protein,hgvsp,prediction_reference_protein,

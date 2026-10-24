@@ -45,7 +45,7 @@ DUCKVEP_V2_DUCKDB=.deps-v2/duckdb-build/duckdb make test_v2
 
 `make test_v2` checks the SDK pin, builds the separate host, verifies that the binary exports only `duckvep_init_c_api_v2` and imports no `duckdb_*` symbols, checks the `C_STRUCT` / `v2.0.0` footer, and runs `test/scripts/check_v2_host.py static`. The static gate confirms that v2 calls are stable functions from the pinned header and that `src/core/` and `src/kernel/` contain no DuckDB API calls.
 
-The runtime suite tests repeated `LOAD` on writable and read-only databases, with no catalog DDL or database-file changes; v2-only SQL assertions; model and budget behavior; and the 601 cases in `test/sql_v2/equality_golden.json`. The golden records v1 results. When `build/release/duckvep.duckdb_extension` exists, the runner also checks those results against the live v1 extension. `test/sql_v2/README.md` documents the SQL and the separate whole-HG002 check.
+The runtime suite tests repeated `LOAD` on writable and read-only databases, with no catalog DDL or database-file changes; v2-only SQL assertions; model and budget behavior; and the 601 cases in `test/sql_v2/equality_golden.json.gz` (gzip). The golden records v1 results. When `build/release/duckvep.duckdb_extension` exists, the runner also checks those results against the live v1 extension. `test/sql_v2/README.md` documents the SQL and the separate whole-HG002 check.
 
 ## Release preflight
 

@@ -37,7 +37,7 @@ local({
   expect_identical(carriers$prediction_status,
     c(rep("predicted", 6), "unsupported_context"))
   expect_identical(carriers$prediction_reason,
-    c(rep("supported_domain", 6), "noncanonical_start"))
+    c(rep("supported_domain", 6), "invalid_base"))
   expect_true("TTGGCTGAACTGAAACGCAGCTAA" %in% got$cds[got$transcript_index == 0])
   expect_true("CTGGCTGAACTGAAACGCAGCTAA" %in% got$cds[got$transcript_index == 1])
   expect_true("LAELKRS*" %in% got$protein[got$transcript_index == 0])

@@ -6,7 +6,7 @@ Run the build, binary, static and SQL gates with a DuckDB CLI built at the SDK r
 DUCKVEP_V2_DUCKDB=/path/to/pinned/duckdb make test_v2
 ```
 
-The runtime suite checks `LOAD` twice on writable and read-only databases, no catalog or database-file changes, v2-only assertions, model-sink and native-budget behavior, and the 585 equality cases in `equality_golden.json`. The golden contains v1-host results; if a v1 extension exists at `build/release/duckvep.duckdb_extension`, the runner compares it with the live v1 host too. A case named `... error` must produce a DuckVEP error; other cases must succeed. The suite and API pin are detailed in [the v2 host guide](../../docs/v2-host.md).
+The runtime suite checks `LOAD` twice on writable and read-only databases, no catalog or database-file changes, v2-only assertions, model-sink and native-budget behavior, and the 585 equality cases in `equality_golden.json.gz` (gzip). The golden contains v1-host results; if a v1 extension exists at `build/release/duckvep.duckdb_extension`, the runner compares it with the live v1 host too. A case named `... error` must produce a DuckVEP error; other cases must succeed. The suite and API pin are detailed in [the v2 host guide](../../docs/v2-host.md).
 
 ## Whole-HG002 parity
 

@@ -352,6 +352,8 @@ typedef struct {
     uint8_t have_domain;
     uint32_t domain_transcript;
     duckvep_prediction_reason_t domain_reason;
+    uint64_t domain_flags; /* Model flags plus the cds_start_NF/cds_end_NF the CDS sequence implies. */
+    uint8_t curated_initiator; /* Set while classifying a curated product: an unchanged first codon initiates. */
     duckvep_haplotype_stream_status_t error;
     duckvep_carriers_status_t carrier_error;
     uint64_t input_events, projected_events, completed_leaves, translated_bases;
