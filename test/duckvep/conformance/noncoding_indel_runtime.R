@@ -148,9 +148,10 @@ run_noncoding_indels <- function(connection, quote) {
     refused <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status,prediction_reason,nmd_prediction,",
       "haplotype_consequences IS NULL AS no_terms,prediction_reference_protein,prediction_protein,cds,protein ",
       "FROM duckvep_haplotypes(", quote(rna_calls), ",", quote(model), ")"))
-    stopifnot(refused$prediction_status == "unsupported_context",
-      refused$prediction_reason == "unsupported_curated_edit", refused$nmd_prediction == "unknown",
-      refused$no_terms, is.na(refused$prediction_reference_protein), is.na(refused$prediction_protein))
+    # A UTR record beside an RNA programme the replay does not cover carries its own VEP terms.
+    stopifnot(refused$prediction_status == "predicted",
+      refused$prediction_reason == "per_record_terms", refused$nmd_prediction == "unknown",
+      !refused$no_terms, is.na(refused$prediction_reference_protein), is.na(refused$prediction_protein))
     if (kind == "withheld") stopifnot(is.na(refused$cds), is.na(refused$protein)) else
       stopifnot(refused$cds == "ATGAAATAA", refused$protein == "MK*")
     DBI::dbGetQuery(connection, paste0("SELECT duckvep_model_drop(", quote(model), ")"))

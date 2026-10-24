@@ -302,6 +302,7 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_project(
     p->source_selected = 1u;
     p->selection_set = 0u;
     p->source_exonic = 1u;
+    p->frameshift_intron = 0u;
     if (p->status == DUCKVEP_CDS_EDIT_OUT_OF_CDS && s->sequences->cds_length[tx] &&
         model->cds_start1 && model->cds_end1 && model->cds_start1[tx] &&
         model->exon_offset && model->exon_count && model->exon_count[tx] &&
@@ -315,12 +316,14 @@ duckvep_haplotype_stream_status_t duckvep_haplotype_stream_project(
             prepared->interbase ? prepared->insertion_boundary0 : prepared->start1,
             prepared->interbase ? duckvep_event_right_flank1(prepared) : prepared->end1,
             0u, 0u);
-        p->source_exonic = region.overlaps_exon;
         /* Haplosaurus admits whole source spans through exons. Intronic
          * context still has provenance but cannot alter its literal CDS,
-         * including the short gaps classified as frameshift introns by SO. */
-        p->cds_unaffected = !region.overlaps_cds ||
-            (stored->source.source_record && !region.overlaps_exon);
+         * including the short gaps classified as frameshift introns by SO:
+         * splicing is the model's. A record that changes an essential splice
+         * site is caught after prediction (per-record terms). */
+        p->cds_unaffected = !region.overlaps_cds || !region.overlaps_exon;
+        p->source_exonic = region.overlaps_exon;
+        p->frameshift_intron = region.within_frameshift_intron;
     }
     stored->projection_count++;
     if (model->end1[tx] > stored->last_end1) stored->last_end1 = model->end1[tx];
@@ -933,6 +936,8 @@ static uint64_t reached_codon_effects(const duckvep_haplotype_stream_t *s,
 }
 
 static int same_island(const duckvep_haplotype_edit_t *a, const duckvep_haplotype_edit_t *b, int8_t strand);
+static int island_relation(const duckvep_haplotype_edit_t *a, const duckvep_haplotype_edit_t *b, int8_t strand);
+static int literal_pair_conflict(const duckvep_haplotype_edit_t *a, const duckvep_haplotype_edit_t *b, int8_t strand);
 
 static int source_edit_geometry(const duckvep_haplotype_stream_t *s, uint32_t tx,
     const duckvep_haplotype_leaf_t *leaf, size_t edit, uint64_t *q,
@@ -1645,7 +1650,14 @@ static int noncoding_haplotype_mask(duckvep_haplotype_stream_t *s,
     duckvep_haplotype_status_t status = duckvep_haplotype_apply_cds_edits(b->noncoding, total,
         b->edits, count, m->strand[tx], b->noncoding + total, b->noncoding_capacity / 2u,
         &alternate_length, &applied);
-    if (status == DUCKVEP_HAPLOTYPE_EDIT_ORDER) return -3;
+    if (status == DUCKVEP_HAPLOTYPE_EDIT_ORDER) {
+        /* Overlapping RNA edits follow the literal rule: records that claim one base or site
+         * differently conflict (-5); agreeing ones are not composed here (-3). */
+        for (size_t i = 0u; i < count; i++)
+            for (size_t j = i + 1u; j < count; j++)
+                if (literal_pair_conflict(&b->edits[i], &b->edits[j], m->strand[tx])) return -5;
+        return -3;
+    }
     if (status == DUCKVEP_HAPLOTYPE_REF_MISMATCH) return -1;
     if (status == DUCKVEP_HAPLOTYPE_BUFFER_TOO_SMALL) return -4;
     if (status != DUCKVEP_HAPLOTYPE_OK) return -2;
@@ -1811,6 +1823,30 @@ static void classify_curated(duckvep_haplotype_stream_t *s, duckvep_haplotype_le
     }
 }
 
+/* A typed RNA editing programme is part of the transcript, as Ensembl's API applies it and VEP reads it.
+ * Its admitted profile changes equal-length bases on a fixed RNA/CDS map, so the paired peptides
+ * (reference and allele, both through the programme, to the first stop) differ only by residues: the
+ * first differing residue decides stop gained, stop lost or missense, and equal peptides are
+ * synonymous. NMD stays unknown. */
+static void classify_rna_programme(duckvep_haplotype_leaf_t *leaf) {
+    if (leaf->path_status != DUCKVEP_PREDICTION_CONDITIONAL_RNA || !leaf->prediction_protein ||
+        !leaf->prediction_reference_protein)
+        return;
+    const uint8_t *r = leaf->prediction_reference_protein, *a = leaf->prediction_protein;
+    const size_t nr = leaf->prediction_reference_protein_length, nv = leaf->prediction_protein_length;
+    size_t i = 0u;
+    while (i < nr && i < nv && r[i] == a[i]) i++;
+    uint64_t mask;
+    if (i == nr && i == nv) mask = DUCKVEP_SO(DUCKVEP_SO_SYNONYMOUS);
+    else if (i < nv && a[i] == '*') mask = DUCKVEP_SO(DUCKVEP_SO_STOP_GAINED);
+    else if (i < nr && r[i] == '*') mask = DUCKVEP_SO(DUCKVEP_SO_STOP_LOST);
+    else mask = DUCKVEP_SO(DUCKVEP_SO_MISSENSE);
+    leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
+    leaf->path_reason = DUCKVEP_REASON_SUPPORTED_DOMAIN;
+    leaf->haplotype_so_mask = mask;
+    leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_UNKNOWN;
+}
+
 /* raw_called: retained source events have only CALLED or private REF replay
  * evidence before folding. Original-call qualification is checked per carrier. */
 static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_leaf_t *leaf,
@@ -1894,6 +1930,13 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
             DUCKVEP_REASON_SUPPORTED_DOMAIN : transcript_domain(s, tx);
         for (size_t i = 0u; i < leaf->contributor_count && reason == DUCKVEP_REASON_SUPPORTED_DOMAIN; i++) {
             const duckvep_haplotype_contributor_t *c = &leaf->contributors[i];
+            /* A record that touches no exon leaves the product to the model's splicing. */
+            if (c->projection_status == DUCKVEP_CDS_EDIT_OUT_OF_CDS && !raw) {
+                const duckvep_haplotype_stored_event_t *e = find_event(s, b->leaf_events[i].event_id);
+                const duckvep_haplotype_projection_t *p = e ? find_projection(s, e, tx) : NULL;
+                /* VEP reads a frameshift intron (a gap of at most 12 bases) as coding sequence. */
+                if (p && p->cds_unaffected && !p->source_exonic && !p->frameshift_intron) continue;
+            }
             if (c->projection_status != DUCKVEP_CDS_EDIT_OK && noncoding != 1) {
                 reason = DUCKVEP_REASON_PROJECTION;
                 leaf->prediction_projection = c->projection_status;
@@ -1911,6 +1954,9 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
         } else if (noncoding == -3) {
             status = DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP;
             reason = DUCKVEP_REASON_OVERLAPPING_EDITS;
+        } else if (noncoding == -5) {
+            status = DUCKVEP_PREDICTION_EDIT_CONFLICT;
+            reason = DUCKVEP_REASON_CONTRADICTORY_EDITS;
         } else if (noncoding == -4) {
             reason = DUCKVEP_REASON_SEQUENCE_CAPACITY;
         } else if (reason != DUCKVEP_REASON_SUPPORTED_DOMAIN) {
@@ -1987,6 +2033,7 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
             (leaf->sequence_status == DUCKVEP_HAPLOTYPE_OK ||
              (leaf->sequence_status == DUCKVEP_HAPLOTYPE_INVALID_ARG && !leaf->cds)) &&
             conditional_rna_prediction(s, leaf, rna_edits);
+        classify_rna_programme(leaf);
         if (!supported && leaf->path_status == DUCKVEP_PREDICTION_PREDICTED) {
             leaf->path_status = DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT;
             leaf->path_reason = DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT;
@@ -2109,6 +2156,26 @@ static void source_changed_span(const duckvep_haplotype_source_t *a, uint64_t *l
     if (prefix + suffix == a->ref_len) { prefix = suffix = 0u; }
     *lo = a->pos1 + prefix;
     *hi = a->pos1 + a->ref_len - 1u - suffix;
+}
+
+/* Two islands that claim one base or site differently: the island relation's contradictions, plus a base
+ * both change to different bases, or one removes and the other changes (the joint pass's base checks). */
+static int literal_pair_conflict(const duckvep_haplotype_edit_t *a, const duckvep_haplotype_edit_t *b, int8_t strand) {
+    if (island_relation(a, b, strand) != UNION_COMPATIBLE) return 1;
+    if (!a->ref_len || !b->ref_len) return 0;
+    size_t lo = (size_t)(a->cds_start > b->cds_start ? a->cds_start : b->cds_start) - 1u;
+    size_t hi = (size_t)((uint64_t)a->cds_start + a->ref_len < (uint64_t)b->cds_start + b->ref_len
+        ? (uint64_t)a->cds_start + a->ref_len : (uint64_t)b->cds_start + b->ref_len) - 1u;
+    for (size_t at = lo; at < hi; at++) {
+        uint32_t ja = (uint32_t)(at - (a->cds_start - 1u)), jb = (uint32_t)(at - (b->cds_start - 1u));
+        int a_removes = a->alt_len != a->ref_len, b_removes = b->alt_len != b->ref_len;
+        uint8_t ra = island_base(a, a->ref, a->ref_len, ja, strand), rb = island_base(b, b->ref, b->ref_len, jb, strand);
+        uint8_t va = a_removes ? 0u : island_base(a, a->alt, a->alt_len, ja, strand);
+        uint8_t vb = b_removes ? 0u : island_base(b, b->alt, b->alt_len, jb, strand);
+        int a_changes = !a_removes && va != ra, b_changes = !b_removes && vb != rb;
+        if ((a_changes && b_changes && va != vb) || (a_removes && b_changes) || (b_removes && a_changes)) return 1;
+    }
+    return 0;
 }
 
 /* Reference-coordinate composition for intersecting literal CDS islands.

@@ -179,6 +179,7 @@ typedef struct {
     uint8_t source_selected; /* Raw source selected for this candidate's replacement. */
     uint8_t selection_set;
     uint8_t source_exonic; /* Full raw REF span reaches an exon admitted by Haplosaurus. */
+    uint8_t frameshift_intron; /* Lies within a gap of at most 12 bases between exons. */
 } duckvep_haplotype_projection_t;
 
 typedef struct {

@@ -573,9 +573,9 @@ SELECT prediction_status, prediction_reason, prediction_reference_protein, predi
 FROM duckvep_haplotypes(
   'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 26::BIGINT AS position, ''A'' reference, ''G'' alternate, 1 alt_index, 3::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
   'ensembl-rna-conditional')
-WHERE transcript_index = 3 AND prediction_status = 'conditional_assumed_rna_programme';
+WHERE transcript_index = 3 AND prediction_reference_protein IS NOT NULL;
 ----
-conditional_assumed_rna_programme	assumed_rna_programme	MF*	MFQ*
+predicted	supported_domain	MF*	MFQ*
 
 query IIIIII
 SELECT cds IS NULL, protein IS NULL, haplotype_consequences IS NULL,
@@ -586,13 +586,13 @@ FROM duckvep_haplotypes(
   'ensembl-rna-conditional')
 WHERE transcript_index = 3;
 ----
-1	1	1	1	1	1
+1	1	0	0	1	1
 
 query I
 SELECT count(*) FROM duckvep_haplotypes(
   'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 26::BIGINT AS position, ''A'' reference, ''G'' alternate, 1 alt_index, 2::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
   'ensembl-rna-conditional')
-WHERE prediction_status = 'conditional_assumed_rna_programme';
+WHERE prediction_reference_protein IS NOT NULL;
 ----
 0
 
@@ -689,9 +689,9 @@ SELECT prediction_status, prediction_reason, prediction_reference_protein, predi
 FROM duckvep_haplotypes(
   'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 25::BIGINT AS position, ''T'' reference, ''C'' alternate, 1 alt_index, 3::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
   'ensembl-rna-plus-code1')
-WHERE transcript_index = 3 AND prediction_status = 'conditional_assumed_rna_programme';
+WHERE transcript_index = 3 AND prediction_reference_protein IS NOT NULL;
 ----
-conditional_assumed_rna_programme	assumed_rna_programme	ML*	MS*
+predicted	supported_domain	ML*	MS*
 
 query I
 SELECT duckvep_model_drop('ensembl-rna-plus-code1');
@@ -763,9 +763,9 @@ SELECT prediction_status, prediction_reason, prediction_reference_protein, predi
 FROM duckvep_haplotypes(
   'SELECT 1::BIGINT event_index, 0::UINTEGER seq_region, 26::BIGINT AS position, ''A'' reference, ''G'' alternate, 1 alt_index, 3::UINTEGER transcript_index, 1::UINTEGER sample_index, [1,0]::INTEGER[] alleles, [false,true] phase_before, NULL::BIGINT phase_set',
   'ensembl-rna-start')
-WHERE transcript_index = 3 AND prediction_status = 'conditional_assumed_rna_programme';
+WHERE transcript_index = 3 AND prediction_reference_protein IS NOT NULL;
 ----
-conditional_assumed_rna_programme	assumed_rna_programme	MF*	MFQ*
+predicted	supported_domain	MF*	MFQ*
 
 query I
 SELECT duckvep_model_drop('ensembl-rna-start');

@@ -1083,20 +1083,39 @@ static int append_prediction(duckvep_h_chunk output, size_t row, duckvep_hap_sta
 }
 
 /* When the whole transcript product cannot be rebuilt (an edit crosses the CDS start or end or an exon
- * boundary, the reference CDS has an in-frame stop, or a curated programme the lift cannot follow), the
+ * boundary, the reference CDS has an in-frame stop, a curated programme the lift cannot follow, or agreeing
+ * overlapping records outside the CDS composition rule, such as RNA edits), the
  * row carries the union of each contributing record's VEP consequences on this transcript, as the
- * per-variant engine assigns them, with status predicted and reason per_record_terms. Protein, protein
- * HGVS and NMD stay unpredicted. Complete called evidence is still required. */
+ * per-variant engine assigns them, with status predicted and reason per_record_terms. Raw replay fields
+ * (cds, protein, blocks, HGVS) stay as built; NMD is not predicted. So does a path one of whose records outside the product changes an
+ * essential splice site (VEP splice_donor_variant or splice_acceptor_variant): the transcript it
+ * produces is not the model's. Complete called evidence is still required. */
 static int per_record_terms(duckvep_hap_state_t *s, const duckvep_hap_config_t *bind,
     duckvep_haplotype_leaf_t *leaf, char *error, size_t error_size) {
-    if (leaf->path_status != DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT || !leaf->contributor_count ||
-        leaf->evidence_flags != DUCKVEP_CARRIER_CALLED || leaf->contributors[0].source.source_record ||
-        !bind->model->kernel ||
-        !(leaf->path_reason == DUCKVEP_REASON_INTERNAL_STOP ||
+    int omitted = 0;
+    for (size_t i = 0u; i < leaf->contributor_count; i++)
+        omitted |= leaf->contributors[i].role == DUCKVEP_ROLE_OMITTED;
+    const int product = leaf->path_status == DUCKVEP_PREDICTION_PREDICTED &&
+        leaf->path_reason == DUCKVEP_REASON_SUPPORTED_DOMAIN && omitted;
+    const int refused = (leaf->path_status == DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP &&
+                         leaf->path_reason == DUCKVEP_REASON_OVERLAPPING_EDITS) ||
+        (leaf->path_status == DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT &&
+         (leaf->path_reason == DUCKVEP_REASON_INTERNAL_STOP ||
           leaf->path_reason == DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT ||
           (leaf->path_reason == DUCKVEP_REASON_PROJECTION &&
-           leaf->prediction_projection == DUCKVEP_CDS_EDIT_OUT_OF_CDS)))
+           leaf->prediction_projection == DUCKVEP_CDS_EDIT_OUT_OF_CDS)));
+    if (!leaf->contributor_count || !(product || refused) ||
+        leaf->evidence_flags != DUCKVEP_CARRIER_CALLED || leaf->contributors[0].source.source_record ||
+        !bind->model->kernel)
         return 1;
+    /* Literal A/C/G/T alleles only, as for every prediction. */
+    for (size_t i = 0u; i < leaf->contributor_count; i++) {
+        const duckvep_haplotype_source_t *a = &leaf->contributors[i].source;
+        for (size_t j = 0u; j < (size_t)a->ref_len + a->alt_len; j++) {
+            uint8_t c = (uint8_t)((j < a->ref_len ? a->ref[j] : a->alt[j - a->ref_len]) & 0xDFu);
+            if (c != 'A' && c != 'C' && c != 'G' && c != 'T') return 1;
+        }
+    }
     const size_t n = leaf->contributor_count, capacity = 4u * n;
     size_t bytes = 0u;
     for (size_t i = 0u; i < n; i++)
@@ -1108,7 +1127,7 @@ static int per_record_terms(duckvep_hap_state_t *s, const duckvep_hap_config_t *
     size_t *order = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, n * sizeof(*order));
     duckvep_consequence_t *rows = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, capacity * sizeof(*rows));
     int ok = chrom && pos && lengths && kind && order && rows, keep = 0;
-    uint64_t mask = 0u;
+    uint64_t mask = 0u, omitted_mask = 0u;
     if (!ok) duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: out of memory classifying records");
     if (ok && !s->vep_options) {
         duckvep_options_init_t init;
@@ -1169,8 +1188,12 @@ static int per_record_terms(duckvep_hap_state_t *s, const duckvep_hap_config_t *
             } else {
                 for (size_t r = 0u; r < duckvep_result_builder_count(&builder); r++)
                     if (rows[r].overlap_object_kind == (uint8_t)DUCKVEP_OVERLAP_OBJECT_TRANSCRIPT &&
-                        rows[r].tx_idx == leaf->carriers.transcript_index)
+                        rows[r].tx_idx == leaf->carriers.transcript_index) {
                         mask |= rows[r].consequence_mask;
+                        if (rows[r].variant_idx < n &&
+                            leaf->contributors[order[rows[r].variant_idx]].role == DUCKVEP_ROLE_OMITTED)
+                            omitted_mask |= rows[r].consequence_mask;
+                    }
             }
         }
     }
@@ -1178,6 +1201,9 @@ static int per_record_terms(duckvep_hap_state_t *s, const duckvep_hap_config_t *
     duckvep_budget_free(kind); duckvep_budget_free(order); duckvep_budget_free(rows);
     if (!ok) return 0;
     if (keep || !mask) return 1;
+    /* A record outside the product that changes an essential splice site leaves the product undefined. */
+    if (product && !(omitted_mask & (DUCKVEP_SO(DUCKVEP_SO_SPLICE_DONOR) | DUCKVEP_SO(DUCKVEP_SO_SPLICE_ACCEPTOR))))
+        return 1;
     leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
     leaf->path_reason = DUCKVEP_REASON_PER_RECORD_TERMS;
     leaf->haplotype_so_mask = mask;

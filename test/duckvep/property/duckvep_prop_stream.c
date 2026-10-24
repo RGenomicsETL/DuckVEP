@@ -2499,10 +2499,11 @@ TEST haplotype_stream_conditional_rna_on_both_strands(void) {
             ASSERT_EQ(0u, leaf.haplotype_so_mask);
             continue;
         }
-        ASSERT_EQ(DUCKVEP_PREDICTION_CONDITIONAL_RNA, leaf.path_status);
-        ASSERT_EQ(DUCKVEP_REASON_ASSUMED_RNA_PROGRAMME, leaf.path_reason);
-        ASSERT_EQ(DUCKVEP_PREDICTION_CONDITIONAL_RNA, leaf.prediction_status);
-        ASSERT_EQ(DUCKVEP_REASON_ASSUMED_RNA_PROGRAMME, leaf.prediction_reason);
+        /* The programme is part of the transcript, as VEP reads it: the paired peptides are classified. */
+        ASSERT_EQ(DUCKVEP_PREDICTION_PREDICTED, leaf.path_status);
+        ASSERT_EQ(DUCKVEP_REASON_SUPPORTED_DOMAIN, leaf.path_reason);
+        ASSERT_EQ(DUCKVEP_PREDICTION_PREDICTED, leaf.prediction_status);
+        ASSERT_EQ(DUCKVEP_REASON_SUPPORTED_DOMAIN, leaf.prediction_reason);
         ASSERT_EQ(4u, leaf.prediction_reference_protein_length);
         ASSERT_EQ(scenario == 19u ? 5u : scenario == 12u ? 3u : 4u,
             leaf.prediction_protein_length);
@@ -2510,7 +2511,8 @@ TEST haplotype_stream_conditional_rna_on_both_strands(void) {
         ASSERT_MEM_EQ((scenario == 19u ? "MEGQP" : scenario == 20u ? "MEGQ" :
             scenario == 12u ? "ME*" : scenario == 17u ? "MKR*" : "MER*"),
             leaf.prediction_protein, scenario == 19u ? 5u : scenario == 12u ? 3u : 4u);
-        ASSERT_EQ(0u, leaf.haplotype_so_mask);
+        ASSERT_EQ(DUCKVEP_SO(scenario == 19u || scenario == 20u ? DUCKVEP_SO_STOP_LOST :
+            scenario == 12u ? DUCKVEP_SO_STOP_GAINED : DUCKVEP_SO_MISSENSE), leaf.haplotype_so_mask);
         ASSERT_EQ(DUCKVEP_HAPLOTYPE_NMD_UNKNOWN, leaf.nmd);
         ASSERT_MEM_EQ((scenario == 17u ? "AAAAAAGTGAAAGGGTAA" : "AAAAAAATGAAAGGGTAA"), f.cdna, 18u);
         }

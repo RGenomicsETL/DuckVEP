@@ -179,7 +179,7 @@ local({
   expect_identical(roles(1), "1:1:applied 2:1:applied")
   expect_identical(roles(7), "1:1:unapplied 5:1:unapplied")
   expect_identical(roles(8), "1:1:unapplied 6:1:unapplied")
-  expect_identical(roles(12), "3:1:unapplied 11:1:omitted")
+  expect_identical(roles(12), "3:1:applied 11:1:omitted")
   expect_identical(roles(16), "3:1:post_stop 10:1:applied")
   expect_identical(roles(40), "20:2:applied")
   # A conflicting leaf still lists its edits, ascending and without a block (sample 8: two different

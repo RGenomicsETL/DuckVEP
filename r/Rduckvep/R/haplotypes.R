@@ -104,7 +104,8 @@
 #' `outside_cds`, `non_contiguous`, `invalid_allele`). A path whose whole product cannot be
 #' rebuilt (an edit crossing the CDS start or end or an exon boundary, an in-frame stop in the
 #' reference CDS) is `predicted` with reason `per_record_terms`: its consequences are the union
-#' of its records' per-variant terms, with no protein, protein HGVS or NMD. Phase-domain completeness and
+#' of its records' per-variant terms; raw replay stays and NMD is not predicted. So is a path
+#' with a record outside the product that changes an essential splice site. Phase-domain completeness and
 #' ploidy belong to each sample/phase/lane, so `carrier_predictions` gives the keyed
 #' result in `carriers` order; the row status is `predicted` or
 #' `eligible_classifier_pending` only when every carrier is eligible, and

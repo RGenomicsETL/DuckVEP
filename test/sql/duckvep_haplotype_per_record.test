@@ -1,0 +1,45 @@
+# name: test/sql/duckvep_haplotype_per_record.test
+# description: Paths whose whole product cannot be rebuilt carry each record's per-variant terms.
+# group: [duckvep]
+
+require duckvep
+
+# Transcript 0 (+ strand, complete coverage): exon 1 = 100-108 (ATGGCTGCT), intron 109-159, exon 2 = 160-168
+# (GAAGGTTAA). Transcript 1 is a noncoding single-exon RNA, 100-119.
+statement ok
+SELECT loaded FROM duckvep_model_load('per_record',
+ 'SELECT i::UINTEGER seq_region, 1000::UBIGINT sequence_length FROM range(2) t(i)',
+ 'SELECT * FROM (VALUES
+  (0::UINTEGER, 0::UINTEGER, 100::UBIGINT, 168::UBIGINT, 1::TINYINT, 0::UINTEGER, 0::UBIGINT, 100::UBIGINT, 168::UBIGINT,
+   ''ATGGCTGCTGAAGGTTAA''::BLOB, 1::UTINYINT, ''''::BLOB, ''''::BLOB, ''ATGGCTGCTGAAGGTTAA''::BLOB),
+  (1, 1, 100, 119, 1, 1, 0, NULL, NULL, NULL, NULL, NULL, NULL, ''ACGTACGTACGTACGTACGT''::BLOB))
+  t(transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end,
+    cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence, cdna_sequence)',
+ 'SELECT * FROM (VALUES (0::UINTEGER, 100::UBIGINT, 108::UBIGINT, 1::UBIGINT, 9::UBIGINT, 0::TINYINT, 0::TINYINT),
+  (0, 160, 168, 10, 18, 0, 0), (1, 100, 119, 1, 20, -1, -1))
+  t(transcript_index, exon_start, exon_end, exon_cdna_start, exon_cdna_end, phase, end_phase)',
+ transcript_coverage_complete := TRUE)
+
+statement ok
+CREATE TABLE per_record_calls AS SELECT *, [1, 0]::INTEGER[] alleles, [false, true]::BOOLEAN[] phase_before,
+ NULL::BIGINT phase_set FROM (VALUES
+ -- 0: c.4G>A with the donor +1 base of intron 1 changed
+ (1::BIGINT, 0::INTEGER, 103::BIGINT, 'G', 'A', 1::INTEGER, 0::INTEGER, 0::INTEGER), (2, 0, 109, 'G', 'C', 1, 0, 0),
+ -- 1: c.4G>A with a deep intronic record: the product stands
+ (3, 0, 103, 'G', 'A', 1, 0, 1), (4, 0, 130, 'A', 'T', 1, 0, 1),
+ -- 2: overlapping RNA substitutions that agree on the shared base
+ (5, 1, 104, 'AC', 'GT', 1, 1, 2), (6, 1, 105, 'C', 'T', 1, 1, 2),
+ -- 3: overlapping RNA substitutions that claim one base differently
+ (7, 1, 104, 'AC', 'GT', 1, 1, 3), (8, 1, 105, 'C', 'G', 1, 1, 3))
+ t(event_index, seq_region, position, reference, alternate, alt_index, transcript_index, sample_index)
+
+query ITTTT
+SELECT carriers[1].sample_index, prediction_status, prediction_reason,
+ array_to_string(list_sort(haplotype_consequences), ','), nmd_prediction
+FROM duckvep_haplotypes('SELECT * FROM per_record_calls ORDER BY seq_region, position, event_index', 'per_record')
+ORDER BY 1
+----
+0	predicted	per_record_terms	missense_variant,splice_donor_variant	unknown
+1	predicted	supported_domain	missense_variant	not_applicable
+2	predicted	per_record_terms	non_coding_transcript_exon_variant	unknown
+3	edit_conflict	contradictory_edits	NULL	unknown

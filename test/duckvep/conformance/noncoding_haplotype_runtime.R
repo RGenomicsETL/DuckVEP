@@ -78,10 +78,12 @@ run_full_noncoding_producer <- function(connection, sql_quote) {
       stopifnot(indel$prediction_status == "predicted", indel$edit_count == 0L,
         indel$consequences == "non_coding_transcript_exon_variant", is.na(indel$cds[[1L]]), is.na(indel$protein[[1L]]))
     }
+    # Two records that change one RNA base differently conflict under the literal rule.
     make_calls(conflict)
-    stopifnot(result()$prediction_status == "unsupported_overlap")
+    stopifnot(result()$prediction_status == "edit_conflict")
+    # An edit next to a splice junction is not replayed on the RNA; it carries its own VEP terms.
     make_calls(splice)
-    stopifnot(result()$prediction_status == "unsupported_context")
+    stopifnot(result()$prediction_status == "predicted")
     make_calls(external_edge)
     stopifnot(result()$prediction_status == "predicted")
     make_calls(valid)
@@ -196,9 +198,11 @@ main <- function(root) {
       "reference=%s,alternate=%s WHERE event_index=2"),
       if (strand == 1L) 99L + other_position else 120L - other_position,
       sql_quote(other_ref), sql_quote(other_alt)))
-    mixed <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status,",
+    # Records in both UTRs leave no single RNA to rebuild here: each record's terms are reported.
+    mixed <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status, prediction_reason,",
       "array_to_string(haplotype_consequences,',') consequences FROM ", relation))
-    stopifnot(nrow(mixed) == 1L, mixed$prediction_status == "unsupported_context", is.na(mixed$consequences))
+    stopifnot(nrow(mixed) == 1L, mixed$prediction_status == "predicted",
+      mixed$prediction_reason == "per_record_terms", !is.na(mixed$consequences))
     DBI::dbExecute(connection, create_calls)
     replayed <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status,",
       "array_to_string(haplotype_consequences,',') consequences FROM ", relation))
@@ -221,9 +225,10 @@ main <- function(root) {
       stopifnot(spliced_loaded$loaded == 1L)
       if (strand == -1L) DBI::dbExecute(connection,
         "UPDATE noncoding_calls SET position=position+6")
-      spliced <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status FROM ",
+      spliced <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status, prediction_reason FROM ",
         sub(sql_quote(model), sql_quote(spliced_model), relation, fixed = TRUE)))
-      stopifnot(nrow(spliced) == 1L, spliced$prediction_status == "unsupported_context")
+      stopifnot(nrow(spliced) == 1L, spliced$prediction_status == "predicted",
+        spliced$prediction_reason == "per_record_terms")
       DBI::dbGetQuery(connection, paste0("SELECT duckvep_model_drop(", sql_quote(spliced_model), ")"))
       DBI::dbExecute(connection, create_calls)
     }
@@ -233,6 +238,7 @@ main <- function(root) {
       sql_quote(missing_model), ",", sql_quote("SELECT 0::UINTEGER seq_region"), ",",
       sql_quote(missing_transcript), ",", sql_quote(exons), ")"))
     stopifnot(missing_loaded$loaded == 1L)
+    # Without the stored flank the record's REF cannot be checked: the path stays refused.
     missing <- DBI::dbGetQuery(connection, paste0("SELECT prediction_status FROM ",
       sub(sql_quote(model), sql_quote(missing_model), relation, fixed = TRUE)))
     stopifnot(nrow(missing) == 1L, missing$prediction_status == "unsupported_context")
