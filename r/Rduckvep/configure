@@ -80,10 +80,13 @@ case "$(uname -s)" in
   Darwin) library="$build/build/libduckvep.dylib" ;;
   *) library="$build/build/libduckvep.so" ;;
 esac
+# The footer declares the stable C API v1.2.0, as the distributed build does: DuckDB 1.2 and later,
+# 2.0 included, load it. An unstable-ABI footer would tie it to one DuckDB version and, from 2.0, to
+# the v2 entry point.
 artifact="$(pwd)/inst/duckvep_extension/artifacts/v${version}/duckvep.duckdb_extension"
 mkdir -p "$(dirname "$artifact")"
 "${R_HOME}/bin/Rscript" tools/append_extension_metadata.R \
   --library-file "$library" --out-file "$artifact" \
   --extension-name duckvep --duckdb-platform "$platform" \
-  --duckdb-version "v${version}" --extension-version "v${version}" \
-  --abi-type C_STRUCT_UNSTABLE
+  --duckdb-version "v1.2.0" --extension-version "v${version}" \
+  --abi-type C_STRUCT
