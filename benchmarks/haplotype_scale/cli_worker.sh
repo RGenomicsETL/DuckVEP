@@ -38,7 +38,7 @@ SELECT loaded FROM duckvep_model_load('hap', 'SELECT seq_region::UINTEGER AS seq
  'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM m.model_transcripts',
  'SELECT transcript_index, e.exon_start, e.exon_end, e.exon_cdna_start, e.exon_cdna_end, e.phase, e.end_phase FROM m.model_transcripts, unnest(exons) u(e)',
  mature_mirna_query := 'SELECT transcript_index, x.mature_mirna_start, x.mature_mirna_end FROM m.model_transcripts, unnest(mature_mirna_regions) u(x)',
- peptide_edit_query := 'SELECT transcript_index, x.protein_position, x.alternate_amino_acid FROM m.model_transcripts, unnest(peptide_edits) u(x)',
+ peptide_edit_query := 'SELECT transcript_index, x.protein_position, x.alternate_amino_acid, x.edit_code FROM m.model_transcripts, unnest(peptide_edits) u(x) ORDER BY 1, 2',
  transcript_coverage_complete := TRUE);
 .print STAGE-END load
 .print STAGE-BEGIN stage

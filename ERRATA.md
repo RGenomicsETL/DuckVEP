@@ -38,24 +38,13 @@ HGVS implementation. Genotype `phase_policy := 'strict'` addresses a different q
 
 ## Remaining limitations
 
-Haplotype sequence replay is a foundation, not complete compound consequence prediction.
-Whole-haplotype SO, IMPACT and NMD require their own contract: Haplosaurus reports
-sequences, differences, carriers and flags, while the pinned NMD plugin evaluates one
-transcript-variation allele. Unioning independent labels or applying the plugin to a
-rebuilt stop position does not reproduce a whole-haplotype upstream method.
-See the [haplotype follow-up](https://github.com/RGenomicsETL/duckhts/issues/92).
-
-Compound HGVS now names the unchanged residue for cis synonymous substitutions. In the
-[internal-codon differential](test/duckvep/conformance/hgvs_cis_codon_differential.R),
-two cis SNVs changing `AGA` to `CGC` reconstruct the same protein as one MNV, and both the
-compound path and VEP's original MNV name the residue as `p.Arg2=`. Whole-protein `p.(=)`
-is kept only when the composed CDS is restored to the reference or a run of adjacent
-unchanged codons cannot be named as a single residue. The unmodified build reported 320
-cis-SNV/MNV disagreements, all `p.(=)` against a named residue; the fixed build reports 0.
-These counts come from an unsigned, build-unbound local diagnostic outside release
-conformance history and do not certify compound HGVS. The linked R file is the comparison
-driver, not a published result; the `p.Arg2=` regression case in
-`test/sql/duckvep_haplotypes.test` is the tracked check.
+Whole-haplotype SO, IMPACT and NMD follow DuckVEP's own [contract](design/duckvep_haplotype_contract.md),
+checked against pinned `bcftools csq`: VEP's haplotype mode (Haplosaurus) reports sequences, differences,
+carriers and flags but no consequence terms, and VEP's NMD plugin evaluates one allele at a time.
+Compound HGVS names the joint allele: two cis SNVs changing `AGA` to `CGC` are `p.(Arg2=)`, as VEP
+names the equivalent MNV ([internal-codon differential](test/duckvep/conformance/hgvs_cis_codon_differential.R);
+regression in `test/sql/duckvep_haplotypes.test`), and the [compound fuzz](test/duckvep/conformance/compound_hgvs_fuzz.py)
+compares random cis alleles with Mutalyzer and with VEP on the merged record.
 
 The [retained indel comparison](test/duckvep/conformance/data/ambiguous_indel_translation/summary.csv)
 contains 168,000 original records and 1,344,000 HGVSp comparisons. Independent and

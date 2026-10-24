@@ -1,18 +1,6 @@
-# DuckDB hosts and release profile
+# DuckDB hosts
 
-DuckVEP has two independently built DuckDB C API hosts. **Stable C API v1 is the default native build and the community-submission target.** It works on released DuckDB 1.5.x. The v2 host is a separate preview workflow with a pinned SDK; its ABI is not frozen across DuckDB snapshots.
-
-## Stable-v1 submission profile
-
-Stable-v1 qualification covers the complete SQL suite on released DuckDB 1.5.x, including DuckDB 1.5.6 (`069cc9f9b5`) and R `duckdb` 1.5.5. Native distribution CI covers Linux and macOS x86_64/ARM64, Windows MinGW x86_64, and wasm. R package Windows ARM checks are separate from native MSVC extension qualification.
-
-The profile includes documented independent-event annotation and the bounded haplotype domains: observed-phase coding replay, compound literal HGVS including agreeing CDS substitutions, duplicate indels, opaque identical delins and compatibly placed deletions, complete-diploid raw-copy prediction with at most one original REF/ALT heterozygote, explicit diploid phase alternatives, and complete-RNA noncoding/UTR replay for literal nonoverlapping substitutions, insertions, deletions/delins and compensation. The [function reference](functions.md) and [haplotype contract](../design/duckvep_haplotype_contract.md) define the admission rules, fields and exclusions. Hypotheses are not observed cis; conditional recoding is not an unconditional biological prediction.
-
-Community distribution is not yet available. Submission is held for owner approval and coordinated CRAN publication. The native, stable-v1 SQL, memory/lifecycle, package/platform and generated-source checks must pass for the pinned source revision, together with executable documentation and accurate scope.
-
-Submission acceptance is defined by the bounded profile above, not by the full scope of [#11](https://github.com/RGenomicsETL/DuckVEP/issues/11) and [#50](https://github.com/RGenomicsETL/DuckVEP/issues/50). Their open remainders — general shifted/overlap HGVS nomenclature, and intronic, splice, regulatory, mixed-domain and overlapping haplotype composition — lie outside the csq-comparable domain, where the pinned oracle defines no answer; whole-haplotype composition there has no oracle at all. They stay open as post-1.0 domain work and do not gate this submission. The v2 default switch separately requires qualification against a released v2 runtime ([#48](https://github.com/RGenomicsETL/DuckVEP/issues/48)).
-
-The community entry is being prepared, not yet published. Use the [source-build instructions](../README.md#install) for local evaluation. Signed publication is coordinated with CRAN: a community PR is not a signed release or a CRAN submission.
+DuckVEP has two independently built hosts for DuckDB's C APIs. **The stable C API v1 host is the default build** and the one the R package and distribution CI use. CI runs the full SQL suite on DuckDB 1.5.6 and R `duckdb`, and builds Linux and macOS (x86_64 and ARM64), Windows MinGW x86_64 and wasm; the same artifact loads in DuckDB 2.0.0. The v2 host is a preview with a pinned SDK snapshot; making it the default is [#48](https://github.com/RGenomicsETL/DuckVEP/issues/48).
 
 ## Host and distribution boundaries
 
@@ -23,7 +11,7 @@ The community entry is being prepared, not yet published. Use the [source-build 
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
 | Headers | `duckdb_capi/` | pinned `duckdb_capi_v2/` |
 
-The R package builds and loads the v1 host. Its `v1.2.0` extension API marker is a C API compatibility version, not a claim that every SQL workflow was tested on DuckDB 1.2. [#48](https://github.com/RGenomicsETL/DuckVEP/issues/48) governs released-v2 qualification and the default-host switch; it requires released DuckDB 2.0.0 and R `duckdb` 2.0 on CRAN. Preview parity does not satisfy that gate, and that future switch is separate from the stable-v1 community submission.
+The R package builds and loads the v1 host and stamps it with the same stable `v1.2.0` footer, so one package build serves R `duckdb` 1.5 and 2.0. The footer names the C API version, not a DuckDB release the SQL suite ran on. Switching the default to v2 needs the v2 host qualified on released DuckDB and R `duckdb` 2.0 ([#48](https://github.com/RGenomicsETL/DuckVEP/issues/48)); parity with the preview snapshot is not enough.
 
 `host_v2/` is a separate CMake project. A v1 build does not compile or link its sources. Both hosts compile the host-neutral implementation in `src/kernel/` and `src/core/`; the v1 adapter is in `src/`, and the v2 adapter is in `host_v2/`. The adapters translate DuckDB vectors and callbacks to the shared row logic and write host-specific results.
 

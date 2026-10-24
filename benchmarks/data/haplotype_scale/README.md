@@ -1,258 +1,103 @@
-# Haplotype scale qualification
+# Haplotype scale measurements
 
-The signed `duckvep-coding-v1` contract (`design/duckvep_haplotype_contract.md`, section 4) requires DuckVEP to be at least 2x faster than
-the pinned `bcftools csq` on identical input, transcript model and core, under the same caps, and to qualify a 5M-physical-variant single-sample
-GRCh38 job on the MANE-selected model.
+The [haplotype contract](../../../design/duckvep_haplotype_contract.md) asks for complete output within fixed memory caps, and for whole-genome prediction at least twice as fast as pinned `bcftools csq` on the same input, model and core. Two runners measure this on GIAB HG002 v4.2.1 (4,023,088 records, 4,070,522 ALT alleles) with the Ensembl 116 GRCh38 model. Every timed process is fresh and pinned to one core.
 
-## Fused native-reader measurement (2026-09-30; gate met)
+## DuckVEP against csq
 
-`duckvep_coding_calls(model, path)` reads the (bgzipped) VCF or BCF with the bundled zlib-only htslib, maps CHROM by name, runs the shared discovery (`src/core/duckvep_core_discovery.c`, the same code as `duckvep_coding_transcripts`) on every ALT allele
-and decodes FORMAT, GT and PS only for the records that touch coding sequence (25,969 of 4,023,088). It emits the calls relation of mode B. The gate measurement uses a fresh process, one core (`taskset -c 6`, cgroup 16 GiB, native budget 4 GiB,
-DuckDB threads 1), median of three, csq (`-p a -Ou -o /dev/null`) alternating with DuckVEP, load at most 3 at each start (waited once for one minute), sibling thread 0% busy in every run. Files: `perf34_slice1/` (receipt `process.tsv`, per-run stage output, `identity.txt`).
-The harness is `benchmarks/haplotype_scale/cli_worker.sh` (DuckDB v1.5.1 CLI, no R); the R worker has the same pipeline as `--mode F`. Extension: release build of source tree `8713686b` (sha256 `ab4dc8e7...`), copied to an immutable file first.
+[`run_hg002_csq.sh`](../../haplotype_scale/run_hg002_csq.sh) alternates csq (`-p a -Ou -o /dev/null`), the DuckDB CLI and R for three rounds on core 6. DuckVEP reads the VCF with its native reader (`duckvep_coding_calls`), stages the calls and writes the complete `duckvep_haplotypes` output to Parquet; model load is inside the timer. Each `hg002_<revision>/` directory holds `process.tsv` (every process), `identity.txt` (input, model, tool and extension hashes, and the output checksum) and `status_counts.tsv`.
 
-| | wall s (runs) | median | gate |
+| `hg002_2417ac9` | wall s (runs) | median | csq median / median |
 |---|---|---|---|
-| pinned `bcftools csq -p a -Ou -o /dev/null` | 18.07 / 17.25 / 17.08 | **17.25** | target 0.5 x = 8.63 |
-| DuckVEP fused, staged (`--mode F`: calls table, then `duckvep_haplotypes` to Parquet), CLI | 8.23 / 8.21 / 8.15 | **8.21** (8.15 to 8.23) | **2.10x: met** |
-| DuckVEP fused, inline (`--mode I`: `duckvep_haplotypes` over the reader, nothing staged), CLI | 8.24 / 8.20 / 8.16 | 8.20 | 2.10x |
-| same pipeline from R (`worker.R --mode F`, R and DuckDB R package start-up included, reported separately) | 8.59 / 8.60 / 8.64 | 8.60 | 2.01x |
+| `bcftools csq` | 17.05 / 17.51 / 16.87 | 17.05 | |
+| DuckVEP, DuckDB CLI | 8.80 / 8.74 / 8.71 | 8.74 | 1.95 |
+| DuckVEP, from R | 9.41 / 9.10 / 9.12 | 9.12 | 1.87 |
 
-Host note: the 2026-09-30 csq runs were 1.6 to 2.6 s faster than the 2026-09-29 median (19.66 s). The ratio uses measurements from the same round. Against the 2026-09-29 csq median, the ratio would be 2.39x. Mode B was not rerun on the 2026-09-30 host; its gate measurement on 2026-09-29 was 12.58 s.
+This run is just under the two-times requirement. Inside DuckVEP's 8.7 s, model load takes 2.3 s, reading and staging 3.1 s, and prediction with Parquet output 3.2 s.
 
-Stages, medians of the three staged CLI runs (the CLI's own timers; the wall clock adds about 0.1 s of start-up and shutdown):
+## Qualification
 
-| stage | mode B (2026-09-29, R) | fused |
-|---|---|---|
-| model load | 2.60 | 2.40 |
-| decode, discovery, call construction (stage) | 6.38 | **3.08** |
-| discovery, prediction and complete Parquet output | 2.88 | 2.57 |
-| process wall | 12.58 | 8.21 |
+[`run_qualification.sh`](../../haplotype_scale/run_qualification.sh) runs every process inside a systemd scope capped at 16 GiB with no swap, a 4 GiB native budget, a DuckDB `memory_limit` of 8 GB, a 32 GiB temp directory and one DuckDB thread. It starts a run only when the one-minute load is at most 4, and alternates csq with DuckVEP. Its R worker has two pipelines:
 
-What remains in the 3.08 s stage is the zlib inflate of 2.9 GB (a diagnostic `gzip -dc` is 6.8 s of single-threaded zlib-ng-less work, `bgzip -dc` with libdeflate 1.0 s; htslib's BGZF inflate with zlib blocks lies between them) plus about 4 million line splits and interval lookups. Model load takes 2.4 s outside the measured stage. Sys time is 1.6 s of the 8.2 (page faults of the model).
+- **Mode B** reads the VCF text with DuckDB's `read_csv`, discovers coding transcripts with `duckvep_coding_transcripts` and parses genotypes in SQL.
+- **Mode A** starts from the calls relation already staged in Parquet, so it times prediction alone.
 
-Caps observed: memory.peak 3.83 GiB (4,107,853,824 bytes; cap 16 GiB), native pass total 1,651 MiB of 4,096 (model 1,304, index 14, workspace 333), DuckDB spill 0, all 15 processes exit 0.
+A cold run is a fresh process; a warm pass is a second execution in the same process. Both modes write the same output, checked by a full-output checksum. [`summarize.R`](../../haplotype_scale/summarize.R) turns the raw receipts into `runs.csv` and `summary.csv`, and [`tables.R`](../../haplotype_scale/tables.R) prints the tables below.
 
-Output identity. The fused pipeline has 157,986 rows and full-output checksum `1456007180270799092358516`, matching the mode B receipts and all nine audited-by-checksum outputs (F, I and R, three each; the checksum is `sum(hash(row))` over the Parquet, as in `worker.R`). `benchmarks/haplotype_scale/verify_coding_calls.sh` builds mode B's calls relation and the reader's in one session and compares them as multisets, every column: 247,374 calls each, 0 only in the reader, 0 only in mode B, equal order-independent hashes.
-
-Differences from the mode B SQL that cannot show in HG002's output, by design: the PS of a sample is read by FORMAT key (mode B takes the last `:` field, which is PS in HG002), the record ordinal counts every data record, a coding record without GT or a file without FORMAT/GT is an error (mode B would parse garbage), and multi-sample files give one row per sample with `sample_index` from 0 (mode B reads the first sample only).
-
-Gates: `make release`, `test_release` (31 SQL files including `duckvep_coding_calls.test`), `test_release_asan`, `test_properties`, `test_haplotype_contract`, `test_fault_injection` (861 failed allocations, all clean, including reader and discovery call sites), `check-function-docs` (26 functions, 29 examples), R tinytests (10,711 expectations, all pass), `scripts/check-rduckvep-bundle.sh`, `git diff --check`, clang `-Werror=string-concatenation` on the reader and discovery files.
-
-## Mode-B gate measurement (2026-09-29)
-
-The gate was not met in this run. Judged on mode B (identical unsorted VCF, decode through Parquet), cold process, model load included, whole-process wall clock
-(R and DuckDB start-up included), one core, three fresh processes each:
-
-| | wall s (median of 3) |
-|---|---|
-| pinned `bcftools csq -p a -Ou -o /dev/null`, re-measured here | **19.66** (20.90 / 19.66 / 18.07) |
-| DuckVEP mode B, cold, model load included | **12.58** (12.83 / 12.58 / 12.04) |
-| gate: 0.5 x csq | 9.83 |
-
-DuckVEP takes 0.640 of csq's time: 1.56x faster, 2.75 s (28% of the target) short of the gate. Other readings:
-
-| reading | ratio to csq `-Ou` (19.66 s) |
-|---|---|
-| mode B cold, whole process (the gate) | **0.640** |
-| mode B cold, without R/DuckDB start-up (load + stage + predict) | 0.608 |
-| mode B cold with the VCF inflated by `bgzip -dc` instead of DuckDB's miniz (diagnostic, not the gate) | 0.561 (11.03 s) |
-| mode B warm (model resident, second pass in the same process) | **0.429** (8.44 s): met |
-| mode A cold / warm | 0.337 / 0.134 |
-| mode B cold against csq writing BCF (`-Ob`, 32.48 s) | 0.387 |
-
-An earlier measurement, before exact discovery, gave 10.87 s against 18.27 s (0.595); the host was quieter then, and exact
-discovery costs about 1.2 s of stage time in mode B (per-ALT event normalization, see below). The ratio is a comparison inside one round of alternating runs, but the round to round noise of this shared host is
-visible in csq itself (18.1 s to 20.9 s). The contract's recorded baseline (22.2 s on 2026-09-28, target 11.1 s) was measured on core 2.
-
-Mode B includes two substantial costs: DuckDB inflates the 2.9 GB VCF text with its bundled miniz (the same job with `bgzip -dc` feeding it has a stage 1.6 s shorter)
-and loading the 1.8 GB transcript model takes 2.5 s (csq parses its 108 MB GFF3 on every run). Load + stage + predict is 11.8 s of the 12.6 s process; the stage (6.4 s) is dominated by the decode.
-
-## What was measured
-
-Host: Intel i5-13500, kernel 6.8.0-78, other agents' jobs running elsewhere. Every timed process was a fresh process pinned with `taskset -c 6`
-(SMT sibling 7) inside `systemd-run --scope -p MemoryMax=16G -p MemorySwapMax=0` (`capped_run.sh`), started only when the one-minute load average was at most 4 (it
-polls every 60 s for up to 30 minutes; the receipt records the load at the start, the time waited and how busy the sibling thread was: loads
-2.12 to 3.94, sibling thread at most 4% busy except in four runs (8, 9, 12 and 18%, none of them a gate run), five runs waited a minute or more). Rounds alternate csq and DuckVEP so both see the same conditions. 78 processes, all exit 0 (the receipts have 90 rows because a process reports its cold and warm pass).
-
-Caps on every DuckVEP run: 16 GiB per process (cgroup), native budget 4 GiB (`duckvep_native_budget_set`), DuckDB `memory_limit` 8GB, temp directory capped at 32GiB, one
-DuckDB thread. Observed maxima are under "Caps observed". csq ran under the same cgroup cap.
-
-Pins (`inputs.tsv`, by content hash): input `hg002.ens.vcf.gz` sha256 `54e5d09d...` (4,023,088 records, 4,070,522 ALT alleles; it is the file that
-`test/data/haplotype/hg002_strict.oracle.tsv` names), Ensembl 116 GRCh38 GFF3 `08e881d9...`, FASTA `1e74081a...`, model `homo_sapiens_116_GRCh38_final.duckdb`
-(`model_sha256` `03019059...`, the receipt in `hg002_domain.accounting.tsv`), bcftools `1.23.1-70-g6dbd8fef` with htslib 1.22.1, R 4.6.0 with DuckDB 1.5.5. The
-DuckVEP extension is the release build of source tree `3d23d8a6` (`git rev-parse HEAD:src`); the binary's SHA-256 is in `inputs.tsv`.
-
-### The csq baseline
-
-`csq.log` (2026-09-28) records only stderr. Its three warnings ("keeping the first 31", the N_REF_PAD note, the `--ncsq 345` note) and its 811,296 KiB peak RSS match
-`bcftools csq -f FASTA -g GFF3 -p a` at the default `-n`, and its 20.09 s user time matches an uncompressed output: writing BCF (`-Ob`) costs another 12 s of
-CPU on this host (user 29.4 s). The gate baseline is therefore `-p a -Ou -o /dev/null`; csq writing a BCF file is reported beside it. The oracle invocation (`-p s -n 1024`) is for
-correctness, not timing. Median of three fresh runs each (table below).
-
-### The pipeline
-
-Both modes go through the public builder `duckvep_haplotypes` and end in a Parquet file (written to `<out>.partial` and renamed only after success, so a failed statement
-publishes nothing at the final name).
-
-- **Mode B**, from the VCF text: `read_csv` of the bgzipped VCF (DuckDB's own decoder), one row per record; the ALT alleles are unnested and, for each, `duckvep_coding_transcripts('hap', seq_region, pos, ref, alt)`
-  returns the transcripts whose coding sequence the normalized event touches (see Discovery); 25,969 of 4,023,088 records (0.65%) reach a call. One call per ALT allele and transcript is built with genotype (`GT` to
-  alleles and per-lane phase flags; an integer `PS` is the phase set, the string labels `PATMAT`, `HOMVAR` and `.` are none); then `duckvep_haplotypes` sorts, replays and writes
-  the complete output (all 31 columns) to Parquet.
-- **Mode A**, from the preordered calls relation (the calls mode B builds, sorted by region, position, event and transcript, read back from Parquet): stage the calls, `duckvep_haplotypes` (its own
-  internal sort included), Parquet.
-- **Cold** is a fresh process: R start-up, model load, first execution. **Warm** is the second execution in the same process. Cold-only runs are the gate runs (their wall clock is the cold wall
-  clock, and they skip the untimed audit); separate runs add the warm pass and the audit (counts and a full-output checksum, `sum(hash(row))` over the Parquet).
-- **Model load** runs `duckvep_model_load` on the model file's own tables without `ORDER BY` (the file is stored in load order and the loader rejects rows that arrive out of order; see "Pipeline choices").
-  The MANE Select model is the same builder with the transcripts of `mane_select_refseq IS NOT NULL` (19,297) re-indexed densely in (region, start, index) order.
-- **Capacities**: `max_alignment_cells` 268,435,456 and `workspace_limit` 1 GiB (the dense control uses 1,073,741,824 and 2 GiB); with the builder's own defaults the HG002 job also succeeds (`failures.tsv`, `builder_defaults`).
-- **Discovery** (`duckvep_coding_transcripts(model, seq_region, position, reference, alternate)`) returns exactly the (event, transcript) pairs that `duckvep_annotate_sql` finds with the CDS bit of `region_mask`, no more and no fewer.
-  It takes the VCF record as written and trims it inside the scalar, with the annotation builder's own normalization (shared prefix and suffix removed, so a shared anchor base never creates an overlap by itself; an insertion is an
-  interbase point; introns of at most 13 bases inside the CDS count as coding, as in VEP). `verify_discovery.R` on the whole HG002 input: the builder finds 247,374 pairs, the scalar 247,374, 0 missing and 0 extra. Of the 23,866 records the committed csq accounting
-  compares, 23,865 are discovered; record 2402008 (`TCTCC>T`, chr10:15719771) touches the CDS only through its anchor base, and the annotation builder does not count it either. Mode B with the scalar, mode B with the
-  annotation builder's discovery and mode A write the same output (checksum `1456007180270799092358516`).
-
-Everything is in `benchmarks/haplotype_scale/`: `run_qualification.sh` (the one command), `prepare_inputs.R` (untimed inputs), `worker.R` (one fresh process), `capped_run.sh`, `failures.R`, `summarize.R`,
-`tables.R`, `verify_discovery.R`.
-
-## Results
-
-### csq baseline and the HG002 gate
+### HG002
 
 | invocation | wall s (runs) | median wall s | median user s | peak RSS KiB | memory.peak MiB | load at start |
 |---|---|---|---|---|---|---|
-| `-p a -Ob -o file.bcf` | 32.48 / 30.35 / 33.63 | 32.48 | 30.85 | 811,312 | 859 | 3.4 / 3.8 / 3.9 |
-| `-p a -Ou -o /dev/null` | 20.90 / 19.66 / 18.07 | 19.66 | 18.51 | 811,312 | 792 | 3.8 / 3.7 / 3.9 |
+| `-p a -Ob -o file.bcf` | 28.53 / 28.42 / 29.10 | 28.53 | 27.64 | 811,312 | 860 | 1.1 / 1.2 / 1.2 |
+| `-p a -Ou -o /dev/null` | 17.01 / 17.09 / 16.93 | 17.01 | 16.35 | 811,312 | 792 | 0.9 / 1.3 / 1.4 |
 
 | mode | cold process wall s (runs) | cold wall median | load | stage | predict + Parquet | warm pass median | warm stage | warm predict |
 |---|---|---|---|---|---|---|---|---|
-| B | 12.58 / 12.83 / 12.04 | 12.58 | 2.60 | 6.38 | 2.88 | 8.44 | 5.75 | 2.69 |
-| A | 6.63 / 6.72 / 6.63 | 6.63 | 2.90 | 0.04 | 3.04 | 2.63 | 0.03 | 2.60 |
+| B | 11.51 / 11.74 / 11.47 | 11.51 | 2.29 | 5.67 | 3.10 | 8.64 | 5.50 | 3.12 |
+| A | 6.09 / 6.16 / 6.06 | 6.09 | 2.31 | 0.03 | 3.25 | 3.19 | 0.03 | 3.16 |
 
-Load, stage and predict are the worker's internal timers (medians); the wall clock adds R and DuckDB start-up and shutdown. In mode B the stage is decode, discovery and call construction (of which the
-DuckDB decode of the 2.9 GB text is the larger part); in mode A it is reading the ordered calls. Mode A and mode B write the identical output: 157,986 rows, checksum `1456007180270799092358516` in every audited run
-(the same checksum across the four optimization variants, including the unmodified base, and across both discovery routes). 149,896 rows are `predicted`.
+Times are seconds; load, stage and predict are the worker's own timers. The output has 158,137 rows: 157,597 whole-product predictions, 212 per-record predictions and 328 `incomplete_input` paths. Of the 4,023,088 records, 25,969 touch coding sequence and become 247,374 calls; the rest reach no call.
 
-Accounting of the HG002 input: 4,023,088 records = 25,969 with a call in coding scope (247,374 calls, emitted as 157,986 output rows, of which 149,896 are `predicted` and the rest carry their status and reason) + 3,997,119 outside coding
-scope (no CDS-exon overlap in the model, so no call) + 0 unavailable. The 5M job: 5,000,000 = 294,000 in coding scope (36,442 rows) + 4,706,000 outside.
+Split by the committed csq accounting (mode A, cold):
 
-### Inside and outside the csq domain
-
-The committed accounting's partition (regenerated here and equal to the committed receipt: 23,866 compared, 3,998,802 outside, ledger hash `81c9b983...`) applied to the calls, mode A, cold:
-
-| partition | records with calls | calls | output rows | predicted | predict + Parquet s (median) |
-|---|---|---|---|---|---|
-| inside the csq domain (23,866 compared records, 23,865 with a call) | 23,865 | 239,300 | 153,654 | 146,987 | 2.69 |
-| outside (records that overlap a CDS but are not compared) | 2,104 | 8,074 | 6,461 | 5,043 | 0.10 |
-
-The other 3,997,119 records of the 4,023,088 reach no call (no coding overlap): their whole cost is the shared stage, decode plus discovery, 6.4 s in mode B. So prediction inside
-the csq domain is 2.69 s, outside 0.10 s, and the stage (dominated by decoding the records outside) is 6.4 s.
-
-### Caps observed (maximum over the three cold processes of each job)
-
-| job | memory.peak GiB (16 cap) | max RSS GiB | native high-water MiB, load (total) | native high-water MiB per owner, pass | native pass total MiB (4096 cap) | DuckDB spill peak bytes |
+| partition | records with calls | calls | output rows | predicted | predict + Parquet s (median) | load s |
 |---|---|---|---|---|---|---|
-| hg002_B | 4.14 | 4.16 | 1,582 | model 1,304, index 14, workspace 333, scratch 0, emit 0, control 0 | 1,651 | 0 |
-| hg002_A | 3.89 | 3.92 | 1,582 | model 1,304, index 14, workspace 333, scratch 0, emit 0, control 0 | 1,651 | 0 |
-| qual5m_B | 3.14 | 3.11 | 97 | model 74, index 0, workspace 333, scratch 0, emit 0, control 0 | 407 | 0 |
-| qual5m_A | 2.55 | 2.55 | 97 | model 74, index 0, workspace 333, scratch 0, emit 0, control 0 | 407 | 0 |
-| dense_B | 2.34 | 2.38 | 97 | model 74, index 0, workspace 1,101, scratch 0, emit 0, control 0 | 1,175 | 0 |
-| low_sharing_B | 1.99 | 2.02 | 97 | model 74, index 0, workspace 333, scratch 0, emit 0, control 0 | 407 | 0 |
+| inside | 23865 | 239300 | 153654 | 153654 | 3.18 | 2.30 |
+| outside | 2104 | 8074 | 6462 | 6292 | 0.13 | 2.30 |
 
-The native model high-water at load fell from 2,680 MiB (`benchmarks/data/scale_contracts/budget-evidence.md`) to 1,582 MiB (the reorder copy is skipped when rows arrive in order). DuckDB never spilled: the staged relations are small (the largest is the 294,251-row 5M calls).
+### 5M records on the MANE model
 
-### 5M-physical-variant job on the MANE-selected model
+The input is HG002 plus 976,912 gnomAD v4.1 exome sites chosen by a fixed hash: 5,000,000 records and 5,047,434 ALT alleles, one sample, all phased. The model is the MANE Select subset (19,297 transcripts). [`prepare_inputs.R`](../../haplotype_scale/prepare_inputs.R) builds the inputs and records the rule.
 
-Input: HG002's 4,023,088 records plus 976,912 records sampled by rule from the staged gnomAD v4.1 exomes = 5,000,000 physical records (5,047,434 ALT alleles), single sample, all phased.
-Top-up rule (`prepare_inputs.R`, deterministic): candidate sites are the gnomAD exome ALT rows with status `literal` and FILTER `PASS` on chromosomes 1-22, X and Y whose (contig, position) is absent
-from HG002; one ALT per site is kept by the smallest `hash(20260929, contig, position, ref, alt)`; the first 976,912 sites by that hash are taken; the genotype is the same hash again: `0|1` 45%, `1|0` 45%,
-`1|1` 10%, with `PS` `PATMAT` for heterozygotes and `HOMVAR` for homozygotes (HG002's own string labels, so all phased records of the sample form one phase domain per transcript and
-compose with HG002's). The exomes are coding-dense, which is why it is a harder job than HG002 alone. The merged file is sorted by contig and position and bgzipped (`qual5m.vcf.gz`, sha256 in `inputs.tsv`).
-
-| mode | cold wall s (runs) | median | load | stage | predict | warm pass | output checksum |
+| mode | cold wall s (runs) | median | load | stage | predict | warm pass | output checksum (audited runs) |
 |---|---|---|---|---|---|---|---|
-| B | 16.39 / 16.65 / 16.37 | 16.39 | 1.02 | 6.08 | 8.79 | 14.80 | 335591545666261315447574 |
-| A | 10.47 / 11.04 / 10.39 | 10.47 | 0.99 | 0.04 | 8.95 | 8.86 | 335591545666261315447574 |
+| B | 15.96 / 16.06 / 15.80 | 15.96 | 0.93 | 5.80 | 8.74 | 14.39 | 336410809266679938646157 |
+| A | 10.28 / 10.34 / 10.18 | 10.28 | 0.92 | 0.04 | 8.85 | 8.81 | 336410809266679938646157 |
 
-What the job contained (audit of the warm runs, identical for modes A and B):
+294,000 records reach a call. The 36,443 output rows are 35,682 whole-product predictions, 331 per-record predictions, 279 `edit_conflict` paths and 151 `incomplete_input` paths. At most 916 events share one transcript.
 
-- physical records 5,000,000, ALT alleles 5,047,434; physical sources in coding scope 294,000 (5.9%), projected ALT events 294,017, projections (event x transcript) 294,251, calls 294,251; every one of the other
-  4.7M physical records is explicitly outside coding scope (no CDS-exon overlap in the MANE model);
-- carrier states 36,514, unique paths (output rows) 36,442, translated bases 63,442,127, output 70,515,196 bytes; 35,476 rows `predicted`, 966 rows not (`outside_cds` 308, `overlapping_edits` 285,
-  `unphased_heterozygous` 157, `curated_transcript` 116, `allele_over_50_bases` 61, `contradictory_edits` 37, `incomplete_cds` 2): nothing is dropped silently;
-- peak active window: 18,700 transcripts carry calls, at most 916 events on one transcript (the peak of events held at once; capacities are 16,384 events and 4,096 transcripts by default); native workspace high-water 333 MiB;
-- caps: memory.peak 3.14 GiB, native 407 MiB, DuckDB spill 0 bytes (see the table above);
-- the output checksum is the same in every audited run.
+### Controls
 
-Controls (mode B, three fresh processes; `dense` on the longest MANE coding sequence, `low_sharing` one variant per MANE transcript):
+`dense` places 4,000 variants on one haplotype of the longest MANE coding sequence (TTN); `low_sharing` places one variant on each MANE transcript.
 
 | control | median wall s | predict s | calls | output rows | carriers | translated bases | max events per transcript | transcripts | output bytes |
 |---|---|---|---|---|---|---|---|---|---|
-| dense_B | 3.36 | 1.86 | 4,000 | 2 | 2 | 215,914 | 4,000 | 1 | 552,711 |
-| low_sharing_B | 2.06 | 0.45 | 19,116 | 19,099 | 19,099 | 33,382,784 | 2 | 19,087 | 27,861,760 |
+| dense_B | 3.18 | 1.79 | 4000 | 2 | 2 | 215914 | 4000 | 1 | 553338 |
+| low_sharing_B | 1.98 | 0.49 | 19116 | 19099 | 19099 | 33382784 | 2 | 19087 | 27884526 |
+| dense_A | 3.16 | 1.80 | 4000 | 2 | 2 | 215914 | 4000 | 1 | 553338 |
+| low_sharing_A | 1.93 | 0.49 | 19116 | 19099 | 19099 | 33382784 | 2 | 19087 | 27884526 |
 
-The dense control is 4,000 non-overlapping variants (75 indels) on one haplotype of the 107,976-base coding sequence of ENST00000589042 (TTN): 4,000 events on a single transcript, two paths. It needs `max_alignment_cells`
-of about 525 million (the exact band for thousands of edits), hence its larger capacity. The low-sharing control is 19,065 records on 19,087 transcripts: 19,099 paths, no sharing.
+### Caps observed
 
-### Explicit failures (`failures.tsv`, one process, each control followed by a check that the connection and the model still work)
+Maximum over the three cold processes of each job. No job spilled to disk.
 
-| control | result |
-|---|---|
-| native budget 64 MiB before `duckvep_model_load` | `capacity error: native memory (model) budget exceeded (requested 8388608 bytes, 65164640 in use, limit 67108864)`; 400 bytes charged afterwards (the registry); no model published; after restoring the budget the load succeeds |
-| budget = resident model + 64 MiB before `duckvep_haplotypes` | `capacity error: native memory (workspace) budget exceeded (requested 16781312 bytes, ...)`; no table, no output file at the final name (`COPY` leaves a 2,581-byte `.partial` file, removed); native bytes back to the resident value; the next query runs |
-| `max_alignment_cells := 100000` on the HG002 calls | `CDS difference status 3, max_alignment_cells=100000, required=166049 at transcript 669`; nothing published; bytes unchanged; reusable |
-| the builder's default capacities on the HG002 calls | succeeds (157,986 rows) since capacity follows the band an alignment needs |
+| job | memory.peak GiB (16 cap) | max RSS GiB | native high-water MiB, load (total) | native high-water MiB per owner, pass | native pass total MiB (4096 cap) | DuckDB spill peak bytes |
+|---|---|---|---|---|---|---|
+| hg002_B | 4.14 | 4.18 | 1,595 | model 1,317, index 14, workspace 346, scratch 0, emit 0, control 0 | 1,677 | 0 |
+| hg002_A | 3.90 | 3.93 | 1,595 | model 1,317, index 14, workspace 346, scratch 0, emit 0, control 0 | 1,677 | 0 |
+| qual5m_B | 3.14 | 3.11 | 98 | model 75, index 0, workspace 344, scratch 0, emit 0, control 0 | 418 | 0 |
+| qual5m_A | 2.56 | 2.56 | 98 | model 75, index 0, workspace 344, scratch 0, emit 0, control 0 | 418 | 0 |
+| dense_B | 2.34 | 2.38 | 98 | model 75, index 0, workspace 1,110, scratch 0, emit 0, control 0 | 1,185 | 0 |
+| low_sharing_B | 1.99 | 2.02 | 98 | model 75, index 0, workspace 344, scratch 0, emit 0, control 0 | 418 | 0 |
 
-At base commit `01f37f4`, the 5M MANE job failed at both tested alignment caps: `max_alignment_cells=268435456` failed with `required=451073810 at transcript 3762`, and
-`3221225472` failed with `required=11659140506 at transcript 6435` (`base_capacity_refusal.tsv`). The capacity-following-band build runs it at 268,435,456.
+### Failures are explicit
 
-## Optimizations, each with its A/B effect
+[`failures.R`](../../haplotype_scale/failures.R) checks that exhausting a budget or capacity raises an error and leaves the connection usable (`failures.tsv`):
 
-All measured optimization variants produce byte-identical output with the same full-output checksum; the SQL, contract and goldens suites pass. Profiling (`perf`) of the 22 s prediction in the first
-measurement showed 67% in `duckvep_sequence_differences`; model load and coding-transcript lookup were the next largest costs.
-
-| variant (commit) | model load s | predict + Parquet s | process wall s (mode A cold) |
-|---|---|---|---|
-| base (`01f37f4`) | 3.43 | 22.21 | 26.76 |
-| + bound alignment work by the optimum | 3.45 | 3.40 | 7.95 |
-| + table validation and no reorder copy in model load | 2.77 | 3.40 | 7.28 |
-| + table fast paths for translation, first stop and normalization | 2.51 | 2.80 | 6.44 |
-| final | 2.50 | 2.72 | 6.35 |
-
-1. **Alignment work** (`duckvep_sequence_differences`): the baseline CDS and protein difference alignment filled the band of a feasible positional path, then the whole matrix after any frameshift. The optimized band starts at the length change and
-   widens until every path leaving it provably costs more (so the traceback, ties included, is that of the full matrix); rows inside the common prefix are closed-form and not computed; equal-length comparisons
-   scan for differing runs; the counting pass is skipped when capacity cannot overflow; validation is word-wise. 22.21 s to 3.40 s. Checked against the previous implementation on 8 million random and repeat-rich cases
-   (also under ASan/UBSan) and, committed, against the independent full-matrix oracle on 40,000 long repeat-rich pairs.
-2. **Model load**: model open validates flank and CDS bytes by testing eight-byte groups. Transcript-ordered rows avoid copying their sequence pools a
-   second time (load high-water 2,680 to 1,582 MiB). 3.45 s to 2.77 s.
-3. **Codon fast paths**: three unambiguous bases index the amino-acid table directly in translation and the first-stop scan, and whole-sequence normalization uses a table; ambiguous and invalid codons take the exact
-   path. Model load 2.77 to 2.51 s (the first-stop cache), prediction 3.40 to 2.80 s.
-4. **Capacity follows the band an alignment needs** (`7e49a27`): the trace capacity is checked against the cells in the feasible bound before work begins. A deletion and a substitution 8,000 bases apart in a 20 kb sequence needed 322
-   million cells for a result within a few columns of the diagonal; TTN needed 11.7 billion, beyond the native budget. The base build failed the 5M MANE job at both tested caps; the capacity-following-band variant completes it at 268,435,456 cells. Capacity is checked against each attempted band, and an inadmissible band is refused with its cell count. SQL tests pin the configured capacity limits. Successful output is identical.
-5. **`duckvep_coding_transcripts`**: transcript discovery from the resident interval index, with the annotation builder's event normalization, exact pair for pair. It is public (SQL docs in the README, `rduckvep_coding_transcripts()` in R) rather than
-   a runner helper; see Discovery. It is not folded into `duckvep_haplotypes` because that builder consumes a relation of calls the caller stages (the calls carry genotype and phase that only the caller can build); the scalar is the
-   fast way to produce the (event, transcript) rows of that relation.
-
-Two pipeline choices, alternating, cold, median of 3 (`abx_*` rows in `runs.csv`):
-
-| choice (process wall includes the untimed audit) | process wall s | load s | stage s | max RSS GiB |
-|---|---|---|---|---|
-| discovery by the annotation builder (twelve transcripts per intronic event) | 17.18 | 2.48 | 11.04 | 6.23 |
-| discovery by `duckvep_coding_transcripts` | 11.95 | 2.49 | 5.85 | 4.28 |
-| model load with `ORDER BY` on the model queries | 3.65 | 3.10 | | 5.06 |
-| model load without (stored order; the loader rejects out-of-order rows) | 3.01 | 2.50 | | 3.92 |
-
-Both discovery routes give the same 247,374 calls, 157,986 output rows and checksum. Making the scalar exact (normalizing each ALT allele and applying the frameshift-intron rule) raised its stage from about 5.1 s to about 5.9 s in this comparison;
-performance work on it is left to the maintainer's decision on the gate.
-
-## What would close the gap
-
-The 2.75 s gap is mostly outside DuckVEP's prediction path: VCF miniz inflation (a libdeflate decoder saves about 1.5 s and yields a 0.561 ratio), model load (2.5 s), R start-up and shutdown (about 0.8 s), and prediction plus
-Parquet output (2.9 s). Reaching 0.5 needs another 1.2 s beyond a libdeflate decoder. Candidate work includes a libdeflate-backed decoder (outside this extension), cheaper exact discovery (per-ALT normalization is about 0.8 s of the stage),
-streaming model-load queries instead of materializing 1.1 GB of results, and avoiding flank sequence loading for coding-only jobs (the loader requires flanks whenever a CDS is present).
+- A 64 MiB native budget refuses the model load, publishes no model, and the load succeeds after the budget is restored.
+- A budget of the resident model plus 64 MiB refuses `duckvep_haplotypes`; no table or output file is published, and native bytes return to the resident value.
+- `max_alignment_cells := 100000` refuses the HG002 calls with the cell count it needed; nothing is published.
+- The builder's default capacities complete the HG002 job (158,137 rows).
 
 ## Files
 
-`runs.csv` (one row per process and pass, with process wall, user, system, RSS, cgroup peak, load, sibling busy, native budget per owner, audit), `summary.csv` (medians and ratios), `inputs.tsv`,
-`input_counts.tsv`, `failures.tsv`, `base_capacity_refusal.tsv`. Regenerate: `Rscript benchmarks/haplotype_scale/prepare_inputs.R WORK && WORK=... bash benchmarks/haplotype_scale/run_qualification.sh &&
-Rscript benchmarks/haplotype_scale/summarize.R WORK/results && Rscript benchmarks/haplotype_scale/tables.R`. Large inputs and outputs are not committed.
+`runs.csv` has one row per process and pass, `summary.csv` the medians and ratios, `inputs.tsv` and `input_counts.tsv` the input hashes and counts, and `failures.tsv` the failure controls. Regenerate with:
+
+```sh
+Rscript benchmarks/haplotype_scale/prepare_inputs.R WORK
+WORK=WORK OUT=RESULTS bash benchmarks/haplotype_scale/run_qualification.sh
+Rscript benchmarks/haplotype_scale/summarize.R RESULTS
+Rscript benchmarks/haplotype_scale/tables.R
+OUT=benchmarks/data/haplotype_scale/hg002_REVISION bash benchmarks/haplotype_scale/run_hg002_csq.sh
+```
+
+Large inputs and outputs stay outside Git.

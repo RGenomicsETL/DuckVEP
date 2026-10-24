@@ -34,12 +34,12 @@
 #'     assumption_id = "joint_assignment", expected_reference_rna = reference$dna,
 #'     annotated_start1 = 1L, alternative_start1 = 0L,
 #'     alternative_trigger_id = "", genetic_code = 1L)
-#'   answer <- rduckvep_product_scenario_v1(con, reference, exons, exons,
-#'                                         sources, programme)
+#'   answer <- rduckvep_product_scenario(con, reference, exons, exons,
+#'                                       sources, programme)
 #'   answer[c("programme_id", "allele_evidence", "product_evidence", "conditional_nmd")]
 #' })
-rduckvep_product_scenario_v1 <- function(conn, reference, exons, blocks,
-                                           sources, programme) {
+rduckvep_product_scenario <- function(conn, reference, exons, blocks,
+                                      sources, programme) {
   u64 <- function(x) {
     if (is.double(x) && !inherits(x, "integer64")) {
       if (any(!is.finite(x) | x != trunc(x) | x > 2^53 | x < 0)) {
@@ -84,7 +84,7 @@ rduckvep_product_scenario_v1 <- function(conn, reference, exons, blocks,
     "genomic_start1 := s.genomic_start1::VARCHAR, genomic_end1 := s.genomic_end1::VARCHAR, ",
     "rna_first1 := s.rna_first1, rna_last1 := s.rna_last1)), ",
     "reference_start1 := p.reference_start1::VARCHAR) AS converted ",
-    "FROM (SELECT duckvep_product_scenario_v1(STRUCT_PACK(",
+    "FROM (SELECT duckvep_product_scenario(STRUCT_PACK(",
     "reference := STRUCT_PACK(start1 := ?::UBIGINT, dna := ?::VARCHAR, strand := ?::TINYINT), ",
     "exons := list_transform(list_zip(?::UBIGINT[], ?::UBIGINT[]), ",
     "lambda x: STRUCT_PACK(start1 := x[1], end1 := x[2])), ",

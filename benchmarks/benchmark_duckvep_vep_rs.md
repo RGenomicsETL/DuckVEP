@@ -1,72 +1,99 @@
-DuckVEP and vep-rs: HG002 Ensembl 116 measurements
+DuckVEP and vep-rs on HG002
 ================
 
-This is one sites-only HG002 v4.2.1 GRCh38 run: 4,070,522 alleles,
-Ensembl 116 annotations, and one ALT allele per record. The tools are
-compared as `(allele, transcript, sorted consequence terms)` on
-transcripts both emit. DuckVEP writes its rich typed result to Parquet;
-vep-rs 0.3.1 writes VEP tab text. Ensembl VEP 116 adjudicates the sites
-where their tuples differ.
+One sites-only HG002 v4.2.1 GRCh38 genome, split to one ALT allele per
+record, annotated with Ensembl 116 transcripts by both tools. DuckVEP
+writes its rich typed relation to Parquet; vep-rs writes VEP tab text.
+The tools are compared as
+`(allele, transcript, sorted consequence terms)` on the transcripts both
+emit, and executable Ensembl VEP adjudicates every tuple where they
+differ.
+
+|                                                |    DuckVEP |     vep-rs |
+|------------------------------------------------|-----------:|-----------:|
+| Median wall time, one core                     |     35.0 s |     41.9 s |
+| Median CPU time                                |     35.0 s |     39.7 s |
+| Median peak memory                             |   2.66 GiB |   2.77 GiB |
+| Output rows                                    | 47,278,065 | 36,258,238 |
+| Transcripts in output                          |    598,993 |    421,878 |
+| Tuples on shared transcripts                   | 34,148,222 | 34,148,222 |
+| Differing tuples where VEP sides with the tool |      1,689 |          1 |
+
+34,146,531 of 34,148,222 tuples agree (99.995%). Of the 1,691 that
+differ, VEP agrees with DuckVEP on 1,689, with vep-rs on 1, and with
+neither on 1.
 
 ## Paired single-core timings
 
-Three cold-process pairs ran sequentially on CPU 19, an i5-13500 E-core.
-Each dot is one process measurement; connecting lines pair the
-repetitions.
+The 3 cold-process pairs ran one after another on CPU 4, vep-rs first in
+each pair. Each timed process includes startup, extension load, model
+snapshot restore, VCF read and sort, annotation, and output. Lines join
+the two halves of a pair.
 
 <div class="figure" style="text-align: center">
 
-<img src="figures/veprs-paired-wall-1.png" alt="Wall time per process. The shared host was busy and output storage was disk-backed; these measurements describe this run." width="100%" />
+<img src="figures/veprs-paired-wall-1.png" alt="Bars are medians; dots are the individual processes. Outputs were disk-backed." width="100%" />
 <p class="caption">
-Wall time per process. The shared host was busy and output storage was
-disk-backed; these measurements describe this run.
+Bars are medians; dots are the individual processes. Outputs were
+disk-backed.
 </p>
 
 </div>
 
-## Query variants and transcript counts
+## Where the time goes in DuckVEP
 
-The separate query-only probe times five complete query variants. Points
-are individual measured durations, not additive components.
+A separate probe after the pairs times five complete queries on the
+restored model. Extension setup and restore are outside these timers,
+and the queries are alternatives, not additive steps.
 
 <div class="figure" style="text-align: center">
 
-<img src="figures/veprs-query-stages-1.png" alt="Each point is a separately timed query variant; extension setup and model restore are outside these timers. The values are not additive." width="100%" />
+<img src="figures/veprs-query-stages-1.png" alt="Each point is one separately timed query." width="100%" />
 <p class="caption">
-Each point is a separately timed query variant; extension setup and
-model restore are outside these timers. The values are not additive.
+Each point is one separately timed query.
 </p>
 
 </div>
 
-The comparison contains 34,148,222 tuples per tool on 420,436 shared
-transcripts; 34,146,531 tuples match (99.995%). VEP 116 ran on the 1,291
-sites with differences.
+## Agreement
 
 <div class="figure" style="text-align: center">
 
-<img src="figures/veprs-adjudicated-differences-1.png" alt="Oracle verdict counts for the 1,691 differing tuples. The horizontal count axis is logarithmic." width="100%" />
+<img src="figures/veprs-adjudicated-differences-1.png" alt="VEP verdicts on the differing tuples. The count axis is logarithmic." width="100%" />
 <p class="caption">
-Oracle verdict counts for the 1,691 differing tuples. The horizontal
-count axis is logarithmic.
+VEP verdicts on the differing tuples. The count axis is logarithmic.
 </p>
 
 </div>
 
-<div class="figure" style="text-align: center">
+On the sites where the tools differ, VEP emits 41,249 tuples. DuckVEP
+matches 41,085 and vep-rs matches 38,109. VEP has 162 rows on
+transcripts DuckVEP’s database-built model does not hold and 1,443 rows
+vep-rs does not emit. DuckVEP emits 0 rows absent from VEP and vep-rs
+emits 0.
 
-<img src="figures/veprs-transcript-counts-1.png" alt="Transcript counts are overlapping set sizes, not disjoint categories. The GTF and cache-builder totals are reported in the archived run analysis; output counts are in adjudication.txt." width="100%" />
-<p class="caption">
-Transcript counts are overlapping set sizes, not disjoint categories.
-The GTF and cache-builder totals are reported in the archived run
-analysis; output counts are in adjudication.txt.
-</p>
+DuckVEP emits 178,557 transcripts that vep-rs does not, because its
+model is built from the Ensembl core database while the vep-rs cache is
+built from the GTF by `vep-cache-builder`. Agreement is measured only on
+the 420,436 transcripts both emit, and tuples on which the tools agree
+were not replayed through VEP.
 
-</div>
+The two tuples where VEP does not side with DuckVEP have [two-record
+witnesses](../test/duckvep/conformance/veprs_residual_witness.vcf):
 
-The archived analysis reports 171,530 lncRNA transcripts among those
-emitted by DuckVEP and not vep-rs. It did not establish why
-`vep-cache-builder` omits transcripts.
+- **`e284879` on `ENST00000696609`.** A deletion across the UTR and
+  start codon leaves an upstream `ATG` before the original CDS suffix.
+  DuckVEP emits `start_lost` and `start_retained_variant`; VEP and
+  vep-rs emit only `start_lost`.
+- **`e391762` on `ENST00001011173`.** Deleting the middle base of a
+  terminal `TGA` leaves `TA`, and the next base makes `TAG`. DuckVEP
+  calls the stop retained, VEP calls it lost, and vep-rs adds a
+  frameshift term.
+
+[Diagnostic SQL](../test/duckvep/conformance/veprs_residual_witness.sql)
+reproduces DuckVEP’s rows from the runner’s snapshot and mappings; load
+the extension and set the SQL variable `comparison_dir` first. Direct
+VEP reruns reproduce both oracle rows.
 
 <details>
 <summary>
@@ -74,151 +101,41 @@ Run design and reproduction
 </summary>
 
 Render from the repository root with
-`Rscript benchmarks/scripts/render_benchmarks.R vep_rs`.
+`Rscript benchmarks/scripts/render_benchmarks.R vep_rs`. The report
+reads the newest `benchmarks/data/vep_rs/*_paired` directory, here
+2417ac9_paired, measured at DuckVEP revision 2417ac9.
 
-The paired campaign was measured 2026-10-05 with DuckVEP source revision
-`bbe2ec4d5e9000c38448edb35e0015f35e8b225e`. Three cold pairs ran vep-rs
-first and DuckVEP second, pinned to CPU 19 on an Intel Core i5-13500 (14
-cores, 20 threads, 62 GiB; CPU 19 is an E-core with maximum clock 3.5
-GHz). The host had other active workloads. Outputs were disk-backed. The
-median wall, CPU, and peak RSS measurements are 58.09 s, 57.98 s, and
-2,778,116 KiB for DuckVEP; 73.26 s, 70.83 s, and 2,896,592 KiB for
-vep-rs.
+vep-rs ran its release binary with `--fork 1`. DuckVEP ran with
+`SET threads = 1`, so both used one worker on the pinned core. The
+adjudicating VEP uses `--gtf` with the same GTF the vep-rs cache was
+built from.
+[`run_receipt.tsv`](data/vep_rs/2417ac9_paired/run_receipt.tsv) records
+the executables and their hashes;
+[`preparation.receipt.tsv`](data/vep_rs/2417ac9_paired/preparation.receipt.tsv)
+and
+[`preparation_outputs.sha256`](data/vep_rs/2417ac9_paired/preparation_outputs.sha256)
+bind the inputs and the prepared snapshot. Paths in them locate the
+measurement host’s files.
+[`timings.tsv`](data/vep_rs/2417ac9_paired/timings.tsv),
+[`stage_timings.tsv`](data/vep_rs/2417ac9_paired/stage_timings.tsv) and
+[`adjudication.txt`](data/vep_rs/2417ac9_paired/adjudication.txt) are
+the raw outputs this page is drawn from.
 
-DuckVEP’s timed process includes extension load, model snapshot restore,
-VCF read and coordinate sort, annotation, and Parquet output. Its rich
-relation contains consequences, impact, cDNA, CDS and protein positions,
-amino acids, and NMD fields. vep-rs uses its 0.3.1 release binary with
-`--fork 1` and emits VEP tab text. DuckVEP’s model is built from the
-Ensembl core database; the vep-rs JSON cache was built from
-`Homo_sapiens.GRCh38.116.gtf.gz`. The release binary’s CPU time matched
-a `target-cpu=native` build, and the release already requires AVX2;
-vep-rs has no hand-written SIMD, with AVX2 use coming from the compiler
-flag and dependencies.
-
-The executable oracle is Ensembl VEP 116 using `--gtf` with the same
-GTF. The benchmark inputs are GIAB HG002 v4.2.1 GRCh38 split to one ALT
-allele per site. The tools emitted 47,278,065 DuckVEP Parquet rows and
-36,258,238 vep-rs text rows; these output contracts differ.
-`run_receipt.tsv` records executable and runner hashes;
-`preparation.receipt.tsv` and `preparation_outputs.sha256` bind the
-input paths, input content hashes, and generated snapshot/mappings.
-Those paths are measurement locators.
-
-To reproduce, provide `DUCKVEP_READER_EXT`, `DUCKVEP_MODEL`,
-`VEP_RS_CACHE`, `VEP_GTF`, and `VEP_FASTA`, plus `VEP_RS_DIR` or
-`VEP_RS_BIN`, as described in
-[`benchmark_duckvep_vep_rs.sh`](benchmark_duckvep_vep_rs.sh). Set
-`BENCH_OUT` to the intended output filesystem; the runner default is
-memory-backed `/dev/shm/duckvep-vep-rs`. Then run:
+To reproduce, set `DUCKVEP_READER_EXT`, `DUCKVEP_MODEL`, `VEP_RS_CACHE`,
+`VEP_GTF`, `VEP_FASTA` and `VEP_RS_DIR` as described in the header of
+[`benchmark_duckvep_vep_rs.sh`](benchmark_duckvep_vep_rs.sh), set
+`BENCH_OUT` to the output filesystem, and run:
 
 ``` bash
-benchmark_duckvep_vep_rs.sh --vcf INPUT.vcf.gz --work WORKDIR --threads 1 --runs 3 --cpu-affinity 19
+benchmark_duckvep_vep_rs.sh --vcf INPUT.vcf.gz --work WORKDIR --threads 1 --runs 3 --cpu-affinity CPU \
+  | tee adjudication.txt
 ```
 
-`VEP_RS_CACHE` must point to the species/version directory containing
-`transcripts/` (`homo_sapiens/116_GRCh38` for this run), not its parent.
-A successful vep-rs exit with no annotation rows is rejected by the
-runner. `--fork 1` and `SET threads=1` limit worker counts; only
-`--cpu-affinity` binds processes to CPU 19. Without affinity, neither
-tool is pinned. With `--threads 16`, that thread setting is measured
-before the one-thread comparison, using the same affinity for both tools
-and the query probe. Preparation is reused only when its source paths
-and SHA-256 hashes match and generated files pass their recorded SHA-256
-checks.
+`VEP_RS_CACHE` is the species and release directory that contains
+`transcripts/`. The runner rejects a vep-rs run that exits cleanly
+without annotation rows. Preparation is reused only when its inputs and
+generated files match their recorded hashes.
 
-`DUCKDB_BIN`, `TIME_BIN`, `TASKSET_BIN`, `VEP_RS_BIN`, and `VEP_BIN`
-select alternate executables; `TIME_BIN` must support GNU time’s `-f`,
-`-a`, and `-o` options. `VEP_PREFIX` can add the adjudicating VEP
-environment to `PATH`. The raw
-[`timings.tsv`](data/vep_rs/bbe2ec4_paired/timings.tsv),
-[`stage_timings.tsv`](data/vep_rs/bbe2ec4_paired/stage_timings.tsv),
-[`adjudication.txt`](data/vep_rs/bbe2ec4_paired/adjudication.txt),
-[`run_receipt.tsv`](data/vep_rs/bbe2ec4_paired/run_receipt.tsv), and
-[run README](data/vep_rs/bbe2ec4_paired/README.md) retain the
-measurement record.
+HGVS, regulatory features and plugins are outside this comparison.
 
 </details>
-<details>
-<summary>
-Agreement details and residual witnesses
-</summary>
-
-A tuple is `(allele, transcript, set of consequence terms)`. Counts use
-only the 420,436 transcripts emitted by both tools. Each tool has
-34,148,222 tuples; 34,146,531 agree and 1,691 differ. VEP ran on 1,291
-sites where the tools differed. Its verdicts were 1,689 tuples agreeing
-with DuckVEP, one agreeing with vep-rs, and one differing from both.
-
-On those 1,291 sites VEP emitted 41,249 tuples. DuckVEP matches 41,085
-and has no rows absent from VEP; 162 VEP rows are for transcripts not
-held by DuckVEP’s database-built model. vep-rs matches 38,109 and lacks
-1,443 VEP rows; neither tool emits rows absent from VEP in this replay.
-The largest disagreement class is 1,317 tuples called synonymous by
-DuckVEP and missense by vep-rs; other differences include stop gained or
-stop retained terms present on one side only.
-
-The two remaining mismatches have [two-record
-witnesses](../test/duckvep/conformance/veprs_residual_witness.vcf):
-
-- `e284879 / ENST00000696609`: a UTR/start deletion leaves an upstream
-  `ATG` before the original CDS suffix. DuckVEP emits both start terms;
-  VEP and vep-rs emit only `start_lost`.
-- `e391762 / ENST00001011173`: deleting the middle base of a terminal
-  `TGA` leaves local `TA`; sequence replay uses the next base to form
-  `TAG`. DuckVEP calls the stop retained, VEP calls it lost, and vep-rs
-  also adds a frameshift term.
-
-[Diagnostic SQL](../test/duckvep/conformance/veprs_residual_witness.sql)
-reproduces DuckVEP’s rows from the runner snapshot and mappings. Load
-the extension and set SQL variable `comparison_dir` before running it
-from the repository root. Direct VEP 116 reruns reproduce both oracle
-rows. The differing sequence contexts are identified; VEP’s internal
-shifted allele operands remain unresolved.
-
-</details>
-<details>
-<summary>
-Historical memory-backed measurements
-</summary>
-
-A separate campaign dated 2026-10-04 used DuckVEP revision `125e34a` on
-the same i5-13500 with outputs on memory-backed storage. At 16 threads,
-median wall times were 6.84 s for DuckVEP and 9.39 s for vep-rs; CPU
-time was 71 s and 105 s, and peak RSS was 4.9 GiB and 3.5 GiB. DuckVEP
-wrote 47,278,065 rows (142 MB Parquet); vep-rs wrote 36,258,238 rows
-(4.17 GB text). The output formats and row counts differ. DuckVEP’s
-resident memory includes a 1.3 GiB model file mapping shared between
-processes.
-
-The separate one-thread measurements were DuckVEP: 33.5 s wall, 33.5 s
-CPU, 2.6 GiB peak RSS; vep-rs `--fork 1`: 30.0 s wall, 53.3 s CPU, 3.1
-GiB peak RSS; vep-rs pinned to one core: 34.4 s wall and 34.4 s CPU. The
-pinned vep-rs and DuckVEP timings came from separate invocations and are
-not a controlled one-core pair. The 33.53 s and 102.86 s timings
-recorded for separate invocations also do not establish a controlled
-comparison. vep-rs 0.3.1 did not accept `--parquet`, so the output
-formats are not identical.
-
-A historical DuckVEP single-thread query probe, without CPU affinity,
-measured compact count 3.4 s, rich count 8.0 s, rich-column touch 11.4
-s, rich joined Parquet 30.3 s, and compact Parquet 15.5 s. Extension
-setup and model restore were outside these query timers; the query
-variants are not additive.
-
-vep-rs’s published concordance describes release 115 and 1.18 billion
-variants. HGVS, regulatory features, and plugins are outside this
-comparison. Tuples on which these tools agree were not checked against
-VEP; the oracle adjudication is limited to the disagreement sites in
-this one genome.
-
-</details>
-
-The R Markdown source renders this report and its figures from the
-checked-in receipts:
-
-``` r
-rmarkdown::render("benchmarks/benchmark_duckvep_vep_rs.Rmd",
-  output_file = "benchmark_duckvep_vep_rs.md", output_dir = "benchmarks",
-  knit_root_dir = normalizePath("."), envir = new.env(parent = globalenv()))
-```

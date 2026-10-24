@@ -5,8 +5,9 @@
 #
 # RAW_DIR holds process.tsv (one row per fresh process from capped_run.sh) and <label>.worker.tsv (one row per pass).
 # OUTPUT_DIR (default benchmarks/data/haplotype_scale) receives runs.csv (one row per process and pass) and summary.csv
-# (medians and ratios). The gate is judged on mode B, cold process, model load included, wall clock of the whole process
-# (R and DuckDB start-up included) against the median wall clock of the pinned csq on the same input and core.
+# (medians and ratios). Ratios compare each mode's cold whole-process wall clock (model load, R and DuckDB start-up
+# included) with the pinned csq median on the same input and core. The speed requirement itself is measured with the
+# fused reader by run_hg002_csq.sh; mode B here is the read_csv reference pipeline.
 args <- commandArgs(trailingOnly = TRUE)
 raw <- args[[1L]]
 here <- normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1L]))
@@ -64,7 +65,7 @@ gate_csq <- med(group_rows("csq_Ou")$wall_s)
 diagnostic_csq <- med(group_rows("csq_Ob")$wall_s)
 summary <- data.frame(measure = character(), value = numeric(), note = character(), stringsAsFactors = FALSE)
 add <- function(measure, value, note = "") summary[nrow(summary) + 1L, ] <<- list(measure, value, note)
-add("csq_median_wall_s_Ou_devnull", gate_csq, "bcftools csq -p a -Ou -o /dev/null, the gate baseline (matches the recorded 22.2 s log: same warnings, 811296 KiB RSS)")
+add("csq_median_wall_s_Ou_devnull", gate_csq, "bcftools csq -p a -Ou -o /dev/null, the csq baseline (same warnings and 811296 KiB RSS)")
 add("csq_median_wall_s_Ob_file", diagnostic_csq, "same with -Ob to a file: BCF compression adds about 12 s")
 for (m in c("B", "A")) {
   g <- paste0("hg002_", m)
@@ -80,7 +81,7 @@ for (m in c("B", "A")) {
   add(paste0(g, "W_cold_pass_internal_total_s_median"), med(coldw$total_s), "cold pass of the runs that also did a warm pass")
 }
 b_wall <- med(group_rows("hg002_B", "cold")$wall_s)
-add("gate_ratio_B_cold_wall_over_csq_Ou", b_wall / gate_csq, "the signed gate is <= 0.5")
+add("ratio_B_cold_wall_over_csq_Ou", b_wall / gate_csq, "mode B, cold whole process")
 add("ratio_B_cold_wall_over_csq_Ob", b_wall / diagnostic_csq, "against csq writing BCF")
 add("ratio_B_cold_internal_over_csq_Ou", med(group_rows("hg002_B", "cold")$total_s) / gate_csq, "without R/DuckDB start-up")
 add("ratio_B_warm_over_csq_Ou", med(group_rows("hg002_BW", "warm")$pass_s) / gate_csq, "warm execution only")
@@ -88,12 +89,10 @@ bz <- group_rows("hg002_Bbgzip", "cold")
 if (nrow(bz)) {
   add("hg002_Bbgzip_cold_process_wall_s_median", med(bz$wall_s), "diagnostic: VCF inflated by bgzip -dc (libdeflate) through a FIFO on the same core")
   add("hg002_Bbgzip_cold_stage_s_median", med(bz$stage_s), "")
-  add("ratio_Bbgzip_cold_wall_over_csq_Ou", med(bz$wall_s) / gate_csq, "diagnostic only; the gate uses DuckDB's own decoder")
+  add("ratio_Bbgzip_cold_wall_over_csq_Ou", med(bz$wall_s) / gate_csq, "diagnostic only; mode B uses DuckDB's own decoder")
 }
 add("ratio_A_cold_wall_over_csq_Ou", med(group_rows("hg002_A", "cold")$wall_s) / gate_csq, "mode A")
 add("ratio_A_warm_over_csq_Ou", med(group_rows("hg002_AW", "warm")$pass_s) / gate_csq, "mode A warm")
-add("gate_met", as.numeric(b_wall / gate_csq <= 0.5), "1 when mode B cold wall <= 0.5 x csq median")
-add("gate_target_wall_s", 0.5 * gate_csq, "")
 for (g in c("hg002_inside_A", "hg002_outside_A")) {
   x <- group_rows(g, "cold")
   add(paste0(g, "_predict_s_median"), med(x$predict_s), "duckvep_haplotypes + Parquet on that partition of the calls")
@@ -123,5 +122,4 @@ for (g in sort(unique(sub("_[0-9]+$", "", runs$label[grepl("^abx_", runs$label)]
 }
 write.csv(summary, file.path(out, "summary.csv"), row.names = FALSE)
 print(summary, row.names = FALSE, digits = 4)
-cat(sprintf("\nVERDICT: mode B cold wall median %.2f s vs csq -Ou median %.2f s: ratio %.3f (gate <= 0.500): %s\n",
-  b_wall, gate_csq, b_wall / gate_csq, if (b_wall / gate_csq <= 0.5) "MET" else "NOT MET"))
+cat(sprintf("\nmode B cold wall median %.2f s, csq -Ou median %.2f s, ratio %.3f\n", b_wall, gate_csq, b_wall / gate_csq))

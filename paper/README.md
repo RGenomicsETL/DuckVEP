@@ -48,9 +48,11 @@ whole-haplotype coverage for every VEP consequence class.
 - Independent-event oracle: Ensembl VEP 116 recomputed locally; compared field
   by field in the declared comparable domain.
   - Evidence: `test/duckvep/conformance/`.
-- Haplotype oracle: bcftools csq for the comparable coding domain (coarse term
-  vocabulary, identical transcript geometry); Haplosaurus for whole-haplotype
-  consequences; Mutalyzer for HGVS.
+- Haplotype oracles: pinned bcftools csq for whole-haplotype consequences where
+  both models share transcript geometry; DuckVEP's per-variant annotation (exact
+  against VEP) for single-record paths outside csq's reach; offline Mutalyzer and
+  VEP on the merged record for compound HGVS. Haplosaurus reports sequences, not
+  consequences, so it checks replay only.
 - Disagreeing cases are enumerated as a refusal/errata ledger, not silently
   dropped: `ERRATA.md`, `test/duckvep/conformance/README.md`.
 - Statistical/property testing: `test/duckvep/property/`.
@@ -66,22 +68,23 @@ revision as a claim for the current one.
 |---|---|---|
 | Throughput at gnomAD scale (≥1M alleles/s) | `benchmarks/duckvep_throughput*.md`, `benchmarks/figures/throughput-*.png` | delivered (#3) |
 | Memory bound enforced per job | `benchmarks/figures/throughput-dense-memory-1.png` | delivered (#3) |
-| bcftools csq agreement on the comparable coding domain | `benchmarks/benchmark_duckvep_vep_rs.md` | delivered |
+| bcftools csq agreement on the comparable coding domain | `test/data/haplotype/hg002_domain.oracle.tsv`, `benchmarks/duckvep_haplotypes.md` | delivered |
+| Agreement and speed against vep-rs, VEP-adjudicated | `benchmarks/benchmark_duckvep_vep_rs.md` | delivered |
+| Compound HGVS against Mutalyzer and VEP | `test/duckvep/conformance/compound_hgvs_fuzz.py` | delivered |
 | Independent-event VEP 116 agreement | `test/duckvep/conformance/` | delivered |
 | Phased haplotype classification timing/workspace | `benchmarks/figures/phase-*.png` | delivered |
 | Projection cost | `benchmarks/figures/projection-*.png` | delivered |
 | HGVS (DNA + protein) vs Mutalyzer/VEP | `benchmarks/duckvep_conformance.*`, conformance README | delivered |
 
-Headline results from the earlier qualification retain their original scope
-labels; they are not new performance claims for later revisions.
-
 ## 5. Discussion and limitations
 
 - Scope boundary: which consequence classes the whole-haplotype profile covers,
   and which remain independent-event only.
-- `compound_hgvs_certified` stays **FALSE**; state exactly what is and is not
-  certified.
-- Overlap/refusal classes and why they are refused (issue #11 boundary).
+- Compound HGVS: DNA names agree with Mutalyzer's normalization; protein names
+  equal VEP's on the merged record except the nonsense-substitution rule and
+  stop-codon frameshift notation.
+- Overlapping records compose at their literal coordinates; conflicting claims
+  are reported as `edit_conflict`, not resolved.
 - Open qualification: released DuckDB 2.0.0 (issue #48).
 
 ## 6. Availability

@@ -5,7 +5,7 @@ executable behavior; open compatibility scope and evidence are linked in the rel
 
 ## Purpose and compatibility
 
-DuckVEP is the deterministic variant-consequence kernel inside DuckHTS. It targets Ensembl
+DuckVEP is a deterministic variant-consequence extension for DuckDB. It targets Ensembl
 VEP 116 (`57ea5c52340acc1f156267f810ad162e26597082`) with Ensembl core
 `c0cf13daa961d80584bad797b2eb0ff3a7500ef3` and variation
 `2fb834b987ede3824e200197a838ce11e91aeb4b`. The behavioral target is not
@@ -23,9 +23,9 @@ VEP's clipped transcript-slice state without changing those semantic edits. Allo
 `query(duckvep_annotate_sql(..., struct_pack(hgvs := true)))` relation path are implemented for independent literal
 small variants. Strict executable-VEP evidence covers the fixed position-one/right-anchor cases
 and 56,998 chromosome-21 ClinVar transcript pairs with zero HGVSc/HGVSp differences.
+Compound HGVS for phased haplotypes follows the [haplotype contract](duckvep_haplotype_contract.md).
 Genomic HGVS, transcript models whose sequence differs from the genomic exon sequence,
-structural/BND HGVS, broader cross-species HGVS distributions, and compound/phased HGVS
-remain open.
+structural/BND HGVS and broader cross-species HGVS distributions remain open.
 VEP 116 is the behavioral authority; pure-C properties and bcftools csq supply independent
 checks for mechanics and phased edit state.
 
@@ -700,9 +700,7 @@ Those richer facts should remain typed DuckDB relations joined by numeric source
 do not belong in every resident C transcript record. Exact VEP-compatible selection and
 the richer Ensembl relation set can therefore be separate named products built from the
 same staged release. The [conformance report](../benchmarks/duckvep_conformance.md)
-records the declared corpus evidence; throughput accounting remains tracked at
-https://github.com/RGenomicsETL/duckhts/issues/95. Further species and genetic-code
-coverage is tracked at https://github.com/RGenomicsETL/duckhts/issues/119.
+records the declared corpus evidence.
 
 ## Ownership
 
@@ -1165,16 +1163,13 @@ must not be retained. Only preparation/materialization uses that connection. A b
 returns an error, including recursive preparation, while completed scan results and native
 state have independent ownership. Caller TEMP objects/uncommitted writes are not visible.
 
-This public sequence-mechanics surface is not complete phased annotation. Local
-block masks and sequence/indel flags are not whole-haplotype SO or protein HGVS, and literal replay does not yet
-compose typed structural events. Existing executable Haplosaurus comparisons exercise
-native replay and the public SQL surface for their declared phased-sequence scope;
-they do not certify compound SO/HGVS. The
-[phased replay benchmark](../benchmarks/duckvep_haplotypes.md) separates the
-initialized native stream from public SQL sort/materialization and records sparse
-pool occupancy, native workspace bytes and whole-process RSS. Its shared synthetic
-cohort measures literal replay, not future combined annotation or real-population
-performance; those paths require renewed evidence when implemented.
+Per-block masks and sequence/indel flags describe local mechanics; whole-haplotype SO,
+IMPACT, NMD and compound HGVS come from the classifier in the
+[haplotype contract](duckvep_haplotype_contract.md). Replay composes literal small
+variants, not typed structural events. Executable Haplosaurus comparisons check the
+replayed sequences. The [phased replay benchmark](../benchmarks/duckvep_haplotypes.md)
+separates the native stream from SQL sort/materialization and records pool occupancy,
+native workspace bytes and process RSS on a shared synthetic cohort.
 
 The stream must preserve the original record/ALT identity, decoded allele indexes,
 ploidy, phasing flag, and `PS`/`PID`-like phase-set provenance. The same called local
@@ -1213,9 +1208,7 @@ or model receipt requires recomputing the affected transcript haplotypes.
 
 Sorted input bounds lifetime: a transcript's phased state can be finalized once the stream
 passes its end. Reference paths stay implicit; non-reference paths should share compact
-edit prefixes across samples and translate each distinct leaf once. GT/PS decoding,
-arbitrary ploidy, transcript-close flushing, and VEP Haplosaurus comparison are tracked at
-https://github.com/RGenomicsETL/duckhts/issues/92.
+edit prefixes across samples and translate each distinct leaf once.
 
 DuckDB may decode genotypes, derive explicit sample/phase-set/haplotype columns, and sort
 the input relation by genomic coordinate before streaming it. That SQL grouping is not the
@@ -1356,8 +1349,7 @@ VEP 116 stores `CIPOS`/`CIEND` and structural inserted-sequence payloads, but it
 fields therefore remain required provenance and future HGVS/round-trip inputs, not missing
 consequence facts. The BND statistical differential is part of the executable-VEP harness;
 broader chromosome, species, and real fusion corpora remain continuing evidence rather
-than a second implementation. Remaining structural follow-up is tracked at
-https://github.com/RGenomicsETL/duckhts/issues/98.
+than a second implementation.
 
 Callers such as Sniffles and cuteSV may provide `CIPOS`/`CIEND`, mate identity, inserted
 sequence, copy number, and several records for one event. For strict VEP-116 consequence
@@ -1470,7 +1462,7 @@ events remain unsupported until their confidence geometry is represented.
 The pinned
 [ferro-hgvs v0.9.0 source](https://github.com/fulcrumgenomics/ferro-hgvs/tree/278e2c11134e3b49067d0c334f650c7c29db9cbe)
 is an independent HGVS-spec oracle and a useful model for structured fuzzing, large ClinVar
-corpora, and hermetic reference fixtures. It is not a DuckHTS dependency and does not
+corpora, and hermetic reference fixtures. It is not a DuckVEP dependency and does not
 replace the VEP 116 executable as the compatibility authority: canonical HGVS,
 Mutalyzer/biocommons behavior, and VEP's historical output can legitimately disagree.
 The intended differential therefore has three independent observations: exact VEP-116
@@ -1510,9 +1502,8 @@ alleles rather than pretending the official human VariantKey contig space is uni
 Position, interval, and gene providers use their own typed keys; they do not inherit exact
 variant semantics merely because all are exposed by one manifest.
 
-FastVEP's `.osa`/`.osa2`, `.osi`, and `.oga` files encode exact-allele, interval, and gene
-provider scopes respectively. DuckHTS closes over those semantics with ordinary typed
-relations rather than reading or creating another cache format. Sorted/partitioned Parquet
+Exact-allele, interval and gene providers are ordinary typed relations, not another cache
+format. Sorted/partitioned Parquet
 holds the hot projections; provider receipts and cold metadata remain relations; tabular or
 JSON output is rendered after selection. VCF round-trip output remains a separate writer and
 FORMAT-remapping contract.
@@ -1642,7 +1633,7 @@ indefinitely open prerequisite for every release.
 - Throughput reports must state input variants, candidate/object pairs, output rows and
   bytes, threads, model, and machine. Site-level rate and cohort haplotype-update rate are
   different measurements.
-- Comparisons with FastVEP report two timings over the same source and output contract:
+- Comparisons with other annotators (vep-rs) report two timings over the same source and output contract:
   annotation from already coordinate-sorted input, and read-plus-sort-plus-annotation.
   Sorting cost is not hidden, but it is not charged only to DuckVEP either. DuckDB may sort
   once and stream ordered chunks directly into the consequence or phased executor.
@@ -1826,7 +1817,5 @@ Source ownership makes the resident model immutable and shared; GNU `time -v` ob
 That process measurement is not allocation attribution. At 50,000 bases the same inputs
 expand to 88,784,213 rows and the observed four-branch RSS premium remains 8.16 MiB.
 
-The conformance report records the closed consequence campaign, while
-https://github.com/RGenomicsETL/duckhts/issues/95 tracks remaining throughput work. Phased
-execution remains a distinct semantic vertical at
-https://github.com/RGenomicsETL/duckhts/issues/92.
+The conformance report records the consequence campaign; phased execution follows the
+[haplotype contract](duckvep_haplotype_contract.md).

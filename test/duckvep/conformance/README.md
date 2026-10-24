@@ -2,13 +2,7 @@
 
 Ensembl VEP 116 is the behavioral oracle. Other reimplementations are not.
 
-## Bounded product contracts
-
-The reviewed raw prediction profile preserves complete original one-record REF/ALT or ALT/ALT copy proof with homozygous background without inventing inter-record phase sets. A one-record ALT/ALT heterozygote requires both sibling lanes in the stream; a lone projected ALT is refused as `non_strict_phase_policy`. Private raw-GT transport uses eight cells; public haplotypes, scalar calls and arrangements retain their 36/32/26-field shapes. Reached effects and the aggregate use the same determinate peptide facts: case-insensitive bases are compared, but X/B/Z are not synonyms, local source masks are not unioned and opaque ALT bases receive no invented ancestry. Compatible source-local edit islands can lie in different coding exons, with each source contained in one coding exon; genomic-gap ownership remains distinct even at equal cDNA coordinates. The coding-edit cache charges 20 bytes per edit island and workspace charges depend on configured capacities.
-
-Typed peptide programmes lift intact reference codons through bounded indels and restored frame, not opaque interiors; changed codons translate ordinarily. Typed transcript SeqEdit capture and optional `rna_edit_query` use all-or-none original raw-cDNA coding start/end (`UBIGINT`) and explicit code (`UTINYINT`), checked into owned 32-bit arrays. Provisional V3 snapshot/contract coexist with V1/V2 migration and fingerprints. Fixed-map, nonoverlapping equal-length RNA operations and substitutions admit conditional paired first-stop peptides; changed-substrate collisions, boundary shifts, unknown/untyped or coexisting programmes are refused. The MF*/MFQ* and ML*/MS* producer positives exercise both hosts and restore. Neither conditional lane supplies unconditional SO or NMD. Complete code-1 CTG/TTG starts use the original coding coordinate and existing nonempty CDS/code authority; the chr20 ENST00000336066.8/ENSP00000477229.2 positive is not a regional-code observation. Nuclear ATG start loss does not imply a downstream-start scan.
-
-Experimental `duckvep_product_scenario_v1(STRUCT)` and `rduckvep_product_scenario_v1` accept explicitly supplied disjoint fixed-length substitutions and product/start hypotheses with variable typed lists, full unsigned 64-bit coordinates and source IDs (including zero), plus explicit source operands and per-source effects. `hypothetical_assignment` and `supplied_programme` are not observed phase or inferred splice/alternative-start products; conditional NMD remains unknown. Broader phase transport, interacting opaque replacements, mixed/regulatory/product domains and conditional NMD remain open in #11/#50. #48, release, publication and model hosting are separate. These bounded profiles do not establish full qualification.
+Whole-haplotype rules and their evidence are in the [haplotype contract](../../../design/duckvep_haplotype_contract.md); this page covers per-variant consequences.
 
 `data/so_consequences.tsv` is generated directly from VEP 116's
 `%OVERLAP_CONSEQUENCES` table. `make duckvep-so-spec` verifies the pinned
@@ -560,7 +554,7 @@ make duckvep-corpus-differential DUCKVEP_DIFFERENTIAL_ARGS="\
   --chrom 21 --seed 17 --sample-per-shape 100"
 ```
 
-When `--model-sql` is empty, the runner loads DuckHTS in a private in-memory database and
+When `--model-sql` is empty, the runner loads DuckVEP in a private in-memory database and
 attaches the prepared model read-only. Independent chromosome/seed jobs can therefore run
 concurrently without copying the model or serializing on a DuckDB file lock. Every generated
 VCF ID contains its state, source transcript ordinal, coordinates, and operation; retaining

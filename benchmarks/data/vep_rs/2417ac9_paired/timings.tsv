@@ -1,0 +1,7 @@
+kind	tool	threads	cpu_affinity	run	wall_s	user_s	sys_s	maxrss_kib
+benchmark	vep-rs	1	4	1	45.34	32.68	6.97	2906784
+benchmark	duckvep	1	4	1	35.05	34.48	0.54	2792244
+benchmark	vep-rs	1	4	2	41.84	34.34	6.16	2912576
+benchmark	duckvep	1	4	2	36.15	35.53	0.61	2790664
+benchmark	vep-rs	1	4	3	41.92	33.57	6.16	2908436
+benchmark	duckvep	1	4	3	33.45	32.82	0.59	2792584

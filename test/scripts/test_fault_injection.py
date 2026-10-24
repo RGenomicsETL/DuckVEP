@@ -177,7 +177,7 @@ QUERIES = {
     "rna": """SELECT 'RESULT rna ' || count(*) || ' ' || hash(list(h ORDER BY hash(h))) FROM
  duckvep_haplotypes('SELECT * FROM f_rna_calls', 'fr') h;""",
     "product": """SELECT 'RESULT product ' || count(*) || ' ' || hash(list(p ORDER BY hash(p))) FROM
- (SELECT id, duckvep_product_scenario_v1(input) result FROM f_product_input) p;""",
+ (SELECT id, duckvep_product_scenario(input) result FROM f_product_input) p;""",
 }
 # The same models restored from snapshots (duckvep_model_restore): 'fms' and 'fcs'.
 QUERIES["hgvs_restored"] = QUERIES["hgvs"].replace("'fm'", "'fms'").replace("RESULT hgvs ", "RESULT hgvs_restored ")
@@ -192,7 +192,7 @@ PRODUCT_POSITIVE = """SELECT 'PRODUCT ' || id || ' ' || p.programme_id || ' ' ||
  p.allele_evidence || ' ' || p.product_evidence || ' ' ||
  list_count(p.sources) || ' ' || list_count(p.source_effects) || ' ' ||
  p.verified_sources || ' ' || p.sources[1].source_id FROM
- (SELECT id, duckvep_product_scenario_v1(input) p FROM f_product_input)
+ (SELECT id, duckvep_product_scenario(input) p FROM f_product_input)
  ORDER BY id;"""
 RESTORE = "SELECT 'LOADED ' || duckvep_model_restore('{model}', '{path}');"
 # The model each annotation phase runs on, and the query that proves a load published nothing.

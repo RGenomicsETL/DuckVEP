@@ -1,0 +1,4 @@
+prediction_status	prediction_reason	paths
+predicted	supported_domain	157597
+incomplete_input	unphased_heterozygous	328
+predicted	per_record_terms	212

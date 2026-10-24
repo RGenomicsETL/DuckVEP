@@ -75,7 +75,7 @@ result. Blocks reuse `max_leaf_edits` capacity and the per-call workspace limit.
 materialized as `reference` and `alternate`. An empty span denotes a gap.
 The reference uses replay's uppercase DNA spelling; model bytes stay immutable.
 Runs join only when adjacent columns have the same gap/non-gap type on both
-sides. Indel-bearing paths use the VEP-116 pure-Perl global-alignment score and
+sides. Indel-bearing paths use VEP's pure-Perl global-alignment score and
 tie order; substitution-only paths compare corresponding positions. Repeated
 sequence can therefore place a difference away from its contributing event.
 Differences are not HGVS normalization or event-provenance reassignment.
@@ -84,7 +84,7 @@ exact traceback band and `max_leaf_differences` bounds output runs; exhaustion
 is an error, not approximate alignment or discarded differences.
 
 `protein_differences` has the same span fields and alignment mode, with
-positions in amino acids. Its reference follows Ensembl-116 start-methionine,
+positions in amino acids. Its reference follows Ensembl's start-methionine,
 terminal-stop and curated single-residue peptide-edit rules. Haplosaurus then
 appends `*` only for an exact uppercase TAA/TAG/TGA raw-CDS suffix, including
 nonstandard-table and partial-CDS cases. The alternate is the displayed
@@ -93,172 +93,45 @@ CDS shorter than one codon have NULL protein differences; identical known
 proteins have an empty list. Both difference axes reuse the same native
 scratch and are separately subject to the alignment-cell and run limits.
 
-`hgvs = TRUE` requests a VEP-116-derived protein HGVS suffix in `hgvsp`: equality,
-one operation, or a cis allele such as `p.[(Gly2del;Ala4CysfsTer2)]`.
-Protein operations use the completed path and may combine several physical
-edits; source contributors and coding blocks remain unchanged. `hgvsp_status`
-is `ok` only after the complete operation set has been rendered. Other statuses
-retain NULL text without discarding the sequence or provenance. Conditional or
-unavailable sequence, ordered overlapping replacements, missing peptide data,
-unsupported coding contexts, and unrepresentable protein ends remain explicit.
-Phase policy controls allele assignment, not HGVS nomenclature. Protein HGVS
-retains VEP's local-peptide and unknown-residue presentation. An `ok` status
-reports a supported computation, not independent HGVS-rule certification.
-A path with one original ALT source uses independent-event VEP-116 HGVS,
-including genomic shifting and absent results. Multiple differing islands
-within one MNV retain that single source identity. Placement needing an
-unavailable genomic FASTA returns `missing_reference`.
-Prepared references retain their own residues and length without changing raw
-CDS/frame facts or inventing source edits. Loss of only a reference stop marker
-supplies no alternate extension, and insertions require reference flanks.
-`max_hgvs_operations` bounds the working operation stack and final operations;
-`max_hgvs_bytes` bounds text bytes excluding NUL; `max_hgvs_reference_bytes`
-bounds the query-local FASTA result buffer, including NUL and line-ending
-scratch. Sequence/edit scratch derives from `max_sequence_bases` and
-`max_leaf_edits`, and allele scratch from `max_allele_bytes` and the literal
-allele width. All DuckVEP-owned buffers count toward `workspace_limit`;
-HTSlib handle/transport storage is separate. Exhaustion errors instead of
-truncating text. Disabled HGVS allocates no HGVS buffers or reference handle
-and returns `not_requested`. Identifiers are joined
-through the model transcript ordinal; the suffix contains no accession.
+`prediction_status`, `prediction_reason`, `haplotype_consequences`,
+`haplotype_impact`, `nmd_prediction` and `nmd_exceptions` classify the whole
+edited product. The rules and the authority each is checked against are in the
+haplotype contract (`design/duckvep_haplotype_contract.md`); in short:
 
-`prediction_policy` names the versioned contract (`duckvep-coding`).
-`prediction_status` and `prediction_reason` state eligibility for its supported
-domain and whether the classifiers decided it (see below), and `nmd_prediction` gives
-the rule `ejc50` NMD prediction; `nmd_exceptions` lists the exceptions to that rule that apply to a
-premature stop (`start_proximal`, `long_exon`) without changing the prediction. On a decoded eligible path,
-a lost stop extends `protein` through the stored 3' flank to the next stop.
-Raw source replay retains its compatibility protein without that extension.
-The ordinary coding domain is strict complete phased calls of
-any ploidy (a haploid call has one lane), one unambiguous heterozygous phase
-domain per transcript and sample (an unphased heterozygous call that is the
-sample's only heterozygous call on the transcript needs no phase), literal ACGT SNVs, MNVs and indels of any
-length, non-overlapping and inside coding exons of CDSs in a supported genetic
-code, including typed curated peptide programmes. A complete CDS needs a start codon
-(ATG in the standard code) and a terminal stop; a CDS whose start or end is not
-annotated, or whose sequence lacks one, is predicted without the test for that end.
-Under `vep_compat`, decoded calls are read in GT slot order, as VEP's haplotype mode
-does, and classified like strict ones. Statuses: `incomplete_input` (reasons
-`missing_call`, `unphased_heterozygous`, `unresolved_cross_ps_phase`),
-`edit_conflict` (`contradictory_edits`), `unsupported_overlap`
-(`overlapping_edits`, `duplicate_edits`, `ambiguous_same_gap_insertions`) and
-`unsupported_context` (`non_strict_phase_policy`,
-`non_literal_allele`, the transcript reasons
-`transcript_not_coding`, `non_standard_codon_table`, `curated_transcript`,
-`incomplete_cds`, `noncanonical_start`, `noncanonical_stop`, `internal_stop`,
-and preserved projection or sequence reasons such as `reference_mismatch`,
-`outside_cds`, `non_contiguous`, `invalid_allele`). A path whose whole product cannot be
-rebuilt (an edit crossing the CDS start or end or an exon boundary, an in-frame stop in the
-reference CDS) is `predicted` with reason `per_record_terms`: its consequences are the union
-of its records' per-variant terms; raw replay stays and NMD is not predicted. So is a path
-with a record outside the product that changes an essential splice site. Phase-domain completeness and
-ploidy belong to each sample/phase/lane, so `carrier_predictions` gives the keyed
-result in `carriers` order; the row status is `predicted` or
-`eligible_classifier_pending` only when every carrier is eligible, and
-otherwise the first ineligible carrier's result.
+* Records compose at their own reference coordinates. Records that agree compose
+  once and keep their identities; two that claim one base or insertion site
+  differently are `edit_conflict`.
+* `strict` reads GT and PS as written. An unphased heterozygous call needs no phase
+  when it is the sample's only heterozygous call on the transcript. A missing allele
+  or undefined phase is `incomplete_input`. `vep_compat` reads GT slots in order, as
+  VEP's haplotype mode does, and then classifies like `strict`.
+* The edited CDS is translated with the transcript's genetic code, with curated
+  translations and RNA editing as part of the reference. A lost stop reads through
+  the stored 3' flank. `start_lost` stands alone; otherwise the terms are
+  `stop_gained`, `stop_lost`, `frameshift_variant` while the frame stays displaced,
+  `protein_altering_variant` or `synonymous_variant` for a restored frame, and
+  missense, in-frame, stop-retained and start-retained terms. Changes after the
+  first stop are contributors with role `post_stop`.
+* A path with no whole product to rebuild (an edit crossing a CDS end or an exon
+  boundary, an essential splice-site record, an in-frame stop in the reference CDS)
+  is `predicted` with reason `per_record_terms`: the union of its records'
+  per-variant terms, without NMD.
+* `nmd_prediction` applies rule `ejc50` to a new premature stop: `trigger` when the
+  stop lies more than 50 bases before the last exon junction, otherwise `escape`.
+  `nmd_exceptions` adds `start_proximal` and `long_exon` without changing it, and
+  `nmd_stop_position`, `nmd_junction_position` and `nmd_contributors` give the
+  evidence.
 
-Overlapping records compose at their literal reference coordinates. Records that
-agree base by base and insertion site by site compose once and every source keeps its
-identity; two records that claim one base or site differently are an `edit_conflict`.
-An opaque delins (unequal `REF`/`ALT`) is replaced as a unit: an identical copy
-composes, an insertion at its first site precedes it, another record that changes or removes one of its bases conflicts.
-Each source lies within one coding exon and every original REF, including padding,
-must match. An equivalent placement of an indel elsewhere in a repeat is not a second
-reading. Immediate introduced stops in
-compound protein HGVS are nonsense substitutions, not multi-residue delins.
-Separate complete-RNA and typed-curation profiles are described in the
-function reference and haplotype contract.
+`carrier_predictions` repeats the prediction per carrier, so one ineligible carrier
+(a triploid call, say) does not hide the others; the row-level fields need every
+carrier to be predicted. `contributor_provenance` lists every source of the path
+(applied, omitted, shadowed, unapplied and post-stop) with its original operands,
+carrier evidence and role. Sequence deduplication never drops a contributor.
 
-Raw `source_records` under `vep_compat` can qualify for coding prediction when
-every original call is complete diploid, with at most one original REF/ALT
-heterozygote and homozygous background. Each retained slot must map to its
-original copy; those copies may follow different disjoint coding paths.
-Multiallelic 0/2 is one original heterozygote; 1/2 is outside this profile.
-CALLED alone, hypothetical slots, leading separators, non-diploid or missing
-calls do not prove copies. Omitted non-diploid REF calls also prevent proof.
-Reference-only compatibility rows retain their status rather than becoming
-ALT predictions. Complete and unproven carriers occupy separate qualification
-rows, preserving the complete sample's
-outer prediction even when other samples share its sequence. Row grouping can
-change even when another context prevents prediction. Qualification-only
-carriers consume bounded carrier slots; per-carrier raw CDS/protein/HGVS stay
-unchanged.
-
-`haplotype_consequences` (a character list) and `haplotype_impact` give the
-reduced whole-protein SO set and IMPACT of the edited coding sequence, decided
-by the same-codon and frame/stop-gain classifiers for an eligible path; both are
-NULL unless `prediction_status` is `predicted`. The combined haplotype is
-classified from its translated sequence, never one edit alone and never from
-the nominal net length change. A new first stop upstream of the reference
-terminator is `stop_gained` (HIGH), and `frameshift_variant` (HIGH) is added when
-that stop codon intersects a displaced-frame interval; with no stop at all, a frame
-still displaced when the CDS runs out is `frameshift_variant` and `stop_lost`. A frame that is
-displaced and restored before termination has no frame term: an unchanged peptide
-is `synonymous_variant` (LOW), any other change `protein_altering_variant`. Two
-compensating indels can therefore be rescued or end in an earlier stop. Without
-frame edits, substitutions that change the peptide are `missense_variant`, and edits
-that are all pure insertions or all pure deletions are `inframe_insertion` or
-`inframe_deletion`; any other frame-preserving replacement is
-`protein_altering_variant` (MODERATE). Edits after the first stop stay
-contributors, never expressed effects. Cis and trans edits are separate carriers
-of separate paths. `carrier_predictions` also carries `haplotype_impact` and
-`haplotype_consequences` per carrier (the edited sequence is shared, so its set is
-defined for every predicted carrier), so a row with an ineligible carrier (for
-example a triploid call) has NULL row-level fields but keeps the set of its
-eligible carriers. The start/stop classifier decides the remaining paths, in this
-order. An edited CDS that no longer begins with ATG is `start_lost` (HIGH) alone: initiation
-and NMD are unknown, so start loss suppresses every other prediction. An edited CDS with no
-stop is `stop_lost` (HIGH), plus `frameshift_variant` when the frame is still displaced
-when the CDS runs out; no downstream extension is invented. A first stop before the
-homologous reference terminator that truncates the peptide is `stop_gained`, as above. A first
-stop at the terminator with an unchanged peptide is `stop_retained_variant` (LOW) when the
-terminal codon changed or moved (it precedes `synonymous_variant`), and any other change
-keeps the whole-protein category above; a stop inserted next to the terminator is judged the
-same way. Every eligible path is therefore decided and the reason
-`start_stop_classifier_pending` no longer occurs. Reference lanes have no carrier row.
-`contributor_provenance` lists every source of the path, including omitted,
-shadowed, unapplied (conflicting or incomplete) and post-stop ones, with its
-original operands, `alt_index`, evidence, projection status, `role` and
-differing edit count. The role is assigned per edit by its position relative to the
-first stop of the edited sequence: a source is `post_stop` only when every edit it
-contributes starts after that stop, even if it shares an interaction block with an earlier edit. `normalized_edits` lists the differing CDS edit islands in
-ascending order with their source `event_index` and `coding_blocks` index
-(NULL when no sequence was rebuilt). Sequence deduplication never merges or
-drops contributors. Malformed identities and exhausted budgets error.
-
-`nmd_prediction` is the versioned NMD prediction of the edited transcript under rule
-`nmd_rule` (`ejc50`), an EJC-distance heuristic on the whole haplotype, never per
-allele, never a union of single-allele results and not the VEP NMD plugin. For a newly
-premature stop (`stop_gained` in `haplotype_consequences`, with or without
-`frameshift_variant`) it is `trigger` when J - S > 50 and `escape` otherwise. S
-(`nmd_stop_position`) is the final nucleotide of the first stop codon and J
-(`nmd_junction_position`) the final nucleotide of the penultimate exon, both 1-based in
-the edited spliced-transcript (cDNA, 5' UTR included) coordinates, so an indel before the
-stop moves S, an indel before or inside the penultimate exon moves J, and one in the last
-exon moves neither; an edit after the stop still moves J when it lies at or before the
-penultimate exon's last base, while S never moves. A single-exon transcript is `escape`
-and has no `nmd_junction_position`. `not_applicable` is known termination without a new
-premature stop (synonymous, missense, protein-altering, in-frame, `stop_retained_variant`,
-a frame displaced and restored before termination) and a reference lane, which has no
-termination change (strict decoded input gives an ALT-free lane no carrier, so no such row
-is returned). `unknown` is lost initiation (`start_lost`), an edited CDS with no stop (a
-frame that runs off the CDS and `stop_lost`: the termination is unavailable, not known
-absent), unresolved exon topology, and every path that is not `predicted`
-(`incomplete_input`, `edit_conflict`, `unsupported_overlap`, `unsupported_context`, and
-the non-strict phase policy), whose consequences and IMPACT are NULL as before.
-`nmd_stop_position` and `nmd_junction_position` are NULL unless a premature stop was
-decided (J also needs a junction). `nmd_contributors` lists the `event_index` of the
-contributors that jointly determine a `trigger` or `escape`: those with role `applied`
-(the edits up to and including the stop) plus the `post_stop` indels that changed length at
-or before the penultimate exon's last base, i.e. exactly the edits that moved J. Their
-`role` stays `post_stop`. Post-stop substitutions, post-stop indels in the last exon, and
-`shadowed` or `omitted` sources are not listed. For `not_applicable`, `unknown` and every
-non-predicted row it is NULL, as are the stop and junction positions. The
-row fields are `unknown` and NULL unless every carrier is predicted; the keyed
-`carrier_predictions` also carry `nmd_prediction`, `nmd_stop_position` and
-`nmd_junction_position`, so one ineligible carrier does not hide the others. Only the
-EJC distance is modelled: no reinitiation, no long-exon exception and no
-`NMD_transcript_variant` biotype term.
+With `hgvs = TRUE`, a multi-record path whose records are proven cis gets compound
+`hgvsc` and `hgvsp` names for the joint allele, and a single-record path gets the
+per-variant names. A status other than `ok` keeps NULL text with its reason. HGVS
+buffers count toward `workspace_limit`; exhaustion is an error, never truncated text.
 
 `stop_in_displaced_frame` reports whether any of the first translated stop
 codon's three bases overlaps a frame-displaced span of the rebuilt CDS.
@@ -268,8 +141,7 @@ It is FALSE for no stop or a stop after frame restoration, and NA when
 sequence is unavailable. It is a sequence fact, not a combined SO consequence
 or a claim that a restored DNA frame rescues the protein.
 
-Whole-haplotype DNA HGVS, complete protein HGVS and structural-event
-composition remain unfinished. Input must contain one row per
+Input must contain one row per
 `event_index`, `transcript_index`, `sample_index`, with columns `seq_region`,
 `position`, `reference`, `alternate`, `alt_index`, `alleles`, `phase_before`
 and nullable `phase_set`. Event indices identify individual ALT events; retain

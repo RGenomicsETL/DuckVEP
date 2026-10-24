@@ -18,7 +18,12 @@ history <- read.csv(file.path(root, "benchmarks/data/duckvep_throughput.csv"),
   colClasses = c(source_revision = "character", checksum_value = "character",
     fingerprint_xor_hash = "character", fingerprint_sum_hash = "character"))
 
-surface_revision <- "660a4ed9a6710846d4e92d14c0630df3cb129053"
+# The newest revision with the complete public-relation set (four outputs at 1 and 4 threads).
+public_rows <- subset(history, workload == "ensembl116_grch38_giab_hg002_v4_2_1_full_literal_public_relation" &
+  output_mode %in% c("compact", "rich", "hgvs", "rich_hgvs") & threads %in% c(1L, 4L))
+complete <- names(which(tapply(paste(public_rows$output_mode, public_rows$threads),
+  public_rows$source_revision, function(x) length(unique(x)) == 8L)))
+surface_revision <- tail(public_rows$source_revision[public_rows$source_revision %in% complete], 1L)
 surface <- subset(history, source_revision == surface_revision &
   workload == "ensembl116_grch38_giab_hg002_v4_2_1_full_literal_public_relation" &
     output_mode %in% c("compact", "rich", "hgvs", "rich_hgvs") &
@@ -35,7 +40,7 @@ for (pair in split(surface, surface$output_mode)) {
   stopifnot(setequal(pair$threads, c(1L, 4L)),
     length(unique(pair$checksum_kind)) == 1L,
     length(unique(pair$checksum_value)) == 1L)
-  if (all(pair$fingerprint_schema_version == 2L, na.rm = FALSE)) {
+  if (isTRUE(all(pair$fingerprint_schema_version == 2L))) {
     stopifnot(length(unique(pair$fingerprint_xor_hash)) == 1L,
       length(unique(pair$fingerprint_sum_hash)) == 1L)
   }
@@ -44,7 +49,12 @@ for (pair in split(surface, surface$output_mode)) {
 core_labels <- c(
   ensembl116_grch38_clinvar_20260706_full_literal_regulation = "ClinVar",
   ensembl116_grch38_giab_hg002_v4_2_1_full_literal_regulation = "HG002")
-core_revision <- "03803bd8dff47f0d41584e7fb7a79d42c9183f04"
+core_rows <- subset(history, workload %in% names(core_labels) &
+  output_mode %in% c("compact", "rich", "hgvs") & threads == 1L &
+  extension_build_binding %in% "htslib_distclean_make_release" & fingerprint_schema_version %in% 2L)
+core_complete <- names(which(tapply(paste(core_rows$workload, core_rows$output_mode),
+  core_rows$source_revision, function(x) length(unique(x)) == 6L)))
+core_revision <- tail(core_rows$source_revision[core_rows$source_revision %in% core_complete], 1L)
 core <- subset(history, source_revision == core_revision & workload %in% names(core_labels) &
   output_mode %in% c("compact", "rich", "hgvs") & threads == 1L &
   input_partitions == 1L & transcript_distance == 5000)

@@ -262,8 +262,7 @@ VEP's finite supported symbolic vocabulary into the typed event API are narrower
 preparation tasks, not missing consequence predicates. VEP itself rejects unrecognised
 types such as CPX, so this closure does not promise arbitrary symbolic parsing. Untested
 species/releases and phased multi-record haplotypes remain outside this contract.
-Phased coding consequences have a separate [correctness and throughput contract](../design/duckvep_haplotype_contract.md);
-compound HGVS and broader domain composition remain open in #11 and #50.
+Phased consequences and compound HGVS have a separate [contract](../design/duckvep_haplotype_contract.md).
 Any newly observed fixed-event mismatch fails this contract rather than being
 relabelled as unsupported.
 
@@ -1031,8 +1030,8 @@ counter with single-digit observations densely explored, and marginal counters
 do not establish coverage of their cross-products. The fresh-seed HGVS failure
 above is direct evidence of this limit. Dedicated rare-state strata and retained
 counterexamples complement broad draws; they do not justify a population
-error-rate claim. Compound phased HGVS and broader domain composition are separate
-contracts in #11 and #50. Real-corpus evidence is bound to the named revision,
+error-rate claim. Compound phased HGVS follows the [haplotype contract](../design/duckvep_haplotype_contract.md).
+Real-corpus evidence is bound to the named revision,
 model and oracle.
 
 ## Phased replay with noncoding contributors

@@ -5,7 +5,7 @@ local({
   artifact <- Sys.getenv("DUCKVEP_PRODUCTS_EXTENSION", "")
   con <- rduckvep_connect(extension_path = if (nzchar(artifact)) artifact else NULL)
   on.exit(dbDisconnect(con, shutdown = TRUE))
-  run <- getFromNamespace("rduckvep_product_scenario_v1", "Rduckvep")
+  run <- getFromNamespace("rduckvep_product_scenario", "Rduckvep")
   reference <- list(start1 = 1L,
                     dna = "ATGAAACCCGGGAAAGGGTTTCCCTAAGGGATGAAATAAGGGAAA", strand = 1L)
   exons <- data.frame(start1 = c(1L, 13L, 19L, 31L, 43L),

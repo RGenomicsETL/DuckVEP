@@ -8,7 +8,7 @@ SELECT p.verified_sources, list_count(p.sources) AS original_sources,
        list_count(p.source_effects) AS effects,
        p.source_effects[257].source_id AS last_id,
        p.source_effects[257].changed_rna_bases AS last_rna_bases
-FROM (SELECT duckvep_product_scenario_v1({
+FROM (SELECT duckvep_product_scenario({
   reference:{start1:1::UBIGINT,dna:subject.dna,strand:1::TINYINT},
   exons:[{start1:1::UBIGINT,end1:1203::UBIGINT}],
   blocks:[{start1:1::UBIGINT,end1:1203::UBIGINT}],

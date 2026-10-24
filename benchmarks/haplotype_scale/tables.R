@@ -43,8 +43,8 @@ for (m in c("B", "A")) {
     `warm pass median` = fmt(med(num(warm$pass_s))), `warm stage` = fmt(med(num(warm$stage_s))), `warm predict` = fmt(med(num(warm$predict_s))), check.names = FALSE)
 }
 md(do.call(rbind, rows))
-for (name in c("gate_ratio_B_cold_wall_over_csq_Ou", "ratio_B_cold_wall_over_csq_Ob", "ratio_B_cold_internal_over_csq_Ou", "ratio_B_warm_over_csq_Ou",
-  "ratio_A_cold_wall_over_csq_Ou", "ratio_A_warm_over_csq_Ou", "gate_target_wall_s"))
+for (name in c("ratio_B_cold_wall_over_csq_Ou", "ratio_B_cold_wall_over_csq_Ob", "ratio_B_cold_internal_over_csq_Ou", "ratio_B_warm_over_csq_Ou",
+  "ratio_A_cold_wall_over_csq_Ou", "ratio_A_warm_over_csq_Ou"))
   cat("- ", name, ": ", fmt(summary$value[summary$measure == name], 3), "\n", sep = "")
 for (g in c("hg002_BW", "hg002_AW")) {
   x <- runs[runs$group == g & !is.na(runs$pass) & runs$pass == "warm", ]
@@ -104,14 +104,14 @@ ctl <- lapply(c("dense_B", "low_sharing_B", "dense_A", "low_sharing_A"), functio
 })
 md(do.call(rbind, ctl))
 
-cat("### Optimizations (mode A cold on the HG002 calls, alternating variants, median of 3)\n\n")
 ab <- runs[grepl("^ab_", runs$label) & !is.na(runs$pass) & runs$pass == "cold", ]
+if (nrow(ab)) cat("### Optimizations (mode A cold on the HG002 calls, alternating variants, median of 3)\n\n")
 if (nrow(ab)) md(do.call(rbind, lapply(split(ab, ab$group), function(x) data.frame(variant = sub("^ab_", "", x$group[1L]),
   `load s` = fmt(med(num(x$load_s))), `predict + Parquet s` = fmt(med(num(x$predict_s))), `process wall s` = fmt(med(num(x$wall_s))),
   `checksum` = paste(unique(vapply(x$audit, function(t) audit_of(t)$checksum %||% "-", "")), collapse = ","), check.names = FALSE))))
 
-cat("### Pipeline choices (cold, alternating, median of 3)\n\n")
 abx <- runs[grepl("^abx_", runs$label) & !is.na(runs$pass) & runs$pass == "cold", ]
+if (nrow(abx)) cat("### Pipeline choices (cold, alternating, median of 3)\n\n")
 if (nrow(abx)) md(do.call(rbind, lapply(split(abx, abx$group), function(x) data.frame(choice = sub("^abx_", "", x$group[1L]),
   `process wall s` = fmt(med(num(x$wall_s))), `load s` = fmt(med(num(x$load_s))), `stage s` = fmt(med(num(x$stage_s))),
   `max RSS GiB` = fmt(max(num(x$max_rss_kib)) / 2^20), check.names = FALSE))))

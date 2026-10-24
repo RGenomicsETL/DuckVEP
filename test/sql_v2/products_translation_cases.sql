@@ -7,7 +7,7 @@ WITH cases AS (
     {id:'alternative_ctg',dna:'ATGAAACTGAAATAA',pos:2,ref:'T',alt:'C',init:7,refp:'MKLK*',altp:'MK*'}
   ]) c
 ), results AS (
-  SELECT c, duckvep_product_scenario_v1({
+  SELECT c, duckvep_product_scenario({
     reference:{start1:1::UBIGINT,dna:c.dna,strand:1::TINYINT},
     exons:[{start1:1::UBIGINT,end1:length(c.dna)::UBIGINT}],
     blocks:[{start1:1::UBIGINT,end1:length(c.dna)::UBIGINT}],

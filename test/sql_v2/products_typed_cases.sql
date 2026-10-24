@@ -7,7 +7,7 @@ WITH profiles AS (
   ]) profile
 ), strands AS (SELECT unnest([1::TINYINT,-1::TINYINT]) strand),
 scenario AS (
-  SELECT profile.id, strand, duckvep_product_scenario_v1({
+  SELECT profile.id, strand, duckvep_product_scenario({
     reference:{start1:4294967297::UBIGINT,
       dna:CASE WHEN strand=1 THEN 'ATGAAACCCGGGAAAGGGTTTCCCTAAGGGATGAAATAAGGGAAA'
                ELSE _duckvep_revcomp('ATGAAACCCGGGAAAGGGTTTCCCTAAGGGATGAAATAAGGGAAA') END,

@@ -74,7 +74,7 @@ model_load <- function() {
       ORDER BY k.transcript_index, e.exon_cdna_start"
     mirna <- "SELECT k.transcript_index, x.mature_mirna_start, x.mature_mirna_end FROM m.model_transcripts t
       JOIN mane_map k ON k.source_index = t.transcript_index, unnest(t.mature_mirna_regions) u(x) ORDER BY 1, 2"
-    edits <- "SELECT k.transcript_index, x.protein_position, x.alternate_amino_acid FROM m.model_transcripts t
+    edits <- "SELECT k.transcript_index, x.protein_position, x.alternate_amino_acid, x.edit_code FROM m.model_transcripts t
       JOIN mane_map k ON k.source_index = t.transcript_index, unnest(t.peptide_edits) u(x) ORDER BY 1, 2"
   } else {
     # The compiled model is stored in load order (transcript_index dense, sorted by region and start, exons by cDNA
@@ -88,7 +88,7 @@ model_load <- function() {
       FROM m.model_transcripts, unnest(exons) u(e)", by("transcript_index, e.exon_cdna_start"))
     mirna <- paste("SELECT transcript_index, x.mature_mirna_start, x.mature_mirna_end FROM m.model_transcripts,
       unnest(mature_mirna_regions) u(x)", by("1, 2"))
-    edits <- paste("SELECT transcript_index, x.protein_position, x.alternate_amino_acid FROM m.model_transcripts,
+    edits <- paste("SELECT transcript_index, x.protein_position, x.alternate_amino_acid, x.edit_code FROM m.model_transcripts,
       unnest(peptide_edits) u(x)", by("1, 2"))
   }
   sql("CREATE TABLE regions AS SELECT seq_region::BIGINT AS seq_region, seq_region_name, sequence_length FROM m.model_regions")

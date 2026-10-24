@@ -1,0 +1,6 @@
+kind	tool	threads	cpu_affinity	stage	seconds
+stage	duckvep	1	4	compact_count	3.367
+stage	duckvep	1	4	rich_count	7.897
+stage	duckvep	1	4	rich_touch	11.260
+stage	duckvep	1	4	rich_joined_parquet	30.165
+stage	duckvep	1	4	compact_parquet	15.466

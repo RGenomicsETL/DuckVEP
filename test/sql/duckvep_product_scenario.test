@@ -9,7 +9,7 @@ WITH scenarios AS (
     {id:'retain',blocks:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:10::UBIGINT,end1:12::UBIGINT},{start1:13::UBIGINT,end1:15::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],rna:'ATGAAACCCGGGAAATTTCCCTAAATGAAATAAAAA'}
   ]) AS s
 ), products AS (
-  SELECT duckvep_product_scenario_v1({
+  SELECT duckvep_product_scenario({
     reference:{start1:1::UBIGINT,dna:'ATGAAACCCGGGAAAGGGTTTCCCTAAGGGATGAAATAAGGGAAA',strand:1::TINYINT},
     exons:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:13::UBIGINT,end1:15::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],
     blocks:s.blocks,

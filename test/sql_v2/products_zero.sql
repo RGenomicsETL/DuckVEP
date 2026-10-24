@@ -14,7 +14,7 @@ WITH fixture AS (
  SELECT i AS row_id, CASE WHEN i=2 THEN struct_update(s,sources := s.sources[:1]) ELSE s END s
  FROM fixture, range(1,4) AS indices(i)
 ), products AS (
- SELECT row_id,duckvep_product_scenario_v1(s) p FROM rows
+ SELECT row_id,duckvep_product_scenario(s) p FROM rows
 )
 SELECT row_id,list_count(p.sources),list_count(p.source_effects),p.sources[1].source_id,
        p.source_effects[1].source_id,p.sources[1].reference,p.sources[1].alternate,

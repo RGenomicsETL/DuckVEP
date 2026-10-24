@@ -194,7 +194,7 @@ bool duckvep_register_product_scenario(duckdb_connection connection){
     }
     result=duckdb_create_struct_type(outputs,(const char **)duckvep_product_output_names,PRODUCT_OUTPUT_COUNT);
     duckdb_scalar_function fun=duckdb_create_scalar_function();
-    duckdb_scalar_function_set_name(fun,"duckvep_product_scenario_v1");
+    duckdb_scalar_function_set_name(fun,"duckvep_product_scenario");
     duckdb_scalar_function_add_parameter(fun,arg);
     duckdb_scalar_function_set_return_type(fun,result);
     duckdb_scalar_function_set_special_handling(fun);

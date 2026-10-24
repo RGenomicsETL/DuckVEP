@@ -171,6 +171,6 @@ bool host_v2_register_products(duckdb_v2_extension_handle extension,duckdb_v2_co
                                duckdb_v2_error_info_handle *error){
     const char *const args[]={duckvep_product_input_type};
     const char *const parameters[]={"scenario"};
-    return register_scalar(extension,context,"duckvep_product_scenario_v1",args,parameters,
+    return register_scalar(extension,context,"duckvep_product_scenario",args,parameters,
                            1,duckvep_product_output_type,product_exec,error);
 }
