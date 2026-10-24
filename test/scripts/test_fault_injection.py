@@ -354,7 +354,7 @@ def execute(args, snapshots):
                BASELINE_SQL.replace("TOTAL", "USED")]
     rc, out = run(args.extension, "\n".join(script), args.duckdb)
     if rc != 0 or re.search(r"(?im)^(?:parser|binder|catalog|invalid input) error:", out) or out.count("LOADED true") != 6 or value(out, "POSITIVE ") != (
-            "conditional_assumed_rna_programme assumed_rna_programme MF* MFQ*"):
+            "predicted supported_domain MF* MFQ*"):
         print(out[-4000:])
         raise SystemExit("count pass failed (exit %d)" % rc)
     products = [line.removeprefix("PRODUCT ") for line in out.splitlines() if line.startswith("PRODUCT ")]
