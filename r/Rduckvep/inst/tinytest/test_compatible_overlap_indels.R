@@ -50,16 +50,19 @@ local({
     insertion_before_substitution = list(pos = c(6L, 7L), ref = c("T", "G"), alt = c("TCCC", "A"),
       start = c(7L, 7L), island_ref = c("", "G"), island_alt = c("CCC", "A"),
       hgvsc = "c.7delinsCCCA", hgvsp = "p.(Glu3delinsProLys)"),
-    slidable_deletion = list(pos = c(3L, 4L), ref = c("GGCT", "GCT"), alt = c("G", "G"),
-      status = "unsupported_overlap"),
+    # Records apply at their own coordinates, also inside a repeat where an equivalent placement exists.
+    nested_repeat_deletion = list(pos = c(3L, 4L), ref = c("GGCT", "GCT"), alt = c("G", "G"),
+      start = c(4L, 5L), island_ref = c("GCT", "CT"), island_alt = c("", ""),
+      hgvsc = "c.5_7del", hgvsp = "p.(Ala2del)"),
+    insertion_before_substitution_in_repeat = list(pos = c(6L, 7L), ref = c("T", "G"), alt = c("TGGG", "A"),
+      start = c(7L, 7L), island_ref = c("", "G"), island_alt = c("GGG", "A"),
+      hgvsc = "c.7_8insGGA", hgvsp = "p.(Glu3delinsGlyLys)"),
     removed_substituted_base = list(pos = c(4L, 5L), ref = c("GCT", "C"), alt = c("G", "A"),
       status = "edit_conflict"),
-    # c.8del inside the AA run is equally c.9del, so meeting c.8A>T on the same literal span is
-    # ambiguous, not a contradiction.
-    slidable_deletion_same_span_substitution = list(pos = c(7L, 8L), ref = c("GA", "A"), alt = c("G", "T"),
-      status = "unsupported_overlap"),
-    slidable_insertion_before_substitution = list(pos = c(6L, 7L), ref = c("T", "G"), alt = c("TGGG", "A"),
-      status = "unsupported_overlap"))
+    # The deletion record removes c.8 and the substitution changes c.8; c.9del would be an equivalent
+    # deletion, but it is not what the record says.
+    deleted_base_substituted_in_repeat = list(pos = c(7L, 8L), ref = c("GA", "A"), alt = c("G", "T"),
+      status = "edit_conflict"))
   for (strand in c(1L, -1L)) for (reverse in c(FALSE, TRUE)) for (name in names(witnesses)) {
     w <- witnesses[[name]]
     genomic_position <- if (strand == 1L) 99L + w$pos else 112L - w$pos - nchar(w$ref) + 1L

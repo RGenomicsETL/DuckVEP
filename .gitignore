@@ -54,3 +54,4 @@ test/sql/mt.fa.fai
 __pycache__/
 .deps-v2/
 test/sql/*.dvsnap
+/demo.dvsnap

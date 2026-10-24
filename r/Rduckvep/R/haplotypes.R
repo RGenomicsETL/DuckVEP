@@ -105,13 +105,14 @@
 #' `eligible_classifier_pending` only when every carrier is eligible, and
 #' otherwise the first ineligible carrier's result.
 #'
-#' A bounded literal overlap profile composes agreeing substitutions, identical
-#' indels, identical minimal delins and compatibly placed pure deletions in one
-#' coding exon shared by every contributing source. Disjoint sources in other
-#' exons remain outside this overlap profile. Opaque delins aliases apply one replacement without assigning
-#' ancestry to ALT bases; every original REF, including padding, must match.
-#' Shared edits count once while each source retains its identity. Ambiguous
-#' placements and distinct interacting delins remain unsupported. Immediate introduced stops in
+#' Overlapping records compose at their literal reference coordinates. Records that
+#' agree base by base and insertion site by site compose once and every source keeps its
+#' identity; two records that claim one base or site differently are an `edit_conflict`.
+#' An opaque delins (unequal `REF`/`ALT`) is replaced as a unit: an identical copy
+#' composes, an insertion at its first site precedes it, another record that changes or removes one of its bases conflicts.
+#' Each source lies within one coding exon and every original REF, including padding,
+#' must match. An equivalent placement of an indel elsewhere in a repeat is not a second
+#' reading. Immediate introduced stops in
 #' compound protein HGVS are nonsense substitutions, not multi-residue delins.
 #' Separate complete-RNA and typed-curation profiles are described in the
 #' function reference and haplotype contract.

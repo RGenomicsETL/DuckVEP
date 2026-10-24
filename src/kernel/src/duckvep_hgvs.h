@@ -385,6 +385,23 @@ DUCKVEP_INTERNAL_API duckvep_hgvs_status_t
     size_t                         allele_scratch_capacity,
     size_t                         *fact_count_out);
 
+/* As above, with the transcript's stored 3' flank after the CDS, so a change can shift into c.*
+ * coordinates as VEP and HGVS place it. A NULL flank bounds shifting at the CDS end. */
+DUCKVEP_INTERNAL_API duckvep_hgvs_status_t
+duckvep_hgvs_dna_haplotype_fact_build_flank(
+    const uint8_t                  *reference_cds,
+    size_t                          reference_cds_length,
+    const uint8_t                  *post_cds,
+    size_t                          post_cds_length,
+    int8_t                          transcript_strand,
+    const duckvep_haplotype_edit_t *edits_descending,
+    size_t                          edit_count,
+    duckvep_hgvs_dna_fact_t        *facts,
+    size_t                          facts_capacity,
+    uint8_t                         *allele_scratch,
+    size_t                          allele_scratch_capacity,
+    size_t                          *fact_count_out);
+
 DUCKVEP_INTERNAL_API duckvep_hgvs_status_t
  duckvep_hgvs_dna_haplotype_render(
     const duckvep_hgvs_dna_fact_t *facts,

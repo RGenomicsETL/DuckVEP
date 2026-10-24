@@ -97,9 +97,9 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 5	20	1	incomplete_input	unresolved_cross_ps_phase
 6	10	1	predicted	supported_domain
 6	10	2	predicted	supported_domain
-7	NULL	1	unsupported_overlap	overlapping_edits
+7	NULL	1	edit_conflict	contradictory_edits
 8	NULL	1	edit_conflict	contradictory_edits
-9	NULL	1	unsupported_overlap	ambiguous_same_gap_insertions
+9	NULL	1	edit_conflict	contradictory_edits
 10	NULL	1	predicted	supported_domain
 11	NULL	1	unsupported_context	reference_mismatch
 12	NULL	1	unsupported_context	outside_cds
@@ -261,7 +261,7 @@ SELECT prediction_status,prediction_reason,sequence_status,count(*)
 FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index NOT IN (2,3,5,6,17)','hap_elig')
 GROUP BY ALL ORDER BY ALL
 ----
-edit_conflict	contradictory_edits	edit_conflict	1
+edit_conflict	contradictory_edits	edit_conflict	3
 predicted	supported_domain	ok	12
 unsupported_context	internal_stop	ok	1
 unsupported_context	invalid_allele	unavailable_projection	1
@@ -269,8 +269,6 @@ unsupported_context	noncanonical_stop	ok	1
 unsupported_context	outside_cds	unavailable_projection	2
 unsupported_context	reference_mismatch	unavailable_projection	1
 unsupported_context	untyped_curated_metadata	ok	1
-unsupported_overlap	ambiguous_same_gap_insertions	edit_conflict	1
-unsupported_overlap	overlapping_edits	edit_conflict	1
 
 # Agreeing duplicate records have one biological change and retain both sources.
 
@@ -309,9 +307,9 @@ GROUP BY ALL ORDER BY ALL
 ----
 1	1	NULL	predicted	1/1:applied 2/1:applied
 4	2	NULL	predicted	1/1:applied
-7	1	NULL	unsupported_overlap	1/1:unapplied 5/1:unapplied
+7	1	NULL	edit_conflict	1/1:unapplied 5/1:unapplied
 8	1	NULL	edit_conflict	1/1:unapplied 6/1:unapplied
-9	1	NULL	unsupported_overlap	71/1:unapplied 72/1:unapplied
+9	1	NULL	edit_conflict	71/1:unapplied 72/1:unapplied
 10	1	NULL	predicted	1/1:applied 8/1:applied
 11	1	NULL	unsupported_context	9/1:omitted
 12	1	NULL	unsupported_context	3/1:unapplied 11/1:omitted

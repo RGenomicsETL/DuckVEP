@@ -100,7 +100,7 @@ ORDER BY 1
 2	predicted	ATGGCTCCCGAATAA	MAPE*	c.6_7insCCC	p.(Ala2_Glu3insPro)	[[5, 6]]	[applied, applied]
 3	predicted	ATGGCTCCCAAATAA	MAPK*	c.7delinsCCCA	p.(Glu3delinsProLys)	[[7, 8]]	[applied, applied]
 4	edit_conflict	NULL	NULL	NULL	NULL	NULL	[unapplied, unapplied]
-5	unsupported_overlap	NULL	NULL	NULL	NULL	NULL	[unapplied, unapplied]
+5	predicted	ATGGAATAA	ME*	c.5_7del	p.(Ala2del)	[[11, 12]]	[applied, applied]
 6	predicted	ATGGAATAA	ME*	c.5_7del	p.(Ala2del)	[[13, 14]]	[applied, applied]
 7	predicted	ATGGCTCCCAAATAA	MAPK*	c.7delinsCCCA	p.(Glu3delinsProLys)	[[15, 16]]	[applied, applied]
 
@@ -115,8 +115,9 @@ FROM indel_result r,unnest(r.contributors) u(c) JOIN indel_calls s ON c.event_in
 # Two-exon transcript, CDS ATG AAA GCT GAA (CTG x25) TAA, exon 1 is cDNA 1..60. A redundant duplicate
 # source adds provenance only: samples 0/1 (duplicate c.4_6del) and 2/3 (duplicate stop MNV c.7_9)
 # keep the single-source blocks and HGVSp, and the abutting c.10G>A stays its own post-stop block.
-# Samples 4/5: a deletion inside an AA run that can sit at c.11 or c.12, with c.11A>T in either
-# source order, has two readings and is refused as an overlap, not a contradiction.
+# Samples 4/5: the deletion record removes c.11 at its own coordinates and c.11A>T substitutes that
+# base, in either source order: a contradiction. Records apply literally; an equivalent placement
+# elsewhere in the AA run is not a second reading.
 statement ok
 SELECT loaded FROM duckvep_model_load('two_exon',
  'SELECT 0::UINTEGER seq_region',
@@ -144,5 +145,5 @@ ORDER BY 1
 1	predicted	M*	c.4_10delinsTAAA	p.(Lys2Ter)	[[11, 13], [14]]	[applied, applied, post_stop]
 2	predicted	MK*	c.7_10delinsTAAA	p.(Ala3Ter)	[[21, 22], [23]]	[applied, applied, post_stop]
 3	predicted	MK*	c.7_10delinsTAAA	p.(Ala3Ter)	[[31], [33]]	[applied, post_stop]
-4	unsupported_overlap	NULL	NULL	NULL	NULL	[unapplied, unapplied]
-5	unsupported_overlap	NULL	NULL	NULL	NULL	[unapplied, unapplied]
+4	edit_conflict	NULL	NULL	NULL	NULL	[unapplied, unapplied]
+5	edit_conflict	NULL	NULL	NULL	NULL	[unapplied, unapplied]

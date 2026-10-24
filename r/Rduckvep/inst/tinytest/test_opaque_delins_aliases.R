@@ -126,18 +126,20 @@ local({
     expect_identical(result$hgvsc, "c.18_*1insC")
     expect_identical(result$hgvsp, "p.(=)")
     expect_identical(result$contributor_provenance[[1L]]$role, rep("post_stop", 2L))
+    # Two different insertions at the terminal site have no literal order.
     terminal$alt[2L] <- "AG"
     refused <- rduckvep_haplotypes(con, calls(terminal, strand, reverse), "opaque_aliases", hgvs = TRUE)
-    expect_identical(refused$prediction_status, "unsupported_overlap")
+    expect_identical(refused$prediction_status, "edit_conflict")
     terminal$ref[] <- "T"
     terminal$alt[] <- "TC"
     refused <- rduckvep_haplotypes(con, calls(terminal, strand, reverse), "opaque_aliases", hgvs = TRUE)
     expect_identical(refused$prediction_reason, "reference_mismatch")
-    # No base ancestry is assigned to a distinct mutation inside the replacement.
+    # No base ancestry is assigned to a distinct mutation inside the replacement: the two records
+    # claim the same reference base differently.
     sources <- data.frame(event = 1:3, start = c(4L, 4L, 5L),
       ref = c("GCT", "GCT", "C"), alt = c("TTTCCC", "TTTCCC", "T"))
     refused <- rduckvep_haplotypes(con, calls(sources, strand, reverse), "opaque_aliases", hgvs = TRUE)
-    expect_identical(refused$prediction_status, "unsupported_overlap")
+    expect_identical(refused$prediction_status, "edit_conflict")
     expect_true(is.na(refused$cds))
     # An unchanged but incorrect padding base does not establish immutable-reference identity.
     sources <- data.frame(event = 1:2, start = c(4L, 3L),
@@ -255,29 +257,23 @@ local({
     expect_identical(single$cds, other$cds)
     expect_identical(single$cds, paste0(substr(long_reference, 1L, 60L), "CCC",
       substr(long_reference, 61L, 90L)))
+    # The two insertions sit in different genomic gaps on either side of the intron; both apply, in
+    # transcript order, on either strand.
     pair <- rduckvep_haplotypes(con, input(if (reverse) 2:1 else 1:2), "opaque_geometry", hgvs = TRUE)
-    if (strand == 1L) {
-      expect_identical(pair$nmd_prediction, "not_applicable")
-      expect_identical(pair$prediction_status, "predicted")
-      expect_identical(pair$cds, paste0(substr(long_reference, 1L, 60L), "CCCCCC",
-        substr(long_reference, 61L, 90L)))
-      expect_equal(pair$nominal_length_diff, 6)
-      expect_equal(sort(unique(unlist(pair$coding_blocks[[1L]]$event_indices))), 1:2)
-    } else {
-      expect_identical(pair$prediction_status, "unsupported_overlap")
-      expect_identical(pair$prediction_reason, "ambiguous_same_gap_insertions")
-      expect_true(is.na(pair$cds))
-    }
+    expect_identical(pair$nmd_prediction, "not_applicable")
+    expect_identical(pair$prediction_status, "predicted")
+    expect_identical(pair$cds, paste0(substr(long_reference, 1L, 60L), "CCCCCC",
+      substr(long_reference, 61L, 90L)))
+    expect_equal(pair$nominal_length_diff, 6)
+    expect_equal(sort(unique(unlist(pair$coding_blocks[[1L]]$event_indices))), 1:2)
     duplicate_rows <- rows
     triple_rows <- c(rows, sub("^\\(1,", "(3,", rows[1L]))
     triple <- rduckvep_haplotypes(con, paste0("SELECT * FROM (VALUES ",
       paste(triple_rows, collapse = ","),
       ") v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,",
       "sample_index,alleles,phase_before,phase_set)"), "opaque_geometry", hgvs = TRUE)
-    if (strand == 1L) {
-      expect_identical(triple$cds, pair$cds)
-      expect_equal(sort(unique(unlist(triple$coding_blocks[[1L]]$event_indices))), 1:3)
-    } else expect_identical(triple$prediction_status, "unsupported_overlap")
+    expect_identical(triple$cds, pair$cds)
+    expect_equal(sort(unique(unlist(triple$coding_blocks[[1L]]$event_indices))), 1:3)
     duplicate_rows[2L] <- sprintf("(%d,%d,%d,%s,%s,1,%d,0,[0,1],[false,true],77::BIGINT)",
       2L, as.integer(strand == -1L), positions[1L], quote(refs[1L]), quote(alts[1L]),
       as.integer(strand == -1L))

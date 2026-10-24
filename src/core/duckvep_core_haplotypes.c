@@ -147,6 +147,8 @@ struct duckvep_hap_state {
     uint32_t difference_transcript;
     int have_difference_reference;
     duckvep_hgvs_protein_operation_t *protein_operations;
+    duckvep_haplotype_edit_t *hgvsp_edits;   /* The joint allele in minimal form, for protein HGVS. */
+    duckvep_haplotype_block_t *hgvsp_blocks;
     duckvep_reference_reader_t reference;
     duckvep_delta_scratch_t hgvs_scratch;
     uint8_t *hgvs_shifted_allele;
@@ -178,6 +180,7 @@ void duckvep_hap_close(duckvep_hap_state_t *s) {
     duckvep_budget_free(s->difference_reference); duckvep_budget_free(b->reference_protein);
     duckvep_budget_free(b->reference_coding_protein); duckvep_budget_free(b->prediction_protein);
     duckvep_budget_free(s->protein_operations); duckvep_budget_free(s->hgvsp); duckvep_budget_free(s->hgvsc);
+    duckvep_budget_free(s->hgvsp_edits); duckvep_budget_free(s->hgvsp_blocks);
     duckvep_budget_free(s->hgvsc_facts); duckvep_budget_free(s->hgvsc_alleles);
     duckvep_reference_reader_close(&s->reference);
     duckvep_budget_free(s->reference.bases);
@@ -253,6 +256,8 @@ static int workspace_prepare(duckvep_hap_state_t *s, const duckvep_hap_config_t 
     X(b->reference_coding_protein, b->reference_protein_capacity) \
     X(b->prediction_protein, b->prediction_protein_capacity) \
     X(s->protein_operations, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_HGVS_OPERATIONS] : 0u) \
+    X(s->hgvsp_edits, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_LEAF_EDITS] : 0u) \
+    X(s->hgvsp_blocks, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_LEAF_EDITS] : 0u) \
     X(s->hgvsp, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_HGVS_BYTES] + 1u : 0u) \
     X(s->hgvsc, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_HGVS_BYTES] + 1u : 0u) \
     X(s->hgvsc_facts, bind->hgvs ? n[DUCKVEP_HAP_LIMIT_LEAF_EDITS] : 0u) \
@@ -578,8 +583,14 @@ static int append_hgvsc(duckvep_h_vector text, duckvep_h_vector status_vector, s
     }
     if (!status) {
         strand = bind->model->transcripts.strand[leaf->carriers.transcript_index];
-        hgvs_status = duckvep_hgvs_dna_haplotype_fact_build(leaf->reference_cds,
-            bind->model->sequences.cds_length[leaf->carriers.transcript_index], strand,
+        const duckvep_sequence_pool_t *pool = &bind->model->sequences;
+        uint32_t tx = leaf->carriers.transcript_index;
+        const uint8_t *post = pool->flank_bytes && pool->post_cds_offset && pool->post_cds_length &&
+            pool->post_cds_length[tx] && pool->post_cds_offset[tx] <= pool->flank_bytes_len &&
+            pool->post_cds_length[tx] <= pool->flank_bytes_len - pool->post_cds_offset[tx]
+            ? pool->flank_bytes + pool->post_cds_offset[tx] : NULL;
+        hgvs_status = duckvep_hgvs_dna_haplotype_fact_build_flank(leaf->reference_cds,
+            pool->cds_length[tx], post, post ? pool->post_cds_length[tx] : 0u, strand,
             leaf->joint_edits ? leaf->joint_edits : s->buffers.edits,
             leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count, s->hgvsc_facts,
             bind->limits[DUCKVEP_HAP_LIMIT_LEAF_EDITS], s->hgvsc_alleles,
@@ -612,9 +623,38 @@ static int append_hgvsc(duckvep_h_vector text, duckvep_h_vector status_vector, s
     return 1;
 }
 
+/* The joint allele in minimal form: abutting edits are one change, and bases a change shares with the
+ * reference at either end are trimmed (prefix first). Edits borrow the reference and edited CDS in
+ * transcript orientation. Protein HGVS describes this allele, so two records that abut at a codon
+ * describe the change their union makes, not the literal split between them. */
+static size_t minimal_joint_edits(const duckvep_haplotype_edit_t *edits, size_t count,
+    const uint8_t *reference, const uint8_t *alternate, int8_t strand, duckvep_haplotype_edit_t *out) {
+    size_t n = 0u;
+    int64_t shift = 0;
+    size_t rs = 0u, re = 0u, as = 0u, ae = 0u;
+    for (size_t i = 0u; i <= count; i++) {
+        size_t start = i < count ? (size_t)edits[i].cds_start - 1u : 0u;
+        if (i && (i == count || start != re)) {
+            while (rs < re && as < ae && (reference[rs] & 0xDFu) == (alternate[as] & 0xDFu)) { rs++; as++; }
+            while (rs < re && as < ae && (reference[re - 1u] & 0xDFu) == (alternate[ae - 1u] & 0xDFu)) { re--; ae--; }
+            if (rs < re || as < ae)
+                out[n++] = (duckvep_haplotype_edit_t){.cds_start = (uint32_t)rs + 1u, .ref_len = (uint32_t)(re - rs),
+                    .ref = reference + rs, .alt_len = (uint32_t)(ae - as), .alt = alternate + as, .variant_strand = strand};
+        }
+        if (i == count) break;
+        if (!i || start != re) { rs = start; as = (size_t)((int64_t)start + shift); }
+        re = start + edits[i].ref_len;
+        shift += (int64_t)edits[i].alt_len - (int64_t)edits[i].ref_len;
+        ae = (size_t)((int64_t)re + shift);
+    }
+    return n;
+}
+
 static int append_hgvsp(duckvep_h_vector text, duckvep_h_vector status_vector, size_t row,
     duckvep_hap_state_t *s, const duckvep_hap_config_t *bind, const duckvep_haplotype_leaf_t *leaf,
     const duckvep_coding_context_t *coding, char *error, size_t error_size) {
+    /* Protein operations borrow their coding context until they are rendered below. */
+    duckvep_coding_context_t minimal;
     null_cell(text, row);
     const char *name = !bind->hgvs ? "not_requested" :
         leaf->path_status == DUCKVEP_PREDICTION_CONDITIONAL_RECODING
@@ -680,10 +720,36 @@ static int append_hgvsp(duckvep_h_vector text, duckvep_h_vector status_vector, s
             reference.bases = s->buffers.prediction_protein;
             reference.length++;
         }
+        const duckvep_haplotype_edit_t *edits = leaf->joint_edits ? leaf->joint_edits : s->buffers.edits;
+        size_t edit_count = leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count;
+        const duckvep_haplotype_block_t *blocks = leaf->blocks;
+        size_t block_count = leaf->block_count;
+        uint32_t tx = leaf->carriers.transcript_index;
+        if (edit_count > 1u && leaf->cds && leaf->reference_cds && !raw && !leaf->ordered_replacements) {
+            const duckvep_owned_model_t *model = bind->model;
+            size_t n = minimal_joint_edits(edits, edit_count, leaf->reference_cds, leaf->cds,
+                model->transcripts.strand[tx], s->hgvsp_edits);
+            duckvep_edit_set_t set = {s->hgvsp_edits, n};
+            duckvep_haplotype_result_t applied = {leaf->cds_length, leaf->nominal_length_diff,
+                leaf->flags & ~(uint32_t)DUCKVEP_HAPLOTYPE_FLAG_STOP_TRUNCATED, n};
+            duckvep_codon_table_t table = model->sequences.codon_table
+                ? (duckvep_codon_table_t)model->sequences.codon_table[tx] : DUCKVEP_CODON_TABLE_STANDARD;
+            if (n && n < edit_count &&
+                duckvep_haplotype_partition(s->hgvsp_edits, n, s->hgvsp_blocks,
+                    bind->limits[DUCKVEP_HAP_LIMIT_LEAF_EDITS], &block_count) == DUCKVEP_HAPLOTYPE_OK &&
+                duckvep_coding_context_open_replay(leaf->reference_cds, model->sequences.cds_length[tx],
+                    &set, model->transcripts.strand[tx], table, leaf->cds, &applied,
+                    leaf->reference_coding_protein, &leaf->reference_coding_translation,
+                    s->buffers.protein, &leaf->translation, &minimal) == DUCKVEP_CODING_CONTEXT_OK &&
+                duckvep_coding_context_attach_model(&model->transcripts, &model->exons, &model->sequences,
+                    tx, NULL, n == 1u ? s->hgvsp_edits[0].cds_start : 0u, &minimal) ==
+                    DUCKVEP_VARIANT_CODING_CONTEXT_OK) {
+                coding = &minimal; edits = s->hgvsp_edits; edit_count = n; blocks = s->hgvsp_blocks;
+            } else block_count = leaf->block_count;
+        }
         duckvep_hgvs_status_t status = duckvep_hgvs_protein_haplotype_build(coding,
-            &reference, leaf->joint_edits ? leaf->joint_edits : s->buffers.edits,
-            leaf->joint_edits ? leaf->joint_edit_count : leaf->edit_count, leaf->blocks, leaf->block_count,
-            bind->model->transcripts.flags[leaf->carriers.transcript_index],
+            &reference, edits, edit_count, blocks, block_count,
+            bind->model->transcripts.flags[tx],
             s->protein_operations, bind->limits[DUCKVEP_HAP_LIMIT_HGVS_OPERATIONS], &count);
         if (status == DUCKVEP_HGVS_BUFFER_TOO_SMALL) {
             snprintf(error, error_size,

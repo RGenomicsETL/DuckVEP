@@ -92,7 +92,7 @@ PROPERTY_SOURCES := $(wildcard $(PROJ_DIR)test/duckvep/property/*.c) \
 	$(wildcard $(PROJ_DIR)test/duckvep/vendor/theft/src/*.c) $(wildcard $(PROJ_DIR)src/kernel/src/*.c) \
 	$(PROJ_DIR)src/core/duckvep_core_products.c $(PROJ_DIR)src/core/duckvep_core_product_scenario.c \
 	$(PROJ_DIR)src/core/duckvep_core_product_fields.c
-.PHONY: test_runner_contracts test_compound_hgvs_oracle test_phase_arrangements_oracle
+.PHONY: test_runner_contracts test_compound_hgvs_oracle test_compound_hgvs_fuzz test_phase_arrangements_oracle
 test_runner_contracts:
 	shellcheck scripts/check_v2_hg002.sh scripts/check_v2_hg002_selftest.sh benchmarks/benchmark_duckvep_vep_rs.sh benchmarks/benchmark_duckvep_vep_rs_selftest.sh
 	bash scripts/check_v2_hg002_selftest.sh
@@ -108,6 +108,13 @@ test_phase_arrangements_runtime: release
 
 test_compound_hgvs_oracle:
 	Rscript test/duckvep/conformance/compound_hgvs_oracle.R
+
+# Differential fuzz of compound haplotype composition and HGVS: an independent literal applier, Mutalyzer
+# offline (MUTALYZER_PYTHON) and executable VEP on one merged record per case (VEP_PREFIX, optional).
+test_compound_hgvs_fuzz: release
+	python3 test/duckvep/conformance/compound_hgvs_fuzz.py --extension build/release/duckvep.duckdb_extension \
+		--mutalyzer-python "$(MUTALYZER_PYTHON)" $(if $(VEP_PREFIX),--vep-prefix "$(VEP_PREFIX)") \
+		--cases $(or $(FUZZ_CASES),1000) --seed $(or $(FUZZ_SEED),1)
 
 test_phase_arrangements_oracle:
 	Rscript --vanilla test/duckvep/conformance/phase_arrangements_oracle.R $(PROJ_DIR)

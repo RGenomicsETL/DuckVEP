@@ -1980,6 +1980,12 @@ TEST haplotype_stream_literal_indel_overlaps_compose_or_refuse(void) {
         {{"GCTGAA", "GCTGAA"}, {"CCC", "CCC"}, {4u, 4u}, 2u, "ATGCCCTAA", "MP*", 4u, 6u, "CCC", 0u},
         {{"GCT", "GCT"}, {"TAAGAA", "TAAGAA"}, {4u, 4u}, 2u, "ATGTAAGAAGAATAA", "M*", 4u, 3u, "TAAGAA", 0u},
         {{"GCT", "GCT", "A"}, {"TAAGAA", "TAAGAA", "AC"}, {4u, 4u, 12u}, 3u, "ATGTAAGAAGAATAAC", "M*", 4u, 3u, "TAAGAA", 4u},
+        /* Records apply at their own coordinates, also where an equivalent placement exists in a
+         * repeat: c.4_6del and c.5_6del remove c.4_6; CCC before c.7G>A; AAA inserted before the
+         * deleted c.5_6. */
+        {{"GGCT", "GCT"}, {"G", "G"}, {3u, 4u}, 2u, "ATGGAATAA", "ME*", 4u, 3u, "", 0u},
+        {{"T", "G"}, {"TGGG", "A"}, {6u, 7u}, 2u, "ATGGCTGGGAAATAA", "MAGK*", 7u, 1u, "GGGA", 0u},
+        {{"G", "GCT"}, {"GAAA", "G"}, {4u, 4u}, 2u, "ATGGAAAGAATAA", "MERI", 5u, 2u, "AAA", 0u},
     };
     for (unsigned reverse = 0u; reverse < 2u; reverse++)
     for (unsigned w = 0u; w < sizeof(composed) / sizeof(composed[0]); w++)
@@ -2047,29 +2053,23 @@ TEST haplotype_stream_literal_indel_overlaps_compose_or_refuse(void) {
         ASSERT_EQ(0u, f.stream.event_count);
     }
 
-    /* Ambiguous or contradictory interactions keep the refusal and publish no sequence. */
+    /* Contradictory records and reference mismatches publish no sequence. */
     static const struct {
         struct literal_overlap_case c;
         duckvep_prediction_status_t status;
     } refused[] = {
-        /* c.4_6 slides to c.5_7, so its union with c.5_6 is not one deletion */
-        {{{"GGCT", "GCT"}, {"G", "G"}, {3u, 4u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
         /* terminal insertion aliases must match their original reference anchor */
         {{{"T", "T"}, {"TC", "TC"}, {12u, 12u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT},
         /* different insertions in one interbase site have no order */
-        {{{"T", "T"}, {"TCCC", "TAAA"}, {6u, 6u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
-        /* GGG can slide past c.7G, so it may follow or precede c.7G>A */
-        {{{"T", "G"}, {"TGGG", "A"}, {6u, 7u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
-        /* the uniquely placed c.5_6 deletion removes the base c.5C>A changes */
+        {{{"T", "T"}, {"TCCC", "TAAA"}, {6u, 6u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_EDIT_CONFLICT},
+        /* the c.5_6 deletion removes the base c.5C>A changes */
         {{{"GCT", "C"}, {"G", "A"}, {4u, 5u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_EDIT_CONFLICT},
-        /* a slidable deletion meeting a substitution is not a placed contradiction */
-        {{{"GGCT", "C"}, {"G", "A"}, {3u, 5u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
-        /* c.8del inside the AA run is equally c.9del: the same literal span as c.8A>T is not a contradiction */
-        {{{"GA", "A"}, {"G", "T"}, {7u, 8u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
-        /* an insertion whose right flank is deleted */
-        {{{"G", "GCT"}, {"GAAA", "G"}, {4u, 4u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
-        /* a distinct mutation inside an opaque replacement has no supplied ancestry */
-        {{{"CT", "C"}, {"AAA", "G"}, {5u, 5u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_OVERLAP},
+        /* so does c.4_6del, though it could be written c.5_7del */
+        {{{"GGCT", "C"}, {"G", "A"}, {3u, 5u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_EDIT_CONFLICT},
+        /* c.8del removes the base c.8A>T changes; c.9del would be an equivalent deletion */
+        {{{"GA", "A"}, {"G", "T"}, {7u, 8u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_EDIT_CONFLICT},
+        /* a distinct mutation inside an opaque replacement claims one of its bases */
+        {{{"CT", "C"}, {"AAA", "G"}, {5u, 5u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_EDIT_CONFLICT},
         /* normalized aliases cannot conceal an incorrect unchanged padding base */
         {{{"GCT", "AGCT"}, {"TTTCCC", "ATTTCCC"}, {4u, 3u}, 2u, NULL, NULL, 0u, 0u, NULL, 0u}, DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT},
     };
@@ -2209,14 +2209,12 @@ TEST haplotype_stream_boundary_insertions_preserve_source_exons(void) {
         duckvep_haplotype_leaf_t leaf;
         ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_TRANSCRIPT_READY, duckvep_haplotype_stream_finish(&f.stream));
         ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_OK, duckvep_haplotype_stream_next(&f.stream, &leaf));
-        if (!reverse) {
-            ASSERT_EQ(DUCKVEP_PREDICTION_PREDICTED, leaf.path_status);
-            ASSERT_EQ(18u, leaf.cds_length); ASSERT_MEM_EQ(c.cds, leaf.cds, 18u);
-            ASSERT_EQ(6, leaf.nominal_length_diff);
-            ASSERT_EQ(2u, leaf.contributor_count);
-        } else {
-            ASSERT(leaf.path_status != DUCKVEP_PREDICTION_PREDICTED);
-        }
+        /* The insertions sit in different genomic gaps on either side of the intron: both apply, in
+         * transcript order, on either strand. */
+        ASSERT_EQ(DUCKVEP_PREDICTION_PREDICTED, leaf.path_status);
+        ASSERT_EQ(18u, leaf.cds_length); ASSERT_MEM_EQ(c.cds, leaf.cds, 18u);
+        ASSERT_EQ(6, leaf.nominal_length_diff);
+        ASSERT_EQ(2u, leaf.contributor_count);
         ASSERT_EQ(DUCKVEP_HAPLOTYPE_STREAM_DONE, duckvep_haplotype_stream_next(&f.stream, &leaf));
     }
     PASS();

@@ -75,11 +75,11 @@ local({
     phase_set = c(rep(NA, 6), 10, 20, rep(NA, 14)),
     haplotype_lane = c(1, 1, 2, 1, 2, 2, 1, 1, rep(1, 14)),
     prediction_status = unname(status[c("predicted", "predicted", "predicted", "predicted", "incomplete",
-      "predicted", "incomplete", "incomplete", "overlap", "conflict", "context",
+      "predicted", "incomplete", "incomplete", "conflict", "conflict", "context",
       "predicted", "predicted", "predicted", rep("context", 3), "predicted", "predicted", "predicted", "predicted", "predicted")]),
     prediction_reason = c("supported_domain", "supported_domain", "supported_domain",
       "supported_domain", "missing_call", "supported_domain",
-      "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "overlapping_edits",
+      "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "contradictory_edits",
       "contradictory_edits", "outside_cds", "supported_domain", "supported_domain",
       "supported_domain", "internal_stop", "noncanonical_stop", "untyped_curated_metadata",
       "supported_domain", "supported_domain", "supported_domain", "supported_domain",
@@ -179,8 +179,9 @@ local({
   expect_identical(roles(12), "3:1:unapplied 11:1:omitted")
   expect_identical(roles(16), "3:1:post_stop 10:1:applied")
   expect_identical(roles(40), "20:2:applied")
-  # A conflicting leaf still lists its edits, ascending and without a block.
-  conflict <- result$normalized_edits[[which(result$prediction_reason == "contradictory_edits")]]
+  # A conflicting leaf still lists its edits, ascending and without a block (sample 8: two different
+  # substitutions of c.4; sample 7 deletes the c.4 that its other record substitutes).
+  conflict <- result$normalized_edits[[which(vapply(result$carriers, function(x) 8 %in% x$sample_index, NA))]]
   expect_identical(conflict$edit_index, c(0, 1))
   expect_true(all(is.na(conflict$block_index)))
 

@@ -1763,15 +1763,12 @@ static void finish_prediction(duckvep_haplotype_stream_t *s, duckvep_haplotype_l
     duckvep_prediction_reason_t relation = leaf->path_reason == DUCKVEP_REASON_CONTRADICTORY_EDITS
         ? leaf->path_reason : DUCKVEP_REASON_SUPPORTED_DOMAIN;
     /* Failed decoded-call leaves keep their edit islands in ascending CDS order;
-     * conflicts are classified on the descending array before it is reversed. A literal union that
-     * found more than one placement is never re-read as a contradiction of its literal spans. */
+     * conflicts are classified on the descending array before it is reversed. */
     if (!raw && !leaf->cds && leaf->edit_count) {
         sort_edits_descending(b->edits, b->edit_event_ids, leaf->edit_count, NULL);
         if (relation != DUCKVEP_REASON_CONTRADICTORY_EDITS &&
             leaf->path_reason != DUCKVEP_REASON_REFERENCE_MISMATCH) {
             relation = edit_relation(b->edits, leaf->edit_count);
-            if (relation == DUCKVEP_REASON_CONTRADICTORY_EDITS && leaf->path_reason == DUCKVEP_REASON_OVERLAPPING_EDITS)
-                relation = DUCKVEP_REASON_OVERLAPPING_EDITS;
         }
         for (size_t i = 0u; i < leaf->edit_count / 2u; i++) {
             duckvep_haplotype_edit_t edit = b->edits[i];
@@ -1994,14 +1991,6 @@ static uint8_t island_base(const duckvep_haplotype_edit_t *e, const uint8_t *seq
     return (uint8_t)(reverse && c ? duckvep_dna_complement(c) : c);
 }
 
-/* A pure deletion or insertion has one literal placement when it cannot slide by one base in
- * either direction inside the CDS; a CDS edge is an unknown flank. */
-static int deletion_placed(const uint8_t *ref, size_t length, const duckvep_haplotype_edit_t *e) {
-    size_t s = (size_t)e->cds_start - 1u, end = s + e->ref_len;
-    return s && end < length && (ref[s] & 0xDFu) != (ref[end] & 0xDFu) &&
-        (ref[s - 1u] & 0xDFu) != (ref[end - 1u] & 0xDFu);
-}
-
 /* Same span and same CDS-oriented ALT: one assertion. */
 static int same_island(const duckvep_haplotype_edit_t *a, const duckvep_haplotype_edit_t *b, int8_t strand) {
     if (a->cds_start != b->cds_start || a->ref_len != b->ref_len || a->alt_len != b->alt_len) return 0;
@@ -2011,31 +2000,55 @@ static int same_island(const duckvep_haplotype_edit_t *a, const duckvep_haplotyp
     return j == a->alt_len;
 }
 
-enum { UNION_COMPATIBLE, UNION_AMBIGUOUS, UNION_CONTRADICTORY };
+enum { UNION_COMPATIBLE, UNION_CONTRADICTORY };
 
-/* Relation of two islands that share a reference base or interbase site. Identical islands are
- * one assertion. Substitutions meet base by base. Distinct deletions combine their absent bases
- * only when each has one placement; such a deletion contradicts a substitution of a base it
- * removes. An insertion may precede a substitution that starts at its site when it cannot slide
- * past that base. Every other indel interaction has more than one literal reading. */
-static int island_relation(const uint8_t *ref, size_t length, const duckvep_haplotype_edit_t *a,
-    const duckvep_haplotype_edit_t *b, int8_t strand) {
+/* Relation of two islands that share a reference base or interbase site. Every record applies at its
+ * own literal coordinates. Identical islands are one assertion. A substitution or pure deletion meets
+ * other substitutions, deletions and insertions base by base and gap by gap; the joint pass reports a
+ * changed base claimed twice differently, or deleted and substituted. An opaque replacement (unequal
+ * nonzero REF and ALT) has no per-base ancestry, so another island that shares one of its bases (islands
+ * hold only changed or removed bases), or an insertion strictly inside it, contradicts it; an insertion
+ * at its first site precedes its payload.
+ * Two different insertions at one interbase site have no literal order. */
+static int island_relation(const duckvep_haplotype_edit_t *a, const duckvep_haplotype_edit_t *b, int8_t strand) {
     if (!a->ref_len && b->ref_len) { const duckvep_haplotype_edit_t *t = a; a = b; b = t; }
     size_t sa = (size_t)a->cds_start - 1u, ea = sa + a->ref_len;
     size_t sb = (size_t)b->cds_start - 1u, eb = sb + b->ref_len;
     if (b->ref_len ? (sa >= eb || sb >= ea) : a->ref_len ? (sb < sa || sb >= ea) : sa != sb)
         return UNION_COMPATIBLE;
     if (same_island(a, b, strand)) return UNION_COMPATIBLE;
-    int a_sub = a->ref_len == a->alt_len, b_sub = b->ref_len == b->alt_len;
-    int a_del = !a->alt_len, b_del = !b->alt_len, b_ins = !b->ref_len;
-    if ((!a_sub && !a_del) || (!b_sub && !b_del && !b_ins)) return UNION_AMBIGUOUS;
-    if (a_sub && b_sub) return UNION_COMPATIBLE;
-    if (b_ins) return a_sub && sa == sb && sb < length &&
-        island_base(b, b->alt, b->alt_len, 0u, strand) != (ref[sb] & 0xDFu)
-        ? UNION_COMPATIBLE : UNION_AMBIGUOUS;
-    if (a_del && b_del) return deletion_placed(ref, length, a) && deletion_placed(ref, length, b)
-        ? UNION_COMPATIBLE : UNION_AMBIGUOUS;
-    return deletion_placed(ref, length, a_del ? a : b) ? UNION_CONTRADICTORY : UNION_AMBIGUOUS;
+    if (!a->ref_len) return UNION_CONTRADICTORY; /* two different insertions at one site */
+    int a_opaque = a->alt_len && a->ref_len != a->alt_len;
+    int b_opaque = b->ref_len && b->alt_len && b->ref_len != b->alt_len;
+    if (!b->ref_len) return a_opaque && sb != sa ? UNION_CONTRADICTORY : UNION_COMPATIBLE;
+    return a_opaque || b_opaque ? UNION_CONTRADICTORY : UNION_COMPATIBLE;
+}
+
+/* The insertion in edits[group, k) at one spliced site that comes next in transcript order after exon
+ * `after` (any exon when !have_after), or k. Insertions at one site from one exon are one assertion. */
+static size_t next_site_insertion(const duckvep_haplotype_stream_buffers_t *b, size_t group, size_t k,
+    int have_after, uint32_t after) {
+    size_t best = k;
+    for (size_t i = group; i < k; i++) {
+        const duckvep_haplotype_edit_t *e = &b->edits[i];
+        if (e->ref_len || !e->alt_len || (have_after && b->edit_source_exon[i] <= after)) continue;
+        if (best == k || b->edit_source_exon[i] < b->edit_source_exon[best]) best = i;
+    }
+    return best;
+}
+
+/* Genomic [lo, hi] of the bases a source changes, after removing the REF/ALT prefix and then suffix it
+ * shares (its VCF padding). A pure insertion keeps its padded REF, whose anchor names its exon. The
+ * padding is reference context and may lie outside the CDS. */
+static void source_changed_span(const duckvep_haplotype_source_t *a, uint64_t *lo, uint64_t *hi) {
+    size_t prefix = 0u, suffix = 0u;
+    while (prefix < a->ref_len && prefix < a->alt_len &&
+           (a->ref[prefix] & 0xDFu) == (a->alt[prefix] & 0xDFu)) prefix++;
+    while (suffix < a->ref_len - prefix && suffix < a->alt_len - prefix &&
+           (a->ref[a->ref_len - 1u - suffix] & 0xDFu) == (a->alt[a->alt_len - 1u - suffix] & 0xDFu)) suffix++;
+    if (prefix + suffix == a->ref_len) { prefix = suffix = 0u; }
+    *lo = a->pos1 + prefix;
+    *hi = a->pos1 + a->ref_len - 1u - suffix;
 }
 
 /* Reference-coordinate composition for intersecting literal CDS islands.
@@ -2056,12 +2069,15 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
     for (size_t i = 0u; i < leaf->contributor_count; i++) {
         const duckvep_haplotype_source_t *a = &b->contributors[i].source;
         duckvep_coding_projection_t first, last;
+        uint64_t lo, hi;
         if (a->source_record || !a->ref_len ||
             !literal_acgt(a->ref, a->ref_len) || !literal_acgt(a->alt, a->alt_len) ||
             a->pos1 > UINT32_MAX || a->ref_len - 1u > UINT32_MAX - a->pos1 ||
-            b->contributors[i].projection_status != DUCKVEP_CDS_EDIT_OK ||
-            !duckvep_project_coding_base(m, s->exons, tx, (uint32_t)a->pos1, &first) ||
-            !duckvep_project_coding_base(m, s->exons, tx, (uint32_t)(a->pos1 + a->ref_len - 1u), &last) ||
+            b->contributors[i].projection_status != DUCKVEP_CDS_EDIT_OK)
+            return DUCKVEP_HAPLOTYPE_STREAM_OK;
+        source_changed_span(a, &lo, &hi);
+        if (!duckvep_project_coding_base(m, s->exons, tx, (uint32_t)lo, &first) ||
+            !duckvep_project_coding_base(m, s->exons, tx, (uint32_t)hi, &last) ||
             first.exon_idx != last.exon_idx)
             return DUCKVEP_HAPLOTYPE_STREAM_OK;
     }
@@ -2091,11 +2107,13 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
         if (c == leaf->contributor_count) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INTERNAL_ERROR);
         const duckvep_haplotype_source_t *a = &b->contributors[c].source;
         duckvep_coding_projection_t first, last;
-        uint32_t first_pos = (uint32_t)(strand > 0 ? a->pos1 : a->pos1 + a->ref_len - 1u);
-        uint32_t last_pos = (uint32_t)(strand > 0 ? a->pos1 + a->ref_len - 1u : a->pos1);
+        uint64_t lo, hi;
+        source_changed_span(a, &lo, &hi);
+        uint32_t first_pos = (uint32_t)(strand > 0 ? lo : hi);
+        uint32_t last_pos = (uint32_t)(strand > 0 ? hi : lo);
         if (!duckvep_project_coding_base(m, s->exons, tx, first_pos, &first) ||
             !duckvep_project_coding_base(m, s->exons, tx, last_pos, &last) ||
-            first.exon_idx != last.exon_idx || last.cdna_pos - first.cdna_pos != a->ref_len - 1u)
+            first.exon_idx != last.exon_idx || last.cdna_pos - first.cdna_pos != hi - lo)
             return DUCKVEP_HAPLOTYPE_STREAM_OK;
         b->edit_source_index[i] = c;
         b->edit_source_cdna[i] = first.cdna_pos;
@@ -2114,14 +2132,20 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
         const duckvep_haplotype_contributor_t *c = &b->contributors[i];
         const duckvep_haplotype_source_t *a = &c->source;
         duckvep_coding_projection_t start;
-        uint32_t pos = strand > 0 ? (uint32_t)a->pos1 : (uint32_t)(a->pos1 + a->ref_len - 1u);
-        if (!duckvep_project_coding_base(m, s->exons, tx, pos, &start) ||
-            !start.cds_pos || start.cds_pos - 1u > length || a->ref_len > length - (start.cds_pos - 1u))
+        uint64_t lo, hi;
+        source_changed_span(a, &lo, &hi);
+        /* REF bases before the changed span in transcript orientation; padding outside the CDS is
+         * checked by the source projection, not here. */
+        uint64_t lead = strand > 0 ? lo - a->pos1 : a->pos1 + a->ref_len - 1u - hi;
+        if (!duckvep_project_coding_base(m, s->exons, tx, (uint32_t)(strand > 0 ? lo : hi), &start) ||
+            !start.cds_pos || start.cds_pos - 1u > length)
             return fail(s, DUCKVEP_HAPLOTYPE_STREAM_INVALID_ARG);
         for (uint32_t j = 0u; j < a->ref_len; j++) {
             uint8_t base = strand > 0 ? a->ref[j] :
                 (uint8_t)duckvep_dna_complement((char)a->ref[a->ref_len - 1u - j]);
-            if ((reference[start.cds_pos - 1u + j] & 0xDFu) != (base & 0xDFu)) {
+            int64_t at = (int64_t)start.cds_pos - 1 - (int64_t)lead + (int64_t)j;
+            if (at < 0 || at >= (int64_t)length) continue;
+            if ((reference[at] & 0xDFu) != (base & 0xDFu)) {
                 leaf->sequence_status = DUCKVEP_HAPLOTYPE_REF_MISMATCH;
                 leaf->path_reason = DUCKVEP_REASON_REFERENCE_MISMATCH;
                 return DUCKVEP_HAPLOTYPE_STREAM_OK;
@@ -2136,29 +2160,12 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
             b->edit_source_exon[i] == b->edit_source_exon[i - 1u]) continue;
         for (size_t j = i + 1u; j < leaf->edit_count && (uint64_t)b->edits[j].cds_start + widest >= e->cds_start; j++) {
             const duckvep_haplotype_edit_t *other = &b->edits[j];
-            int r = same_island(e, other, strand) &&
-                b->edit_source_exon[i] != b->edit_source_exon[j] ? UNION_AMBIGUOUS :
-                island_relation(reference, length, e, other, strand);
-            const duckvep_haplotype_edit_t *replacement = e->ref_len ? e : other;
-            const duckvep_haplotype_edit_t *insertion = e->ref_len ? other : e;
-            size_t ri = e->ref_len ? i : j, ii = e->ref_len ? j : i;
-            size_t site = replacement->cds_start - 1u;
-            if (r == UNION_AMBIGUOUS && replacement->ref_len && replacement->alt_len &&
-                replacement->ref_len != replacement->alt_len && !insertion->ref_len &&
-                insertion->alt_len && insertion->cds_start == replacement->cds_start &&
-                site && site < length && b->edit_source_exon[ri] == b->edit_source_exon[ii] &&
-                b->edit_source_cdna[ii] +
-                    b->contributors[b->edit_source_index[ii]].source.ref_len == b->edit_source_cdna[ri] &&
-                island_base(insertion, insertion->alt, insertion->alt_len, 0u, strand) !=
-                    (reference[site] & 0xDFu) &&
-                island_base(insertion, insertion->alt, insertion->alt_len, insertion->alt_len - 1u, strand) !=
-                    (reference[site - 1u] & 0xDFu)) r = UNION_COMPATIBLE;
+            /* Insertions at one spliced site from different exons sit in different genomic gaps: both
+             * apply, in transcript order. */
+            int r = !e->ref_len && !other->ref_len && b->edit_source_exon[i] != b->edit_source_exon[j]
+                ? UNION_COMPATIBLE : island_relation(e, other, strand);
             if (r > relation) relation = r;
         }
-    }
-    if (relation == UNION_AMBIGUOUS) {
-        leaf->path_reason = DUCKVEP_REASON_OVERLAPPING_EDITS;
-        return DUCKVEP_HAPLOTYPE_STREAM_OK;
     }
     for (size_t i = 0u; i < length; i++) {
         b->joint_alt[i] = (uint8_t)duckvep_dna_normalize_n((char)reference[i]);
@@ -2179,10 +2186,14 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
             if (j) b->joint_assigned[at] |= 8u;
             uint8_t r = island_base(e, e->ref, e->ref_len, j, strand);
             mismatch |= (reference[at] & 0xDFu) != r;
-            if (e->ref_len != e->alt_len) { b->joint_assigned[at] |= 2u; continue; }
+            if (e->ref_len != e->alt_len) {
+                conflict |= (b->joint_assigned[at] & 1u) != 0u; /* removed and substituted */
+                b->joint_assigned[at] |= 2u;
+                continue;
+            }
             uint8_t v = island_base(e, e->alt, e->alt_len, j, strand);
             if (r == v) continue;
-            conflict |= (b->joint_assigned[at] & 1u) && b->joint_alt[at] != v;
+            conflict |= ((b->joint_assigned[at] & 1u) && b->joint_alt[at] != v) || (b->joint_assigned[at] & 2u);
             b->joint_alt[at] = v; b->joint_assigned[at] |= 1u;
         }
     }
@@ -2221,15 +2232,21 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
             if (touched && !open) { open = 1; start = end = at; alt_start = out; }
             if (item && at == length) break;
             if (!item) {
-                for (unsigned kind = 0u; kind < 2u; kind++) {
-                    for (size_t i = group; touched && i < k; i++) {
-                        const duckvep_haplotype_edit_t *e = &b->edits[i];
-                        if (!e->alt_len || e->ref_len == e->alt_len || (e->ref_len != 0u) != (kind != 0u)) continue;
-                        if (e->alt_len > b->cds_capacity - out) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL);
-                        for (uint32_t j = 0u; j < e->alt_len; j++)
-                            b->cds[out++] = island_base(e, e->alt, e->alt_len, j, strand);
-                        break;
-                    }
+                /* Insertions in transcript order, then an opaque replacement's payload. */
+                for (size_t i = touched ? next_site_insertion(b, group, k, 0, 0u) : k; i < k;
+                     i = next_site_insertion(b, group, k, 1, b->edit_source_exon[i])) {
+                    const duckvep_haplotype_edit_t *e = &b->edits[i];
+                    if (e->alt_len > b->cds_capacity - out) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL);
+                    for (uint32_t j = 0u; j < e->alt_len; j++)
+                        b->cds[out++] = island_base(e, e->alt, e->alt_len, j, strand);
+                }
+                for (size_t i = group; touched && i < k; i++) {
+                    const duckvep_haplotype_edit_t *e = &b->edits[i];
+                    if (!e->ref_len || !e->alt_len || e->ref_len == e->alt_len) continue;
+                    if (e->alt_len > b->cds_capacity - out) return fail(s, DUCKVEP_HAPLOTYPE_STREAM_SEQUENCE_FULL);
+                    for (uint32_t j = 0u; j < e->alt_len; j++)
+                        b->cds[out++] = island_base(e, e->alt, e->alt_len, j, strand);
+                    break;
                 }
                 continue;
             }
@@ -2267,17 +2284,26 @@ static duckvep_haplotype_stream_status_t strict_literal_union(
     for (size_t at = 0u, alt = 0u, k = leaf->edit_count; first_stop && at <= length; at++) {
         size_t group = k, inserted = 0u, replaced = 0u;
         while (group && b->edits[group - 1u].cds_start - 1u == at) group--;
-        for (int item = 0; item < 2; item++)
+        /* Each insertion starts where the earlier ones at its site end. */
+        for (size_t d = next_site_insertion(b, group, k, 0, 0u); d < k;
+             d = next_site_insertion(b, group, k, 1, b->edit_source_exon[d])) {
             for (size_t i = group; i < k; i++) {
-                if (!b->edits[i].ref_len != !item) continue;
-                if (!item) inserted = b->edits[i].alt_len;
-                else if (b->edits[i].ref_len != b->edits[i].alt_len)
-                    replaced = b->edits[i].alt_len;
-                if (alt + (item ? inserted : 0u) < first_stop * 3u) continue;
+                if (b->edits[i].ref_len || b->edit_source_exon[i] != b->edit_source_exon[d] ||
+                    alt + inserted < first_stop * 3u) continue;
                 for (size_t c = 0u; c < leaf->contributor_count; c++)
                     if (b->contributors[c].source.event_id == b->edit_event_ids[i])
                         b->contributors[c].post_stop_edits++;
             }
+            inserted += b->edits[d].alt_len;
+        }
+        for (size_t i = group; i < k; i++) {
+            if (!b->edits[i].ref_len) continue;
+            if (b->edits[i].ref_len != b->edits[i].alt_len) replaced = b->edits[i].alt_len;
+            if (alt + inserted < first_stop * 3u) continue;
+            for (size_t c = 0u; c < leaf->contributor_count; c++)
+                if (b->contributors[c].source.event_id == b->edit_event_ids[i])
+                    b->contributors[c].post_stop_edits++;
+        }
         if (at < length) alt += inserted + replaced + !(b->joint_assigned[at] & 2u);
         k = group;
     }

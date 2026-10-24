@@ -164,9 +164,9 @@ Replay composes one admissible edit set per haplotype and reports what it settle
 | --- | --- |
 | Cis substitutions in one codon (demo `GTA` to `GCG`) | one codon-level call, `p.(Val2Ala)`, not two |
 | Cis substitutions that keep the residue (`AGA` to `CGC`) | `p.(Arg2=)`, matching the equivalent MNV |
-| Agreeing substitutions, duplicate or compatibly placed deletions, identical same-gap insertions, identical minimal delins | composed; shared edits applied once, every source keeps its provenance |
-| Opaque delins aliases | original `REF` context validated, one replacement applied without assigning `ALT` ancestry |
-| Ambiguous placement or distinct interacting delins | `unsupported_overlap`, never a guess |
+| Overlapping records that agree base by base and site by site, including duplicates and identical delins | composed at their literal coordinates; shared edits applied once, every source keeps its provenance |
+| Opaque delins (unequal `REF`/`ALT`) | replaced as a unit; an identical copy composes, an insertion at its first site precedes it |
+| Records that claim one base or insertion site differently | `edit_conflict`; an equivalent placement elsewhere in a repeat is not a second reading |
 | Noncoding and coding-transcript UTR substitutions, indels and compensating edits with complete RNA, each within one exon | replayed; coding-transcript edits must share one UTR |
 | Raw source records | qualify only with complete diploid copy proof; proven and unproven carriers stay in separate rows |
 
