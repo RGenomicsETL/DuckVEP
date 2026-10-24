@@ -125,7 +125,9 @@ typedef enum {
     DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING,
     DUCKVEP_REASON_NMD_GEOMETRY_UNAVAILABLE,
     DUCKVEP_REASON_SEQUENCE_CAPACITY,
-    DUCKVEP_REASON_ASSUMED_RNA_PROGRAMME
+    DUCKVEP_REASON_ASSUMED_RNA_PROGRAMME,
+    /* The whole product could not be rebuilt; the row carries each record's VEP terms. */
+    DUCKVEP_REASON_PER_RECORD_TERMS
 } duckvep_prediction_reason_t;
 
 /* Whole-haplotype NMD prediction under rule ejc50. An EJC-distance heuristic on the

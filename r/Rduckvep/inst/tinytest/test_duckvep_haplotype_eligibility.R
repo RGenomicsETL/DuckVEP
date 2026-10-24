@@ -75,13 +75,13 @@ local({
     phase_set = c(rep(NA, 6), 10, 20, rep(NA, 14)),
     haplotype_lane = c(1, 1, 2, 1, 2, 2, 1, 1, rep(1, 14)),
     prediction_status = unname(status[c("predicted", "predicted", "predicted", "predicted", "incomplete",
-      "predicted", "incomplete", "incomplete", "conflict", "conflict", "context",
-      "predicted", "predicted", "predicted", "context", "predicted", "context", "predicted", "predicted", "predicted", "predicted", "predicted")]),
+      "predicted", "incomplete", "incomplete", "conflict", "conflict", "predicted",
+      "predicted", "predicted", "predicted", "predicted", "predicted", "context", "predicted", "predicted", "predicted", "predicted", "predicted")]),
     prediction_reason = c("supported_domain", "supported_domain", "supported_domain",
       "supported_domain", "missing_call", "supported_domain",
       "unresolved_cross_ps_phase", "unresolved_cross_ps_phase", "contradictory_edits",
-      "contradictory_edits", "outside_cds", "supported_domain", "supported_domain",
-      "supported_domain", "internal_stop", "supported_domain", "untyped_curated_metadata",
+      "contradictory_edits", "per_record_terms", "supported_domain", "supported_domain",
+      "supported_domain", "per_record_terms", "supported_domain", "untyped_curated_metadata",
       "supported_domain", "supported_domain", "supported_domain", "supported_domain",
       "supported_domain"),
     stringsAsFactors = FALSE)
@@ -128,10 +128,13 @@ local({
   expect_equal(length(result$nmd_contributors[[stopped]]), 1L)
   prov <- result$contributor_provenance[[stopped]]
   expect_identical(prov$role[prov$event_index %in% result$nmd_contributors[[stopped]]], "applied")
-  expect_identical(result$nmd_prediction[result$prediction_status != "predicted"], rep("unknown", sum(result$prediction_status != "predicted")))
-  expect_identical(result$nmd_prediction[result$prediction_status == "predicted" & seq_len(nrow(result)) != stopped &
-    !grepl("stop_lost|start_lost", so)], rep("not_applicable", sum(result$prediction_status == "predicted" &
-    seq_len(nrow(result)) != stopped & !grepl("stop_lost|start_lost", so))))
+  # Rows carrying per-record terms have no rebuilt product, so NMD stays unknown there too.
+  per_record <- result$prediction_reason == "per_record_terms"
+  expect_identical(result$nmd_prediction[result$prediction_status != "predicted" | per_record],
+    rep("unknown", sum(result$prediction_status != "predicted" | per_record)))
+  decided <- result$prediction_status == "predicted" & !per_record & seq_len(nrow(result)) != stopped &
+    !grepl("stop_lost|start_lost", so)
+  expect_identical(result$nmd_prediction[decided], rep("not_applicable", sum(decided)))
   expect_true(all(is.na(result$nmd_stop_position[-stopped])) && all(is.na(result$nmd_junction_position[-stopped])))
   expect_true(all(vapply(result$nmd_contributors[-stopped], is.null, NA)))
 

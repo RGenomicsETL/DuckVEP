@@ -158,6 +158,8 @@ struct duckvep_hap_state {
     duckvep_hgvs_dna_fact_t *hgvsc_facts;
     uint8_t *hgvsc_alleles;
     size_t workspace_bytes;
+    duckvep_workspace_t *vep_workspace; /* Per-record VEP classification, opened on first use. */
+    duckvep_options_t *vep_options;
 };
 
 static void assign_text(duckvep_h_vector vector, size_t row, const char *text) {
@@ -183,6 +185,9 @@ void duckvep_hap_close(duckvep_hap_state_t *s) {
     duckvep_budget_free(s->hgvsp_edits); duckvep_budget_free(s->hgvsp_blocks);
     duckvep_budget_free(s->hgvsc_facts); duckvep_budget_free(s->hgvsc_alleles);
     duckvep_reference_reader_close(&s->reference);
+    if (s->vep_workspace) duckvep_workspace_close(s->vep_workspace);
+    if (s->vep_options) duckvep_options_close(s->vep_options);
+    s->vep_workspace = NULL; s->vep_options = NULL;
     duckvep_budget_free(s->reference.bases);
     duckvep_budget_free(s->hgvs_scratch.edits); duckvep_budget_free(s->hgvs_scratch.alt_cds);
     duckvep_budget_free(s->hgvs_scratch.ref_peptide); duckvep_budget_free(s->hgvs_scratch.alt_peptide);
@@ -824,6 +829,7 @@ static const char *reason_name(duckvep_prediction_reason_t reason, duckvep_cds_e
     case DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT: return "unsupported_curated_edit";
     case DUCKVEP_REASON_ASSUMED_RECODING_PROGRAMME: return "assumed_recoding_programme";
     case DUCKVEP_REASON_ASSUMED_RNA_PROGRAMME: return "assumed_rna_programme";
+    case DUCKVEP_REASON_PER_RECORD_TERMS: return "per_record_terms";
     case DUCKVEP_REASON_INCOMPLETE_CDS: return "incomplete_cds";
     case DUCKVEP_REASON_NONCANONICAL_START: return "noncanonical_start";
     case DUCKVEP_REASON_NONCANONICAL_STOP: return "noncanonical_stop";
@@ -1073,6 +1079,123 @@ static int append_prediction(duckvep_h_chunk output, size_t row, duckvep_hap_sta
     const char *listed = decided && leaf->nmd_stop_valid ? exception_names[leaf->nmd_exceptions & 3u] : NULL;
     if (listed) assign_text(exceptions, row, listed);
     else null_cell(exceptions, row);
+    return 1;
+}
+
+/* When the whole transcript product cannot be rebuilt (an edit crosses the CDS start or end or an exon
+ * boundary, the reference CDS has an in-frame stop, or a curated programme the lift cannot follow), the
+ * row carries the union of each contributing record's VEP consequences on this transcript, as the
+ * per-variant engine assigns them, with status predicted and reason per_record_terms. Protein, protein
+ * HGVS and NMD stay unpredicted. Complete called evidence is still required. */
+static int per_record_terms(duckvep_hap_state_t *s, const duckvep_hap_config_t *bind,
+    duckvep_haplotype_leaf_t *leaf, char *error, size_t error_size) {
+    if (leaf->path_status != DUCKVEP_PREDICTION_UNSUPPORTED_CONTEXT || !leaf->contributor_count ||
+        leaf->evidence_flags != DUCKVEP_CARRIER_CALLED || leaf->contributors[0].source.source_record ||
+        !bind->model->kernel ||
+        !(leaf->path_reason == DUCKVEP_REASON_INTERNAL_STOP ||
+          leaf->path_reason == DUCKVEP_REASON_UNSUPPORTED_CURATED_EDIT ||
+          (leaf->path_reason == DUCKVEP_REASON_PROJECTION &&
+           leaf->prediction_projection == DUCKVEP_CDS_EDIT_OUT_OF_CDS)))
+        return 1;
+    const size_t n = leaf->contributor_count, capacity = 4u * n;
+    size_t bytes = 0u;
+    for (size_t i = 0u; i < n; i++)
+        bytes += (size_t)leaf->contributors[i].source.ref_len + leaf->contributors[i].source.alt_len;
+    uint16_t *chrom = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, n * sizeof(*chrom));
+    uint32_t *pos = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, 6u * n * sizeof(*pos));
+    uint16_t *lengths = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, 2u * n * sizeof(*lengths));
+    uint8_t *kind = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, n + bytes + 1u);
+    size_t *order = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, n * sizeof(*order));
+    duckvep_consequence_t *rows = duckvep_budget_malloc(DUCKVEP_OWNER_WORKSPACE, capacity * sizeof(*rows));
+    int ok = chrom && pos && lengths && kind && order && rows, keep = 0;
+    uint64_t mask = 0u;
+    if (!ok) duckvep_sql_set_error(error, error_size, "duckvep_haplotypes: out of memory classifying records");
+    if (ok && !s->vep_options) {
+        duckvep_options_init_t init;
+        duckvep_error_t kernel_error;
+        memset(&init, 0, sizeof init);
+        memset(&kernel_error, 0, sizeof kernel_error);
+        init.compatibility_profile = (uint8_t)DUCKVEP_COMPAT_VEP_116;
+        ok = duckvep_options_open(&init, &s->vep_options, &kernel_error) == DUCKVEP_OK;
+        if (!ok) snprintf(error, error_size, "duckvep_haplotypes: %s", kernel_error.message);
+    }
+    if (ok && !s->vep_workspace) {
+        duckvep_error_t kernel_error;
+        memset(&kernel_error, 0, sizeof kernel_error);
+        ok = duckvep_workspace_open(bind->model->kernel, &s->vep_workspace, &kernel_error) == DUCKVEP_OK;
+        if (!ok) snprintf(error, error_size, "duckvep_haplotypes: %s", kernel_error.message);
+    }
+    if (ok) {
+        /* The batch is sorted by (contig, position). */
+        for (size_t i = 0u; i < n; i++) {
+            size_t j = i;
+            order[i] = i;
+            while (j && (leaf->contributors[order[j - 1u]].source.chrom_id > leaf->contributors[i].source.chrom_id ||
+                   (leaf->contributors[order[j - 1u]].source.chrom_id == leaf->contributors[i].source.chrom_id &&
+                    leaf->contributors[order[j - 1u]].source.pos1 > leaf->contributors[i].source.pos1))) {
+                order[j] = order[j - 1u]; j--;
+            }
+            order[j] = i;
+        }
+        uint32_t *end = pos + n, *ref_offset = pos + 2u * n, *alt_offset = pos + 3u * n;
+        uint32_t *variant_idx = pos + 4u * n, *tx_idx = pos + 5u * n;
+        uint16_t *ref_length = lengths, *alt_length = lengths + n;
+        uint8_t *alleles = kind + n;
+        size_t at = 0u;
+        for (size_t k = 0u; k < n && !keep; k++) {
+            const duckvep_haplotype_source_t *a = &leaf->contributors[order[k]].source;
+            duckvep_event_t event;
+            if (!a->ref_len || !duckvep_event_prepare_small(a->pos1, a->ref, a->ref_len, a->alt, a->alt_len, &event)) {
+                keep = 1; break;
+            }
+            chrom[k] = a->chrom_id; pos[k] = a->pos1; end[k] = a->pos1 + a->ref_len - 1u;
+            kind[k] = event.kind;
+            ref_offset[k] = (uint32_t)at; ref_length[k] = a->ref_len; memcpy(alleles + at, a->ref, a->ref_len); at += a->ref_len;
+            alt_offset[k] = (uint32_t)at; alt_length[k] = a->alt_len; memcpy(alleles + at, a->alt, a->alt_len); at += a->alt_len;
+            variant_idx[k] = (uint32_t)k; tx_idx[k] = leaf->carriers.transcript_index;
+        }
+        if (!keep) {
+            duckvep_variant_batch_t batch = {chrom, pos, end, NULL, NULL, ref_offset, ref_length, alt_offset, alt_length,
+                alleles, at, kind, NULL, NULL, n};
+            duckvep_candidate_pairs_t pairs = {variant_idx, tx_idx, n};
+            duckvep_result_builder_t builder;
+            duckvep_error_t kernel_error;
+            memset(&kernel_error, 0, sizeof kernel_error);
+            duckvep_result_builder_init(&builder, rows, capacity);
+            if (duckvep_annotate_pairs(bind->model->kernel, &batch, &pairs, s->vep_options, s->vep_workspace,
+                    &builder, &kernel_error) != DUCKVEP_OK) {
+                snprintf(error, error_size, "duckvep_haplotypes: %s", kernel_error.message);
+                ok = 0;
+            } else {
+                for (size_t r = 0u; r < duckvep_result_builder_count(&builder); r++)
+                    if (rows[r].overlap_object_kind == (uint8_t)DUCKVEP_OVERLAP_OBJECT_TRANSCRIPT &&
+                        rows[r].tx_idx == leaf->carriers.transcript_index)
+                        mask |= rows[r].consequence_mask;
+            }
+        }
+    }
+    duckvep_budget_free(chrom); duckvep_budget_free(pos); duckvep_budget_free(lengths);
+    duckvep_budget_free(kind); duckvep_budget_free(order); duckvep_budget_free(rows);
+    if (!ok) return 0;
+    if (keep || !mask) return 1;
+    leaf->path_status = DUCKVEP_PREDICTION_PREDICTED;
+    leaf->path_reason = DUCKVEP_REASON_PER_RECORD_TERMS;
+    leaf->haplotype_so_mask = mask;
+    leaf->nmd = DUCKVEP_HAPLOTYPE_NMD_UNKNOWN;
+    leaf->nmd_stop_valid = leaf->nmd_junction_valid = leaf->nmd_exceptions = 0u;
+    leaf->nmd_stop_position1 = leaf->nmd_junction_position1 = 0u;
+    leaf->prediction_status = leaf->path_status;
+    leaf->prediction_reason = leaf->path_reason;
+    uint32_t id = leaf->carriers.first_call;
+    for (uint32_t i = 0u; i < leaf->carriers.call_count; i++) {
+        const duckvep_carrier_call_t *call = duckvep_carriers_call(&s->stream.carriers, id);
+        if (!call) break;
+        duckvep_prediction_status_t cs;
+        duckvep_prediction_reason_t cr;
+        duckvep_haplotype_carrier_prediction(&s->stream.carriers, leaf, call, &cs, &cr);
+        if (cs != DUCKVEP_PREDICTION_PREDICTED) { leaf->prediction_status = cs; leaf->prediction_reason = cr; break; }
+        id = call->next_leaf;
+    }
     return 1;
 }
 
@@ -1469,6 +1592,7 @@ int duckvep_hap_scan(duckvep_hap_state_t *s, const duckvep_hap_input_t *input, v
             status = duckvep_haplotype_stream_next(&s->stream, &leaf);
             if (status == DUCKVEP_HAPLOTYPE_STREAM_DONE) continue;
             if (status == DUCKVEP_HAPLOTYPE_STREAM_OK) {
+                if (!per_record_terms(s, bind, &leaf, error, error_size)) return 0;
                 if (!append_leaf(output, rows, s, bind, &leaf, error, error_size)) {
                     if (!error[0]) duckvep_sql_set_error(error, error_size,
                         "duckvep_haplotypes: output list allocation failed");
@@ -1546,6 +1670,7 @@ int duckvep_hap_replay(duckvep_hap_state_t *s, const duckvep_hap_input_t *input,
             status = duckvep_haplotype_stream_next(&s->stream, &leaf);
             if (status == DUCKVEP_HAPLOTYPE_STREAM_DONE) continue;
             if (status == DUCKVEP_HAPLOTYPE_STREAM_OK) {
+                if (!per_record_terms(s, bind, &leaf, error, error_size)) return 0;
                 duckvep_hap_prediction_t prediction = {leaf.carriers.transcript_index, leaf.cds, leaf.protein,
                     leaf.cds_length, leaf.protein_length, leaf.nominal_length_diff,
                     leaf.prediction_status, leaf.prediction_reason, leaf.haplotype_so_mask,

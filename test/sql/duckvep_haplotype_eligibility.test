@@ -102,15 +102,15 @@ FROM (SELECT unnest(carrier_predictions) c FROM duckvep_haplotypes(
 9	NULL	1	edit_conflict	contradictory_edits
 10	NULL	1	predicted	supported_domain
 11	NULL	1	unsupported_context	reference_mismatch
-12	NULL	1	unsupported_context	outside_cds
-13	NULL	1	unsupported_context	outside_cds
+12	NULL	1	predicted	per_record_terms
+13	NULL	1	predicted	per_record_terms
 14	NULL	1	predicted	supported_domain
 15	NULL	1	predicted	supported_domain
 16	NULL	1	predicted	supported_domain
 17	NULL	1	predicted	supported_domain
 18	NULL	1	unsupported_context	invalid_allele
 21	NULL	1	predicted	supported_domain
-22	NULL	1	unsupported_context	internal_stop
+22	NULL	1	predicted	per_record_terms
 23	NULL	1	predicted	supported_domain
 24	NULL	1	unsupported_context	untyped_curated_metadata
 25	NULL	1	predicted	supported_domain
@@ -262,10 +262,10 @@ FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls WHERE sample_index NOT IN 
 GROUP BY ALL ORDER BY ALL
 ----
 edit_conflict	contradictory_edits	edit_conflict	3
+predicted	per_record_terms	ok	1
+predicted	per_record_terms	unavailable_projection	2
 predicted	supported_domain	ok	13
-unsupported_context	internal_stop	ok	1
 unsupported_context	invalid_allele	unavailable_projection	1
-unsupported_context	outside_cds	unavailable_projection	2
 unsupported_context	reference_mismatch	unavailable_projection	1
 unsupported_context	untyped_curated_metadata	ok	1
 
@@ -294,6 +294,22 @@ SELECT count(*) FROM ((SELECT * FROM all_calls EXCEPT ALL SELECT * FROM isolated
 ----
 0
 
+# Without a whole product to rebuild (12: c.13G>C with a record between the exons; 13: a deletion crossing
+# the exon 1 end; 22: an in-frame stop in the reference CDS) a path carries the union of its records'
+# per-variant terms on the transcript (duckvep_annotate's), with no protein, protein HGVS or NMD call.
+# This fixture does not declare complete transcript coverage, so the engine places the bases between
+# the exons in the CDS span and reports coding_sequence_variant for them.
+
+query ITTTTT
+SELECT carriers[1].sample_index, array_to_string(haplotype_consequences, ','), haplotype_impact,
+ protein IS NULL, hgvsp IS NULL, nmd_prediction
+FROM duckvep_haplotypes('SELECT * FROM hap_elig_calls','hap_elig',hgvs:=true)
+WHERE prediction_reason = 'per_record_terms' ORDER BY 1
+----
+12	missense_variant,coding_sequence_variant	MODERATE	1	1	unknown
+13	coding_sequence_variant	MODIFIER	1	1	unknown
+22	missense_variant	MODERATE	0	0	unknown
+
 # Contributor conservation: single-carrier leaves, keyed by their carrier. Every source keeps its ALT ordinal
 # and role. Omitted, unapplied (conflicting) and post-stop sources are retained, not dropped.
 
@@ -311,14 +327,14 @@ GROUP BY ALL ORDER BY ALL
 9	1	NULL	edit_conflict	71/1:unapplied 72/1:unapplied
 10	1	NULL	predicted	1/1:applied 8/1:applied
 11	1	NULL	unsupported_context	9/1:omitted
-12	1	NULL	unsupported_context	3/1:unapplied 11/1:omitted
-13	1	NULL	unsupported_context	12/1:omitted
+12	1	NULL	predicted	3/1:unapplied 11/1:omitted
+13	1	NULL	predicted	12/1:omitted
 14	1	NULL	predicted	13/1:applied
 15	1	NULL	predicted	14/1:applied
 16	1	NULL	predicted	3/1:post_stop 10/1:applied
 18	1	NULL	unsupported_context	15/1:omitted
 21	1	NULL	predicted	101/1:applied
-22	1	NULL	unsupported_context	102/1:applied
+22	1	NULL	predicted	102/1:applied
 23	1	NULL	predicted	103/1:applied
 24	1	NULL	unsupported_context	104/1:applied
 25	1	NULL	predicted	105/1:applied
