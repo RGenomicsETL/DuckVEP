@@ -1532,8 +1532,28 @@ FROM (
   SELECT * FROM duckvep_grch37_receipt
 ) ORDER BY assembly;
 ----
-GRCh37	cc6c7fe9de77e61c52011b5c3b68e0017a1112f2a26e63954bde2e7ae70a1b1f	all current transcripts on MT and GL000201.1
-GRCh38	ac35b613089f6ba2f9d15ffa2a91c4625cee24d2fc9496c9dd08b5ebb4217d5f	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
+GRCh37	de042a5650929ba7dca9c64b487e45463e71a0492b3df686f9365e40b6bda4e9	all current transcripts on MT and GL000201.1
+GRCh38	6d9f79077e8dfcca418ef82fffcc49f7c44f939eea83045a49bc1139e66b037b	all current transcripts and funcgen features on MT, KI270395.1, and HG2047_PATCH
+
+# model_sha256 has a fixed definition: these values were recorded before cDNA and RNA coding
+# authority joined the prepared rows, and external releases (MANE on GRCh37) join on it.
+# Those RNA facts are hashed separately in rna_sha256, so removing them changes only that column.
+statement ok
+CREATE TABLE duckvep_grch37_transcripts_without_rna AS
+SELECT * EXCLUDE (cdna_sequence, rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table)
+FROM duckvep_grch37_transcripts;
+
+query III
+SELECT r.model_sha256 = full_receipt.model_sha256, full_receipt.rna_sha256 IS NOT NULL, r.rna_sha256 IS NULL
+FROM query(duckvep_model_receipt_sql(
+  'duckvep_grch37_regions', 'duckvep_grch37_transcripts_without_rna',
+  'Ensembl', '116', 'GRCh37',
+  '768298c5f837c6c386eda3c0d4646b264641cf33dcb577290f480de6b2b91ac4',
+  '09de6c8bdf434f9fe29e9803c7403b145452fdeefb5387292af67811f1523d80',
+  'all current transcripts on MT and GL000201.1'
+)) r CROSS JOIN duckvep_grch37_receipt full_receipt;
+----
+true	true	true
 
 query II
 SELECT (SELECT count(*) FROM duckvep_grch38_transcripts

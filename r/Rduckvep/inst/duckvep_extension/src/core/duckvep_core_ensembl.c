@@ -820,7 +820,6 @@ static const char *const receipt_body[] = {
 		"transcript_flags := transcript_flags, cds_start := cds_start, cds_end := cds_end, ",
 		"cds_sequence := cds_sequence, codon_table := codon_table, ",
 		"pre_cds_sequence := pre_cds_sequence, post_cds_sequence := post_cds_sequence, ",
-		"cdna_sequence := CAST(cdna_sequence AS BLOB), ",
 		"seq_region_name := seq_region_name, sequence_length := sequence_length, ",
 		"source_seq_region_id := source_seq_region_id, source_transcript_id := source_transcript_id, ",
 		"transcript_stable_id := transcript_stable_id, transcript_version := transcript_version, ",
@@ -834,14 +833,22 @@ static const char *const receipt_body[] = {
 		"CAST(struct_pack(*COLUMNS(lambda c: lower(c) IN ('transcript_index', ",
 		"'rna_cds_cdna_start', 'rna_cds_cdna_end', 'rna_codon_table'))) AS STRUCT(",
 		"transcript_index UINTEGER, rna_cds_cdna_start UBIGINT, ",
-		"rna_cds_cdna_end UBIGINT, rna_codon_table UTINYINT)) AS authority FROM model), ",
-		"row_hashes AS MATERIALIZED (SELECT transcript_index, sha256(legacy_row || CASE WHEN ",
-		"authority.rna_cds_cdna_start IS NOT NULL OR authority.rna_cds_cdna_end IS NOT NULL ",
-		"OR authority.rna_codon_table IS NOT NULL THEN CAST(struct_pack(",
+		"rna_cds_cdna_end UBIGINT, rna_codon_table UTINYINT)) AS authority, ",
+		"CAST(cdna_sequence AS BLOB) AS cdna_sequence FROM model), ",
+		/* model_sha256 keeps its fixed definition over the legacy row. RNA facts (the cDNA and the
+		 * original coding authority) are hashed separately into rna_sha256, so models that carry
+		 * them keep the identity that external releases such as MANE-on-GRCh37 join on. */
+		"row_hashes AS MATERIALIZED (SELECT transcript_index, sha256(legacy_row) AS row_hash, ",
+		"CASE WHEN authority.rna_cds_cdna_start IS NOT NULL OR authority.rna_cds_cdna_end IS NOT NULL ",
+		"OR authority.rna_codon_table IS NOT NULL OR cdna_sequence IS NOT NULL THEN sha256(CAST(struct_pack(",
+		"transcript_index := transcript_index, ",
 		"rna_cds_cdna_start := authority.rna_cds_cdna_start, ",
 		"rna_cds_cdna_end := authority.rna_cds_cdna_end, ",
-		"rna_codon_table := authority.rna_codon_table) AS VARCHAR) ELSE '' END) ",
-		"AS row_hash FROM row_payloads), ",
+		"rna_codon_table := authority.rna_codon_table, ",
+		"cdna_sequence := cdna_sequence) AS VARCHAR)) END AS rna_hash FROM row_payloads), ",
+		"rna_fingerprint AS MATERIALIZED (SELECT CASE WHEN count(rna_hash) = 0 THEN NULL ",
+		"ELSE sha256(string_agg(rna_hash, '' ORDER BY transcript_index)) END AS rna_sha256 ",
+		"FROM row_hashes), ",
 		"hash_blocks AS MATERIALIZED (SELECT transcript_index // 4096 AS block_index, ",
 		"sha256(string_agg(row_hash, '' ORDER BY transcript_index)) AS block_hash ",
 		"FROM row_hashes GROUP BY block_index), ",
@@ -899,8 +906,9 @@ static const char *const receipt_body[] = {
 		"(SELECT sha256(string_agg(sha256(CAST(struct_pack( ",
 		"seq_region_name := seq_region_name, sequence_length := sequence_length, ",
 		"circular := circular) AS VARCHAR)), '' ORDER BY seq_region_name, seq_region)) ",
-		"FROM regions) AS topology_sha256 ",
+		"FROM regions) AS topology_sha256, rna_fingerprint.rna_sha256 ",
 		"FROM parameters CROSS JOIN summary CROSS JOIN regulation_summary CROSS JOIN fingerprint ",
+		"CROSS JOIN rna_fingerprint ",
 		"CROSS JOIN validation WHERE validation.valid"
 	};
 

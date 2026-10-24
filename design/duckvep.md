@@ -407,7 +407,9 @@ from the same Ensembl core release as its `seq_region`. The builder accepts one
 `circular_seq` attribute with value `1` per circular region and rejects duplicate
 or invalid circular attributes; absence means linear. Model identity is `model_sha256`,
 which covers the declared model rows. `topology_sha256` separately hashes region name,
-length and circular flag, and the receipt lists circular regions. A change to hashed rows
+length and circular flag, and the receipt lists circular regions. `rna_sha256` separately
+hashes each transcript's cDNA and original RNA coding authority, and is NULL for a model
+without them. A change to hashed rows
 requires a versioned definition and re-recording every receipt in the same commit. Circular
 topology is a property of the reference sequence region;
 `codon_table` is an independently sourced translation rule. A mitochondrial

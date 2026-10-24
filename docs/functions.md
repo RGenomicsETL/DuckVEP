@@ -163,7 +163,7 @@ SELECT * FROM query(duckvep_ensembl_regulation_features_sql(
 
 ### duckvep_model_receipt_sql
 
-Builds the SQL that summarizes a prepared model as one receipt row: source identity, counts and content hashes. A reused model can be checked by reproducing its stored receipt. Nonempty original RNA coding authority participates in the model hash; absent or all-NULL authority preserves legacy receipt identity. The receipt commits to supplied content, not independently verified biological correctness.
+Builds the SQL that summarizes a prepared model as one receipt row: source identity, counts and content hashes. A reused model can be checked by reproducing its stored receipt. `model_sha256` has a fixed definition over the declared model rows, so external relations keyed on it (such as MANE mapped to GRCh37) keep joining. `topology_sha256` hashes region topology and `rna_sha256` the transcripts' cDNA and original RNA coding authority (NULL when the model has neither). The receipt commits to supplied content, not independently verified biological correctness.
 
 Signatures:
 
@@ -178,7 +178,7 @@ All eight required parameters are VARCHAR. `regions_table` and `transcripts_tabl
 
 Options: `regulation_features_table` (VARCHAR) names a prepared regulation relation to include in the counts.
 
-Returns: a SQL string. The relation it produces has one row with `source_name`, `source_version`, `assembly`, `source_manifest_sha256`, `reference_sha256`, `transcript_filter`, `model_sha256`, `region_count`, `reference_base_count`, `transcript_count`, `gene_count`, `coding_transcript_count`, `sequence_backed_transcript_count`, `sequence_withheld_transcript_count`, `exon_membership_count`, `cds_base_count`, `mature_mirna_transcript_count`, `mature_mirna_segment_count`, `peptide_edit_count`, `transcript_flank_base_count`, `regulation_feature_count`, `regulatory_region_count`, `motif_feature_count`, `circular_region_count`, `circular_regions` and `topology_sha256`.
+Returns: a SQL string. The relation it produces has one row with `source_name`, `source_version`, `assembly`, `source_manifest_sha256`, `reference_sha256`, `transcript_filter`, `model_sha256`, `region_count`, `reference_base_count`, `transcript_count`, `gene_count`, `coding_transcript_count`, `sequence_backed_transcript_count`, `sequence_withheld_transcript_count`, `exon_membership_count`, `cds_base_count`, `mature_mirna_transcript_count`, `mature_mirna_segment_count`, `peptide_edit_count`, `transcript_flank_base_count`, `regulation_feature_count`, `regulatory_region_count`, `motif_feature_count`, `circular_region_count`, `circular_regions`, `topology_sha256` and `rna_sha256`.
 
 ```sql
 SELECT region_count, transcript_count, gene_count, model_sha256
