@@ -2,6 +2,7 @@
 % Please edit documentation in R/builders.R
 \name{rduckvep_builders}
 \alias{rduckvep_builders}
+\alias{rduckvep_vcf_events_sql}
 \alias{rduckvep_annotate_sql}
 \alias{rduckvep_transcript_projection_sql}
 \alias{rduckvep_lof_sql}
@@ -11,6 +12,8 @@
 \alias{rduckvep_model_receipt_sql}
 \title{Generate DuckVEP SQL on the caller's connection}
 \usage{
+rduckvep_vcf_events_sql(con, records_table, regions_table, ...)
+
 rduckvep_annotate_sql(con, events_table, model_name, ...)
 
 rduckvep_transcript_projection_sql(
@@ -68,9 +71,13 @@ rduckvep_model_receipt_sql(
 \arguments{
 \item{con}{A DBI connection with DuckVEP loaded.}
 
-\item{events_table}{Event relation name.}
+\item{records_table}{VCF record relation name with `read_bcf` columns
+(`CHROM`, `POS`, `REF`, `ALT`, and optionally `ID`, `INFO_END`,
+`INFO_SVTYPE`, `INFO_SVLEN`).}
 
-\item{model_name}{Loaded model name.}
+\item{regions_table}{Canonical region relation name; for
+`rduckvep_vcf_events_sql()`, a relation with `seq_region` and
+`seq_region_name`.}
 
 \item{...}{Named builder options (for annotation: `hgvs`, `rich`,
 `upstream_distance`, `downstream_distance`; for Ensembl regions and
@@ -79,6 +86,10 @@ the loss-of-function relation: `gerp`, `ancestor`, `phylocsf`,
 `min_intron_size`, `gerp_end_trunc_cutoff`, `check_complete_cds`).
 Other builders accept no options. Each value must be a length-one string,
 logical, integer, double or `NA`.}
+
+\item{events_table}{Event relation name.}
+
+\item{model_name}{Loaded model name.}
 
 \item{annotations_table}{Annotation relation name.}
 
@@ -93,8 +104,6 @@ logical, integer, double or `NA`.}
 \item{assembly}{Assembly name.}
 
 \item{funcgen_schema}{Ensembl funcgen schema name.}
-
-\item{regions_table}{Canonical region relation name.}
 
 \item{source_name, source_version}{Source identity strings.}
 

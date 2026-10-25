@@ -42,7 +42,8 @@ FROM query(duckvep_annotate_sql('demo_events', 'demo', {hgvs: true}))
 | | [`duckvep_model_drop`](#duckvep_model_drop) | scalar | Unload a model and return its memory. |
 | | [`duckvep_model_save`](#duckvep_model_save) | scalar | Write a loaded model to a snapshot file. |
 | | [`duckvep_model_restore`](#duckvep_model_restore) | scalar | Load a model by mapping a snapshot file. |
-| [Annotation: SQL builders](#annotation-sql-builders) | [`duckvep_annotate_sql`](#duckvep_annotate_sql) | scalar | SQL that annotates a relation of alleles with consequences, impact and HGVS. |
+| [Annotation: SQL builders](#annotation-sql-builders) | [`duckvep_vcf_events_sql`](#duckvep_vcf_events_sql) | scalar | SQL that turns VCF records in `read_bcf` shape into the events relation, as VEP reads them. |
+| | [`duckvep_annotate_sql`](#duckvep_annotate_sql) | scalar | SQL that annotates a relation of alleles with consequences, impact and HGVS. |
 | | [`duckvep_annotate_projected_sql`](#duckvep_annotate_projected_sql) | scalar | SQL that annotates ordered small variants and returns projected-edit facts. |
 | | [`duckvep_transcript_projection_sql`](#duckvep_transcript_projection_sql) | scalar | SQL that presents transcript positions, codons and peptides for annotated events. |
 | [Loss of function](#loss-of-function) | [`duckvep_lof_sql`](#duckvep_lof_sql) | scalar | SQL that derives LOFTEE's HC/LC loss-of-function call, filters and flags from annotation rows. |
@@ -302,7 +303,7 @@ SELECT duckvep_model_drop('demo_restored') AS dropped;
 
 ## Annotation: SQL builders
 
-Annotation runs as SQL emitted by a builder and executed with `query()`. The event relation stays in the caller's transaction. The three builders below share one events relation.
+Annotation runs as SQL emitted by a builder and executed with `query()`. The event relation stays in the caller's transaction. [`duckvep_vcf_events_sql`](#duckvep_vcf_events_sql) builds that relation from VCF records; the three annotation builders after it read it.
 
 **Events relation.** One row per ALT allele, already in global coordinate order (the builder never hides an `ORDER BY`; input that is out of order is rejected by the native sorted-stream checks) with the columns:
 
@@ -310,7 +311,7 @@ Annotation runs as SQL emitted by a builder and executed with `query()`. The eve
 | --- | --- |
 | `event_index` | Unsigned identity, used to join results back to the source rows. |
 | `seq_region` | Model-local region ordinal. |
-| `position` | One-based position. |
+| `position` | One-based position: VCF `POS` for a small variant or a breakend; for a symbolic structural event, the first base of VEP's feature, `POS + 1`. |
 | `reference`, `alternate` | Literal REF and ALT alleles. |
 | `end_position`, `structural_type`, `copy_change` | Nullable single-locus structural span, type and copy direction. An `INS` row with `end_position = position` is the interbase site after that base; an `INS` row with a wider interval is VEP's reading of a symbolic insertion that carries SVLEN (a span of SVLEN reference bases from POS + 1, END ignored), annotated as that span with the insertion class. |
 | `mate_seq_region`, `mate_position` | Nullable mate coordinates for a paired breakend. |
@@ -328,6 +329,61 @@ SELECT row_number() OVER (ORDER BY position, alternate)::UBIGINT AS event_index,
        NULL::UBIGINT AS mate_position
 FROM (VALUES (110, 'C', 'T'), (124, 'T', 'C'), (125, 'A', 'G'), (130, 'C', 'CA'),
              (134, 'C', 'A'), (151, 'G', 'A'), (175, 'A', 'G')) v(position, reference, alternate);
+```
+
+<a id="duckvep_vcf_events_sql"></a>
+
+### duckvep_vcf_events_sql
+
+Builds the SQL that turns VCF records into the events relation, one row per ALT allele, sorted and numbered for the annotation builders. It reads the records as VEP 116 does (`Parser::VCF` and ensembl-io `BaseVCF4`), so a symbolic structural record starts at `POS + 1`.
+
+Signatures:
+
+```text
+duckvep_vcf_events_sql(records VARCHAR, regions VARCHAR) -> VARCHAR
+duckvep_vcf_events_sql(records VARCHAR, regions VARCHAR, options STRUCT) -> VARCHAR
+```
+
+Parameters: `records` names a relation with the columns of DuckHTS `read_bcf`: `CHROM`, `POS`, `REF` and `ALT` (`VARCHAR[]`), and optionally `ID`, `INFO_END`, `INFO_SVTYPE` and `INFO_SVLEN`. Column names match in any letter case; other columns are not read. `read_bcf` exposes only INFO keys that the header declares. `regions` names a relation with `seq_region` and `seq_region_name`; contig names match exactly, extra rows are aliases, and a name with two regions is ambiguous. The options STRUCT takes no fields. A NULL or invalid name is an error.
+
+Rules:
+
+- A record is structural when its alleles are not all `A`, `C`, `G` and `T` and it has `INFO/SVTYPE` or an ALT such as `<...>` or a breakend (`<*>` alone is not one). Other records are small variants: each ALT, including `*` and `<*>`, keeps `POS`, `REF` and its ALT.
+- A single-ALT symbolic record of type DEL, DUP, `DUP:TANDEM` (TDUP), INV, INS or CNV, taken from the ALT or else from SVTYPE, starts at `POS + 1` and ends at `POS + |SVLEN|`, else `INFO/END`, else at its start. An INS that ends at `POS` is the interbase site after `POS` (`position = end_position = POS`). `copy_change` is LOSS for DEL, GAIN for DUP and TDUP, NEUTRAL for INV and UNKNOWN otherwise.
+- A single-ALT paired breakend keeps `POS`; the mate comes from the ALT through [`duckvep_breakend_geometry`](#duckvep_breakend_geometry).
+
+Returns: the events columns, then `event_kind` (`small_variant`, `structural_variant` or `breakend`), `event_status` (`ok` or `unsupported`), `event_reason`, and the source `source_chrom`, `source_pos`, `source_id`, `source_ref`, `source_alt` and one-based `alt_index`. Rows are in `event_index` order: `ok` rows by `seq_region` and `position`, then the others.
+
+An `unsupported` row keeps its source columns and has NULL event columns, so passing it to an annotation builder is an error. `event_reason` is one of `contig_not_in_model`, `ambiguous_contig`, `invalid_position`, `no_alternate_allele`, `missing_reference`, `multiallelic_structural_record` (VEP makes one feature for the record; a gVCF `A,<NON_REF>` record is one, and VEP skips it), `single_breakend`, `mate_contig_not_in_model`, `malformed_breakend`, `literal_alleles_with_svtype`, `unsupported_symbolic_allele` (for example `<DEL:ME:ALU>` or `<CN0>`), `unsupported_structural_type`, `invalid_end`, `invalid_svlen`, `incomplete_deletion` (VEP skips it), `empty_span`, `invalid_span` and `single_base_insertion_span` (VEP reads a one-base feature that the events relation cannot hold).
+
+Annotate the `ok` rows:
+
+```sql
+CREATE TABLE vcf_regions AS SELECT 1::UINTEGER AS seq_region, 'chrDuck' AS seq_region_name;
+CREATE TABLE vcf_records AS SELECT * FROM (VALUES
+  ('chrDuck', 124::BIGINT, 'snv', 'T', ['C', '*'], NULL::INTEGER, NULL::VARCHAR, NULL::INTEGER[]),
+  ('chrDuck', 139, 'del', 'A', ['<DEL>'], 160, 'DEL', NULL),
+  ('chrDuck', 180, 'cnv', 'G', ['<DEL>', '<DUP>'], 190, 'CNV', NULL),
+  ('chr9', 5, 'elsewhere', 'A', ['G'], NULL, NULL, NULL)
+) t("CHROM", "POS", "ID", "REF", "ALT", "INFO_END", "INFO_SVTYPE", "INFO_SVLEN");
+CREATE TABLE vcf_events AS SELECT * FROM query(duckvep_vcf_events_sql('vcf_records', 'vcf_regions'));
+SELECT event_index, source_id, source_alt, position, end_position, event_status, event_reason
+FROM vcf_events ORDER BY event_index;
+```
+
+```sql
+CREATE VIEW vcf_events_ok AS SELECT * FROM vcf_events WHERE event_status = 'ok' ORDER BY event_index;
+SELECT e.source_id, e.source_alt, a.consequence
+FROM query(duckvep_annotate_sql('vcf_events_ok', 'readme', {rich: true})) a
+JOIN vcf_events_ok e USING (event_index)
+ORDER BY e.event_index;
+```
+
+With DuckHTS loaded, the records relation can be `read_bcf` itself:
+
+```sql no-run
+CREATE VIEW cohort AS SELECT * FROM read_bcf('cohort.vcf.gz');
+CREATE TABLE cohort_events AS SELECT * FROM query(duckvep_vcf_events_sql('cohort', 'grch38_regions'));
 ```
 
 <a id="duckvep_annotate_sql"></a>

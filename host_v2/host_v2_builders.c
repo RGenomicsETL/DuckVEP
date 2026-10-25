@@ -415,11 +415,39 @@ static void receipt_exec(duckdb_v2_scalar_function_exec_info_handle info,
 
 /* ---------------------------------------------------------------------------
  * duckvep_prepare_sv_geometry_sql(events [, options]),
- * duckvep_prepare_expansionhunter_sql(events, reference [, options])
+ * duckvep_prepare_expansionhunter_sql(events, reference [, options]),
+ * duckvep_vcf_events_sql(records, regions [, options])
  * ------------------------------------------------------------------------- */
 
+typedef enum { PREPARE_SV, PREPARE_EXPANSIONHUNTER, PREPARE_VCF_EVENTS } prepare_kind;
+
+static bool prepare_sql(prepare_kind kind, char *const names[2], duckvep_sql_text *sql) {
+    switch (kind) {
+    case PREPARE_SV:
+        return duckvep_core_prepare_sv_sql(names[0], sql);
+    case PREPARE_EXPANSIONHUNTER:
+        return duckvep_core_prepare_expansionhunter_sql(names[0], names[1], sql);
+    case PREPARE_VCF_EVENTS:
+        return duckvep_core_vcf_events_sql(names[0], names[1], sql);
+    }
+    return false;
+}
+
+static const char *prepare_failed(prepare_kind kind) {
+    switch (kind) {
+    case PREPARE_SV:
+        return duckvep_core_prepare_sv_failed;
+    case PREPARE_EXPANSIONHUNTER:
+        return duckvep_core_prepare_expansionhunter_failed;
+    case PREPARE_VCF_EVENTS:
+        return duckvep_core_vcf_events_failed;
+    }
+    return duckvep_core_prepare_sv_failed;
+}
+
 static void prepare_common(duckdb_v2_scalar_function_exec_info_handle info,
-                           duckdb_v2_error_info_handle *error, idx_t relations) {
+                           duckdb_v2_error_info_handle *error, prepare_kind kind) {
+    idx_t relations = kind == PREPARE_SV ? 1 : 2;
     static const char *const keys[] = {"unused"};
     static const duckvep_core_option_kind_t kinds[] = {DUCKVEP_CORE_OPTION_TEXT};
     call c;
@@ -447,8 +475,7 @@ static void prepare_common(duckdb_v2_scalar_function_exec_info_handle info,
             }
         }
         if (ok) {
-            ok = relations == 1 ? duckvep_core_prepare_sv_sql(names[0], &sql)
-                                : duckvep_core_prepare_expansionhunter_sql(names[0], names[1], &sql);
+            ok = prepare_sql(kind, names, &sql);
         }
         if (ok) {
             ok = write_sql(&c, row, &sql);
@@ -458,8 +485,7 @@ static void prepare_common(duckdb_v2_scalar_function_exec_info_handle info,
                 return;
             }
         } else {
-            report(*error, relations == 1 ? duckvep_core_prepare_sv_failed
-                                          : duckvep_core_prepare_expansionhunter_failed);
+            report(*error, prepare_failed(kind));
         }
         duckvep_sql_free(&sql);
         free_all(names, 2);
@@ -472,13 +498,18 @@ static void prepare_common(duckdb_v2_scalar_function_exec_info_handle info,
 static void prepare_sv_exec(duckdb_v2_scalar_function_exec_info_handle info,
                             duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
     (void)context;
-    prepare_common(info, error, 1);
+    prepare_common(info, error, PREPARE_SV);
 }
 static void prepare_expansionhunter_exec(duckdb_v2_scalar_function_exec_info_handle info,
                                          duckdb_v2_context_handle context,
                                          duckdb_v2_error_info_handle *error) {
     (void)context;
-    prepare_common(info, error, 2);
+    prepare_common(info, error, PREPARE_EXPANSIONHUNTER);
+}
+static void vcf_events_exec(duckdb_v2_scalar_function_exec_info_handle info,
+                            duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
+    (void)context;
+    prepare_common(info, error, PREPARE_VCF_EVENTS);
 }
 
 /* ---------------------------------------------------------------------------
@@ -668,6 +699,7 @@ bool host_v2_register_builders(duckdb_v2_extension_handle extension, duckdb_v2_c
            register_builder(extension, context, "duckvep_prepare_sv_geometry_sql", 1, prepare_sv_exec, error) &&
            register_builder(extension, context, "duckvep_prepare_expansionhunter_sql", 2,
                             prepare_expansionhunter_exec, error) &&
+           register_builder(extension, context, "duckvep_vcf_events_sql", 2, vcf_events_exec, error) &&
            register_builder(extension, context, "duckvep_prepare_breakend_pairs_sql", 1, pairs_exec, error) &&
            register_builder(extension, context, "duckvep_prepare_breakend_fusion_sql", 2, fusion_exec, error) &&
            register_builder(extension, context, "duckvep_prepare_structural_hgvs_sql", 2, hgvs_exec, error) &&

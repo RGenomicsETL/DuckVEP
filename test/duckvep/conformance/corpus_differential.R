@@ -2412,6 +2412,95 @@ close(vc)
 sample_vcf <- normalizePath(sample_vcf, mustWork = TRUE)
 input_vcf_sha256 <- duckvep_evidence_sha256(sample_vcf)
 
+# The sampled VCF is VEP's input. Read back through duckvep_vcf_events_sql, every
+# variant it accepts must carry exactly the kernel inputs this runner passes, so the
+# comparison with VEP also covers the public VCF-to-events path. The builder may
+# refuse a shape this runner types from SVTYPE alone (for example <DEL:ME:ALU>);
+# refusals are counted, not compared.
+lane_inputs_sql <- if (identical(opt$event_mode, "small")) {
+  "SELECT variant_id, seq_region, position, NULL::UBIGINT AS end_position,
+     NULL::VARCHAR AS structural_type, NULL::VARCHAR AS copy_change,
+     NULL::UINTEGER AS mate_seq_region, NULL::UBIGINT AS mate_position
+   FROM duckvep_sample"
+} else if (identical(opt$event_mode, "breakend")) {
+  "SELECT variant_id, seq_region, position, NULL::UBIGINT AS end_position,
+     NULL::VARCHAR AS structural_type, NULL::VARCHAR AS copy_change,
+     mate_seq_region, mate_position
+   FROM duckvep_sample"
+} else {
+  "SELECT variant_id, seq_region, event_start AS position, event_end AS end_position,
+     structural_type, copy_change, NULL::UINTEGER AS mate_seq_region,
+     NULL::UBIGINT AS mate_position
+   FROM duckvep_sample"
+}
+invisible(dbExecute(
+  con,
+  "CREATE OR REPLACE TEMP VIEW duckvep_builder_regions AS
+   SELECT seq_region, name AS seq_region_name FROM duckvep_sequence_regions"
+))
+invisible(dbExecute(
+  con,
+  glue(
+    "CREATE OR REPLACE TEMP VIEW duckvep_builder_records AS
+     SELECT * FROM read_bcf({sql_q(sample_vcf)}, scan_mode := 'sequential')"
+  )
+))
+invisible(dbExecute(
+  con,
+  glue(
+    "CREATE OR REPLACE TEMP TABLE duckvep_builder_check AS
+     WITH builder AS (
+       SELECT * FROM query(duckvep_vcf_events_sql(
+         'duckvep_builder_records', 'duckvep_builder_regions'
+       ))
+     ), lane AS ({lane_inputs_sql})
+     SELECT
+       coalesce(l.variant_id, b.source_id) AS variant_id,
+       l.variant_id IS NULL AS builder_only,
+       b.source_id IS NULL AS lane_only,
+       b.event_status, b.event_reason,
+       b.event_status = 'ok' AND (
+         l.seq_region::BIGINT IS DISTINCT FROM b.seq_region::BIGINT OR
+         l.position::BIGINT IS DISTINCT FROM b.position::BIGINT OR
+         l.end_position::BIGINT IS DISTINCT FROM b.end_position::BIGINT OR
+         l.structural_type IS DISTINCT FROM b.structural_type OR
+         l.copy_change IS DISTINCT FROM b.copy_change OR
+         l.mate_seq_region::BIGINT IS DISTINCT FROM b.mate_seq_region::BIGINT OR
+         l.mate_position::BIGINT IS DISTINCT FROM b.mate_position::BIGINT
+       ) AS differs,
+       l.position AS lane_position, b.position AS builder_position,
+       l.end_position AS lane_end_position, b.end_position AS builder_end_position,
+       l.structural_type AS lane_structural_type, b.structural_type AS builder_structural_type,
+       l.copy_change AS lane_copy_change, b.copy_change AS builder_copy_change
+     FROM lane l FULL JOIN builder b ON b.source_id = l.variant_id"
+  )
+))
+builder_bad <- dbGetQuery(
+  con,
+  "SELECT * FROM duckvep_builder_check
+   WHERE builder_only OR lane_only OR differs
+   ORDER BY variant_id LIMIT 20"
+)
+if (nrow(builder_bad) != 0L) {
+  print(builder_bad)
+  die(
+    "duckvep_vcf_events_sql disagrees with the runner on {nrow(builder_bad)} ",
+    "sampled variant(s) (first 20 shown)"
+  )
+}
+builder_summary <- dbGetQuery(
+  con,
+  "SELECT event_status, coalesce(event_reason, '-') AS event_reason, count(*) AS n
+   FROM duckvep_builder_check GROUP BY ALL ORDER BY ALL"
+)
+cat(
+  "duckvep_vcf_events_sql on the sampled VCF: ",
+  paste0(builder_summary$event_status, "/", builder_summary$event_reason, "=",
+         builder_summary$n, collapse = ", "),
+  "\n",
+  sep = ""
+)
+
 stage_gff <- function(path) {
   indexed <- grepl("[.]gz$", path) && file.exists(paste0(path, ".tbi"))
   if (identical(opt$gff_index_policy, "require") && !indexed) {

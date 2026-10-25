@@ -8,6 +8,9 @@
 #'
 #' @param con A DBI connection with DuckVEP loaded.
 #' @param events_table Event relation name.
+#' @param records_table VCF record relation name with `read_bcf` columns
+#'   (`CHROM`, `POS`, `REF`, `ALT`, and optionally `ID`, `INFO_END`,
+#'   `INFO_SVTYPE`, `INFO_SVLEN`).
 #' @param model_name Loaded model name.
 #' @param annotations_table Annotation relation name.
 #' @param transcripts_table Transcript relation name.
@@ -16,7 +19,9 @@
 #' @param reference_chunks_table Reference chunk relation name.
 #' @param assembly Assembly name.
 #' @param funcgen_schema Ensembl funcgen schema name.
-#' @param regions_table Canonical region relation name.
+#' @param regions_table Canonical region relation name; for
+#'   `rduckvep_vcf_events_sql()`, a relation with `seq_region` and
+#'   `seq_region_name`.
 #' @param source_name,source_version Source identity strings.
 #' @param source_manifest_sha256,reference_sha256 Source and reference digests.
 #' @param transcript_filter Transcript selection description.
@@ -61,6 +66,12 @@ NULL
   }
   call <- paste0("SELECT ", builder, "(", paste(args, collapse = ", "), ") AS sql")
   DBI::dbGetQuery(con, call)$sql[[1L]]
+}
+
+#' @rdname rduckvep_builders
+#' @export
+rduckvep_vcf_events_sql <- function(con, records_table, regions_table, ...) {
+  .duckvep_builder_sql(con, "duckvep_vcf_events_sql", list(records_table, regions_table), list(...))
 }
 
 #' @rdname rduckvep_builders

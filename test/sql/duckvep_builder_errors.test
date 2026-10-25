@@ -52,6 +52,16 @@ SELECT duckvep_prepare_expansionhunter_sql('x', NULL);
 ----
 duckvep_prepare_expansionhunter_sql: invalid relation name
 
+statement error
+SELECT duckvep_vcf_events_sql(NULL, 'x');
+----
+duckvep_vcf_events_sql: invalid relation name
+
+statement error
+SELECT duckvep_vcf_events_sql('x', NULL);
+----
+duckvep_vcf_events_sql: invalid relation name
+
 # A NULL name in one row of a vector fails the statement, not the process.
 statement error
 SELECT duckvep_prepare_sv_geometry_sql(CASE WHEN i = 2 THEN NULL ELSE 'x' END) FROM range(4) t(i);
@@ -82,6 +92,11 @@ no_such_relation
 
 statement error
 SELECT * FROM query(duckvep_prepare_expansionhunter_sql('no_such_relation', 'also_missing'));
+----
+no_such_relation
+
+statement error
+SELECT * FROM query(duckvep_vcf_events_sql('no_such_relation', 'also_missing'));
 ----
 no_such_relation
 

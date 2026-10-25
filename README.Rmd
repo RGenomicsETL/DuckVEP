@@ -210,30 +210,33 @@ DBI::dbDisconnect(con, shutdown = TRUE)
 DuckVEP needs no other extension, but it is meant to share a query with them: [DuckHTS](https://github.com/RGenomicsETL/duckhts) reads the VCF and [DuckClinVarbitration](https://github.com/RGenomicsETL/DuckClinVarbitration) supplies arbitrated ClinVar decisions. Not evaluated here, since it needs a full Ensembl model and both extensions:
 
 ```sql
--- One row per ALT allele, with the model's region index (DuckHTS reads the VCF)
+-- Ensembl names contigs 1..22, X, Y, MT; a UCSC-style VCF says chr1 .. chrM. Alias rows map them.
+CREATE VIEW grch38_region_names AS
+SELECT seq_region, seq_region_name FROM grch38_regions
+UNION ALL
+SELECT seq_region, CASE seq_region_name WHEN 'MT' THEN 'chrM' ELSE 'chr' || seq_region_name END
+FROM grch38_regions;
+
+-- One row per ALT allele, read as VEP reads it (DuckHTS reads the VCF)
+CREATE VIEW cohort AS SELECT * FROM read_bcf('cohort.vcf.gz');
 CREATE TABLE alleles AS
-SELECT row_number() OVER (ORDER BY r.seq_region, v.POS, alt_allele)::UBIGINT AS event_index,
-       r.seq_region, v.POS::UBIGINT AS position, v.REF AS reference, alt_allele AS alternate,
-       NULL::UBIGINT AS end_position, NULL::VARCHAR AS structural_type,
-       NULL::VARCHAR AS copy_change, NULL::UINTEGER AS mate_seq_region,
-       NULL::UBIGINT AS mate_position
-FROM read_bcf('cohort.vcf.gz') v CROSS JOIN unnest(v.ALT) AS t(alt_allele)
-JOIN grch38_regions r   -- Ensembl names contigs 1..22, X, Y, MT; UCSC-style VCFs say chr1, chrM
-  ON r.seq_region_name = CASE WHEN v.CHROM IN ('chrM', 'M') THEN 'MT'
-                              ELSE regexp_replace(v.CHROM, '^chr', '') END;
+SELECT * FROM query(duckvep_vcf_events_sql('cohort', 'grch38_region_names'));
+CREATE VIEW annotatable AS SELECT * FROM alleles WHERE event_status = 'ok' ORDER BY event_index;
 
 -- High-impact consequences next to their arbitrated ClinVar decision
-SELECT r.seq_region_name AS contig, e.position, e.reference, e.alternate,
+SELECT r.seq_region_name AS contig, e.source_pos, e.source_ref, e.source_alt,
        a.consequence, a.protein_hgvs, d.policy_classification, d.gold_stars
-FROM query(duckvep_annotate_sql('alleles', 'human_116_grch38', struct_pack(rich := true, hgvs := true))) a
-JOIN alleles e USING (event_index)
+FROM query(duckvep_annotate_sql('annotatable', 'human_116_grch38', struct_pack(rich := true, hgvs := true))) a
+JOIN annotatable e USING (event_index)
 JOIN grch38_regions r USING (seq_region)
 LEFT JOIN clinvar_vcf v                              -- DuckClinVarbitration
-  ON v.assembly = 'GRCh38' AND v.contig = r.seq_region_name AND v.position = e.position
- AND v.reference = e.reference AND v.alternate = e.alternate
+  ON v.assembly = 'GRCh38' AND v.contig = r.seq_region_name AND v.position = e.source_pos
+ AND v.reference = e.source_ref AND v.alternate = e.source_alt
 LEFT JOIN clinvar_policy_allele_decisions d USING (allele_id)
 WHERE a.impact = 'HIGH';
 ```
+
+`event_reason` says why a record was left out, for example a gVCF `A,<NON_REF>` record that VEP skips.
 
 ## Documentation
 

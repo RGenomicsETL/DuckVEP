@@ -7,6 +7,8 @@ const char duckvep_core_prepare_sv_failed[] =
     "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure";
 const char duckvep_core_prepare_expansionhunter_failed[] =
     "duckvep_prepare_expansionhunter_sql: invalid relation name or allocation failure";
+const char duckvep_core_vcf_events_failed[] =
+    "duckvep_vcf_events_sql: invalid relation name or allocation failure";
 
 static const char sv_sql[] =
 "), parts AS (SELECT *, string_split(info, ';') AS tokens, "
@@ -132,6 +134,107 @@ bool duckvep_core_prepare_expansionhunter_sql(const char *events, const char *re
         duckvep_sql_relation(out, events) && duckvep_sql_append(out, str_sql) &&
         duckvep_sql_relation(out, reference) && duckvep_sql_append(out, str_tail) &&
         duckvep_sql_append(out, str_tail2);
+}
+
+/* ---- VCF records to the events relation ------------------------------------ */
+
+/* Records are read_bcf-shaped (CHROM, POS, ID, REF, ALT[], optional INFO_END,
+ * INFO_SVTYPE and INFO_SVLEN). Dispatch and coordinates follow VEP 116
+ * Parser::VCF::create_VariationFeatures and BaseVCF4 get_start/get_end: a
+ * structural record starts at POS + 1 and ends at POS + |SVLEN|, else END, else
+ * its start. Records outside the supported families keep a row with a reason. */
+static const char vcf_events_head[] =
+"WITH __duckvep_ve_source AS (FROM (SELECT NULL::VARCHAR AS \"CHROM\", NULL::BIGINT AS \"POS\", NULL::VARCHAR AS \"ID\", NULL::VARCHAR AS \"REF\", NULL::VARCHAR[] AS \"ALT\", NULL::VARCHAR AS \"INFO_END\", NULL::VARCHAR AS \"INFO_SVTYPE\", NULL::VARCHAR AS \"INFO_SVLEN\" WHERE false) UNION ALL BY NAME SELECT COLUMNS('(?i)^(chrom|pos|id|ref|alt|info_end|info_svtype|info_svlen)$') FROM ";
+
+static const char vcf_events_middle[] =
+"),\n"
+"__duckvep_ve_regions AS (SELECT CAST(seq_region_name AS VARCHAR) AS seq_region_name, min(CAST(seq_region AS UINTEGER)) AS seq_region, count(*) AS name_rows FROM ";
+
+static const char vcf_events_records[] =
+" GROUP BY 1),\n"
+"__duckvep_ve_records AS (SELECT CAST(\"CHROM\" AS VARCHAR) AS source_chrom, CAST(\"POS\" AS BIGINT) AS source_pos, CAST(\"ID\" AS VARCHAR) AS source_id, CAST(\"REF\" AS VARCHAR) AS source_ref, CAST(\"ALT\" AS VARCHAR[]) AS alts,\n"
+"  nullif(nullif(trim(split_part(trim(CAST(\"INFO_END\" AS VARCHAR), '[]'), ',', 1)), ''), 'NULL') AS end_text,\n"
+"  nullif(nullif(trim(split_part(trim(CAST(\"INFO_SVLEN\" AS VARCHAR), '[]'), ',', 1)), ''), 'NULL') AS svlen_text,\n"
+"  upper(nullif(nullif(trim(split_part(trim(CAST(\"INFO_SVTYPE\" AS VARCHAR), '[]'), ',', 1)), ''), 'NULL')) AS svtype FROM __duckvep_ve_source),\n"
+"__duckvep_ve_classified AS (SELECT *, len(coalesce(alts, [])) AS alt_count,\n"
+"  NOT regexp_full_match(coalesce(source_ref, '') || coalesce(array_to_string(alts, ''), ''), '[ACGT]+')\n"
+"  AND (svtype IS NOT NULL OR regexp_matches(coalesce(array_to_string(alts, ','), ''), '[<\\[\\]][^*]+[>\\]\\[]|^\\.\\w+|\\w+\\.$')) AS structural_record,\n"
+"  try_cast(end_text AS BIGINT) AS info_end, try_cast(svlen_text AS BIGINT) AS info_svlen FROM __duckvep_ve_records),\n"
+"__duckvep_ve_alleles AS (SELECT c.*, a.source_alt, a.alt_index FROM __duckvep_ve_classified c CROSS JOIN UNNEST(CASE WHEN c.alt_count = 0 THEN [NULL::VARCHAR] ELSE c.alts END) WITH ORDINALITY AS a(source_alt, alt_index)),\n";
+
+static const char vcf_events_types[] =
+"__duckvep_ve_typed AS (SELECT l.*, r.seq_region AS local_region, r.name_rows AS local_rows,\n"
+"  CASE WHEN structural_record AND alt_count = 1 THEN TRY(duckvep_breakend_geometry(source_alt)) END AS bnd,\n"
+"  CASE WHEN regexp_matches(source_alt, '^<?(DEL|INS|DUP|INV|CNV|CN=?[0-9]+)') THEN CASE source_alt WHEN '<DEL>' THEN 'DEL' WHEN '<DUP>' THEN 'DUP' WHEN '<DUP:TANDEM>' THEN 'TDUP' WHEN '<INV>' THEN 'INV' WHEN '<INS>' THEN 'INS' WHEN '<CNV>' THEN 'CNV' ELSE 'unsupported_symbolic_allele' END\n"
+"       WHEN regexp_full_match(source_alt, '<[^>]+>') THEN CASE WHEN svtype IS NULL THEN 'unsupported_symbolic_allele' WHEN svtype IN ('DEL', 'DUP', 'INV', 'INS', 'CNV') THEN svtype ELSE 'unsupported_structural_type' END\n"
+"       ELSE NULL END AS sv_type\n"
+"  FROM __duckvep_ve_alleles l LEFT JOIN __duckvep_ve_regions r ON r.seq_region_name = l.source_chrom),\n"
+"__duckvep_ve_spans AS (SELECT t.*, m.seq_region AS mate_region, m.name_rows AS mate_rows,\n"
+"  try_cast(source_pos::HUGEINT + 1 AS BIGINT) AS vep_start,\n"
+"  CASE WHEN info_svlen IS NOT NULL THEN try_cast(source_pos::HUGEINT + abs(info_svlen::HUGEINT) AS BIGINT)\n"
+"       WHEN info_end IS NOT NULL THEN info_end ELSE try_cast(source_pos::HUGEINT + 1 AS BIGINT) END AS vep_end\n"
+"  FROM __duckvep_ve_typed t LEFT JOIN __duckvep_ve_regions m ON m.seq_region_name = t.bnd.mate_chrom),\n";
+
+static const char vcf_events_decisions[] =
+"__duckvep_ve_decided AS (SELECT *, CASE\n"
+"  WHEN source_chrom IS NULL OR local_region IS NULL THEN 'contig_not_in_model'\n"
+"  WHEN local_rows > 1 THEN 'ambiguous_contig'\n"
+"  WHEN source_pos IS NULL OR source_pos < 1 OR source_pos > 4294967294 THEN 'invalid_position'\n"
+"  WHEN source_alt IS NULL THEN 'no_alternate_allele'\n"
+"  WHEN source_ref IS NULL OR source_ref = '' THEN 'missing_reference'\n"
+"  WHEN NOT structural_record THEN NULL\n"
+"  WHEN alt_count <> 1 THEN 'multiallelic_structural_record'\n"
+"  WHEN bnd IS NOT NULL AND bnd.mate_chrom IS NULL THEN 'single_breakend'\n"
+"  WHEN bnd IS NOT NULL AND (mate_region IS NULL OR mate_rows > 1) THEN 'mate_contig_not_in_model'\n"
+"  WHEN bnd IS NOT NULL AND (bnd.mate_position < 1 OR bnd.mate_position > 4294967294) THEN 'invalid_position'\n"
+"  WHEN bnd IS NOT NULL THEN NULL\n"
+"  WHEN regexp_matches(source_alt, '[\\[\\]]') OR regexp_matches(source_alt, '^\\.\\w+|\\w+\\.$') THEN 'malformed_breakend'\n"
+"  WHEN sv_type IS NULL THEN 'literal_alleles_with_svtype'\n"
+"  WHEN sv_type IN ('unsupported_symbolic_allele', 'unsupported_structural_type') THEN sv_type\n"
+"  WHEN end_text IS NOT NULL AND info_end IS NULL THEN 'invalid_end'\n"
+"  WHEN svlen_text IS NOT NULL AND info_svlen IS NULL THEN 'invalid_svlen'\n"
+"  WHEN sv_type = 'DEL' AND (vep_start > vep_end OR (info_end IS NULL AND info_svlen IS NULL)) THEN 'incomplete_deletion'\n"
+"  WHEN sv_type = 'INS' AND vep_end = vep_start THEN 'single_base_insertion_span'\n"
+"  WHEN sv_type = 'INS' AND vep_end < source_pos THEN 'invalid_span'\n"
+"  WHEN sv_type <> 'INS' AND vep_end < vep_start THEN 'empty_span'\n"
+"  WHEN vep_end > 4294967294 THEN 'invalid_position'\n"
+"  ELSE NULL END AS event_reason FROM __duckvep_ve_spans),\n";
+
+static const char vcf_events_select[] =
+"__duckvep_ve_events AS (SELECT *, event_reason IS NULL AS ok,\n"
+"  CASE WHEN NOT structural_record THEN 'small_variant' WHEN bnd IS NOT NULL THEN 'breakend' WHEN sv_type IS NOT NULL AND NOT starts_with(sv_type, 'unsupported') THEN 'structural_variant' END AS event_kind,\n"
+"  CASE WHEN NOT structural_record OR bnd IS NOT NULL THEN source_pos WHEN sv_type = 'INS' AND vep_end < vep_start THEN source_pos ELSE vep_start END AS event_position,\n"
+"  CASE WHEN structural_record AND bnd IS NULL THEN CASE WHEN sv_type = 'INS' AND vep_end < vep_start THEN source_pos ELSE vep_end END END AS event_end\n"
+"  FROM __duckvep_ve_decided)\n"
+"SELECT CAST(row_number() OVER (ORDER BY CASE WHEN ok THEN local_region END NULLS LAST, CASE WHEN ok THEN event_position END NULLS LAST, CASE WHEN ok THEN event_end END NULLS FIRST, source_chrom, source_pos, source_id, alt_index) AS UBIGINT) AS event_index,\n"
+"  CASE WHEN ok THEN local_region END AS seq_region,\n"
+"  CASE WHEN ok THEN CAST(event_position AS UBIGINT) END AS position,\n"
+"  CASE WHEN ok THEN source_ref END AS reference,\n"
+"  CASE WHEN ok THEN source_alt END AS alternate,\n"
+"  CASE WHEN ok THEN CAST(event_end AS UBIGINT) END AS end_position,\n"
+"  CASE WHEN ok AND event_kind = 'structural_variant' THEN sv_type END AS structural_type,\n"
+"  CASE WHEN ok AND event_kind = 'structural_variant' THEN CASE sv_type WHEN 'DEL' THEN 'LOSS' WHEN 'DUP' THEN 'GAIN' WHEN 'TDUP' THEN 'GAIN' WHEN 'INV' THEN 'NEUTRAL' ELSE 'UNKNOWN' END END AS copy_change,\n"
+"  CASE WHEN ok AND event_kind = 'breakend' THEN mate_region END AS mate_seq_region,\n"
+"  CASE WHEN ok AND event_kind = 'breakend' THEN CAST(bnd.mate_position AS UBIGINT) END AS mate_position,\n"
+"  event_kind, CASE WHEN ok THEN 'ok' ELSE 'unsupported' END AS event_status, event_reason,\n"
+"  source_chrom, source_pos, source_id, source_ref, source_alt, CAST(alt_index AS UINTEGER) AS alt_index\n"
+"FROM __duckvep_ve_events ORDER BY event_index";
+
+/* The tail is split by common table expression: ISO C99 caps a string literal at
+ * 4,095 characters. */
+static const char *const vcf_events_tail[] = {
+    vcf_events_records, vcf_events_types, vcf_events_decisions, vcf_events_select
+};
+
+bool duckvep_core_vcf_events_sql(const char *records, const char *regions, duckvep_sql_text *out)
+{
+    if (!records || !regions || !duckvep_sql_append(out, vcf_events_head) ||
+        !duckvep_sql_relation(out, records) || !duckvep_sql_append(out, vcf_events_middle) ||
+        !duckvep_sql_relation(out, regions))
+        return false;
+    for (size_t i = 0; i < sizeof(vcf_events_tail) / sizeof(vcf_events_tail[0]); i++)
+        if (!duckvep_sql_append(out, vcf_events_tail[i])) return false;
+    return true;
 }
 
 typedef enum { PIECE_TEXT, PIECE_RELATION, PIECE_INTEGER } piece_kind;

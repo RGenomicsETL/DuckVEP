@@ -1,5 +1,27 @@
 # DuckVEP
 
+## Events from VCF records
+
+- `duckvep_vcf_events_sql(records, regions[, options])` builds the events relation from
+  VCF records with the columns of DuckHTS `read_bcf` (`CHROM`, `POS`, `REF`, `ALT[]`, and
+  optionally `ID`, `INFO_END`, `INFO_SVTYPE`, `INFO_SVLEN`). It reads them as VEP 116 does
+  (`Parser::VCF::create_VariationFeatures` and ensembl-io `BaseVCF4`): a symbolic
+  structural record starts at `POS + 1` and ends at `POS + |SVLEN|`, else `END`, else its
+  start. Each ALT gets a row, sorted and numbered for the annotation builders. A record
+  that VEP skips or that the events relation cannot carry keeps a row with
+  `event_status = 'unsupported'` and a named reason, for example
+  `multiallelic_structural_record` for a gVCF `A,<NON_REF>` record or
+  `single_base_insertion_span` for an `<INS>` without END or SVLEN.
+- The events contract now states the `position` of a symbolic structural event: the
+  first base of VEP's feature, `POS + 1`. A caller that passed VCF `POS` moved the event
+  one base left. With a `<DEL>` at the last transcript base (POS 37, END 45, transcript
+  11 to 37) DuckVEP then reported `stop_lost&feature_truncation&coding_sequence_variant&3_prime_UTR_variant`;
+  VEP 116 reads 38 to 45 and reports `intergenic_variant`.
+- `test/sql/duckvep_vcf_events.test` pins the builder against VEP 116 run on the same
+  records, transcripts and FASTA: 26 records, every supported small, DEL, DUP,
+  `DUP:TANDEM`, INV, CNV and INS case with VEP's span and consequences, and VEP's own
+  skips. Breakend consequences remain pinned by the breakend lane.
+
 ## Singleton source-record HGVSp with ambiguous alleles
 
 - One-contributor `source_records` paths render protein HGVS from the independently normalized ALT when raw Haplosaurus replay marks an ambiguous ALT as `source_allele_skipped`. Raw CDS, protein, evidence and prediction status remain container-owned.

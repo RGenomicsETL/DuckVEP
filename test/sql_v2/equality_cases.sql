@@ -639,6 +639,37 @@ SELECT duckvep_prepare_expansionhunter_sql('e', 'a.b.c') AS x
 -- case: builder prepare expansionhunter option unsupported error
 SELECT duckvep_prepare_expansionhunter_sql('e', 'r', {'x': 1}) AS x
 
+-- case: builder vcf events defaults
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_vcf_events_sql('records', 'regions') AS x)
+
+-- case: builder vcf events schemas
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_vcf_events_sql('a.records', 'b.regions') AS x)
+
+-- case: builder vcf events null options
+SELECT md5(x) AS h, length(x) AS n FROM (SELECT duckvep_vcf_events_sql('r', 'g', NULL) AS x)
+
+-- case: builder vcf events null regions error
+SELECT duckvep_vcf_events_sql('r', NULL) AS x
+
+-- case: builder vcf events empty records error
+SELECT duckvep_vcf_events_sql('', 'g') AS x
+
+-- case: builder vcf events option unsupported error
+SELECT duckvep_vcf_events_sql('r', 'g', {'x': 1}) AS x
+
+-- case: builder vcf events rows
+WITH recs("CHROM", "POS", "ID", "REF", "ALT", "INFO_END", "INFO_SVTYPE", "INFO_SVLEN") AS (VALUES
+  ('c1', 10::BIGINT, 'snv', 'A', ['G', '*'], NULL::INTEGER, NULL::VARCHAR, NULL::INTEGER[]),
+  ('c1', 20, 'del', 'C', ['<DEL>'], 30, 'DEL', NULL),
+  ('c1', 20, 'del_svlen', 'C', ['<DEL>'], 30, 'DEL', [-4]),
+  ('c1', 25, 'ins', 'T', ['<INS>'], 25, 'INS', NULL),
+  ('c1', 26, 'ins_span', 'T', ['<INS>'], NULL, 'INS', [6]),
+  ('c1', 27, 'bnd', 'G', ['G[c2:5['], NULL, 'BND', NULL),
+  ('c1', 28, 'multi', 'G', ['<DEL>', '<DUP>'], 40, 'CNV', NULL),
+  ('c9', 5, 'elsewhere', 'A', ['C'], NULL, NULL, NULL)),
+regs(seq_region, seq_region_name) AS (VALUES (0::UINTEGER, 'c1'), (1::UINTEGER, 'c2'))
+SELECT * FROM query(duckvep_vcf_events_sql('recs', 'regs'))
+
 -- case: builder prepare sv many rows
 SELECT count(*) AS n, md5(string_agg(x, '' ORDER BY i)) AS h FROM (SELECT i, duckvep_prepare_sv_geometry_sql('t' || (i % 7)) AS x FROM range(2500) t(i))
 
