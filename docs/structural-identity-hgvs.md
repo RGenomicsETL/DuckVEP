@@ -1,10 +1,10 @@
 # BND record identity, fusion evidence and structural HGVS
 
-Native SQL builders (safe quoting, trailing typed options STRUCT, deterministic text). `Rduckvep` only wraps them.
+Native SQL builders (safe quoting, trailing typed options STRUCT, deterministic text). `Rduckvep` only wraps them. Their input is shaped like DuckHTS `read_bcf` output: typed `INFO_*` columns, in any letter case, as scalars, lists or text, so the builders never parse VCF INFO text. `read_bcf` exposes only the INFO keys the header declares; an undeclared key reads as absent.
 
 ## `duckvep_prepare_breakend_pairs_sql(events[, {}])`
 
-Input columns: `event_index, chrom, pos, id, ref, alt, info` (raw VCF records). Output: exactly one row per input record, ordered by `event_index`. A record and its mate are separate rows; the shared `pair_key` (`min|max` event_index) exists only when both agree.
+Input columns: `event_index, CHROM, POS, ID, ALT` and optionally `INFO_MATEID` and `INFO_EVENT`, each read as a list of values; `ALT` may be a list, with the 1-based `alt_index` choosing the allele. More than one `MATEID` value is `duplicate_mateid`; more than one `EVENT` value is `duplicate_event`. Output: exactly one row per input record, ordered by `event_index`. A record and its mate are separate rows; the shared `pair_key` (`min|max` event_index) exists only when both agree.
 
 `record_kind`: `paired_breakend`, `single_breakend`, `malformed_alt`, `not_breakend`, parsed by `duckvep_breakend_geometry()`.
 
@@ -28,11 +28,11 @@ Inputs: `event_index` is cast to BIGINT and a non-integral `pos` becomes NULL.
 
 ## `duckvep_prepare_structural_hgvs_sql(events, reference[, {max_span}])`
 
-`events`: `event_index, chrom, pos, ref, alt, info`. `reference`: `event_index, reference_sequence` = FASTA[pos..END], plus (for DUP) an equal-length following flank, FASTA[pos..END+(END-pos)]; DEL and INV accept either. `max_span` defaults to 5000 (1 to 60000).
+`events`: `event_index, CHROM, POS, REF, ALT` and optionally `INFO_END`, `INFO_SVLEN`, `INFO_CIPOS`, `INFO_CIEND` and `INFO_IMPRECISE`. The end is `POS + |SVLEN|`, else `END`, as VEP reads it; whole numbers only. `reference`: `event_index, reference_sequence` = FASTA[pos..end], plus (for DUP) an equal-length following flank, FASTA[pos..end+(end-pos)]; DEL and INV accept either. `max_span` defaults to 5000 (1 to 60000).
 
-Supported domain (`hgvs_status = 'supported'`): precise symbolic `<DEL>`, `<DUP>`, `<DUP:TANDEM>` and `<INV>` with integral `INFO/END`, no `CIPOS`/`CIEND`/`IMPRECISE`, and a matching reference. Output: `hgvs_g` (`chrom:g.S_Edel|dup|inv`, `normalization = 'none'`, no 3' shifting), and the equivalent literal edit (`literal_position`, `literal_reference`, `literal_alternate`) that the existing small-variant path turns into `c.`/`n.` HGVS (`transcript_hgvs_route = 'literal_equivalent'`). Nothing is derived from consequence labels.
+Supported domain (`hgvs_status = 'supported'`): precise symbolic `<DEL>`, `<DUP>`, `<DUP:TANDEM>` and `<INV>` with an integral end, no `CIPOS`/`CIEND`/`IMPRECISE`, and a matching reference. Output: `hgvs_g` (`chrom:g.S_Edel|dup|inv`, `normalization = 'none'`, no 3' shifting), and the equivalent literal edit (`literal_position`, `literal_reference`, `literal_alternate`) that the existing small-variant path turns into `c.`/`n.` HGVS (`transcript_hgvs_route = 'literal_equivalent'`). Nothing is derived from consequence labels.
 
-`unavailable` (an input needed for the description is absent or unusable): `missing_field`, `invalid_pos`, `missing_chrom`, `missing_end`, `duplicate_end`, `invalid_end`, `missing_reference_sequence`, `ambiguous_reference_sequence`, `reference_length_mismatch`, `reference_alphabet`, `invalid_ref`, `reference_anchor_mismatch`, `missing_flank_sequence`.
+`unavailable` (an input needed for the description is absent or unusable): `missing_field`, `invalid_pos`, `missing_chrom`, `missing_end` (neither `END` nor `SVLEN`), `invalid_end`, `inconsistent_end` (`END` and `SVLEN` disagree), `missing_reference_sequence`, `ambiguous_reference_sequence`, `reference_length_mismatch`, `reference_alphabet`, `invalid_ref`, `reference_anchor_mismatch`, `missing_flank_sequence`.
 
 `unsupported` (well formed but outside the domain): `breakend` (paired and single), `symbolic_insertion`, `copy_number`, `repeat_expansion`, `symbolic_allele`, `literal_allele` (use the small-variant HGVS path), `alt_syntax`, `imprecise`, `span_capacity`, `duplication_adjacent_repeat`, `inversion_identity`, `inversion_not_reducible`.
 

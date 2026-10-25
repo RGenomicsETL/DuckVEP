@@ -1231,7 +1231,9 @@ tandem-DUP, tandem-repeat (`STR`), INV, INS, CNV, or unknown operation and an ex
 loss/neutral/gain/unknown copy direction. Span operations use one-based inclusive start/end
 coordinates. An insertion uses `start = end = P` for the interbase site after reference base
 `P`; preparing symbolic VCF therefore removes the left anchor, maps a span to
-`start = POS + 1, end = INFO/END`, and maps an insertion to `P = POS`. VEP's `Parser::VCF`
+`start = POS + 1, end = POS + |SVLEN|`, else `INFO/END` (VEP's `get_end` order), and maps an
+insertion that ends at `POS` to `P = POS`. The preparation builders read typed `read_bcf`
+columns, not INFO text, and share that rule with `duckvep_vcf_events_sql`. VEP's `Parser::VCF`
 reads a symbolic insertion that carries SVLEN as a feature span of SVLEN bases from `POS + 1`
 and ignores END; an `INS` event with `end > start` is that reading, annotated as the span
 with the insertion class (`feature_elongation` within a feature, the bare transcript term when

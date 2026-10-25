@@ -1,7 +1,8 @@
 #' Validate BND mate and event identity
 #'
-#' The input relation has `event_index`, `chrom`, `pos`, `id`, `ref`, `alt` and
-#' `info`. The native builder returns one row per physical source record and
+#' The input relation is shaped like DuckHTS `read_bcf()` output:
+#' `event_index`, `CHROM`, `POS`, `ID`, `ALT` and optionally `INFO_MATEID` and
+#' `INFO_EVENT`, each read as a list of values. The native builder returns one row per physical source record and
 #' never merges a record with its mate. `status` is `reciprocal`, `unproven`,
 #' `conflict`, `invalid` or `not_applicable`; `reason` is a stable identifier.
 #' ALT syntax alone never proves a fusion, phase or inserted-only sequence:
@@ -9,7 +10,7 @@
 #' `not_evaluated`.
 #'
 #' @param con A connection with DuckVEP loaded.
-#' @param events_table Name of the caller's raw VCF record relation.
+#' @param events_table Name of the caller's VCF record relation.
 #' @param ... Named options for the native builder.
 #' @return A data frame with one identity row per input record.
 #' @export

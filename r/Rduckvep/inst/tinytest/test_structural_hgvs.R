@@ -3,10 +3,10 @@ library(DBI)
 con <- dbConnect(duckdb::duckdb(shared_home = FALSE,
   config = list(allow_unsigned_extensions = "true")))
 rduckvep_load(con)
-events <- data.frame(event_index = 0:7, chrom = "21", pos = 7467462, ref = "T",
-  alt = c("<DEL>", "<DUP>", "<INV>", "<DEL>", "N[21:7467900[", "<INS>", "<DEL>", "<CNV>"),
-  info = c("END=7467465", "END=7467464", "END=7467468", "END=7467465;CIPOS=-1,1",
-           "SVTYPE=BND", "END=7467462", "SVTYPE=DEL", "END=7467465"),
+events <- data.frame(event_index = 0:7, CHROM = "21", POS = 7467462, REF = "T",
+  ALT = c("<DEL>", "<DUP>", "<INV>", "<DEL>", "N[21:7467900[", "<INS>", "<DEL>", "<CNV>"),
+  INFO_END = c(7467465L, 7467464L, 7467468L, 7467465L, NA, 7467462L, NA, 7467465L),
+  INFO_CIPOS = c(NA, NA, NA, "-1,1", NA, NA, NA, NA),
   stringsAsFactors = FALSE)
 refs <- data.frame(event_index = c(0L, 1L, 2L, 3L),
   reference_sequence = c("TCAG", "TCAGC", "TCAGTAGCAGTAG", "TCAG"))

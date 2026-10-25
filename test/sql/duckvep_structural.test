@@ -16,47 +16,47 @@ FROM (SELECT TRY(duckvep_breakend_geometry(alt)) g FROM (VALUES
 
 statement ok
 CREATE TEMP TABLE "bnd"";λ" (event_index INTEGER, chrom VARCHAR, pos BIGINT, id VARCHAR,
-  ref VARCHAR, alt VARCHAR, info VARCHAR);
+  ref VARCHAR, alt VARCHAR, "INFO_MATEID" VARCHAR[], "INFO_EVENT" VARCHAR[]);
 
 statement ok
 INSERT INTO "bnd"";λ" VALUES
-(0, '1', 100, 'a1', 'A', 'ATT[2:200[', 'MATEID=a2;EVENT=e1'),
-(1, '2', 200, 'a2', 'C', ']1:100]AAC', 'MATEID=a1;EVENT=e1'),
-(2, '3', 10, 's1', 'G', '.G', 'SVTYPE=BND'),
-(3, '3', 20, 'n1', 'G', '<DEL>', 'END=30'),
-(4, '3', 30, 'm0', 'G', 'G[3:5', 'MATEID=zz'),
-(5, '3', 40, '.', 'G', 'G[3:5[', 'MATEID=zz'),
-(6, '3', 50, 'd', 'G', 'G[3:5[', 'MATEID=zz'),
-(7, '3', 60, 'd', 'G', 'G[3:5[', 'MATEID=zz'),
-(8, '4', 10, 'b1', 'G', 'G[4:50[', 'SVTYPE=BND'),
-(9, '4', 20, 'b2', 'G', 'G[4:50[', 'MATEID=x,y'),
-(10, '4', 30, 'b3', 'G', 'G[4:50[', 'MATEID=b3'),
-(11, '4', 40, 'b4', 'G', 'G[4:50[', 'MATEID=nowhere'),
-(12, '5', 10, 'p1', 'G', 'G[5:20[', 'MATEID=p2'),
-(13, '5', 20, 'p2', 'G', ']5:10]G', 'SVTYPE=BND'),
-(14, '5', 30, 'q1', 'G', 'G[5:40[', 'MATEID=q2'),
-(15, '5', 40, 'q2', 'G', ']5:30]G', 'MATEID=q3'),
-(16, '5', 50, 'q3', 'G', 'G[5:60[', 'MATEID=q2'),
-(17, '6', 10, 'r1', 'G', 'G[6:20[', 'MATEID=r2'),
-(18, '6', 20, 'r2', 'G', '.G', 'MATEID=r1'),
-(19, '7', 10, 'c1', 'G', 'G[7:20[', 'MATEID=c2'),
-(20, '7', 21, 'c2', 'G', ']7:10]G', 'MATEID=c1'),
-(21, '8', 10, 'o1', 'G', 'G[8:20[', 'MATEID=o2'),
-(22, '8', 20, 'o2', 'G', 'G[8:10[', 'MATEID=o1'),
-(23, '9', 10, 'i1', 'G', 'GAA[9:20[', 'MATEID=i2'),
-(24, '9', 20, 'i2', 'G', ']9:10]G', 'MATEID=i1'),
-(25, '10', 10, 'v1', 'G', 'G[10:20[', 'MATEID=v2;EVENT=x'),
-(26, '10', 20, 'v2', 'G', ']10:10]G', 'MATEID=v1;EVENT=y'),
-(27, '11', 10, 'w1', 'G', 'G[11:20[', 'MATEID=w2;EVENT=x;EVENT=y'),
-(28, '11', 20, 'w2', 'G', ']11:10]G', 'MATEID=w1'),
-(29, '12', 10, 'k1', 'G', 'G[12:20[', 'MATEID=k2'),
-(30, '12', 20, 'k2', 'G', ']12:10]G', 'MATEID=k1'),
-(31, '12', 20, 'k2', 'G', ']12:10]G', 'MATEID=k1'),
-(32, '13', 10, 't1', 'G', '.G', 'MATEID=t2'),
-(33, '14', 10, 'u1', 'G', 'G[14:20[', 'MATEID=u2;EVENT=z'),
-(34, '14', 20, 'u2', 'G', ']14:10]G', 'MATEID=u1;EVENT=z'),
-(35, '14', 30, 'u3', 'G', 'G[14:40[', 'MATEID=u4;EVENT=z'),
-(36, '14', 40, 'u4', 'G', ']14:30]G', 'MATEID=u3;EVENT=z');
+(0, '1', 100, 'a1', 'A', 'ATT[2:200[', ['a2'], ['e1']),
+(1, '2', 200, 'a2', 'C', ']1:100]AAC', ['a1'], ['e1']),
+(2, '3', 10, 's1', 'G', '.G', NULL, NULL),
+(3, '3', 20, 'n1', 'G', '<DEL>', NULL, NULL),
+(4, '3', 30, 'm0', 'G', 'G[3:5', ['zz'], NULL),
+(5, '3', 40, '.', 'G', 'G[3:5[', ['zz'], NULL),
+(6, '3', 50, 'd', 'G', 'G[3:5[', ['zz'], NULL),
+(7, '3', 60, 'd', 'G', 'G[3:5[', ['zz'], NULL),
+(8, '4', 10, 'b1', 'G', 'G[4:50[', NULL, NULL),
+(9, '4', 20, 'b2', 'G', 'G[4:50[', ['x', 'y'], NULL),
+(10, '4', 30, 'b3', 'G', 'G[4:50[', ['b3'], NULL),
+(11, '4', 40, 'b4', 'G', 'G[4:50[', ['nowhere'], NULL),
+(12, '5', 10, 'p1', 'G', 'G[5:20[', ['p2'], NULL),
+(13, '5', 20, 'p2', 'G', ']5:10]G', NULL, NULL),
+(14, '5', 30, 'q1', 'G', 'G[5:40[', ['q2'], NULL),
+(15, '5', 40, 'q2', 'G', ']5:30]G', ['q3'], NULL),
+(16, '5', 50, 'q3', 'G', 'G[5:60[', ['q2'], NULL),
+(17, '6', 10, 'r1', 'G', 'G[6:20[', ['r2'], NULL),
+(18, '6', 20, 'r2', 'G', '.G', ['r1'], NULL),
+(19, '7', 10, 'c1', 'G', 'G[7:20[', ['c2'], NULL),
+(20, '7', 21, 'c2', 'G', ']7:10]G', ['c1'], NULL),
+(21, '8', 10, 'o1', 'G', 'G[8:20[', ['o2'], NULL),
+(22, '8', 20, 'o2', 'G', 'G[8:10[', ['o1'], NULL),
+(23, '9', 10, 'i1', 'G', 'GAA[9:20[', ['i2'], NULL),
+(24, '9', 20, 'i2', 'G', ']9:10]G', ['i1'], NULL),
+(25, '10', 10, 'v1', 'G', 'G[10:20[', ['v2'], ['x']),
+(26, '10', 20, 'v2', 'G', ']10:10]G', ['v1'], ['y']),
+(27, '11', 10, 'w1', 'G', 'G[11:20[', ['w2'], ['x', 'y']),
+(28, '11', 20, 'w2', 'G', ']11:10]G', ['w1'], NULL),
+(29, '12', 10, 'k1', 'G', 'G[12:20[', ['k2'], NULL),
+(30, '12', 20, 'k2', 'G', ']12:10]G', ['k1'], NULL),
+(31, '12', 20, 'k2', 'G', ']12:10]G', ['k1'], NULL),
+(32, '13', 10, 't1', 'G', '.G', ['t2'], NULL),
+(33, '14', 10, 'u1', 'G', 'G[14:20[', ['u2'], ['z']),
+(34, '14', 20, 'u2', 'G', ']14:10]G', ['u1'], ['z']),
+(35, '14', 30, 'u3', 'G', 'G[14:40[', ['u4'], ['z']),
+(36, '14', 40, 'u4', 'G', ']14:30]G', ['u3'], ['z']);
 
 query IIIIIIIIIII
 SELECT event_index, id, record_kind, status, reason, mate_event_index,
@@ -172,36 +172,37 @@ unknown option 'bogus'
 # following flank for duplications.
 statement ok
 CREATE TEMP TABLE "sv"";λ" (event_index INTEGER, chrom VARCHAR, pos DOUBLE, ref VARCHAR,
-  alt VARCHAR, info VARCHAR);
+  alt VARCHAR, "INFO_END" BIGINT, "INFO_SVLEN" INTEGER[], "INFO_CIPOS" INTEGER[]);
 
 statement ok
 INSERT INTO "sv"";λ" VALUES
-(0, '21', 7467462, 'T', '<DEL>', 'END=7467465'),
-(1, '21', 7467462, 'T', '<DUP>', 'END=7467465'),
-(2, '21', 7467462, 'T', '<DUP:TANDEM>', 'END=7467463'),
-(3, '21', 7467462, 'T', '<INV>', 'END=7467465'),
-(4, '21', 7467462, 'T', '<DEL>', 'END=7467463'),
-(5, '21', 7467462, 'T', '<DEL>', 'END=7467465;CIPOS=-1,1'),
-(6, '21', 7467462, 'T', 'N[21:7467900[', 'SVTYPE=BND'),
-(7, '21', 7467462, 'T', '<INS>', 'END=7467462'),
-(8, '21', 7467462, 'T', '<DEL>', 'SVTYPE=DEL'),
-(9, '21', 7467462, 'T', '<DEL>', 'END=7467465'),
-(10, '21', 7467462, 'C', '<DEL>', 'END=7467465'),
-(11, '21', 7467462, 'T', '<INV>', 'END=7467468'),
-(12, '21', 7467462, 'T', '<DUP>', 'END=7467464'),
-(13, '21', 7467462, 'T', '<DEL>', 'END=7467465;END=7467466'),
-(14, '21', 7467462, 'T', 'TCAG', '.'),
-(15, '21', 7467462, 'T', '<CNV>', 'END=7467465'),
-(16, '21', 7467462, 'T', '<STR7>', 'END=7467465'),
-(17, '21', 7467462, 'T', '<DEL>', 'END=7467465'),
-(18, '21', 7467462.5, 'T', '<DEL>', 'END=7467465'),
-(19, '21', 7467462, 'T', '<INV>', 'END=7467465'),
-(20, '21', 7467462, 'T', '<DEL>', 'END=99999999999999999'),
-(21, NULL, 7467462, 'T', '<DEL>', 'END=7467465'),
-(22, '21', 7467462, 'T', '<DEL>', 'END=7467462'),
-(23, '21', 7467462, 'T', '<DEL>', 'END=7467700'),
-(24, '21', 7467462, 'T', '<DEL>', 'END=7467465'),
-(25, '21', 7467462, 'T', '<DEL>', 'END=7467465');
+(0, '21', 7467462, 'T', '<DEL>', 7467465, NULL, NULL),
+(1, '21', 7467462, 'T', '<DUP>', 7467465, NULL, NULL),
+(2, '21', 7467462, 'T', '<DUP:TANDEM>', 7467463, NULL, NULL),
+(3, '21', 7467462, 'T', '<INV>', 7467465, NULL, NULL),
+(4, '21', 7467462, 'T', '<DEL>', 7467463, NULL, NULL),
+(5, '21', 7467462, 'T', '<DEL>', 7467465, NULL, [-1,1]),
+(6, '21', 7467462, 'T', 'N[21:7467900[', NULL, NULL, NULL),
+(7, '21', 7467462, 'T', '<INS>', 7467462, NULL, NULL),
+(8, '21', 7467462, 'T', '<DEL>', NULL, NULL, NULL),
+(9, '21', 7467462, 'T', '<DEL>', 7467465, NULL, NULL),
+(10, '21', 7467462, 'C', '<DEL>', 7467465, NULL, NULL),
+(11, '21', 7467462, 'T', '<INV>', 7467468, NULL, NULL),
+(12, '21', 7467462, 'T', '<DUP>', 7467464, NULL, NULL),
+(13, '21', 7467462, 'T', '<DEL>', 7467465, [-4], NULL),
+(14, '21', 7467462, 'T', 'TCAG', NULL, NULL, NULL),
+(15, '21', 7467462, 'T', '<CNV>', 7467465, NULL, NULL),
+(16, '21', 7467462, 'T', '<STR7>', 7467465, NULL, NULL),
+(17, '21', 7467462, 'T', '<DEL>', 7467465, NULL, NULL),
+(18, '21', 7467462.5, 'T', '<DEL>', 7467465, NULL, NULL),
+(19, '21', 7467462, 'T', '<INV>', 7467465, NULL, NULL),
+(20, '21', 7467462, 'T', '<DEL>', 99999999999999999, NULL, NULL),
+(21, NULL, 7467462, 'T', '<DEL>', 7467465, NULL, NULL),
+(22, '21', 7467462, 'T', '<DEL>', 7467462, NULL, NULL),
+(23, '21', 7467462, 'T', '<DEL>', 7467700, NULL, NULL),
+(24, '21', 7467462, 'T', '<DEL>', 7467465, NULL, NULL),
+(25, '21', 7467462, 'T', '<DEL>', 7467465, NULL, NULL),
+(26, '21', 7467462, 'T', '<DEL>', NULL, [-3], NULL);
 
 statement ok
 CREATE TEMP TABLE "ref"";λ" (event_index INTEGER, reference_sequence VARCHAR);
@@ -211,7 +212,7 @@ INSERT INTO "ref"";λ" VALUES
 (0, 'TCAG'), (1, 'TCAGCAG'), (2, 'TCAG'), (3, 'TCAG'), (4, 'TC'), (5, 'TCAG'), (9, 'TCA'),
 (10, 'TCAG'), (11, 'TCAGTAGCAGTAG'), (12, 'TCAGC'), (13, 'TCAG'), (17, 'TCAN'),
 (19, 'TCTG'), (20, 'TCAG'), (21, 'TCAG'), (22, 'TC'), (23, 'TCAG'), (24, 'tcag'), (24, 'TCAG'),
-(25, 'tcag');
+(25, 'tcag'), (26, 'TCAG');
 
 query IIIIIIII
 SELECT event_index, hgvs_status, hgvs_reason, edit, hgvs_g, transcript_hgvs_route,
@@ -231,7 +232,7 @@ FROM query(duckvep_prepare_structural_hgvs_sql('sv";λ', 'ref";λ')) ORDER BY ev
 10	unavailable	reference_anchor_mismatch	NULL	NULL	unavailable	NULL	NULL
 11	supported	NULL	inversion	21:g.7467463_7467468inv	literal_equivalent	7467463	CAGTAG>CTACTG
 12	supported	NULL	duplication	21:g.7467463_7467464dup	literal_equivalent	7467464	A>ACA
-13	unavailable	duplicate_end	NULL	NULL	unavailable	NULL	NULL
+13	unavailable	inconsistent_end	NULL	NULL	unavailable	NULL	NULL
 14	unsupported	literal_allele	NULL	NULL	unsupported	NULL	NULL
 15	unsupported	copy_number	NULL	NULL	unsupported	NULL	NULL
 16	unsupported	repeat_expansion	NULL	NULL	unsupported	NULL	NULL
@@ -244,6 +245,7 @@ FROM query(duckvep_prepare_structural_hgvs_sql('sv";λ', 'ref";λ')) ORDER BY ev
 23	unavailable	reference_length_mismatch	NULL	NULL	unavailable	NULL	NULL
 24	unavailable	ambiguous_reference_sequence	NULL	NULL	unavailable	NULL	NULL
 25	supported	NULL	deletion	21:g.7467463_7467465del	literal_equivalent	7467462	TCAG>T
+26	supported	NULL	deletion	21:g.7467463_7467465del	literal_equivalent	7467462	TCAG>T
 
 # max_span bounds the description; the option is validated.
 query II
@@ -281,10 +283,10 @@ SELECT contains(duckvep_prepare_structural_hgvs_sql('sv";λ', 'ref";λ'), '"ref"
 statement ok
 CREATE TEMP TABLE bnd_scale AS
 SELECT (2 * p)::BIGINT AS event_index, '1' AS chrom, (1000 + 3 * p)::BIGINT AS pos, 'a' || p AS id, 'N' AS ref,
-  'N[2:' || (500 + 3 * p) || '[' AS alt, 'MATEID=b' || p || ';EVENT=e' || p AS info FROM range(20000) t(p)
+  'N[2:' || (500 + 3 * p) || '[' AS alt, ['b' || p] AS "INFO_MATEID", ['e' || p] AS "INFO_EVENT" FROM range(20000) t(p)
 UNION ALL
 SELECT (2 * p + 1)::BIGINT, '2', (500 + 3 * p)::BIGINT, 'b' || p, 'N',
-  ']1:' || (1000 + 3 * p) || ']N', 'MATEID=a' || p || ';EVENT=e' || p FROM range(20000) t(p);
+  ']1:' || (1000 + 3 * p) || ']N', ['a' || p], ['e' || p] FROM range(20000) t(p);
 
 query III
 SELECT count(*), count(*) FILTER (WHERE status = 'reciprocal'), count(DISTINCT pair_key)

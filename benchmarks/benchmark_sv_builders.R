@@ -24,6 +24,26 @@ if (identical(args[[1L]], "--child")) {
   on.exit(dbDisconnect(con, shutdown = TRUE))
   run <- function(sql) invisible(dbExecute(con, sql))
   run(paste0("LOAD '", extension, "'")); run("SET threads=1")
+  # The builders take read_bcf-shaped typed columns. This harness generates VCF text, so it
+  # types INFO (and FORMAT with the sample) here, the way read_bcf would.
+  typed_input <- function(table) {
+    cols <- dbListFields(con, table)
+    info <- function(key, list = FALSE) {
+      v <- sprintf("nullif(regexp_extract(info, '(?:^|;)%s=([^;]*)', 1), '')", key)
+      if (list) v <- sprintf("string_split(%s, ',')", v)
+      sprintf('%s AS "INFO_%s"', v, key)
+    }
+    typed <- c(info("END"), info("SVLEN"), info("CIPOS", TRUE), info("CIEND", TRUE), info("SEQ"),
+               info("MATEID", TRUE), info("EVENT", TRUE), info("REF"), info("RL"), info("RU"))
+    drop <- "info"
+    if ("format" %in% cols) {
+      fmt <- function(key) sprintf("string_split(\"sample\", ':')[list_position(string_split(format, ':'), '%s')] AS \"FORMAT_%s\"", key, key)
+      typed <- c(typed, vapply(c("GT", "SO", "REPCN", "REPCI", "CN", "CI"), fmt, ""))
+      drop <- c(drop, "format", "\"sample\"")
+    }
+    run(sprintf("CREATE OR REPLACE TEMP TABLE %s AS SELECT * EXCLUDE (%s), %s FROM %s", table,
+      paste(drop, collapse = ", "), paste(typed, collapse = ", "), table))
+  }
   seq_expr <- function(len_expr, salt) sprintf(
     "array_to_string(list_transform(range((%s)::BIGINT), lambda x: substr('ACGT', 1 + (hash(event_index, x, %d) %% 4)::INTEGER, 1)), '')",
     len_expr, salt)
@@ -69,10 +89,12 @@ if (identical(args[[1L]], "--child")) {
     run(input); run("CREATE TEMP TABLE reference AS SELECT event_index,
       substr(array_to_string(list_transform(range((2 * (try_cast(regexp_extract(info, 'END=([0-9]+)', 1) AS BIGINT) - pos) + 1)::BIGINT),
       lambda x: substr('ACGT', 1 + (hash(event_index, x, 9) % 4)::INTEGER, 1)), ''), 1) AS reference_sequence FROM input");
+    typed_input("input")
     reference <- "reference"
   } else if (builder == "expansionhunter") {
     run(input); run("CREATE TEMP TABLE reference AS SELECT event_index,
       CASE WHEN event_index % 10 = 3 THEN repeat('CAG', (1 + hash(event_index) % 20 + 1)::BIGINT) ELSE repeat('CAG', (1 + hash(event_index) % 20)::BIGINT) END AS reference_sequence FROM input")
+    typed_input("input")
     reference <- "reference"
   } else if (builder == "breakend_fusion") {
     # The fusion builder's input is the pair-identity table plus endpoint genes.
@@ -87,12 +109,13 @@ if (identical(args[[1L]], "--child")) {
           WHEN 2 THEN 'N]' || c1 || ':' || p1 || ']' ELSE '[' || c1 || ':' || p1 || '[N' END,
         'SVTYPE=BND;MATEID=p' || pair || 'a;EVENT=e' || pair FROM p", n %/% 2L)
     run(ids)
+    typed_input("raw_pairs")
     run("CREATE TEMP TABLE input AS SELECT * FROM query(duckvep_prepare_breakend_pairs_sql('raw_pairs'))")
     run(sprintf("CREATE TEMP TABLE genes AS SELECT event_index, 'G' || (hash(event_index, k) %% 40000) AS gene_id
       FROM range(%d) t(event_index), range(0, 3) u(k) WHERE hash(event_index, k, 5) %% 3 <> 0", n))
     reference <- "genes"
   }
-  if (is.null(reference) && builder != "breakend_fusion") run(input)
+  if (is.null(reference) && builder != "breakend_fusion") { run(input); typed_input("input") }
   table_name <- "input"
   sql_call <- switch(builder,
     sv_geometry = "duckvep_prepare_sv_geometry_sql('input')",

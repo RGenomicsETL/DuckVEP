@@ -199,17 +199,13 @@ DBI::dbDisconnect(con, shutdown = TRUE)
 DuckVEP needs no other extension, but it is meant to share a query with them: [DuckHTS](https://github.com/RGenomicsETL/duckhts) reads the VCF and [DuckClinVarbitration](https://github.com/RGenomicsETL/DuckClinVarbitration) supplies arbitrated ClinVar decisions. Not evaluated here, since it needs a full Ensembl model and both extensions:
 
 ```sql
--- Ensembl names contigs 1..22, X, Y, MT; a UCSC-style VCF says chr1 .. chrM. Alias rows map them.
-CREATE VIEW grch38_region_names AS
-SELECT seq_region, seq_region_name FROM grch38_regions
-UNION ALL
-SELECT seq_region, CASE seq_region_name WHEN 'MT' THEN 'chrM' ELSE 'chr' || seq_region_name END
-FROM grch38_regions;
+-- DuckHTS reads the VCF; duckhts_contig_key maps UCSC names (chr1, chrM) to Ensembl's (1, MT)
+CREATE VIEW cohort AS
+SELECT * REPLACE (duckhts_contig_key("CHROM") AS "CHROM") FROM read_bcf('cohort.vcf.gz');
 
--- One row per ALT allele, read as VEP reads it (DuckHTS reads the VCF)
-CREATE VIEW cohort AS SELECT * FROM read_bcf('cohort.vcf.gz');
+-- One row per ALT allele, read as VEP reads it
 CREATE TABLE alleles AS
-SELECT * FROM query(duckvep_vcf_events_sql('cohort', 'grch38_region_names'));
+SELECT * FROM query(duckvep_vcf_events_sql('cohort', 'grch38_regions'));
 CREATE VIEW annotatable AS SELECT * FROM alleles WHERE event_status = 'ok' ORDER BY event_index;
 
 -- High-impact consequences next to their arbitrated ClinVar decision
@@ -225,7 +221,7 @@ LEFT JOIN clinvar_policy_allele_decisions d USING (allele_id)
 WHERE a.impact = 'HIGH';
 ```
 
-`event_reason` says why a record was left out, for example a gVCF `A,<NON_REF>` record that VEP skips.
+`event_reason` says why a record was left out, for example a gVCF `A,<NON_REF>` record that VEP skips; `source_chrom` holds the contig key. The structural preparation builders (breakend identity, confidence bounds, structural HGVS, ExpansionHunter repeats) read the same `read_bcf` rows, with their typed `INFO_*` columns, once each row has an `event_index`.
 
 ## Documentation
 

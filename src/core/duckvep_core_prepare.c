@@ -3,6 +3,39 @@
 #include <stdio.h>
 #include <string.h>
 
+/* ---- Reading read_bcf-shaped columns -------------------------------------
+ * The VCF header decides an INFO or FORMAT column's shape: read_bcf gives a list
+ * for Number=A, R or ., a scalar for Number=1, and VARCHAR for Type=String.
+ * DUCKVEP_VCF_VALUES reads any of these as VARCHAR[] without an extension: a list
+ * column's elements, or a scalar's text split at the commas VCF writes between list
+ * values; NULL stays NULL. TRY_CAST of a scalar to a list is NULL at run time, not
+ * a bind error (measured on DuckDB 1.5.1, 1.5.6 and 2.0.0), so one SQL text serves
+ * every shape. A scalar string written like a bracketed list reads as that list. A
+ * whole number written with a zero fraction, as a DOUBLE column renders 40 ("40.0"),
+ * reads as that whole number.
+ * Optional columns come from a template of untyped NULLs joined UNION ALL BY NAME,
+ * which keeps each present column's own type. */
+#define DUCKVEP_VCF_VALUES(x) \
+    "list_transform(CASE WHEN try_cast(" x " AS VARCHAR[]) IS NOT NULL THEN try_cast(" x " AS VARCHAR[]) " \
+    "ELSE string_split(try_cast(" x " AS VARCHAR), ',') END, " \
+    "lambda v: regexp_replace(v, '^([+-]?[0-9]+)\\.0+$', '\\1'))"
+/* The first value, trimmed, or NULL when empty. VEP reads the first comma value. */
+#define DUCKVEP_VCF_FIRST(x) "nullif(trim(" DUCKVEP_VCF_VALUES(x) "[1]), '')"
+/* An integer read from such text: only whole-number text counts, because TRY_CAST
+ * rounds '20.5' to 21 and reads '1e3' as 1000. */
+#define DUCKVEP_VCF_INTEGER(text) \
+    "CASE WHEN regexp_full_match(" text ", '[+-]?[0-9]{1,18}') THEN try_cast(" text " AS BIGINT) END"
+/* The allele a row describes: element alt_index (1-based, default 1) of ALT. */
+#define DUCKVEP_VCF_ALT \
+    DUCKVEP_VCF_VALUES("\"ALT\"") "[coalesce(try_cast(alt_index AS BIGINT), 1)]"
+/* VEP 116 ensembl-io BaseVCF4 get_start/get_end for a structural record: it starts
+ * at POS + 1 and ends at POS + |SVLEN| when SVLEN is set, else at END, else at its
+ * start. The arguments are BIGINT expressions. */
+#define DUCKVEP_VEP_SV_START(pos) "try_cast(" pos "::HUGEINT + 1 AS BIGINT)"
+#define DUCKVEP_VEP_SV_END(pos, svlen, end) \
+    "CASE WHEN " svlen " IS NOT NULL THEN try_cast(" pos "::HUGEINT + abs(" svlen "::HUGEINT) AS BIGINT) " \
+    "WHEN " end " IS NOT NULL THEN " end " ELSE try_cast(" pos "::HUGEINT + 1 AS BIGINT) END"
+
 const char duckvep_core_prepare_sv_failed[] =
     "duckvep_prepare_sv_geometry_sql: invalid relation name or allocation failure";
 const char duckvep_core_prepare_expansionhunter_failed[] =
@@ -10,27 +43,40 @@ const char duckvep_core_prepare_expansionhunter_failed[] =
 const char duckvep_core_vcf_events_failed[] =
     "duckvep_vcf_events_sql: invalid relation name or allocation failure";
 
+/* Records are read_bcf-shaped: event_index, POS, REF and ALT (a list, with the
+ * 1-based alt_index choosing the allele, or one allele), and the optional INFO_END,
+ * INFO_SVLEN, INFO_CIPOS, INFO_CIEND and INFO_SEQ. A symbolic allele's nominal span
+ * follows VEP's get_start/get_end, the same rule duckvep_vcf_events_sql applies. */
+static const char sv_head[] =
+"WITH __duckvep_sv_source AS (FROM (SELECT NULL AS alt_index, NULL AS \"INFO_END\", NULL AS \"INFO_SVLEN\", "
+"NULL AS \"INFO_CIPOS\", NULL AS \"INFO_CIEND\", NULL AS \"INFO_SEQ\" WHERE false) UNION ALL BY NAME "
+"SELECT COLUMNS('(?i)^(event_index|pos|ref|alt|alt_index|info_end|info_svlen|info_cipos|info_ciend|info_seq)$') FROM ";
+
 static const char sv_sql[] =
-"), parts AS (SELECT *, string_split(info, ';') AS tokens, "
-"try_cast(try_cast(pos AS HUGEINT) + length(ref) AS BIGINT) AS nominal_start, "
+"), __duckvep_sv_rows AS (SELECT event_index, pos, ref, alt, alt_index, \"INFO_END\", \"INFO_SVLEN\", "
+"\"INFO_CIPOS\", \"INFO_CIEND\", \"INFO_SEQ\" FROM __duckvep_sv_source), "
+"source AS (SELECT event_index, try_cast(pos AS BIGINT) AS pos, CAST(ref AS VARCHAR) AS ref, "
+DUCKVEP_VCF_ALT " AS alt, "
+DUCKVEP_VCF_FIRST("\"INFO_END\"") " AS end_text, " DUCKVEP_VCF_FIRST("\"INFO_SVLEN\"") " AS svlen_text, "
+DUCKVEP_VCF_FIRST("\"INFO_SEQ\"") " AS source_sequence, "
+DUCKVEP_VCF_VALUES("\"INFO_CIPOS\"") " AS cipos, " DUCKVEP_VCF_VALUES("\"INFO_CIEND\"") " AS ciend "
+"FROM __duckvep_sv_rows), parts AS (SELECT *, "
 "regexp_full_match(alt, '<[^>]+>') AS symbolic, "
 "regexp_full_match(ref, '[ACGT]+') AND regexp_full_match(alt, '[ACGT]+') "
-"AND length(alt)>length(ref) AND starts_with(alt,ref) AS literal FROM source), "
-"fields AS (SELECT *, list_transform(tokens, lambda x: split_part(x,'=',1)) AS keys, "
-"nullif(regexp_extract(info, '(?:^|;)END=([^;]*)', 1), '') AS end_text, "
-"nullif(regexp_extract(info, '(?:^|;)SEQ=([^;]*)', 1), '') AS source_sequence, "
-"nullif(regexp_extract(info, '(?:^|;)CIPOS=([^;]*)', 1), '') AS cipos_text, "
-"nullif(regexp_extract(info, '(?:^|;)CIEND=([^;]*)', 1), '') AS ciend_text "
-"FROM parts), bounds AS (SELECT *, CASE WHEN symbolic THEN try_cast(end_text AS BIGINT) "
-"ELSE try_cast(nominal_start::HUGEINT-1 AS BIGINT) END AS nominal_end, "
-"CASE WHEN cipos_text IS NOT NULL AND regexp_full_match(cipos_text,'[+-]?[0-9]+,[+-]?[0-9]+') "
-"THEN try_cast(split_part(cipos_text,',',1) AS BIGINT) END AS cipos_lo, "
-"CASE WHEN cipos_text IS NOT NULL AND regexp_full_match(cipos_text,'[+-]?[0-9]+,[+-]?[0-9]+') "
-"THEN try_cast(split_part(cipos_text,',',2) AS BIGINT) END AS cipos_hi, "
-"CASE WHEN ciend_text IS NOT NULL AND regexp_full_match(ciend_text,'[+-]?[0-9]+,[+-]?[0-9]+') "
-"THEN try_cast(split_part(ciend_text,',',1) AS BIGINT) END AS ciend_lo, "
-"CASE WHEN ciend_text IS NOT NULL AND regexp_full_match(ciend_text,'[+-]?[0-9]+,[+-]?[0-9]+') "
-"THEN try_cast(split_part(ciend_text,',',2) AS BIGINT) END AS ciend_hi FROM fields), "
+"AND length(alt)>length(ref) AND starts_with(alt,ref) AS literal, "
+DUCKVEP_VCF_INTEGER("end_text") " AS info_end, " DUCKVEP_VCF_INTEGER("svlen_text") " AS info_svlen FROM source), "
+"";
+
+/* ISO C99 caps a string literal at 4,095 characters, so the text continues here. */
+static const char sv_sql2[] =
+"bounds AS (SELECT *, CASE WHEN symbolic THEN " DUCKVEP_VEP_SV_START("pos") " "
+"ELSE try_cast(pos::HUGEINT + length(ref) AS BIGINT) END AS nominal_start, "
+"CASE WHEN symbolic THEN " DUCKVEP_VEP_SV_END("pos", "info_svlen", "info_end") " "
+"ELSE try_cast(pos::HUGEINT + length(ref) - 1 AS BIGINT) END AS nominal_end, "
+"CASE WHEN len(cipos) = 2 THEN " DUCKVEP_VCF_INTEGER("trim(cipos[1])") " END AS cipos_lo, "
+"CASE WHEN len(cipos) = 2 THEN " DUCKVEP_VCF_INTEGER("trim(cipos[2])") " END AS cipos_hi, "
+"CASE WHEN len(ciend) = 2 THEN " DUCKVEP_VCF_INTEGER("trim(ciend[1])") " END AS ciend_lo, "
+"CASE WHEN len(ciend) = 2 THEN " DUCKVEP_VCF_INTEGER("trim(ciend[2])") " END AS ciend_hi FROM parts), "
 "geometry AS (SELECT *, try_cast(nominal_start::HUGEINT+cipos_lo AS BIGINT) AS outer_start, "
 "try_cast(nominal_start::HUGEINT+cipos_hi AS BIGINT) AS inner_start, "
 "try_cast(nominal_end::HUGEINT+ciend_lo AS BIGINT) AS inner_end, "
@@ -38,37 +84,57 @@ static const char sv_sql[] =
 "SELECT event_index, CASE WHEN "
 "(symbolic OR literal) AND pos BETWEEN 1 AND 2147483647 AND nominal_start BETWEEN 0 AND 2147483647 "
 "AND nominal_end BETWEEN nominal_start::HUGEINT-1 AND 2147483647 "
-"AND (NOT symbolic OR (regexp_full_match(ref,'[ACGTN]') AND regexp_full_match(end_text,'[1-9][0-9]*'))) "
-"AND (cipos_text IS NULL OR (outer_start BETWEEN 0 AND 2147483647 AND inner_start BETWEEN 0 AND 2147483647 AND outer_start<=inner_start)) "
-"AND (ciend_text IS NULL OR (inner_end BETWEEN 0 AND 2147483647 AND outer_end BETWEEN 0 AND 2147483647 AND inner_end<=outer_end)) "
-"AND length(keys)=length(list_distinct(keys)) "
+"AND (end_text IS NULL OR info_end > 0) AND (svlen_text IS NULL OR info_svlen IS NOT NULL) "
+"AND (NOT symbolic OR (regexp_full_match(ref,'[ACGTN]') AND (info_end IS NOT NULL OR info_svlen IS NOT NULL))) "
+"AND (cipos IS NULL OR (outer_start BETWEEN 0 AND 2147483647 AND inner_start BETWEEN 0 AND 2147483647 AND outer_start<=inner_start)) "
+"AND (ciend IS NULL OR (inner_end BETWEEN 0 AND 2147483647 AND outer_end BETWEEN 0 AND 2147483647 AND inner_end<=outer_end)) "
 "THEN 'ok' ELSE 'unsupported_geometry' END AS status, "
 "CASE WHEN symbolic THEN 'structural' WHEN literal THEN 'literal_insertion' ELSE 'unsupported' END AS mode, "
 "nominal_start, nominal_end, outer_start, inner_start, inner_end, outer_end, "
 "CASE WHEN literal THEN substring(alt,length(ref)+1) END AS inserted_sequence, source_sequence FROM geometry";
+
+/* Rows are read_bcf-shaped, one per event and sample as read_bcf(..., tidy_format :=
+ * true) gives them: event_index, REF, ALT (a list or one comma-separated text) and the
+ * 1-based alt_index, the optional INFO_END, INFO_REF, INFO_RL and INFO_RU, and the
+ * optional FORMAT_GT, FORMAT_SO and either FORMAT_REPCN with FORMAT_REPCI or FORMAT_CN
+ * with FORMAT_CI. The '/'-separated values inside the FORMAT fields are
+ * ExpansionHunter's own notation and are read here. */
+static const char str_head[] =
+"WITH __duckvep_str_source AS (FROM (SELECT NULL AS \"INFO_END\", NULL AS \"INFO_REF\", NULL AS \"INFO_RL\", "
+"NULL AS \"INFO_RU\", NULL AS \"FORMAT_GT\", NULL AS \"FORMAT_SO\", NULL AS \"FORMAT_REPCN\", "
+"NULL AS \"FORMAT_REPCI\", NULL AS \"FORMAT_CN\", NULL AS \"FORMAT_CI\" WHERE false) UNION ALL BY NAME "
+"SELECT COLUMNS('(?i)^(event_index|ref|alt|alt_index|info_end|info_ref|info_rl|info_ru|"
+"format_gt|format_so|format_repcn|format_repci|format_cn|format_ci)$') FROM ";
+
+static const char str_source[] =
+"), __duckvep_str_rows AS (SELECT event_index, ref, alt, alt_index, \"INFO_END\", \"INFO_REF\", \"INFO_RL\", \"INFO_RU\", "
+"\"FORMAT_GT\", \"FORMAT_SO\", \"FORMAT_REPCN\", \"FORMAT_REPCI\", \"FORMAT_CN\", \"FORMAT_CI\" FROM __duckvep_str_source), "
+"source AS (SELECT event_index, CAST(ref AS VARCHAR) AS ref, " DUCKVEP_VCF_VALUES("\"ALT\"") " AS alts, alt_index, "
+DUCKVEP_VCF_FIRST("\"INFO_REF\"") " AS ref_text, " DUCKVEP_VCF_FIRST("\"INFO_RL\"") " AS rl_text, "
+DUCKVEP_VCF_FIRST("\"INFO_RU\"") " AS unit, " DUCKVEP_VCF_FIRST("\"INFO_END\"") " AS end_text, "
+DUCKVEP_VCF_FIRST("\"FORMAT_GT\"") " AS gt_text, " DUCKVEP_VCF_FIRST("\"FORMAT_SO\"") " AS so_text, "
+DUCKVEP_VCF_FIRST("\"FORMAT_REPCN\"") " AS repcn_text, " DUCKVEP_VCF_FIRST("\"FORMAT_REPCI\"") " AS repci_text, "
+DUCKVEP_VCF_FIRST("\"FORMAT_CN\"") " AS cn_text, " DUCKVEP_VCF_FIRST("\"FORMAT_CI\"") " AS ci_text "
+"FROM __duckvep_str_rows";
 
 static const char str_sql[] =
 "), joined AS (SELECT s.*, r.reference_sequence, r.ref_rows FROM source s LEFT JOIN "
 "(SELECT event_index, count(*) AS ref_rows, CASE WHEN count(*) > 1 THEN NULL ELSE min(reference_sequence) END AS reference_sequence FROM " ;
 
 static const char str_tail[] =
-" GROUP BY event_index) r USING (event_index)), parsed AS (SELECT *, string_split(alt,',') alts, "
-"string_split(info,';') tokens, string_split(format,':') fields, string_split(\"sample\",':') entries "
-"FROM joined), metadata AS (SELECT *, list_transform(tokens, lambda x: split_part(x,'=',1)) keys, "
-"nullif(regexp_extract(info,'(?:^|;)REF=([^;]*)',1),'') ref_text, "
-"nullif(regexp_extract(info,'(?:^|;)RL=([^;]*)',1),'') rl_text, "
-"nullif(regexp_extract(info,'(?:^|;)RU=([^;]*)',1),'') unit, "
-"nullif(regexp_extract(info,'(?:^|;)END=([^;]*)',1),'') end_text, "
-"list_extract(alts, try_cast(alt_index AS INTEGER)) selected FROM parsed), counts AS (SELECT *, "
+" GROUP BY event_index) r USING (event_index)), metadata AS (SELECT *, "
+"list_extract(alts, try_cast(alt_index AS INTEGER)) selected, "
+"cn_text IS NOT NULL AND ci_text IS NOT NULL has_cn, repcn_text IS NOT NULL AND repci_text IS NOT NULL has_repcn "
+"FROM joined), counts AS (SELECT *, "
 "try_cast(ref_text AS DOUBLE) ref_count, try_cast(rl_text AS DOUBLE) ref_length, "
 "try_cast(regexp_extract(selected,'^<STR([0-9]+)>$',1) AS DOUBLE) alt_count, "
-"CASE WHEN list_has_all(fields,['CN','CI']) THEN 'CN' ELSE 'REPCN' END count_key, "
-"CASE WHEN list_has_all(fields,['CN','CI']) THEN 'CI' ELSE 'REPCI' END ci_key "
+"CASE WHEN has_cn THEN cn_text ELSE repcn_text END count_text, "
+"CASE WHEN has_cn THEN ci_text ELSE repci_text END ci_value "
 "FROM metadata), samples AS (SELECT *, "
-"string_split(replace(coalesce(list_extract(entries,list_position(fields,'GT')),''),'|','/'),'/') gt, "
-"string_split(coalesce(list_extract(entries,list_position(fields,count_key)),''),'/') copies, "
-"string_split(coalesce(list_extract(entries,list_position(fields,ci_key)),''),'/') ranges, "
-"string_split(coalesce(list_extract(entries,list_position(fields,'SO')),''),'/') support "
+"string_split(replace(coalesce(gt_text,''),'|','/'),'/') gt, "
+"string_split(coalesce(count_text,''),'/') copies, "
+"string_split(coalesce(ci_value,''),'/') ranges, "
+"string_split(coalesce(so_text,''),'/') support "
 "FROM counts), calls AS (SELECT *, "
 "list_filter(range(1,length(gt)+1),lambda i: gt[i]=cast(try_cast(alt_index AS BIGINT) AS VARCHAR)) selected_calls "
 "FROM samples), ";
@@ -76,13 +142,12 @@ static const char str_tail[] =
 static const char str_tail2[] =
 "decisions AS (SELECT *, CASE "
 "WHEN ref_rows > 1 THEN 'ambiguous_reference_sequence' "
-"WHEN info IS NULL OR format IS NULL OR \"sample\" IS NULL OR ref IS NULL OR alt IS NULL OR reference_sequence IS NULL THEN 'missing_field' "
+"WHEN ref IS NULL OR alts IS NULL OR reference_sequence IS NULL THEN 'missing_field' "
 "WHEN alt_index IS NULL OR NOT isfinite(try_cast(alt_index AS DOUBLE)) OR "
 "try_cast(alt_index AS DOUBLE) != floor(try_cast(alt_index AS DOUBLE)) OR "
 "try_cast(alt_index AS DOUBLE) NOT BETWEEN 1 AND length(alts) THEN 'alt_index' "
 "WHEN NOT regexp_full_match(ref,'[ACGT]') OR NOT regexp_full_match(reference_sequence,'[ACGT]+') THEN 'literal_reference' "
-"WHEN length(keys)!=length(list_distinct(keys)) THEN 'duplicate_info' "
-"WHEN NOT list_has_all(keys,['REF','RL','RU','END']) THEN 'missing_info' "
+"WHEN ref_text IS NULL OR rl_text IS NULL OR unit IS NULL OR end_text IS NULL THEN 'missing_info' "
 "WHEN NOT regexp_full_match(unit,'[ACGT]+') OR "
 "NOT regexp_full_match(ref_text,'(0|[1-9][0-9]*)') OR "
 "NOT regexp_full_match(rl_text,'(0|[1-9][0-9]*)') OR "
@@ -94,10 +159,8 @@ static const char str_tail2[] =
 "repeat(unit,try_cast(ref_count AS INTEGER))!=reference_sequence THEN 'reference_mismatch' "
 "WHEN NOT regexp_full_match(selected,'<STR(0|[1-9][0-9]*)>') THEN 'unsupported_alt' "
 "WHEN NOT isfinite(alt_count) THEN 'metadata_syntax' "
-"WHEN length(fields)!=length(entries) OR length(fields)!=length(list_distinct(fields)) THEN 'format_shape' "
-"WHEN NOT list_has_all(fields,['GT','SO']) OR NOT (list_has_all(fields,['CN','CI']) OR "
-"list_has_all(fields,['REPCN','REPCI'])) THEN 'missing_format' "
-"WHEN list_has_all(fields,['CN','CI','REPCN','REPCI']) THEN 'ambiguous_count_fields' "
+"WHEN gt_text IS NULL OR so_text IS NULL OR NOT (has_cn OR has_repcn) THEN 'missing_format' "
+"WHEN has_cn AND has_repcn THEN 'ambiguous_count_fields' "
 "WHEN length(gt)!=length(copies) OR length(gt)!=length(ranges) OR length(gt)!=length(support) THEN 'format_shape' "
 "WHEN NOT coalesce(list_bool_and(list_transform(gt,lambda x: x='.' OR "
 "(regexp_full_match(x,'(0|[1-9][0-9]*)') AND try_cast(x AS DOUBLE) BETWEEN 0 AND length(alts)))),false) THEN 'genotype_index' "
@@ -112,9 +175,11 @@ static const char str_tail2[] =
 "WHEN reason IN ('missing_field','missing_info','missing_format') THEN 'incomplete' "
 "WHEN reason IN ('unsupported_alt','uncalled_alt','estimated_count','allele_capacity') THEN 'summary_only' "
 "ELSE 'invalid' END status, reason, "
-"struct_pack(info := info, format := format, sample := \"sample\", ref := ref, alt := alt, "
-"reference_sequence := reference_sequence, alt_index := alt_index) AS \"source\", "
-"CASE WHEN reason NOT IN ('ambiguous_reference_sequence','missing_field','alt_index','literal_reference','duplicate_info',"
+"struct_pack(ref := ref, alts := alts, alt_index := alt_index, \"end\" := end_text, reference_copies := ref_text, "
+"reference_length := rl_text, repeat_unit := unit, genotype := gt_text, read_support := so_text, "
+"copy_numbers := count_text, copy_number_intervals := ci_value, "
+"reference_sequence := reference_sequence) AS \"source\", "
+"CASE WHEN reason NOT IN ('ambiguous_reference_sequence','missing_field','alt_index','literal_reference',"
 "'missing_info','metadata_syntax','reference_mismatch','allele_capacity') "
 "OR (reason='allele_capacity' AND ref_length<=5000) "
 "THEN struct_pack(unit := unit, count := ref_count) END reference_components, "
@@ -123,15 +188,16 @@ static const char str_tail2[] =
 
 bool duckvep_core_prepare_sv_sql(const char *relation, duckvep_sql_text *out)
 {
-    return relation && duckvep_sql_append(out, "WITH source AS (SELECT event_index, pos, ref, alt, info FROM ") &&
-        duckvep_sql_relation(out, relation) && duckvep_sql_append(out, sv_sql);
+    return relation && duckvep_sql_append(out, sv_head) &&
+        duckvep_sql_relation(out, relation) && duckvep_sql_append(out, sv_sql) &&
+        duckvep_sql_append(out, sv_sql2);
 }
 
 bool duckvep_core_prepare_expansionhunter_sql(const char *events, const char *reference,
     duckvep_sql_text *out)
 {
-    return duckvep_sql_append(out, "WITH source AS (SELECT event_index, info, format, \"sample\", ref, alt, alt_index FROM ") &&
-        duckvep_sql_relation(out, events) && duckvep_sql_append(out, str_sql) &&
+    return duckvep_sql_append(out, str_head) &&
+        duckvep_sql_relation(out, events) && duckvep_sql_append(out, str_source) && duckvep_sql_append(out, str_sql) &&
         duckvep_sql_relation(out, reference) && duckvep_sql_append(out, str_tail) &&
         duckvep_sql_append(out, str_tail2);
 }
@@ -144,7 +210,7 @@ bool duckvep_core_prepare_expansionhunter_sql(const char *events, const char *re
  * structural record starts at POS + 1 and ends at POS + |SVLEN|, else END, else
  * its start. Records outside the supported families keep a row with a reason. */
 static const char vcf_events_head[] =
-"WITH __duckvep_ve_source AS (FROM (SELECT NULL::VARCHAR AS \"CHROM\", NULL::BIGINT AS \"POS\", NULL::VARCHAR AS \"ID\", NULL::VARCHAR AS \"REF\", NULL::VARCHAR[] AS \"ALT\", NULL::VARCHAR AS \"INFO_END\", NULL::VARCHAR AS \"INFO_SVTYPE\", NULL::VARCHAR AS \"INFO_SVLEN\" WHERE false) UNION ALL BY NAME SELECT COLUMNS('(?i)^(chrom|pos|id|ref|alt|info_end|info_svtype|info_svlen)$') FROM ";
+"WITH __duckvep_ve_source AS (FROM (SELECT NULL::VARCHAR AS \"CHROM\", NULL::BIGINT AS \"POS\", NULL::VARCHAR AS \"ID\", NULL::VARCHAR AS \"REF\", NULL::VARCHAR[] AS \"ALT\", NULL AS \"INFO_END\", NULL AS \"INFO_SVTYPE\", NULL AS \"INFO_SVLEN\" WHERE false) UNION ALL BY NAME SELECT COLUMNS('(?i)^(chrom|pos|id|ref|alt|info_end|info_svtype|info_svlen)$') FROM ";
 
 static const char vcf_events_middle[] =
 "),\n"
@@ -153,13 +219,13 @@ static const char vcf_events_middle[] =
 static const char vcf_events_records[] =
 " GROUP BY 1),\n"
 "__duckvep_ve_records AS (SELECT CAST(\"CHROM\" AS VARCHAR) AS source_chrom, CAST(\"POS\" AS BIGINT) AS source_pos, CAST(\"ID\" AS VARCHAR) AS source_id, CAST(\"REF\" AS VARCHAR) AS source_ref, CAST(\"ALT\" AS VARCHAR[]) AS alts,\n"
-"  nullif(nullif(trim(split_part(trim(CAST(\"INFO_END\" AS VARCHAR), '[]'), ',', 1)), ''), 'NULL') AS end_text,\n"
-"  nullif(nullif(trim(split_part(trim(CAST(\"INFO_SVLEN\" AS VARCHAR), '[]'), ',', 1)), ''), 'NULL') AS svlen_text,\n"
-"  upper(nullif(nullif(trim(split_part(trim(CAST(\"INFO_SVTYPE\" AS VARCHAR), '[]'), ',', 1)), ''), 'NULL')) AS svtype FROM __duckvep_ve_source),\n"
+"  " DUCKVEP_VCF_FIRST("\"INFO_END\"") " AS end_text,\n"
+"  " DUCKVEP_VCF_FIRST("\"INFO_SVLEN\"") " AS svlen_text,\n"
+"  upper(" DUCKVEP_VCF_FIRST("\"INFO_SVTYPE\"") ") AS svtype FROM __duckvep_ve_source),\n"
 "__duckvep_ve_classified AS (SELECT *, len(coalesce(alts, [])) AS alt_count,\n"
 "  NOT regexp_full_match(coalesce(source_ref, '') || coalesce(array_to_string(alts, ''), ''), '[ACGT]+')\n"
 "  AND (svtype IS NOT NULL OR regexp_matches(coalesce(array_to_string(alts, ','), ''), '[<\\[\\]][^*]+[>\\]\\[]|^\\.\\w+|\\w+\\.$')) AS structural_record,\n"
-"  try_cast(end_text AS BIGINT) AS info_end, try_cast(svlen_text AS BIGINT) AS info_svlen FROM __duckvep_ve_records),\n"
+"  " DUCKVEP_VCF_INTEGER("end_text") " AS info_end, " DUCKVEP_VCF_INTEGER("svlen_text") " AS info_svlen FROM __duckvep_ve_records),\n"
 "__duckvep_ve_alleles AS (SELECT c.*, a.source_alt, a.alt_index FROM __duckvep_ve_classified c CROSS JOIN UNNEST(CASE WHEN c.alt_count = 0 THEN [NULL::VARCHAR] ELSE c.alts END) WITH ORDINALITY AS a(source_alt, alt_index)),\n";
 
 static const char vcf_events_types[] =
@@ -170,9 +236,8 @@ static const char vcf_events_types[] =
 "       ELSE NULL END AS sv_type\n"
 "  FROM __duckvep_ve_alleles l LEFT JOIN __duckvep_ve_regions r ON r.seq_region_name = l.source_chrom),\n"
 "__duckvep_ve_spans AS (SELECT t.*, m.seq_region AS mate_region, m.name_rows AS mate_rows,\n"
-"  try_cast(source_pos::HUGEINT + 1 AS BIGINT) AS vep_start,\n"
-"  CASE WHEN info_svlen IS NOT NULL THEN try_cast(source_pos::HUGEINT + abs(info_svlen::HUGEINT) AS BIGINT)\n"
-"       WHEN info_end IS NOT NULL THEN info_end ELSE try_cast(source_pos::HUGEINT + 1 AS BIGINT) END AS vep_end\n"
+"  " DUCKVEP_VEP_SV_START("source_pos") " AS vep_start,\n"
+"  " DUCKVEP_VEP_SV_END("source_pos", "info_svlen", "info_end") " AS vep_end\n"
 "  FROM __duckvep_ve_typed t LEFT JOIN __duckvep_ve_regions m ON m.seq_region_name = t.bnd.mate_chrom),\n";
 
 static const char vcf_events_decisions[] =
@@ -262,19 +327,28 @@ static bool assemble(duckvep_sql_text *sql, const piece *pieces, size_t count,
 
 /* ---- BND record identity -------------------------------------------------- */
 
+/* Records are read_bcf-shaped: event_index, CHROM, POS, ID and ALT (a list, with the
+ * 1-based alt_index choosing the allele, or one allele), and the optional INFO_MATEID
+ * and INFO_EVENT read as value lists. */
 static const char pairs_head[] =
-"WITH source AS (SELECT CAST(event_index AS BIGINT) AS event_index, chrom, "
-"CASE WHEN try_cast(pos AS DOUBLE) = floor(try_cast(pos AS DOUBLE)) THEN try_cast(pos AS BIGINT) END AS pos, "
-"id, ref, alt, info FROM ";
+"WITH __duckvep_bnd_source AS (FROM (SELECT NULL AS alt_index, NULL AS \"INFO_MATEID\", NULL AS \"INFO_EVENT\" "
+"WHERE false) UNION ALL BY NAME "
+"SELECT COLUMNS('(?i)^(event_index|chrom|pos|id|alt|alt_index|info_mateid|info_event)$') FROM ";
 
 static const char pairs_body_0[] =
-"), parsed AS (SELECT *, TRY(duckvep_breakend_geometry(alt)) AS g, "
-"string_split(coalesce(info, ''), ';') AS tokens, "
+"), __duckvep_bnd_rows AS (SELECT event_index, chrom, pos, id, alt, alt_index, \"INFO_MATEID\", \"INFO_EVENT\" "
+"FROM __duckvep_bnd_source), "
+"source AS (SELECT CAST(event_index AS BIGINT) AS event_index, chrom, "
+"CASE WHEN try_cast(pos AS DOUBLE) = floor(try_cast(pos AS DOUBLE)) THEN try_cast(pos AS BIGINT) END AS pos, "
+"CAST(id AS VARCHAR) AS id, " DUCKVEP_VCF_ALT " AS alt, "
+"list_filter(coalesce(" DUCKVEP_VCF_VALUES("\"INFO_MATEID\"") ", []), lambda x: nullif(trim(x), '') IS NOT NULL) AS mate_tokens, "
+"list_filter(coalesce(" DUCKVEP_VCF_VALUES("\"INFO_EVENT\"") ", []), lambda x: nullif(trim(x), '') IS NOT NULL) AS event_tokens "
+"FROM __duckvep_bnd_rows), "
+"tokened AS (SELECT *, TRY(duckvep_breakend_geometry(alt)) AS g, "
 "CASE WHEN id IS NULL OR id IN ('', '.') THEN NULL ELSE id END AS rid FROM source), "
-"tokened AS (SELECT *, "
-"list_filter(tokens, lambda x: split_part(x, '=', 1) = 'MATEID') AS mate_tokens, "
-"list_filter(tokens, lambda x: split_part(x, '=', 1) = 'EVENT') AS event_tokens "
-"FROM parsed), "
+"";
+
+static const char pairs_body_0b[] =
 "records AS (SELECT event_index, CAST(chrom AS VARCHAR) AS chrom, pos, rid AS id, g, "
 "CASE WHEN g IS NOT NULL THEN CASE WHEN g.mate_chrom IS NULL THEN 'single_breakend' "
 "ELSE 'paired_breakend' END "
@@ -282,8 +356,8 @@ static const char pairs_body_0[] =
 "(length(alt) > 1 AND (starts_with(alt, '.') OR ends_with(alt, '.')))) THEN 'malformed_alt' "
 "ELSE 'not_breakend' END AS record_kind, "
 "length(mate_tokens) AS mate_token_count, length(event_tokens) AS event_token_count, "
-"CASE WHEN length(mate_tokens) = 1 THEN nullif(substring(mate_tokens[1], 8), '') END AS mate_id, "
-"CASE WHEN length(event_tokens) = 1 THEN nullif(substring(event_tokens[1], 7), '') END AS event_id, "
+"CASE WHEN length(mate_tokens) > 0 THEN array_to_string(list_transform(mate_tokens, lambda x: trim(x)), ',') END AS mate_id, "
+"CASE WHEN length(event_tokens) = 1 THEN trim(event_tokens[1]) END AS event_id, "
 "g.mate_chrom AS declared_mate_chrom, "
 "CAST(g.mate_position AS BIGINT) AS declared_mate_position, "
 "g.local_join_after AS local_join_after, g.mate_extends_right AS mate_extends_right, "
@@ -358,6 +432,7 @@ static const piece pairs_pieces[] = {
     {PIECE_TEXT, pairs_head},
     {PIECE_RELATION, "0"},
     {PIECE_TEXT, pairs_body_0},
+    {PIECE_TEXT, pairs_body_0b},
     {PIECE_TEXT, pairs_body_1},
 };
 /* ---- Breakend gene evidence ---------------------------------------------- */
@@ -397,28 +472,39 @@ static const piece fusion_pieces[] = {
 };
 /* ---- Structural HGVS ------------------------------------------------------- */
 
+/* Records are read_bcf-shaped: event_index, CHROM, POS, REF and ALT (a list, with the
+ * 1-based alt_index choosing the allele, or one allele), and the optional INFO_END,
+ * INFO_SVLEN, INFO_CIPOS, INFO_CIEND and INFO_IMPRECISE. The span follows VEP's
+ * get_end; an END and SVLEN that disagree are refused, not reconciled. */
 static const char hgvs_head[] =
-"WITH source AS (SELECT CAST(event_index AS BIGINT) AS event_index, chrom, pos AS raw_pos, "
+"WITH __duckvep_shgvs_source AS (FROM (SELECT NULL AS alt_index, NULL AS \"INFO_END\", NULL AS \"INFO_SVLEN\", "
+"NULL AS \"INFO_CIPOS\", NULL AS \"INFO_CIEND\", NULL AS \"INFO_IMPRECISE\" WHERE false) UNION ALL BY NAME "
+"SELECT COLUMNS('(?i)^(event_index|chrom|pos|ref|alt|alt_index|info_end|info_svlen|info_cipos|info_ciend|info_imprecise)$') FROM ";
+
+static const char hgvs_source[] =
+"), __duckvep_shgvs_rows AS (SELECT event_index, chrom, pos, ref, alt, alt_index, \"INFO_END\", \"INFO_SVLEN\", "
+"\"INFO_CIPOS\", \"INFO_CIEND\", \"INFO_IMPRECISE\" FROM __duckvep_shgvs_source), "
+"source AS (SELECT CAST(event_index AS BIGINT) AS event_index, chrom, pos AS raw_pos, "
 "CASE WHEN try_cast(pos AS DOUBLE) = floor(try_cast(pos AS DOUBLE)) THEN try_cast(pos AS BIGINT) END AS pos, "
-"ref, alt, info FROM ";
+"ref, " DUCKVEP_VCF_ALT " AS alt, "
+DUCKVEP_VCF_FIRST("\"INFO_END\"") " AS end_text, " DUCKVEP_VCF_FIRST("\"INFO_SVLEN\"") " AS svlen_text, "
+DUCKVEP_VCF_VALUES("\"INFO_CIPOS\"") " AS cipos, " DUCKVEP_VCF_VALUES("\"INFO_CIEND\"") " AS ciend, "
+"coalesce(try_cast(" DUCKVEP_VCF_FIRST("\"INFO_IMPRECISE\"") " AS BOOLEAN), false) AS imprecise_flag "
+"FROM __duckvep_shgvs_rows";
 
 static const char hgvs_mid[] =
 "), refs AS (SELECT CAST(event_index AS BIGINT) AS event_index, count(*) AS n, min(upper(reference_sequence)) AS refseq FROM ";
 
 static const char hgvs_a[] =
 " GROUP BY 1), "
-"parsed AS (SELECT s.*, r.n AS ref_rows, r.refseq, string_split(coalesce(s.info, ''), ';') AS tokens, "
+"parsed AS (SELECT s.*, r.n AS ref_rows, r.refseq, "
 "TRY(duckvep_breakend_geometry(s.alt)) AS g FROM source s LEFT JOIN refs r USING (event_index)), "
-"fields AS (SELECT *, "
-"list_filter(tokens, lambda x: split_part(x, '=', 1) = 'END') AS end_tokens, "
-"list_filter(tokens, lambda x: split_part(x, '=', 1) IN ('CIPOS', 'CIEND', 'IMPRECISE')) AS imprecise_tokens "
-"FROM parsed), "
 "spans AS (SELECT *, "
-"CASE WHEN length(end_tokens) = 1 THEN nullif(substring(end_tokens[1], 5), '') END AS end_text, "
-"CASE WHEN alt IN ('<DEL>', '<DUP>', '<DUP:TANDEM>', '<INV>') THEN alt END AS symbolic_kind FROM fields), "
-"bounds AS (SELECT *, "
-"CASE WHEN regexp_full_match(end_text, '[1-9][0-9]{0,15}') THEN CAST(end_text AS BIGINT) END AS end_pos "
-"FROM spans), "
+"CASE WHEN regexp_full_match(end_text, '[1-9][0-9]{0,15}') THEN CAST(end_text AS BIGINT) END AS info_end, "
+DUCKVEP_VCF_INTEGER("svlen_text") " AS info_svlen, "
+"CASE WHEN alt IN ('<DEL>', '<DUP>', '<DUP:TANDEM>', '<INV>') THEN alt END AS symbolic_kind FROM parsed), "
+"bounds AS (SELECT *, CASE WHEN info_end IS NOT NULL OR info_svlen IS NOT NULL THEN "
+DUCKVEP_VEP_SV_END("pos", "info_svlen", "info_end") " END AS end_pos FROM spans), "
 "sequences AS (SELECT *, "
 "CASE WHEN refseq IS NOT NULL AND end_pos > pos THEN substring(refseq, 1, end_pos - pos + 1) END AS core, "
 "CASE WHEN refseq IS NOT NULL AND end_pos > pos THEN substring(refseq, 2, end_pos - pos) END AS span, "
@@ -448,9 +534,12 @@ static const char hgvs_a[] =
 "WHEN symbolic_kind IS NULL AND regexp_full_match(alt, '[ACGTN]+') THEN 'unsupported:literal_allele' "
 "WHEN symbolic_kind IS NULL THEN 'unsupported:alt_syntax' "
 "WHEN chrom IS NULL OR chrom = '' THEN 'unavailable:missing_chrom' "
-"WHEN length(imprecise_tokens) > 0 THEN 'unsupported:imprecise' "
-"WHEN length(end_tokens) = 0 THEN 'unavailable:missing_end' "
-"WHEN length(end_tokens) > 1 THEN 'unavailable:duplicate_end' "
+"WHEN imprecise_flag OR cipos IS NOT NULL OR ciend IS NOT NULL THEN 'unsupported:imprecise' "
+"WHEN end_text IS NULL AND svlen_text IS NULL THEN 'unavailable:missing_end' "
+"WHEN (end_text IS NOT NULL AND info_end IS NULL) OR (svlen_text IS NOT NULL AND info_svlen IS NULL) "
+"THEN 'unavailable:invalid_end' "
+"WHEN info_end IS NOT NULL AND info_svlen IS NOT NULL AND info_end <> pos + abs(info_svlen) "
+"THEN 'unavailable:inconsistent_end' "
 "WHEN end_pos IS NULL OR pos < 1 OR end_pos <= pos THEN 'unavailable:invalid_end' "
 "WHEN end_pos - pos > ";
 
@@ -492,6 +581,7 @@ static const char hgvs_b[] =
 static const piece hgvs_pieces[] = {
     {PIECE_TEXT, hgvs_head},
     {PIECE_RELATION, "0"},
+    {PIECE_TEXT, hgvs_source},
     {PIECE_TEXT, hgvs_mid},
     {PIECE_RELATION, "1"},
     {PIECE_TEXT, hgvs_a},

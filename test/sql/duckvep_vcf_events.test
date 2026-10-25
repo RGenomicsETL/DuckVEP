@@ -176,6 +176,38 @@ A	15	15	NULL	ok	-
 <DEL>	16	NULL	NULL	unsupported	incomplete_deletion
 <DUP>	17	18	18	ok	-
 
+# END and SVLEN must be whole numbers. A Type=String header gives them as text, where
+# '20.5' and '1e3' are refused instead of rounded; a DOUBLE column's 40.0 is 40.
+statement ok
+CREATE TABLE string_spans AS SELECT * FROM (VALUES
+  ('readthrough_x', 16::BIGINT, 'C', ['<DEL>'], '20.5', NULL::VARCHAR),
+  ('readthrough_x', 17, 'A', ['<DEL>'], '1e3', NULL),
+  ('readthrough_x', 18, 'T', ['<DEL>'], NULL, '-5.5'),
+  ('readthrough_x', 19, 'C', ['<DEL>'], '30', NULL)
+) t("CHROM", "POS", "REF", "ALT", "INFO_END", "INFO_SVLEN");
+
+query IIITT
+SELECT source_pos, position, end_position, event_status, coalesce(event_reason, '-')
+FROM query(duckvep_vcf_events_sql('string_spans', 'vcf_regions')) ORDER BY source_pos;
+----
+16	NULL	NULL	unsupported	invalid_end
+17	NULL	NULL	unsupported	invalid_end
+18	NULL	NULL	unsupported	invalid_svlen
+19	20	30	ok	-
+
+statement ok
+CREATE TABLE double_spans AS SELECT * FROM (VALUES
+  ('readthrough_x', 16::BIGINT, 'C', ['<DEL>'], 40.0::DOUBLE, NULL::DOUBLE),
+  ('readthrough_x', 17, 'A', ['<DEL>'], NULL, -5.0)
+) t("CHROM", "POS", "REF", "ALT", "INFO_END", "INFO_SVLEN");
+
+query IIITT
+SELECT source_pos, position, end_position, event_status, coalesce(event_reason, '-')
+FROM query(duckvep_vcf_events_sql('double_spans', 'vcf_regions')) ORDER BY source_pos;
+----
+16	17	40	ok	-
+17	18	22	ok	-
+
 # Extra region rows are contig aliases; a name that names two regions is ambiguous.
 statement ok
 CREATE TABLE alias_regions AS SELECT * FROM (VALUES

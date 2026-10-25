@@ -74,7 +74,7 @@ stopifnot(all(nchar(refseq) == 2L * lengths + 1L))
 short <- kinds %in% c("<DEL>", "<INV>") & seq_len(n_events) %% 2L == 0L
 refseq[short] <- substr(refseq[short], 1L, lengths[short] + 1L)
 events <- data.frame(event_index = seq_len(n_events) - 1L, chrom = "21", pos = pos,
-  ref = substr(refseq, 1L, 1L), alt = kinds, info = paste0("END=", end),
+  ref = substr(refseq, 1L, 1L), alt = kinds, INFO_END = end,
   stringsAsFactors = FALSE)
 refs <- data.frame(event_index = events$event_index, reference_sequence = refseq)
 dbWriteTable(con, "sh_events", events, temporary = TRUE)
@@ -243,7 +243,7 @@ stopifnot(transcript_pairs > 0L)
 symbolic_vcf <- file.path(directory, "symbolic.vcf")
 sym <- events[events$event_index < 40L, ]
 write_vcf(symbolic_vcf, "21", sym$pos, "N", sym$alt, paste0("s", sym$event_index),
-          sym$info)
+          sprintf("END=%.0f", sym$INFO_END))
 symbolic <- runner(symbolic_vcf, file.path(directory, "symbolic.json"), "--hgvs", "--hgvsg")
 bnd_vcf <- file.path(directory, "bnd.vcf")
 write_vcf(bnd_vcf, "21", c(7467462, 7467900), "N", c("N[21:7467900[", "]21:7467462]N"),
@@ -259,9 +259,10 @@ stopifnot(length(symbolic) == 40L, length(bnd) == 2L, all(emitted == 0L),
 controls <- data.frame(event_index = 0:11, chrom = "21", pos = 7467462,
   ref = "T", alt = c("<DEL>", "<DEL>", "<DEL>", "<INS>", "<CNV>", "<STR7>", "<DUP>",
                      "N[21:7467900[", "<DEL>", "<INV>", "<DEL>", "TCAG"),
-  info = c("END=7467465;CIPOS=-1,1", "SVTYPE=DEL", "END=7467465", "END=7467462",
-           "END=7467465", "END=7467465", "END=7467465;END=7467466", "SVTYPE=BND",
-           "END=7467465", "END=7467465", "END=7467465", "."),
+  INFO_END = c(7467465, NA, 7467465, 7467462, 7467465, 7467465, 7467465, NA,
+               7467465, 7467465, 7467465, NA),
+  INFO_SVLEN = c(NA, NA, NA, NA, NA, NA, 4, NA, NA, NA, NA, NA),
+  INFO_CIPOS = c("-1,1", NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA),
   stringsAsFactors = FALSE)
 control_refs <- data.frame(event_index = c(2L, 9L, 10L, 6L),
   reference_sequence = c("TCAN", "TCAG", "ACAG", "TCAG"))
@@ -270,7 +271,7 @@ dbWriteTable(con, "sh_control_refs", control_refs, temporary = TRUE)
 c1 <- rduckvep_prepare_structural_hgvs(con, "sh_controls", "sh_control_refs")
 expected_controls <- c("unsupported:imprecise", "unavailable:missing_end",
   "unavailable:reference_alphabet", "unsupported:symbolic_insertion", "unsupported:copy_number",
-  "unsupported:repeat_expansion", "unavailable:duplicate_end", "unsupported:breakend",
+  "unsupported:repeat_expansion", "unavailable:inconsistent_end", "unsupported:breakend",
   "unavailable:missing_reference_sequence", "unsupported:inversion_not_reducible",
   "unavailable:reference_anchor_mismatch", "unsupported:literal_allele")
 stopifnot(identical(paste0(c1$hgvs_status, ":", c1$hgvs_reason), expected_controls),
