@@ -93,6 +93,7 @@ Maximum over the three cold processes of each job. No job spilled to disk.
 `runs.csv` has one row per process and pass, `summary.csv` the medians and ratios, `inputs.tsv` and `input_counts.tsv` the input hashes and counts, and `failures.tsv` the failure controls. Regenerate with:
 
 ```sh
+bash benchmarks/prepare_hg002.sh /root/duckvep/data/hg002-csq
 Rscript benchmarks/haplotype_scale/prepare_inputs.R WORK
 WORK=WORK OUT=RESULTS bash benchmarks/haplotype_scale/run_qualification.sh
 Rscript benchmarks/haplotype_scale/summarize.R RESULTS
