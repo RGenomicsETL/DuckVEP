@@ -21,7 +21,7 @@ make configure release test_release
 duckdb -unsigned -c "LOAD 'build/release/duckvep.duckdb_extension'"
 ```
 
-`LOAD` registers functions and nothing else: it downloads nothing and creates no tables. Transcript models come from Ensembl data you supply, or from a snapshot you saved earlier. The extension links its own htslib (for indexed FASTA) and cgranges. From R, [Rduckvep](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/) builds the same sources offline and adds connection, model and haplotype helpers.
+`LOAD` registers functions and nothing else: it downloads nothing and creates no tables. Transcript models come from Ensembl data you supply, or from a snapshot you saved earlier. Prebuilt Ensembl GRCh38 and GRCh37 models are published in the [duckvep-models](https://huggingface.co/datasets/RgenomicsETL/duckvep-models) dataset on Hugging Face; download one, or attach it in place with `httpfs` as `hf://datasets/RgenomicsETL/duckvep-models/...`. The extension links its own htslib (for indexed FASTA) and cgranges. From R, [Rduckvep](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/) builds the same sources offline and adds connection, model and haplotype helpers.
 
 A second host built on DuckDB’s C API v2 is available as a preview ([docs/v2-host.md](docs/v2-host.md)); making it the default is [\#48](https://github.com/RGenomicsETL/DuckVEP/issues/48).
 

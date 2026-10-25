@@ -106,6 +106,8 @@ transcript remains an explicit caller policy, not VEP `--pick`.
 
 ## Download and verify
 
+The [duckvep-models](https://huggingface.co/datasets/RgenomicsETL/duckvep-models) dataset on Hugging Face also carries these three files under `ensembl-116/mane-grch37/`, next to the GRCh37 model they apply to. That model's `model_receipt` table holds the `model_sha256` above, so the join works on the downloaded model as published.
+
 | Asset | SHA-256 |
 |:------|:--------|
 | [`mane_grch37_mapping.parquet`](https://github.com/RGenomicsETL/DuckVEP/releases/download/mane-grch37-v1.5-e116/mane_grch37_mapping.parquet) | `dc6c369c3b61cc4d232bb7aa84e8dce736de544b3f4c3c5cac49b9cf1aab3861` |
