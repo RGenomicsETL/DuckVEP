@@ -1,7 +1,10 @@
 #' Prepare ExpansionHunter v5 repeat alleles
 #'
-#' The input relation has `event_index`, `info`, `format`, `sample`, `ref`,
-#' `alt`, and one-based `alt_index`. The reference relation has `event_index`
+#' The input relation has one row per event and sample, as DuckHTS
+#' `read_bcf(..., tidy_format = TRUE)` gives them: `event_index`, `REF`, `ALT`,
+#' the one-based `alt_index`, and optionally `INFO_END`, `INFO_REF`, `INFO_RL`,
+#' `INFO_RU`, `FORMAT_GT`, `FORMAT_SO`, and either `FORMAT_REPCN` with
+#' `FORMAT_REPCI` or `FORMAT_CN` with `FORMAT_CI`. The reference relation has `event_index`
 #' and the literal `reference_sequence` from POS+1 through END. Each input
 #' event retains its source, preparation reason and exactness decision.
 #'

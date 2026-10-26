@@ -25,11 +25,20 @@ gr_path <- file.path(data_dir, "gridss_DO52605T_excerpt.vcf")
 stopifnot(identical(sha256(fc_path), pin("fusioncatcher_v1.20_test.vcf", "fixture_sha256")),
           identical(sha256(gr_path), pin("gridss_DO52605T_excerpt.vcf", "fixture_sha256")))
 
+info_field <- function(info, key)
+  vapply(strsplit(info, ";", fixed = TRUE), function(tokens) {
+    hit <- grep(paste0("^", key, "="), tokens, value = TRUE)
+    if (length(hit)) sub(paste0("^", key, "="), "", hit[1L]) else NA_character_
+  }, "")
+# The builder takes read_bcf-shaped typed columns; MATEID and EVENT are passed as text, which it
+# reads as comma-separated values, as for a Number=1 String header.
 read_vcf <- function(path) {
   lines <- grep("^[^#]", readLines(path), value = TRUE)
   x <- do.call(rbind, strsplit(lines, "\t", fixed = TRUE))
   data.frame(event_index = seq_len(nrow(x)) - 1L, chrom = x[, 1L], pos = as.numeric(x[, 2L]),
-             id = x[, 3L], ref = x[, 4L], alt = x[, 5L], info = x[, 8L], stringsAsFactors = FALSE)
+             id = x[, 3L], ref = x[, 4L], alt = x[, 5L], info = x[, 8L],
+             INFO_MATEID = info_field(x[, 8L], "MATEID"), INFO_EVENT = info_field(x[, 8L], "EVENT"),
+             stringsAsFactors = FALSE)
 }
 directory <- tempfile("bnd-fusion-")
 dir.create(directory)
@@ -39,11 +48,6 @@ con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extens
 on.exit({dbDisconnect(con, shutdown = TRUE); unlink(directory, recursive = TRUE)}, add = TRUE)
 q <- function(value) as.character(dbQuoteString(con, value))
 invisible(dbExecute(con, paste("LOAD", q(binary))))
-info_field <- function(info, key)
-  vapply(strsplit(info, ";", fixed = TRUE), function(tokens) {
-    hit <- grep(paste0("^", key, "="), tokens, value = TRUE)
-    if (length(hit)) sub(paste0("^", key, "="), "", hit[1L]) else NA_character_
-  }, "")
 
 ## ---- GRIDSS excerpt: spec-conformant pairs, insertions, a contradictory pair ----
 gridss <- read_vcf(gr_path)
@@ -158,7 +162,7 @@ control <- function(rows) {
   dbWriteTable(con, "bnd_control", rows, temporary = TRUE, overwrite = TRUE)
   rduckvep_prepare_breakend_pairs(con, "bnd_control")
 }
-base <- fc[fc$fusion == "BRD4--NUTM1", c("event_index", "chrom", "pos", "id", "ref", "alt", "info")]
+base <- fc[fc$fusion == "BRD4--NUTM1", c("event_index", "chrom", "pos", "id", "ref", "alt", "INFO_MATEID", "INFO_EVENT")]
 base$event_index <- 0:1
 stopifnot(all(control(base)$reason == "reciprocal"))
 missing_mate <- control(base[1L, ])
@@ -170,9 +174,9 @@ shifted_mate <- base
 shifted_mate$pos[2L] <- shifted_mate$pos[2L] + 1
 stopifnot(identical(control(shifted_mate)$reason[1L], "mate_coordinate_conflict"))
 wrong_event <- base
-wrong_event$info[2L] <- sub("EVENT=[^;]*", "EVENT=OTHER", wrong_event$info[2L])
+wrong_event$INFO_EVENT[2L] <- "OTHER"
 stopifnot(identical(control(wrong_event)$reason[1L], "event_conflict"))
 no_mateid <- base
-no_mateid$info[1L] <- gsub("MATEID=[^;]*;", "", no_mateid$info[1L])
+no_mateid$INFO_MATEID[1L] <- NA_character_
 stopifnot(identical(control(no_mateid)$reason, c("missing_mateid", "mate_missing_mateid")))
 cat("BND controls: 6 mutations of the BRD4--NUTM1 pair each fail with the expected stable reason\n")

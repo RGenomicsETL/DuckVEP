@@ -656,16 +656,17 @@ duckvep_prepare_sv_geometry_sql(input_table VARCHAR) -> VARCHAR
 duckvep_prepare_sv_geometry_sql(input_table VARCHAR, options STRUCT) -> VARCHAR
 ```
 
-Parameters: `input_table` names a relation with `event_index`, `pos`, `ref`, `alt` and `info`.
+Parameters: `input_table` names a relation shaped like DuckHTS `read_bcf` output, one row per event: `event_index`, `POS`, `REF`, `ALT` (a list, with the 1-based `alt_index` choosing the allele and 1 by default, or one allele), and optionally `INFO_END`, `INFO_SVLEN`, `INFO_CIPOS`, `INFO_CIEND` and `INFO_SEQ`. Column names match in any letter case, so `read_bcf` output can be passed as it is. An INFO column may be a scalar, a list or text, as the VCF header's `Number` and `Type` make it, and a missing optional column reads as NULL. `read_bcf` exposes only the INFO keys the header declares, so an undeclared key reads as absent.
 
-Returns: one row per input event with `event_index`, `status`, `mode`, `nominal_start`, `nominal_end`, `outer_start`, `inner_start`, `inner_end`, `outer_end`, `inserted_sequence` and `source_sequence`. `status` is `ok`, or `unsupported_geometry` for missing, inconsistent or extreme coordinates; such a row does not fail the batch. `mode` is `structural`, `literal_insertion` or `unsupported`.
+Returns: one row per input event with `event_index`, `status`, `mode`, `nominal_start`, `nominal_end`, `outer_start`, `inner_start`, `inner_end`, `outer_end`, `inserted_sequence` and `source_sequence`. `status` is `ok`, or `unsupported_geometry` for missing, inconsistent or extreme coordinates; such a row does not fail the batch. `mode` is `structural`, `literal_insertion` or `unsupported`. A symbolic allele starts at `POS + 1` and ends at `POS + |SVLEN|`, else at `END`, as VEP reads it and as [`duckvep_vcf_events_sql`](#duckvep_vcf_events_sql) places it; a symbolic allele with neither is `unsupported_geometry`. Only whole-number values count: an `END` of `20.5` is refused, not rounded.
 
 ```sql
 CREATE TABLE sv_records AS SELECT * FROM (VALUES
-  (0::BIGINT, 13546123::BIGINT, 'G', '<INS>', 'SVTYPE=INS;END=13546123;CIPOS=-2,0;CIEND=0,2;SEQ=ATG'),
-  (1, 100, 'A', '<DEL>', 'END=220;CIPOS=-5,5'),
-  (2, 500, 'G', 'GATG', '.')
-) t(event_index, pos, ref, alt, info);
+  (0::BIGINT, 13546123::BIGINT, 'G', ['<INS>'], 13546123, NULL::INTEGER[], [-2, 0], [0, 2], 'ATG'),
+  (1, 100, 'A', ['<DEL>'], 220, NULL, [-5, 5], NULL, NULL),
+  (2, 500, 'G', ['GATG'], NULL, NULL, NULL, NULL, NULL),
+  (3, 100, 'A', ['<DEL>'], 220, [-5], NULL, NULL, NULL)
+) t(event_index, "POS", "REF", "ALT", "INFO_END", "INFO_SVLEN", "INFO_CIPOS", "INFO_CIEND", "INFO_SEQ");
 
 SELECT * FROM query(duckvep_prepare_sv_geometry_sql('sv_records')) ORDER BY event_index;
 ```
@@ -683,16 +684,16 @@ duckvep_prepare_breakend_pairs_sql(events_table VARCHAR) -> VARCHAR
 duckvep_prepare_breakend_pairs_sql(events_table VARCHAR, options STRUCT) -> VARCHAR
 ```
 
-Parameters: `events_table` names a relation with `event_index`, `chrom`, `pos`, `id`, `ref`, `alt` and `info`.
+Parameters: `events_table` names a relation shaped like `read_bcf` output, one row per physical record: `event_index`, `CHROM`, `POS`, `ID`, `ALT` (a list, with the 1-based `alt_index` choosing the allele and 1 by default, or one allele), and optionally `INFO_MATEID` and `INFO_EVENT`, each read as a list of values. Column names match in any letter case, so `read_bcf` output can be passed as it is. An INFO column may be a scalar, a list or text, as the VCF header's `Number` and `Type` make it, and a missing optional column reads as NULL. `read_bcf` exposes only the INFO keys the header declares, so an undeclared key reads as absent.
 
 Returns: `event_index`, `id`, `chrom`, `pos`, `record_kind`, `status`, `reason`, `mate_id`, `event_id`, `mate_event_index`, `declared_mate_chrom`, `declared_mate_position`, `id_reciprocal`, `coordinate_reciprocal`, `orientation_reciprocal`, `insert_agree`, `event_agree`, `event_record_count`, `inserted_length`, `inserted_sequence`, `pair_key`, `phase_status` and `fusion_status`. `record_kind` is `paired_breakend`, `single_breakend`, `malformed_alt` or `not_breakend`. `status` is `reciprocal`, `unproven`, `conflict`, `invalid` or `not_applicable`, and `reason` is a stable identifier. `fusion_status` is always `not_asserted` and `phase_status` always `not_evaluated`. The evidence columns stay separate so partial agreement is visible.
 
 ```sql
 CREATE TABLE bnd_records AS SELECT * FROM (VALUES
-  (0::INTEGER, '1', 100::BIGINT, 'a1', 'A', 'ATT[2:200[', 'MATEID=a2;EVENT=e1'),
-  (1, '2', 200, 'a2', 'C', ']1:100]AAC', 'MATEID=a1;EVENT=e1'),
-  (2, '3', 10, 's1', 'G', '.G', 'SVTYPE=BND')
-) t(event_index, chrom, pos, id, ref, alt, info);
+  (0::INTEGER, '1', 100::BIGINT, 'a1', ['ATT[2:200['], ['a2'], 'e1'),
+  (1, '2', 200, 'a2', [']1:100]AAC'], ['a1'], 'e1'),
+  (2, '3', 10, 's1', ['.G'], NULL, NULL)
+) t(event_index, "CHROM", "POS", "ID", "ALT", "INFO_MATEID", "INFO_EVENT");
 
 SELECT event_index, record_kind, status, reason, mate_event_index, pair_key
 FROM query(duckvep_prepare_breakend_pairs_sql('bnd_records'))
@@ -738,7 +739,7 @@ duckvep_prepare_structural_hgvs_sql(events_table VARCHAR, reference_table VARCHA
 duckvep_prepare_structural_hgvs_sql(events_table VARCHAR, reference_table VARCHAR, options STRUCT) -> VARCHAR
 ```
 
-Parameters: `events_table` has `event_index`, `chrom`, `pos`, `ref`, `alt` and `info`, and `reference_table` has `event_index` and `reference_sequence`, the reference from `pos` through `END`.
+Parameters: `events_table` is shaped like `read_bcf` output: `event_index`, `CHROM`, `POS`, `REF`, `ALT` (a list, with the 1-based `alt_index` choosing the allele and 1 by default, or one allele), and optionally `INFO_END`, `INFO_SVLEN`, `INFO_CIPOS`, `INFO_CIEND` and `INFO_IMPRECISE`. Column names match in any letter case, so `read_bcf` output can be passed as it is. An INFO column may be a scalar, a list or text, as the VCF header's `Number` and `Type` make it, and a missing optional column reads as NULL. `read_bcf` exposes only the INFO keys the header declares, so an undeclared key reads as absent. `reference_table` has `event_index` and `reference_sequence`, the reference from `POS` through the end. The end is `POS + |SVLEN|`, else `END`, as VEP reads it; an `END` and `SVLEN` that disagree are `unavailable` with reason `inconsistent_end`, and a record with `CIPOS`, `CIEND` or `IMPRECISE` is `unsupported` with reason `imprecise`.
 
 Options: `max_span` (INTEGER, default 5000, range 1 to 60000) bounds the described span; a longer span is `unsupported` with reason `span_capacity`.
 
@@ -746,9 +747,9 @@ Returns: `event_index`, `hgvs_status` (`supported`, `unsupported` or `unavailabl
 
 ```sql
 CREATE TABLE shgvs_events AS SELECT * FROM (VALUES
-  (0::INTEGER, '21', 7467462::DOUBLE, 'T', '<DEL>', 'END=7467465'),
-  (1, '21', 7467462, 'T', 'N[21:7467900[', 'SVTYPE=BND')
-) t(event_index, chrom, pos, ref, alt, info);
+  (0::INTEGER, '21', 7467462::BIGINT, 'T', ['<DEL>'], 7467465),
+  (1, '21', 7467462, 'T', ['N[21:7467900['], NULL)
+) t(event_index, "CHROM", "POS", "REF", "ALT", "INFO_END");
 CREATE TABLE shgvs_reference AS SELECT 0::INTEGER AS event_index, 'TCAG' AS reference_sequence;
 
 SELECT event_index, hgvs_status, hgvs_reason, hgvs_g, literal_reference, literal_alternate
@@ -769,15 +770,16 @@ duckvep_prepare_expansionhunter_sql(input_table VARCHAR, reference_table VARCHAR
 duckvep_prepare_expansionhunter_sql(input_table VARCHAR, reference_table VARCHAR, options STRUCT) -> VARCHAR
 ```
 
-Parameters: `input_table` has `event_index`, `info`, `format`, `sample`, `ref`, `alt` and the one-based `alt_index`, and `reference_table` has `event_index` and the literal `reference_sequence` from POS+1 through END.
+Parameters: `input_table` has one row per event and sample, as `read_bcf(..., tidy_format := true)` gives them: `event_index`, `REF`, `ALT` (a list or one comma-separated text) and the one-based `alt_index`, and optionally `INFO_END`, `INFO_REF`, `INFO_RL`, `INFO_RU`, `FORMAT_GT`, `FORMAT_SO`, and either `FORMAT_REPCN` with `FORMAT_REPCI` or `FORMAT_CN` with `FORMAT_CI`. Column names match in any letter case, so `read_bcf` output can be passed as it is. An INFO column may be a scalar, a list or text, as the VCF header's `Number` and `Type` make it, and a missing optional column reads as NULL. `read_bcf` exposes only the INFO keys the header declares, so an undeclared key reads as absent. The `/`-separated values inside the FORMAT fields are ExpansionHunter's own notation and are read by the builder. `reference_table` has `event_index` and the literal `reference_sequence` from POS+1 through END.
 
-Returns: `event_index`, `status`, `reason`, `source` (a STRUCT echoing the input fields and the reference sequence), `reference_components` and `alternate_components` (each a STRUCT of `unit` and `count`) and `sequence_exact`. `status` values include `ok`, `summary_only`, `incomplete` and `invalid`. Duplicate reference rows never duplicate output rows: the event is `invalid` with reason `ambiguous_reference_sequence`.
+Returns: `event_index`, `status`, `reason`, `source` (a STRUCT of the values read: `ref`, `alts`, `alt_index`, `end`, `reference_copies`, `reference_length`, `repeat_unit`, `genotype`, `read_support`, `copy_numbers`, `copy_number_intervals` and `reference_sequence`), `reference_components` and `alternate_components` (each a STRUCT of `unit` and `count`) and `sequence_exact`. `status` values include `ok`, `summary_only`, `incomplete` and `invalid`. Duplicate reference rows never duplicate output rows: the event is `invalid` with reason `ambiguous_reference_sequence`.
 
 ```sql
 CREATE TABLE eh_records AS SELECT * FROM (VALUES
-  (0::INTEGER, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 1::DOUBLE),
-  (1, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 2)
-) t(event_index, info, format, "sample", ref, alt, alt_index);
+  (0::INTEGER, 'C', ['<STR2>', '<STR10>'], 1, 2008, 1, 3, 'CAG', '1/2', 'SPANNING/SPANNING', '2/10', '2-2/10-10'),
+  (1, 'C', ['<STR2>', '<STR10>'], 2, 2008, 1, 3, 'CAG', '1/2', 'SPANNING/SPANNING', '2/10', '2-2/10-10')
+) t(event_index, "REF", "ALT", alt_index, "INFO_END", "INFO_REF", "INFO_RL", "INFO_RU",
+    "FORMAT_GT", "FORMAT_SO", "FORMAT_REPCN", "FORMAT_REPCI");
 CREATE TABLE eh_reference AS SELECT event_index, 'CAG' AS reference_sequence FROM eh_records;
 
 SELECT event_index, status, reason, reference_components, alternate_components, sequence_exact

@@ -342,7 +342,7 @@ write.csv(isolated, file.path(out, "isolated_rerun.csv"), row.names = FALSE)
 
 ## ---- geometry and identity builders on the same records ----------------------------------
 sv_in <- dbGetQuery(con, "SELECT event_index, CASE WHEN stype = 'INS' THEN s ELSE s - 1 END::DOUBLE AS pos, 'N' AS ref, alt,
-  'END=' || CASE WHEN stype = 'INS' THEN s ELSE e END || ';SVTYPE=' || CASE stype WHEN 'TDUP' THEN 'DUP' ELSE stype END AS info
+  CASE WHEN stype = 'INS' THEN s ELSE e END AS \"INFO_END\"
   FROM g_events ORDER BY event_index")
 dbWriteTable(con, "sv_geometry_in", sv_in, temporary = TRUE)
 geometry <- rduckvep_prepare_sv_geometry(con, "sv_geometry_in")
@@ -352,7 +352,7 @@ g <- merge(geometry, vep_span, by = "event_index")
 geometry_mismatch <- g[g$status != "ok" | g$nominal_start != g$vep_start | g$nominal_end != g$vep_end, ]
 write.csv(geometry_mismatch, file.path(out, "geometry_disagreements.csv"), row.names = FALSE)
 bnd_in <- dbGetQuery(con, "SELECT event_index, chrom, pos::DOUBLE AS pos, id, 'N' AS ref, alt,
-  'SVTYPE=BND;MATEID=' || mate_id || ';EVENT=bnd' || pair_index AS info FROM b_events ORDER BY event_index")
+  mate_id AS \"INFO_MATEID\", 'bnd' || pair_index AS \"INFO_EVENT\" FROM b_events ORDER BY event_index")
 dbWriteTable(con, "bnd_identity_in", bnd_in, temporary = TRUE)
 identity <- rduckvep_prepare_breakend_pairs(con, "bnd_identity_in")
 identity_reasons <- table(identity$reason)
@@ -394,7 +394,7 @@ refseq <- toupper(fetch(hev$chrom, hev$pos, end + hev$len))
 stopifnot(all(nchar(refseq) == 2L * hev$len + 1L))
 n_ambig <- sum(grepl("[^ACGT]", refseq))
 events <- data.frame(event_index = hev$event_index, chrom = hev$chrom, pos = hev$pos, ref = substr(refseq, 1L, 1L),
-  alt = hev$alt, info = paste0("END=", end), stringsAsFactors = FALSE)
+  alt = hev$alt, INFO_END = end, stringsAsFactors = FALSE)
 refs <- data.frame(event_index = hev$event_index, reference_sequence = refseq)
 dbWriteTable(con, "sh_events", events, temporary = TRUE)
 dbWriteTable(con, "sh_refs", refs, temporary = TRUE)

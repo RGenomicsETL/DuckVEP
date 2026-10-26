@@ -18,13 +18,21 @@ con <- dbConnect(duckdb(shared_home = FALSE,
   config = list(allow_unsigned_extensions = "true")))
 q <- function(value) as.character(dbQuoteString(con, value))
 dbExecute(con, paste("LOAD", q(binary)))
+# The builder takes read_bcf-shaped typed columns; this harness reads VCF text, so it types
+# the INFO keys the builder reads. CIPOS and CIEND are passed as text, read as two values.
+info_of <- function(rows, key) vapply(rows, function(x) {
+  hit <- regmatches(x[8L], regexec(paste0("(^|;)", key, "=([^;]*)"), x[8L]))[[1L]]
+  if (length(hit)) hit[[3L]] else NA_character_
+}, "")
 prepare <- function(rows) {
   dbWriteTable(con, "sv_prepare_input", data.frame(
     event_index = seq_along(rows) - 1L,
     pos = vapply(rows, function(x) as.numeric(x[2L]), 0),
     ref = vapply(rows, function(x) x[4L], ""),
     alt = vapply(rows, function(x) x[5L], ""),
-    info = vapply(rows, function(x) x[8L], "")), temporary = TRUE, overwrite = TRUE)
+    INFO_END = info_of(rows, "END"), INFO_SVLEN = info_of(rows, "SVLEN"),
+    INFO_CIPOS = info_of(rows, "CIPOS"), INFO_CIEND = info_of(rows, "CIEND"),
+    INFO_SEQ = info_of(rows, "SEQ"), stringsAsFactors = FALSE), temporary = TRUE, overwrite = TRUE)
   rduckvep_prepare_sv_geometry(con, "sv_prepare_input")
 }
 geometry <- prepare(records)

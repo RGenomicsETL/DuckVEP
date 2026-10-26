@@ -11,8 +11,8 @@ records <- data.frame(
   ref = "N",
   alt = c("N[4:1727977[", "]4:1806934]N", "N]6:117321394]", "N]6:117566854]",
           "N[9:20[", "N[9:10[", "N[10:30[", "]10:30]N"),
-  info = c("MATEID=A3;EVENT=e", "MATEID=A5;EVENT=e", "MATEID=B3", "MATEID=B5",
-           "MATEID=C2", "MATEID=C1", "MATEID=D2", "MATEID=D1"),
+  INFO_MATEID = c("A3", "A5", "B3", "B5", "C2", "C1", "D2", "D1"),
+  INFO_EVENT = c("e", "e", NA, NA, NA, NA, NA, NA),
   stringsAsFactors = FALSE)
 dbWriteTable(con, "bnd_input", records, temporary = TRUE)
 pairs <- rduckvep_prepare_breakend_pairs(con, "bnd_input")

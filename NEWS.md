@@ -22,6 +22,25 @@
   `DUP:TANDEM`, INV, CNV and INS case with VEP's span and consequences, and VEP's own
   skips. Breakend consequences remain pinned by the breakend lane.
 
+## Structural preparation reads typed VCF columns
+
+- `duckvep_prepare_sv_geometry_sql`, `duckvep_prepare_breakend_pairs_sql`,
+  `duckvep_prepare_structural_hgvs_sql` and `duckvep_prepare_expansionhunter_sql` take
+  rows shaped like DuckHTS `read_bcf` output instead of raw `info`, `format` and `sample`
+  text: typed `INFO_*` columns (and, for ExpansionHunter, the `FORMAT_*` columns of
+  `read_bcf(..., tidy_format := true)`), in any letter case, as scalars, lists or text,
+  with `ALT` as a list and an optional 1-based `alt_index`. VCF parsing stays in DuckHTS.
+- The geometry and structural HGVS builders read a symbolic span as VEP does, with
+  `SVLEN` before `END`, from the same SQL as `duckvep_vcf_events_sql`. A `<DEL>` at POS 20
+  with `END=40;SVLEN=-5` now spans 21 to 25, not 21 to 40. The HGVS builder refuses an
+  `END` and `SVLEN` that disagree (`inconsistent_end`).
+- A non-integer `END` or `SVLEN` is now refused instead of rounded, in all five builders
+  including `duckvep_vcf_events_sql`: `TRY_CAST` read an `END` of `20.5` as 21 and `1e3`
+  as 1000, which are now `invalid_end`. A zero fraction such as `40.0`, as a DOUBLE column
+  renders 40, still reads as 40.
+- A missing required column now fails with DuckDB's own "not found" binder error, and
+  columns of other types give rows that are not `ok` instead of a statement error.
+
 ## Singleton source-record HGVSp with ambiguous alleles
 
 - One-contributor `source_records` paths render protein HGVS from the independently normalized ALT when raw Haplosaurus replay marks an ambiguous ALT as `source_allele_skipped`. Raw CDS, protein, evidence and prediction status remain container-owned.

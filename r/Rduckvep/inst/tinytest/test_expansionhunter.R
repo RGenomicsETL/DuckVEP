@@ -6,11 +6,27 @@ rduckvep_load(con)
 info <- "END=2008;REF=1;RL=3;RU=CAG;REPID=SNV_AND_STR"
 format <- "GT:SO:REPCN:REPCI"
 sample <- "1/2:SPANNING/SPANNING:2/10:2-2/10-10"
+# The columns read_bcf(..., tidy_format := true) gives for one VCF record and sample.
+typed <- function(event_index, info_value, format_value, sample_value, ref, alt, alt_index) {
+  pairs <- strsplit(strsplit(info_value, ";", fixed = TRUE)[[1L]], "=", fixed = TRUE)
+  info_of <- function(key) {
+    hit <- Filter(function(p) p[[1L]] == key, pairs)
+    if (length(hit)) hit[[1L]][[2L]] else NA_character_
+  }
+  values <- setNames(strsplit(sample_value, ":", fixed = TRUE)[[1L]],
+                     strsplit(format_value, ":", fixed = TRUE)[[1L]][
+                       seq_along(strsplit(sample_value, ":", fixed = TRUE)[[1L]])])
+  format_of <- function(key) if (key %in% names(values)) values[[key]] else NA_character_
+  data.frame(event_index, REF = ref, ALT = alt, alt_index,
+    INFO_END = info_of("END"), INFO_REF = info_of("REF"), INFO_RL = info_of("RL"),
+    INFO_RU = info_of("RU"), FORMAT_GT = format_of("GT"), FORMAT_SO = format_of("SO"),
+    FORMAT_REPCN = format_of("REPCN"), FORMAT_REPCI = format_of("REPCI"),
+    FORMAT_CN = format_of("CN"), FORMAT_CI = format_of("CI"), stringsAsFactors = FALSE)
+}
 prepare <- function(info_value = info, format_value = format, sample_value = sample, ref = "C",
                     alt = "<STR2>,<STR10>", reference = "CAG", alt_index = 1L) {
-  dbWriteTable(con, "eh_input", data.frame(event_index = 1L, info = info_value,
-    format = format_value, sample = sample_value, ref, alt, alt_index),
-    temporary = TRUE, overwrite = TRUE)
+  dbWriteTable(con, "eh_input", typed(1L, info_value, format_value, sample_value, ref, alt,
+    alt_index), temporary = TRUE, overwrite = TRUE)
   dbWriteTable(con, "eh_reference", data.frame(event_index = 1L,
     reference_sequence = reference), temporary = TRUE, overwrite = TRUE)
   as.list(rduckvep_prepare_expansionhunter(con, "eh_input", "eh_reference")[1L, ])
@@ -40,9 +56,8 @@ expect_identical(prepare("END=6000;REF=6000;RL=6000;RU=A", "GT:SO:CN:CI",
   "allele_capacity")
 
 # Duplicate reference rows give one ambiguous row per input record, never extra rows.
-dbWriteTable(con, "eh_input", data.frame(event_index = 1:2, info = info, format = format,
-  sample = sample, ref = "C", alt = "<STR2>,<STR10>", alt_index = 1L),
-  temporary = TRUE, overwrite = TRUE)
+dbWriteTable(con, "eh_input", rbind(typed(1L, info, format, sample, "C", "<STR2>,<STR10>", 1L),
+  typed(2L, info, format, sample, "C", "<STR2>,<STR10>", 1L)), temporary = TRUE, overwrite = TRUE)
 dbWriteTable(con, "eh_reference", data.frame(event_index = c(1L, 1L, 2L),
   reference_sequence = c("CAG", "CAG", "CAG")), temporary = TRUE, overwrite = TRUE)
 dup <- rduckvep_prepare_expansionhunter(con, "eh_input", "eh_reference")

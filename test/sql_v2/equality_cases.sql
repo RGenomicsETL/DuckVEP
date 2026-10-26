@@ -989,10 +989,10 @@ SELECT duckvep_model_receipt_sql('regions', 'model', 'a' || chr(0), 'b', 'c', 'd
 SELECT count(*) AS n, md5(string_agg(x, '' ORDER BY i)) AS h FROM (SELECT i, duckvep_model_receipt_sql('r' || (i % 3), 'm' || (i % 5), 's' || i, NULL, 'a', 'b', 'c', 'd', CASE WHEN i % 2 = 0 THEN {'regulation_features_table': 'rg' || (i % 7)} ELSE NULL END) AS x FROM range(1500) t(i))
 
 -- fixture: temp tables for the builders whose SQL runs on both hosts
-CREATE TEMP TABLE sv_records AS SELECT * FROM (VALUES (0::BIGINT, 13546123::BIGINT, 'G', '<INS>', 'SVTYPE=INS;END=13546123;CIPOS=-2,0;CIEND=0,2;SEQ=ATG'), (1, 100, 'A', '<DEL>', 'END=220;CIPOS=-5,5'), (2, 500, 'G', 'GATG', '.'), (3, 9, 'A', '<DEL>', 'END=x')) t(event_index, pos, ref, alt, info)
+CREATE TEMP TABLE sv_records AS SELECT * FROM (VALUES (0::BIGINT, 13546123::BIGINT, 'G', ['<INS>'], '13546123', NULL::INTEGER[], [-2, 0], [0, 2], 'ATG'), (1, 100, 'A', ['<DEL>'], '220', NULL, [-5, 5], NULL, NULL), (2, 500, 'G', ['GATG'], NULL, NULL, NULL, NULL, NULL), (3, 9, 'A', ['<DEL>'], 'x', NULL, NULL, NULL, NULL), (4, 20, 'A', ['<DEL>'], '40', [-5], NULL, NULL, NULL)) t(event_index, "POS", "REF", "ALT", "INFO_END", "INFO_SVLEN", "INFO_CIPOS", "INFO_CIEND", "INFO_SEQ")
 
 -- fixture: breakend records
-CREATE TEMP TABLE bnd_records AS SELECT * FROM (VALUES (0::INTEGER, '1', 100::BIGINT, 'a1', 'A', 'ATT[2:200[', 'MATEID=a2;EVENT=e1'), (1, '2', 200, 'a2', 'C', ']1:100]AAC', 'MATEID=a1;EVENT=e1'), (2, '3', 10, 's1', 'G', '.G', 'SVTYPE=BND'), (3, '4', 5, 'x1', 'T', 'T[9:9]', 'MATEID=zz'), (4, '5', 7, 'n1', 'A', 'C', '.')) t(event_index, chrom, pos, id, ref, alt, info)
+CREATE TEMP TABLE bnd_records AS SELECT * FROM (VALUES (0::INTEGER, '1', 100::BIGINT, 'a1', 'A', ['ATT[2:200['], ['a2'], 'e1'), (1, '2', 200, 'a2', 'C', [']1:100]AAC'], ['a1'], 'e1'), (2, '3', 10, 's1', 'G', ['.G'], NULL, NULL), (3, '4', 5, 'x1', 'T', ['T[9:9]'], ['zz'], NULL), (4, '5', 7, 'n1', 'A', ['C'], NULL, NULL)) t(event_index, "CHROM", "POS", "ID", "REF", "ALT", "INFO_MATEID", "INFO_EVENT")
 
 -- fixture: breakend pairs
 CREATE TEMP TABLE bnd_pairs AS SELECT * FROM query(duckvep_prepare_breakend_pairs_sql('bnd_records'))
@@ -1001,13 +1001,13 @@ CREATE TEMP TABLE bnd_pairs AS SELECT * FROM query(duckvep_prepare_breakend_pair
 CREATE TEMP TABLE bnd_genes AS SELECT * FROM (VALUES (0, 'G1'), (1, 'G2'), (2, 'G1')) t(event_index, gene_id)
 
 -- fixture: structural HGVS events
-CREATE TEMP TABLE shgvs_events AS SELECT * FROM (VALUES (0::INTEGER, '21', 7467462::DOUBLE, 'T', '<DEL>', 'END=7467465'), (1, '21', 7467462, 'T', 'N[21:7467900[', 'SVTYPE=BND'), (2, '21', 100, 'A', '<DUP>', 'END=110'), (3, '21', 200, 'C', '<INV>', 'END=203')) t(event_index, chrom, pos, ref, alt, info)
+CREATE TEMP TABLE shgvs_events AS SELECT * FROM (VALUES (0::INTEGER, '21', 7467462::DOUBLE, 'T', ['<DEL>'], 7467465, NULL::INTEGER[]), (1, '21', 7467462, 'T', ['N[21:7467900['], NULL, NULL), (2, '21', 100, 'A', ['<DUP>'], 110, NULL), (3, '21', 200, 'C', ['<INV>'], 203, NULL), (4, '21', 7467462, 'T', ['<DEL>'], 7467465, [-4])) t(event_index, "CHROM", "POS", "REF", "ALT", "INFO_END", "INFO_SVLEN")
 
 -- fixture: structural HGVS reference
 CREATE TEMP TABLE shgvs_reference AS SELECT * FROM (VALUES (0::INTEGER, 'TCAG'), (2, 'AAAAAAAAAAA'), (3, 'CGTA')) t(event_index, reference_sequence)
 
 -- fixture: ExpansionHunter records
-CREATE TEMP TABLE eh_records AS SELECT * FROM (VALUES (0::INTEGER, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 1::DOUBLE), (1, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/2:SPANNING/SPANNING:2/10:2-2/10-10', 'C', '<STR2>,<STR10>', 2), (2, 'END=2008;REF=1;RL=3;RU=CAG', 'GT:SO:REPCN:REPCI', '1/1:SPANNING/SPANNING:2/2:2-2/2-2', 'C', '<STR2>', 1), (3, NULL, 'GT', '1', 'C', '<STR2>', 1)) t(event_index, info, format, "sample", ref, alt, alt_index)
+CREATE TEMP TABLE eh_records AS SELECT * FROM (VALUES (0::INTEGER, 'C', ['<STR2>', '<STR10>'], 1::DOUBLE, 2008, 1, 3, 'CAG', '1/2', 'SPANNING/SPANNING', '2/10', '2-2/10-10'), (1, 'C', ['<STR2>', '<STR10>'], 2, 2008, 1, 3, 'CAG', '1/2', 'SPANNING/SPANNING', '2/10', '2-2/10-10'), (2, 'C', ['<STR2>'], 1, 2008, 1, 3, 'CAG', '1/1', 'SPANNING/SPANNING', '2/2', '2-2/2-2'), (3, 'C', ['<STR2>'], 1, NULL, NULL, NULL, NULL, '1', NULL, NULL, NULL)) t(event_index, "REF", "ALT", alt_index, "INFO_END", "INFO_REF", "INFO_RL", "INFO_RU", "FORMAT_GT", "FORMAT_SO", "FORMAT_REPCN", "FORMAT_REPCI")
 
 -- fixture: ExpansionHunter reference
 CREATE TEMP TABLE eh_reference AS SELECT event_index, 'CAG' AS reference_sequence FROM eh_records

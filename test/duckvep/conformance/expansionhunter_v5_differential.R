@@ -18,10 +18,25 @@ stopifnot(file.copy(Sys.getenv("DUCKVEP_EXTENSION_FILE", "build/release/duckvep.
 con <- dbConnect(duckdb(shared_home = FALSE,
                         config = list(allow_unsigned_extensions = "true")))
 dbExecute(con, paste("LOAD", as.character(dbQuoteString(con, binary))))
+# The builder takes the typed columns read_bcf(..., tidy_format := true) gives for a record
+# and sample; this harness reads the VCF as text, so it types INFO and FORMAT here.
+typed <- function(info, row, i) {
+  pairs <- strsplit(strsplit(info, ";", fixed = TRUE)[[1L]], "=", fixed = TRUE)
+  info_of <- function(key) {
+    hit <- Filter(function(p) p[[1L]] == key, pairs)
+    if (length(hit)) hit[[1L]][[2L]] else NA_character_
+  }
+  values <- strsplit(row[10L], ":", fixed = TRUE)[[1L]]
+  names(values) <- strsplit(row[9L], ":", fixed = TRUE)[[1L]][seq_along(values)]
+  format_of <- function(key) if (key %in% names(values)) values[[key]] else NA_character_
+  data.frame(event_index = 1L, REF = row[4L], ALT = row[5L], alt_index = i,
+    INFO_END = info_of("END"), INFO_REF = info_of("REF"), INFO_RL = info_of("RL"),
+    INFO_RU = info_of("RU"), FORMAT_GT = format_of("GT"), FORMAT_SO = format_of("SO"),
+    FORMAT_REPCN = format_of("REPCN"), FORMAT_REPCI = format_of("REPCI"),
+    FORMAT_CN = format_of("CN"), FORMAT_CI = format_of("CI"), stringsAsFactors = FALSE)
+}
 prepare <- function(info, i, row = record, literal = reference) {
-  dbWriteTable(con, "eh_input", data.frame(event_index = 1L, info,
-    format = row[9L], sample = row[10L], ref = row[4L], alt = row[5L],
-    alt_index = i), temporary = TRUE, overwrite = TRUE)
+  dbWriteTable(con, "eh_input", typed(info, row, i), temporary = TRUE, overwrite = TRUE)
   dbWriteTable(con, "eh_reference", data.frame(event_index = 1L,
     reference_sequence = literal), temporary = TRUE, overwrite = TRUE)
   as.list(rduckvep_prepare_expansionhunter(con, "eh_input", "eh_reference")[1L, ])
