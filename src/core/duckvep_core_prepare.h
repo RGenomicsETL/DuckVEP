@@ -1,6 +1,6 @@
 /* Text of the preparation builders: duckvep_prepare_sv_geometry_sql,
- * duckvep_prepare_expansionhunter_sql and the BND identity, breakend gene and
- * structural HGVS builders. */
+ * duckvep_prepare_expansionhunter_sql, duckvep_vcf_events_sql and the BND
+ * identity, breakend gene and structural HGVS builders. */
 #ifndef DUCKVEP_CORE_PREPARE_H
 #define DUCKVEP_CORE_PREPARE_H
 
@@ -12,6 +12,8 @@ bool duckvep_core_prepare_expansionhunter_sql(const char *events, const char *re
     duckvep_sql_text *out);
 extern const char duckvep_core_prepare_sv_failed[];
 extern const char duckvep_core_prepare_expansionhunter_failed[];
+bool duckvep_core_vcf_events_sql(const char *records, const char *regions, duckvep_sql_text *out);
+extern const char duckvep_core_vcf_events_failed[];
 
 typedef enum {
     DUCKVEP_STRUCTURAL_PAIRS, DUCKVEP_STRUCTURAL_FUSION, DUCKVEP_STRUCTURAL_HGVS

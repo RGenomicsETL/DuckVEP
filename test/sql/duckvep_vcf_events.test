@@ -1,0 +1,223 @@
+# name: test/sql/duckvep_vcf_events.test
+# description: VCF records in read_bcf shape become the events relation, as VEP 116 parses them
+# group: [duckvep]
+
+require duckvep
+
+# Expectations come from VEP 116 run on the same records in GFF mode against the
+# same two transcripts and FASTA (--distance 0; BND records alone with
+# --buffer_size 1). VEP's Location column gives each structural span: a symbolic
+# record starts at POS + 1 and ends at POS + |SVLEN|, else END, else its start
+# (Bio::EnsEMBL::IO::Parser::BaseVCF4 get_start/get_end). VEP skipped
+# snv_nonref ("G/NON_REF is not a supported structural variant type"),
+# del_end_eq_pos ("deletion looks incomplete"), no_alt and unknown_contig, and
+# printed no row for the * allele.
+statement ok
+CREATE TABLE vcf_transcripts AS SELECT * FROM (VALUES
+  (0::UINTEGER, 'readthrough_x', 'ATGCCCATCCGAAACTTCTGATAG'),
+  (1::UINTEGER, 'selenocysteine', 'ATGAGGATCCGTTGCATTTGAACTTAA')
+) t(transcript_index, seq_region_name, cds);
+
+query I
+SELECT loaded FROM duckvep_model_load('vcf-events',
+  'SELECT transcript_index seq_region, (length(cds) + 20)::UBIGINT sequence_length,
+   seq_region_name FROM vcf_transcripts ORDER BY seq_region',
+  'SELECT transcript_index, transcript_index seq_region, 11::UBIGINT transcript_start,
+   (10 + length(cds))::UBIGINT transcript_end, 1::TINYINT strand, transcript_index gene_index,
+   3::UBIGINT transcript_flags, 11::UBIGINT cds_start, (10 + length(cds))::UBIGINT cds_end,
+   cds::BLOB cds_sequence, 1::UTINYINT codon_table, ''''::BLOB pre_cds_sequence,
+   ''''::BLOB post_cds_sequence FROM vcf_transcripts ORDER BY transcript_index',
+  'SELECT transcript_index, 11::UBIGINT exon_start, (10 + length(cds))::UBIGINT exon_end,
+   1::UBIGINT exon_cdna_start, length(cds)::UBIGINT exon_cdna_end, 0::TINYINT phase,
+   0::TINYINT end_phase FROM vcf_transcripts ORDER BY transcript_index',
+  reference_fasta := '__WORKING_DIRECTORY__/test/data/duckvep/peptide_edit_witness.fa');
+----
+1
+
+statement ok
+CREATE TABLE vcf_regions AS SELECT transcript_index AS seq_region, seq_region_name FROM vcf_transcripts;
+
+# The columns and types read_bcf gives for this header.
+statement ok
+CREATE TABLE vcf_records AS SELECT * FROM (VALUES
+  ('readthrough_x', 29::BIGINT, 'snv_multi', 'T', ['A', 'C', 'G'], NULL::INTEGER, NULL::VARCHAR, NULL::INTEGER[]),
+  ('selenocysteine', 30, 'del_small', 'GAACT', ['G'], NULL, NULL, NULL),
+  ('selenocysteine', 31, 'del_star', 'AACTTA', ['A', '*'], NULL, NULL, NULL),
+  ('readthrough_x', 15, 'snv_any', 'C', ['A', '<*>'], NULL, NULL, NULL),
+  ('readthrough_x', 16, 'snv_nonref', 'C', ['G', '<NON_REF>'], NULL, NULL, NULL),
+  ('selenocysteine', 20, 'del_inside', 'C', ['<DEL>'], 30, 'DEL', NULL),
+  ('selenocysteine', 37, 'del_past_end', 'A', ['<DEL>'], 45, 'DEL', NULL),
+  ('selenocysteine', 12, 'del_end_eq_pos', 'T', ['<DEL>'], 12, 'DEL', NULL),
+  ('selenocysteine', 21, 'del_svlen_wins', 'G', ['<DEL>'], 40, 'DEL', [-5]),
+  ('readthrough_x', 15, 'dup_inside', 'C', ['<DUP>'], 25, 'DUP', NULL),
+  ('readthrough_x', 17, 'tdup_inside', 'A', ['<DUP:TANDEM>'], 25, 'DUP', NULL),
+  ('selenocysteine', 13, 'inv_inside', 'G', ['<INV>'], 30, 'INV', NULL),
+  ('selenocysteine', 22, 'ins_end_eq_pos', 'T', ['<INS>'], 22, 'INS', NULL),
+  ('selenocysteine', 23, 'ins_svlen', 'T', ['<INS>'], NULL, 'INS', [8]),
+  ('selenocysteine', 24, 'ins_no_length', 'G', ['<INS>'], NULL, 'INS', NULL),
+  ('readthrough_x', 18, 'cnv_inside', 'T', ['<CNV>'], 26, 'CNV', NULL),
+  ('readthrough_x', 19, 'del_me', 'C', ['<DEL:ME:ALU>'], 27, 'DEL', NULL),
+  ('readthrough_x', 21, 'cn0', 'G', ['<CN0>'], 28, 'CNV', NULL),
+  ('readthrough_x', 20, 'bnd_a', 'C', ['C[selenocysteine:25['], NULL, 'BND', NULL),
+  ('selenocysteine', 25, 'bnd_b', 'C', [']readthrough_x:20]C'], NULL, 'BND', NULL),
+  ('readthrough_x', 22, 'bnd_single', 'A', ['A.'], NULL, 'BND', NULL),
+  ('selenocysteine', 14, 'multi_sv', 'A', ['<DEL>', '<DUP>'], 20, 'CNV', NULL),
+  ('selenocysteine', 16, 'literal_n_svtype', 'G', ['GNNNN'], NULL, 'INS', NULL),
+  ('selenocysteine', 17, 'literal_acgt_svtype', 'A', ['ATTTT'], NULL, 'INS', NULL),
+  ('selenocysteine', 18, 'no_alt', 'T', []::VARCHAR[], NULL, NULL, NULL),
+  ('chrZ', 5, 'unknown_contig', 'A', ['G'], NULL, NULL, NULL)
+) t("CHROM", "POS", "ID", "REF", "ALT", "INFO_END", "INFO_SVTYPE", "INFO_SVLEN");
+
+statement ok
+CREATE TABLE vcf_events AS SELECT * FROM query(duckvep_vcf_events_sql('vcf_records', 'vcf_regions'));
+
+# VEP Location minus the breakend rule: breakends keep the raw POS (ERRATA:
+# VEP adds one to the local POS itself). An interbase insertion (VEP 22-23)
+# has position = end_position = POS.
+query IITTTIITTII
+SELECT event_index, seq_region, source_id, coalesce(source_alt, '-'), event_status,
+  position, end_position, coalesce(structural_type, '-'), coalesce(copy_change, '-'),
+  mate_seq_region, mate_position
+FROM vcf_events WHERE event_status = 'ok' ORDER BY event_index;
+----
+1	0	snv_any	A	ok	15	NULL	-	-	NULL	NULL
+2	0	snv_any	<*>	ok	15	NULL	-	-	NULL	NULL
+3	0	dup_inside	<DUP>	ok	16	25	DUP	GAIN	NULL	NULL
+4	0	tdup_inside	<DUP:TANDEM>	ok	18	25	TDUP	GAIN	NULL	NULL
+5	0	cnv_inside	<CNV>	ok	19	26	CNV	UNKNOWN	NULL	NULL
+6	0	bnd_a	C[selenocysteine:25[	ok	20	NULL	-	-	1	25
+7	0	snv_multi	A	ok	29	NULL	-	-	NULL	NULL
+8	0	snv_multi	C	ok	29	NULL	-	-	NULL	NULL
+9	0	snv_multi	G	ok	29	NULL	-	-	NULL	NULL
+10	1	inv_inside	<INV>	ok	14	30	INV	NEUTRAL	NULL	NULL
+11	1	literal_acgt_svtype	ATTTT	ok	17	NULL	-	-	NULL	NULL
+12	1	del_inside	<DEL>	ok	21	30	DEL	LOSS	NULL	NULL
+13	1	ins_end_eq_pos	<INS>	ok	22	22	INS	UNKNOWN	NULL	NULL
+14	1	del_svlen_wins	<DEL>	ok	22	26	DEL	LOSS	NULL	NULL
+15	1	ins_svlen	<INS>	ok	24	31	INS	UNKNOWN	NULL	NULL
+16	1	bnd_b	]readthrough_x:20]C	ok	25	NULL	-	-	0	20
+17	1	del_small	G	ok	30	NULL	-	-	NULL	NULL
+18	1	del_star	A	ok	31	NULL	-	-	NULL	NULL
+19	1	del_star	*	ok	31	NULL	-	-	NULL	NULL
+20	1	del_past_end	<DEL>	ok	38	45	DEL	LOSS	NULL	NULL
+
+# Records VEP skips, and shapes whose VEP reading the events relation cannot
+# carry (one-base insertion spans, one feature for several symbolic ALTs) or
+# that the conformance lanes do not cover, keep a row with a reason and no
+# event coordinates.
+query ITTTTTI
+SELECT event_index, source_chrom, source_id, coalesce(source_alt, '-'), coalesce(event_kind, '-'),
+  event_reason, (seq_region IS NULL AND position IS NULL)::INTEGER
+FROM vcf_events WHERE event_status = 'unsupported' ORDER BY event_index;
+----
+21	chrZ	unknown_contig	G	small_variant	contig_not_in_model	1
+22	readthrough_x	snv_nonref	G	-	multiallelic_structural_record	1
+23	readthrough_x	snv_nonref	<NON_REF>	-	multiallelic_structural_record	1
+24	readthrough_x	del_me	<DEL:ME:ALU>	-	unsupported_symbolic_allele	1
+25	readthrough_x	cn0	<CN0>	-	unsupported_symbolic_allele	1
+26	readthrough_x	bnd_single	A.	breakend	single_breakend	1
+27	selenocysteine	del_end_eq_pos	<DEL>	structural_variant	incomplete_deletion	1
+28	selenocysteine	multi_sv	<DEL>	structural_variant	multiallelic_structural_record	1
+29	selenocysteine	multi_sv	<DUP>	structural_variant	multiallelic_structural_record	1
+30	selenocysteine	literal_n_svtype	GNNNN	-	literal_alleles_with_svtype	1
+31	selenocysteine	no_alt	-	small_variant	no_alternate_allele	1
+32	selenocysteine	ins_no_length	<INS>	structural_variant	single_base_insertion_span	1
+
+statement ok
+CREATE VIEW vcf_events_ok AS SELECT * FROM vcf_events WHERE event_status = 'ok' ORDER BY event_index;
+
+# Consequences equal VEP's for every non-breakend event; del_past_end lies
+# beyond both transcripts, where VEP says intergenic_variant and DuckVEP reports
+# that the loaded model has no feature. The * allele has no row in either.
+# Breakend consequences are pinned by the breakend lane, not here.
+query TTTT
+SELECT e.source_id, e.alternate,
+  coalesce((SELECT string_agg(t.consequence, '&' ORDER BY t.consequence) FROM duckvep_so_terms() t
+            WHERE (a.consequence_mask & t.consequence_mask) <> 0), '-'),
+  coalesce(a.duckvep_reason, '-')
+FROM vcf_events_ok e
+JOIN query(duckvep_annotate_sql('vcf_events_ok', 'vcf-events', struct_pack(rich := true,
+  upstream_distance := 0, downstream_distance := 0))) a USING (event_index)
+WHERE e.event_kind <> 'breakend'
+ORDER BY e.event_index, a.transcript_index;
+----
+snv_any	A	missense_variant	-
+snv_any	<*>	coding_sequence_variant	-
+dup_inside	<DUP>	coding_sequence_variant&feature_elongation	-
+tdup_inside	<DUP:TANDEM>	coding_sequence_variant&feature_elongation	-
+cnv_inside	<CNV>	coding_sequence_variant	-
+snv_multi	A	stop_lost	-
+snv_multi	C	stop_lost	-
+snv_multi	G	stop_lost	-
+inv_inside	<INV>	coding_sequence_variant	-
+literal_acgt_svtype	ATTTT	frameshift_variant	-
+del_inside	<DEL>	feature_truncation&frameshift_variant	-
+ins_end_eq_pos	<INS>	coding_sequence_variant&feature_elongation	-
+del_svlen_wins	<DEL>	feature_truncation&frameshift_variant	-
+ins_svlen	<INS>	coding_sequence_variant&feature_elongation	-
+del_small	G	inframe_deletion	-
+del_star	A	frameshift_variant&stop_lost	-
+del_past_end	<DEL>	-	no_feature_in_loaded_model
+
+# Optional INFO columns may be absent and names may differ in case. Without END
+# or SVLEN a DEL is incomplete for VEP and a DUP is a one-base span at POS + 1.
+statement ok
+CREATE TABLE minimal_records AS SELECT * FROM (VALUES
+  ('readthrough_x', 15::BIGINT, 'C', ['A']),
+  ('readthrough_x', 16, 'C', ['<DEL>']),
+  ('readthrough_x', 17, 'A', ['<DUP>'])
+) t(chrom, pos, ref, alt);
+
+query TIIITT
+SELECT source_alt, source_pos, position, end_position, event_status, coalesce(event_reason, '-')
+FROM query(duckvep_vcf_events_sql('minimal_records', 'vcf_regions')) ORDER BY source_pos;
+----
+A	15	15	NULL	ok	-
+<DEL>	16	NULL	NULL	unsupported	incomplete_deletion
+<DUP>	17	18	18	ok	-
+
+# Extra region rows are contig aliases; a name that names two regions is ambiguous.
+statement ok
+CREATE TABLE alias_regions AS SELECT * FROM (VALUES
+  (0::UINTEGER, 'readthrough_x'), (0, 'chrreadthrough_x'), (1, 'selenocysteine'), (0, 'twice'), (1, 'twice')
+) t(seq_region, seq_region_name);
+
+statement ok
+CREATE TABLE alias_records AS SELECT * FROM (VALUES
+  ('chrreadthrough_x', 29::BIGINT, 'T', ['A']),
+  ('twice', 29, 'T', ['A'])
+) t("CHROM", "POS", "REF", "ALT");
+
+query TIT
+SELECT source_chrom, seq_region, coalesce(event_reason, '-')
+FROM query(duckvep_vcf_events_sql('alias_records', 'alias_regions')) ORDER BY source_chrom;
+----
+chrreadthrough_x	0	-
+twice	NULL	ambiguous_contig
+
+# Caller relations may share names with the builder's own common table expressions.
+statement ok
+CREATE TABLE source AS SELECT * FROM minimal_records;
+
+statement ok
+CREATE TABLE regions AS SELECT * FROM vcf_regions;
+
+query I
+SELECT count(*) FROM query(duckvep_vcf_events_sql('source', 'regions')) WHERE event_status = 'ok';
+----
+2
+
+# ALT must be the VARCHAR[] that read_bcf gives; comma-joined text fails instead
+# of being read character by character.
+statement ok
+CREATE TABLE text_alt AS SELECT 'readthrough_x' AS "CHROM", 15::BIGINT AS "POS", 'C' AS "REF", 'A,G' AS "ALT";
+
+statement error
+SELECT * FROM query(duckvep_vcf_events_sql('text_alt', 'vcf_regions'));
+----
+Conversion Error
+
+query I
+SELECT duckvep_model_drop('vcf-events');
+----
+1

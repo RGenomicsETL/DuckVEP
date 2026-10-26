@@ -28,7 +28,10 @@ static void prepare_sv(duckdb_function_info info, duckdb_data_chunk input, duckd
     }
 }
 
-static void prepare_str(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+typedef bool (*two_relation_sql)(const char *, const char *, duckvep_sql_text *);
+
+static void prepare_two(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output,
+                        two_relation_sql build, const char *failed) {
     idx_t argc = duckdb_data_chunk_get_column_count(input);
     const char *const names[] = {"unused"};
     const duckvep_option_kind kinds[] = {DUCKVEP_OPTION_TEXT};
@@ -46,16 +49,26 @@ static void prepare_str(duckdb_function_info info, duckdb_data_chunk input, duck
             if (!tables[i]) { ok = false; break; }
         }
         duckvep_sql_text sql = {0};
-        if (ok) ok = duckvep_core_prepare_expansionhunter_sql(tables[0], tables[1], &sql);
+        if (ok) ok = build(tables[0], tables[1], &sql);
         if (ok) duckdb_vector_assign_string_element_len(output, row, sql.data, sql.length);
-        else duckvep_builder_set_error(info, duckvep_core_prepare_expansionhunter_failed);
+        else duckvep_builder_set_error(info, failed);
         duckvep_sql_free(&sql);
         for (size_t i = 0; i < 2; i++) duckvep_budget_free(tables[i]);
         if (!ok) return;
     }
 }
 
+static void prepare_str(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+    prepare_two(info, input, output, duckvep_core_prepare_expansionhunter_sql,
+                duckvep_core_prepare_expansionhunter_failed);
+}
+
+static void prepare_vcf_events(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
+    prepare_two(info, input, output, duckvep_core_vcf_events_sql, duckvep_core_vcf_events_failed);
+}
+
 bool register_duckvep_prepare_sql(duckdb_connection connection) {
     return duckvep_register_builder(connection, "duckvep_prepare_sv_geometry_sql", 1, prepare_sv) &&
-        duckvep_register_builder(connection, "duckvep_prepare_expansionhunter_sql", 2, prepare_str);
+        duckvep_register_builder(connection, "duckvep_prepare_expansionhunter_sql", 2, prepare_str) &&
+        duckvep_register_builder(connection, "duckvep_vcf_events_sql", 2, prepare_vcf_events);
 }
