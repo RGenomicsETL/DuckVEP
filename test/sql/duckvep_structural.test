@@ -101,6 +101,21 @@ FROM query(duckvep_prepare_breakend_pairs_sql('bnd";λ')) ORDER BY event_index;
 35	u3	paired_breakend	reciprocal	reciprocal	36	1	1	1	35|36	4
 36	u4	paired_breakend	reciprocal	reciprocal	35	1	1	1	35|36	4
 
+# Identifiers stay verbatim: an ID and MATEID of "1.0" still pair, and EVENT "1" and
+# "1.0" stay distinct. Only numeric fields drop a zero fraction.
+statement ok
+CREATE TEMP TABLE bnd_text_ids AS SELECT * FROM (VALUES
+  (0, '1', 100::BIGINT, '1.0', ['ATT[2:200['], ['2.0'], '1'),
+  (1, '2', 200, '2.0', [']1:100]AAC'], ['1.0'], '1.0')
+) t(event_index, "CHROM", "POS", "ID", "ALT", "INFO_MATEID", "INFO_EVENT");
+
+query ITTTT
+SELECT event_index, status, reason, mate_id, event_id
+FROM query(duckvep_prepare_breakend_pairs_sql('bnd_text_ids')) ORDER BY event_index;
+----
+0	conflict	event_conflict	2.0	1
+1	conflict	event_conflict	1.0	1.0
+
 query II
 SELECT contains(duckvep_prepare_breakend_pairs_sql('bnd";λ'), '"bnd"";λ"'),
  duckvep_prepare_breakend_pairs_sql('bnd";λ') = duckvep_prepare_breakend_pairs_sql('bnd";λ');

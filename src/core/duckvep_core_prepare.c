@@ -10,21 +10,23 @@
  * column's elements, or a scalar's text split at the commas VCF writes between list
  * values; NULL stays NULL. TRY_CAST of a scalar to a list is NULL at run time, not
  * a bind error (measured on DuckDB 1.5.1, 1.5.6 and 2.0.0), so one SQL text serves
- * every shape. A scalar string written like a bracketed list reads as that list. A
- * whole number written with a zero fraction, as a DOUBLE column renders 40 ("40.0"),
- * reads as that whole number.
+ * every shape. A scalar string written like a bracketed list reads as that list.
+ * Values stay verbatim: identifiers such as an ID or MATEID of "1.0" keep their text.
  * Optional columns come from a template of untyped NULLs joined UNION ALL BY NAME,
  * which keeps each present column's own type. */
 #define DUCKVEP_VCF_VALUES(x) \
-    "list_transform(CASE WHEN try_cast(" x " AS VARCHAR[]) IS NOT NULL THEN try_cast(" x " AS VARCHAR[]) " \
-    "ELSE string_split(try_cast(" x " AS VARCHAR), ',') END, " \
-    "lambda v: regexp_replace(v, '^([+-]?[0-9]+)\\.0+$', '\\1'))"
+    "(CASE WHEN try_cast(" x " AS VARCHAR[]) IS NOT NULL THEN try_cast(" x " AS VARCHAR[]) " \
+    "ELSE string_split(try_cast(" x " AS VARCHAR), ',') END)"
 /* The first value, trimmed, or NULL when empty. VEP reads the first comma value. */
 #define DUCKVEP_VCF_FIRST(x) "nullif(trim(" DUCKVEP_VCF_VALUES(x) "[1]), '')"
+/* Text of a numeric field with a zero fraction dropped, so a DOUBLE column's 40
+ * (rendered "40.0") reads as 40. Only numeric fields go through it. */
+#define DUCKVEP_VCF_NUMBER_TEXT(text) "regexp_replace(" text ", '^([+-]?[0-9]+)\\.0+$', '\\1')"
 /* An integer read from such text: only whole-number text counts, because TRY_CAST
  * rounds '20.5' to 21 and reads '1e3' as 1000. */
 #define DUCKVEP_VCF_INTEGER(text) \
-    "CASE WHEN regexp_full_match(" text ", '[+-]?[0-9]{1,18}') THEN try_cast(" text " AS BIGINT) END"
+    "CASE WHEN regexp_full_match(" DUCKVEP_VCF_NUMBER_TEXT(text) ", '[+-]?[0-9]{1,18}') " \
+    "THEN try_cast(" DUCKVEP_VCF_NUMBER_TEXT(text) " AS BIGINT) END"
 /* The allele a row describes: element alt_index (1-based, default 1) of ALT. */
 #define DUCKVEP_VCF_ALT \
     DUCKVEP_VCF_VALUES("\"ALT\"") "[coalesce(try_cast(alt_index AS BIGINT), 1)]"
@@ -110,8 +112,9 @@ static const char str_source[] =
 "), __duckvep_str_rows AS (SELECT event_index, ref, alt, alt_index, \"INFO_END\", \"INFO_REF\", \"INFO_RL\", \"INFO_RU\", "
 "\"FORMAT_GT\", \"FORMAT_SO\", \"FORMAT_REPCN\", \"FORMAT_REPCI\", \"FORMAT_CN\", \"FORMAT_CI\" FROM __duckvep_str_source), "
 "source AS (SELECT event_index, CAST(ref AS VARCHAR) AS ref, " DUCKVEP_VCF_VALUES("\"ALT\"") " AS alts, alt_index, "
-DUCKVEP_VCF_FIRST("\"INFO_REF\"") " AS ref_text, " DUCKVEP_VCF_FIRST("\"INFO_RL\"") " AS rl_text, "
-DUCKVEP_VCF_FIRST("\"INFO_RU\"") " AS unit, " DUCKVEP_VCF_FIRST("\"INFO_END\"") " AS end_text, "
+DUCKVEP_VCF_NUMBER_TEXT(DUCKVEP_VCF_FIRST("\"INFO_REF\"")) " AS ref_text, "
+DUCKVEP_VCF_NUMBER_TEXT(DUCKVEP_VCF_FIRST("\"INFO_RL\"")) " AS rl_text, "
+DUCKVEP_VCF_FIRST("\"INFO_RU\"") " AS unit, " DUCKVEP_VCF_NUMBER_TEXT(DUCKVEP_VCF_FIRST("\"INFO_END\"")) " AS end_text, "
 DUCKVEP_VCF_FIRST("\"FORMAT_GT\"") " AS gt_text, " DUCKVEP_VCF_FIRST("\"FORMAT_SO\"") " AS so_text, "
 DUCKVEP_VCF_FIRST("\"FORMAT_REPCN\"") " AS repcn_text, " DUCKVEP_VCF_FIRST("\"FORMAT_REPCI\"") " AS repci_text, "
 DUCKVEP_VCF_FIRST("\"FORMAT_CN\"") " AS cn_text, " DUCKVEP_VCF_FIRST("\"FORMAT_CI\"") " AS ci_text "
@@ -500,7 +503,8 @@ static const char hgvs_a[] =
 "parsed AS (SELECT s.*, r.n AS ref_rows, r.refseq, "
 "TRY(duckvep_breakend_geometry(s.alt)) AS g FROM source s LEFT JOIN refs r USING (event_index)), "
 "spans AS (SELECT *, "
-"CASE WHEN regexp_full_match(end_text, '[1-9][0-9]{0,15}') THEN CAST(end_text AS BIGINT) END AS info_end, "
+"CASE WHEN regexp_full_match(" DUCKVEP_VCF_NUMBER_TEXT("end_text") ", '[1-9][0-9]{0,15}') "
+"THEN CAST(" DUCKVEP_VCF_NUMBER_TEXT("end_text") " AS BIGINT) END AS info_end, "
 DUCKVEP_VCF_INTEGER("svlen_text") " AS info_svlen, "
 "CASE WHEN alt IN ('<DEL>', '<DUP>', '<DUP:TANDEM>', '<INV>') THEN alt END AS symbolic_kind FROM parsed), "
 "bounds AS (SELECT *, CASE WHEN info_end IS NOT NULL OR info_svlen IS NOT NULL THEN "
