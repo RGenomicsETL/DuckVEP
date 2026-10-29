@@ -116,16 +116,17 @@ duckvep_query_count(duckdb_connection connection, const char *query,
 	duckdb_state state;
 
 	length = strlen(query);
-	if (length > SIZE_MAX - sizeof("SELECT CAST(count(*) AS UBIGINT) FROM () q")) {
+	if (length > SIZE_MAX - sizeof("SELECT CAST(count(*) AS UBIGINT) FROM (\n) q")) {
 		duckvep_sql_set_error(error, error_size, "model query is too long");
 		return 0;
 	}
-	sql = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + sizeof("SELECT CAST(count(*) AS UBIGINT) FROM () q"));
+	sql = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, length + sizeof("SELECT CAST(count(*) AS UBIGINT) FROM (\n) q"));
 	if (sql == NULL) {
 		duckvep_sql_set_error(error, error_size, "out of memory counting model rows");
 		return 0;
 	}
-	(void)sprintf(sql, "SELECT CAST(count(*) AS UBIGINT) FROM (%s) q", query);
+	/* The newline ends a trailing -- comment in the caller's query before the closing parenthesis. */
+	(void)sprintf(sql, "SELECT CAST(count(*) AS UBIGINT) FROM (%s\n) q", query);
 	memset(&result, 0, sizeof(result));
 	state = duckdb_query(connection, sql, &result);
 	duckvep_budget_free(sql);

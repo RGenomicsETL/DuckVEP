@@ -361,13 +361,14 @@ duckvep_model_reserve_interval_features(duckvep_owned_model_t *model,
 
 static void duckvep_lifted_destroy(duckvep_lifted_model_t *);
 
-/* Frees an array the model owns; an array inside a snapshot's storage is released with it. */
+/* Frees an array the model owns; an array inside a snapshot's storage is released with it. A
+ * present empty array in the last section points one past the end, so the bound is inclusive. */
 static void
 duckvep_model_array_free(const duckvep_owned_model_t *model, void *array)
 {
 	const char *base = model->snapshot_base, *at = array;
 
-	if (base != NULL && at >= base && at < base + model->snapshot_bytes)
+	if (base != NULL && at >= base && at <= base + model->snapshot_bytes)
 		return;
 	duckvep_budget_free(array);
 }

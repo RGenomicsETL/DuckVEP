@@ -129,7 +129,7 @@ static void duckvep_model_receipt_sql(duckdb_function_info info,
         }
         duckvep_sql_text sql = {0};
         bool ok = duckvep_core_receipt_sql((const char *const *)values, option_values[0], &sql);
-        if (!ok) duckvep_builder_set_error(info, "duckvep_model_receipt_sql: allocation failed");
+        if (!ok) duckvep_builder_set_error(info, "duckvep_model_receipt_sql: invalid relation name or allocation failure");
         else {
             duckdb_vector_ensure_validity_writable(output);
             duckdb_validity_set_row_valid(duckdb_vector_get_validity(output), row);
