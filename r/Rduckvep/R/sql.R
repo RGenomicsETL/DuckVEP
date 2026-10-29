@@ -17,10 +17,10 @@ build_param_str <- function(params) {
   }
 }
 
+# CREATE OR REPLACE swaps the table in only once the query succeeds, so a failed query
+# leaves the existing table in place.
 .duckvep_create_table <- function(con, table_name, query, overwrite) {
   name <- as.character(DBI::dbQuoteIdentifier(con, table_name))
-  if (overwrite && DBI::dbExistsTable(con, table_name)) {
-    DBI::dbExecute(con, paste("DROP TABLE", name))
-  }
-  DBI::dbExecute(con, paste("CREATE TABLE", name, "AS", query))
+  create <- if (overwrite) "CREATE OR REPLACE TABLE" else "CREATE TABLE"
+  DBI::dbExecute(con, paste(create, name, "AS", query))
 }
