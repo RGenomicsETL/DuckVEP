@@ -2,6 +2,26 @@
 
 No DuckVEP release has been tagged yet; everything below is unreleased.
 
+## A model replaced mid-query is an error
+
+- An annotation query pins its model one chunk at a time, so `duckvep_model_drop` could
+  remove it between chunks and a reload under the same name would annotate the rest of
+  the query against the new model, mixing two models' `transcript_index` values in one
+  result. Every installed model now carries a load generation; the annotation builders
+  read it once when the query starts (`_duckvep_model_generation`), and each chunk
+  refuses a model whose generation differs with `the model was dropped or reloaded while
+  the query ran`. Table functions (`duckvep_haplotypes`, `duckvep_coding_calls`) already
+  held their model for the whole query.
+
+## Concurrent v2 model loads cannot mix relations
+
+- Staged relations on the v2 host are shared by every connection, keyed by model name, so
+  two sessions loading one name could publish a model built from both sessions' rows.
+  Each `duckvep_model_load_sql` script now stages and publishes under its own key (the
+  name, U+001F and a sequence number); the publish installs under the bare name, reads only
+  its own relations and discards others staged for the name, so the second publish fails
+  instead. A hand-written COPY with a bare name and `duckvep_model_publish(name)` still pair.
+
 ## Input hardening
 
 - `duckvep_model_receipt_sql` quotes its region, transcript and `regulation_features_table`

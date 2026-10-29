@@ -661,8 +661,7 @@ duckvep_model_load_init(duckdb_init_info info)
 		    "duckvep_model_load: model name was created concurrently");
 		return;
 	}
-	entry->next = registry->models;
-	registry->models = entry;
+	duckvep_registry_link_locked(registry, entry);
 	pthread_mutex_unlock(&registry->mutex);
 	duckdb_init_set_init_data(info, state, duckvep_model_load_state_destroy);
 }
@@ -857,6 +856,34 @@ duckvep_model_fingerprint_scalar(duckdb_function_info info,
 	}
 }
 
+/* Internal: the load generation of the model now under a name, NULL for none. The annotation
+ * builders read it once per query so a model dropped and reloaded mid-query is an error. */
+static void
+duckvep_model_generation_scalar(duckdb_function_info info,
+	duckdb_data_chunk input, duckdb_vector output)
+{
+	duckvep_registry_t *registry;
+	duckdb_vector name_vector;
+	uint64_t *values;
+	idx_t row, rows;
+
+	registry = duckdb_scalar_function_get_extra_info(info);
+	rows = duckdb_data_chunk_get_size(input);
+	name_vector = duckdb_data_chunk_get_vector(input, 0);
+	values = duckdb_vector_get_data(output);
+	duckdb_vector_ensure_validity_writable(output);
+	for (row = 0; row < rows; row++) {
+		char *name;
+		int found;
+
+		name = duckvep_vector_string(name_vector, row);
+		found = name != NULL && duckvep_registry_generation(registry, name, &values[row]);
+		duckvep_budget_free(name);
+		if (!found)
+			duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
+	}
+}
+
 static void
 duckvep_v1_registry_release(duckvep_registry_t *registry)
 {
@@ -977,6 +1004,19 @@ duckvep_register_model_functions(duckdb_connection connection,
 		duckdb_scalar_function_set_extra_info(scalar, registry,
 		    duckvep_registry_release);
 		duckdb_scalar_function_set_function(scalar, duckvep_model_fingerprint_scalar);
+		(void)duckdb_register_scalar_function(connection, scalar);
+		duckdb_destroy_scalar_function(&scalar);
+
+		scalar = duckdb_create_scalar_function();
+		duckdb_scalar_function_set_name(scalar, "_duckvep_model_generation");
+		duckdb_scalar_function_add_parameter(scalar, varchar_type);
+		duckdb_scalar_function_set_return_type(scalar, ubigint_type);
+		duckdb_scalar_function_set_volatile(scalar);
+		duckdb_scalar_function_set_special_handling(scalar);
+		duckvep_registry_retain(registry);
+		duckdb_scalar_function_set_extra_info(scalar, registry,
+		    duckvep_registry_release);
+		duckdb_scalar_function_set_function(scalar, duckvep_model_generation_scalar);
 		(void)duckdb_register_scalar_function(connection, scalar);
 		duckdb_destroy_scalar_function(&scalar);
 		duckdb_destroy_logical_type(&ubigint_type);

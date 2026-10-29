@@ -13,6 +13,19 @@ COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' 
 COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'temp-model', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
 SELECT CASE WHEN duckvep_model_publish('temp-model') THEN true ELSE error('publish of a TEMP-table model') END;
 SELECT CASE WHEN _duckvep_model_fingerprint('temp-model') = 16162758230738989510 THEN true ELSE error('TEMP model equals the README model fingerprint') END;
+-- Two load scripts for one model name stage under their own keys (name<US>sequence), so one
+-- script's publish never reads the other's rows; it installs under the bare name and discards
+-- the rest, and the other script's publish then fails loudly instead of mixing relations.
+SELECT CASE WHEN contains(duckvep_model_load_sql('k', 'a', 'b', 'c')[1], E'MODEL ''k\x1f') AND starts_with(duckvep_model_load_sql('k', 'a', 'b', 'c')[4], E'SELECT duckvep_model_publish(''k\x1f') AND duckvep_model_load_sql('k', 'a', 'b', 'c')[1] <> duckvep_model_load_sql('k', 'a', 'b', 'c')[1] THEN true ELSE error('each load script stages under its own key') END;
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL E'race\x1f901', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM (VALUES (0::UINTEGER), (1::UINTEGER), (2::UINTEGER)) t(seq_region)) TO 'x' (FORMAT duckvep_stage, MODEL E'race\x1f902', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL E'race\x1f901', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL E'race\x1f901', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN duckvep_model_publish(E'race\x1f901') THEN true ELSE error('publish of a script key') END;
+SELECT CASE WHEN _duckvep_model_fingerprint('race') = 16162758230738989510 AND _duckvep_model_fingerprint(E'race\x1f901') IS NULL THEN true ELSE error('the script installs its own rows under the bare name') END;
+-- expect error: is not staged
+SELECT duckvep_model_publish(E'race\x1f902');
+SELECT CASE WHEN duckvep_model_drop('race') THEN true ELSE error('drop race') END;
 -- Snapshots: the same core as v1. A saved model restores to the same arrays; bad input is refused.
 SELECT CASE WHEN duckvep_model_save('temp-model', 'build/v2_temp_model.dvsnap') AND duckvep_model_restore('temp-snapshot', 'build/v2_temp_model.dvsnap') THEN true ELSE error('snapshot round trip') END;
 SELECT CASE WHEN _duckvep_model_fingerprint('temp-snapshot') = 16162758230738989510 THEN true ELSE error('restored model equals the README model fingerprint') END;

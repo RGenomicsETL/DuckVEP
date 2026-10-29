@@ -1,6 +1,9 @@
 /* The resident annotation natives (_duckvep_annotate_*): batch preparation, the kernel run and
  * the result writers. DuckDB is reached only through the duckvep_h_* host layer of
  * "duckvep_host.h", so both the v1 and the v2 host compile this file unchanged. */
+#include <stdlib.h>
+#include <string.h>
+
 #include "duckvep_host.h"
 
 #include "core/duckvep_core_model.h"
@@ -646,14 +649,25 @@ static int
 duckvep_scalar_select_model(duckvep_scalar_state_t *state,
 	duckvep_h_vector model_vector, size_t row, char *error, size_t error_size)
 {
+	static const char replaced[] =
+	    "duckvep_annotate: the model was dropped or reloaded while the query ran";
 	duckvep_model_entry_t *entry;
-	char *name;
+	uint64_t expected = 0;
+	char *name, *separator;
 
 	name = duckvep_h_string(model_vector, row);
 	if (name == NULL && duckvep_h_string_wellformed(model_vector, row)) {
 		duckvep_sql_set_error(error, error_size,
 		    "duckvep_annotate: out of memory copying the model name");
 		return 0;
+	}
+	/* The builders pass "name<US>generation", the generation read once when the query
+	 * started; the model is re-resolved for every chunk, so a mismatch means it changed. */
+	separator = name != NULL ? strrchr(name, '\x1f') : NULL;
+	if (separator != NULL && separator[1] != '\0' &&
+	    strspn(separator + 1, "0123456789") == strlen(separator + 1)) {
+		expected = strtoull(separator + 1, NULL, 10);
+		*separator = '\0';
 	}
 	if (name == NULL || *name == '\0') {
 		duckvep_budget_free(name);
@@ -663,13 +677,22 @@ duckvep_scalar_select_model(duckvep_scalar_state_t *state,
 	}
 	if (state->entry != NULL && strcmp(state->entry->name, name) == 0) {
 		duckvep_budget_free(name);
+		if (expected != 0 && state->entry->generation != expected) {
+			duckvep_sql_set_error(error, error_size, replaced);
+			return 0;
+		}
 		return 1;
 	}
 	entry = duckvep_registry_pin(state->registry, name);
 	duckvep_budget_free(name);
 	if (entry == NULL) {
-		duckvep_sql_set_error(error, error_size,
+		duckvep_sql_set_error(error, error_size, expected != 0 ? replaced :
 		    "duckvep_annotate: unknown model name");
+		return 0;
+	}
+	if (expected != 0 && entry->generation != expected) {
+		duckvep_registry_unpin(state->registry, entry);
+		duckvep_sql_set_error(error, error_size, replaced);
 		return 0;
 	}
 	duckvep_scalar_release_model(state);

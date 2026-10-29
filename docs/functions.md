@@ -251,7 +251,7 @@ Signature:
 duckvep_model_drop(name VARCHAR) -> BOOLEAN
 ```
 
-Returns true when the model was dropped. Returns false when no model has that name or when the model is pinned by a running query. An empty name is an error.
+Returns true when the model was dropped. Returns false when no model has that name or when a table function (haplotypes, coding calls) or an annotation chunk is using it at that moment. An annotation query pins the model one chunk at a time, so it can be dropped between chunks; the annotation builders record the model's load generation when the query starts, and a query whose model is dropped or reloaded under the same name before it finishes fails with `the model was dropped or reloaded while the query ran` instead of mixing two models' rows. An empty name is an error.
 
 ```sql
 SELECT loaded FROM duckvep_model_load('scratch',
