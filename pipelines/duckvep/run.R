@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 root <- normalizePath(
-  Sys.getenv("DUCKHTS_ROOT", unset = "."),
+  Sys.getenv("DUCKVEP_ROOT", unset = Sys.getenv("DUCKHTS_ROOT", unset = ".")),
   mustWork = TRUE
 )
 script <- file.path(root, "pipelines", "duckvep", "_targets.R")
