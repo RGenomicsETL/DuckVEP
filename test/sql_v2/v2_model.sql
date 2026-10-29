@@ -206,7 +206,7 @@ COPY (SELECT 0::UINTEGER transcript_index, 1::UINTEGER cdna_start, 1::UINTEGER c
              'transcript_attrib:SeqEdit'::VARCHAR evidence_name, 0::UTINYINT boundary_overrides)
   TO 'x' (FORMAT duckvep_stage, MODEL 'rna-typed', RELATION 'rna_edits', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
 SELECT CASE WHEN duckvep_model_publish('rna-typed') AND duckvep_model_drop('rna-typed') THEN true ELSE error('typed RNA source did not publish and release') END;
-SELECT CASE WHEN duckvep_model_load_sql('it''s', 'SELECT 1 -- c', 'SELECT 2', 'SELECT 3')[4] = 'SELECT duckvep_model_publish(''it''''s'')' THEN true ELSE error('publish statement text') END;
+SELECT CASE WHEN starts_with(x[4], 'SELECT duckvep_model_publish(''it''''s' || chr(31)) AND ends_with(x[4], ''')') AND contains(x[1], 'MODEL ' || x[4][30:-2] || ', RELATION') THEN true ELSE error('publish statement text') END FROM (SELECT duckvep_model_load_sql('it''s', 'SELECT 1 -- c', 'SELECT 2', 'SELECT 3') AS x);
 SELECT CASE WHEN contains(duckvep_model_load_sql('m', 'SELECT 1 -- c', 'SELECT 2', 'SELECT 3')[1], E'-- c\n) TO ''duckvep_stage''') THEN true ELSE error('trailing comment stays inside the parentheses') END;
 -- expect error: arguments must be non-empty strings
 SELECT duckvep_model_load_sql('m', '', 'SELECT 2', 'SELECT 3');
