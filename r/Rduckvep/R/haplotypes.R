@@ -118,6 +118,9 @@
 #' caller-local temporary objects and uncommitted changes are not visible. One
 #' preparation may run per registry at a time. Nested or concurrent preparation
 #' returns a busy error; completed scans use independent native workspaces.
+#' On the C API v2 host the calls are instead staged by statements run on `con`
+#' (`duckvep_haplotype_load_sql`) and read back with `duckvep_haplotype_scan`, so
+#' temporary objects visible to `con` can supply them.
 #'
 #' @param con An open DuckDB connection with DuckVEP loaded.
 #' @param table_name Optional output table name.
@@ -173,8 +176,27 @@ rduckvep_haplotypes <- function(con, calls_query, model_name,
     }
     params[[name]] <- format(value, scientific = FALSE, trim = TRUE)
   }
-  query <- paste0("SELECT * FROM duckvep_haplotypes(", sql_quote_string(con, calls_query),
-                  ",", sql_quote_string(con, model_name), build_param_str(params), ")")
+  if (.duckvep_is_v2(con)) {
+    # v2 stages the calls with caller-side statements, then a scan consumes the job.
+    job <- .duckvep_job_name("rduckvep_haplotypes")
+    options <- paste0("struct_pack(", paste(paste0(names(params), " := ", unlist(params)),
+                                            collapse = ", "), ")")
+    statements <- DBI::dbGetQuery(con, paste0(
+      "SELECT unnest(duckvep_haplotype_load_sql(", sql_quote_string(con, calls_query), ", ",
+      sql_quote_string(con, model_name), ", ", sql_quote_string(con, job), ", ", options,
+      ")) AS statement"))$statement
+    staged <- FALSE
+    on.exit(if (!staged) {
+      try(DBI::dbGetQuery(con, paste0("SELECT duckvep_haplotype_drop(",
+                                      sql_quote_string(con, job), ")")), silent = TRUE)
+    }, add = TRUE)
+    for (statement in statements) DBI::dbExecute(con, statement)
+    staged <- TRUE
+    query <- paste0("SELECT * FROM duckvep_haplotype_scan(", sql_quote_string(con, job), ")")
+  } else {
+    query <- paste0("SELECT * FROM duckvep_haplotypes(", sql_quote_string(con, calls_query),
+                    ",", sql_quote_string(con, model_name), build_param_str(params), ")")
+  }
   if (is.null(table_name)) return(DBI::dbGetQuery(con, query))
   .duckvep_create_table(con, table_name, query, overwrite)
   invisible(TRUE)

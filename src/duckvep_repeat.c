@@ -27,9 +27,11 @@ static bool valid(duckdb_vector vector, idx_t row) {
 static bool axis_init(duckdb_vector vector, repeat_axis *axis) {
     axis->list = vector;
     duckdb_logical_type type = duckdb_vector_get_column_type(vector);
-    bool is_list = duckdb_get_type_id(type) == DUCKDB_TYPE_LIST;
+    duckdb_type type_id = duckdb_get_type_id(type);
+    bool is_list = type_id == DUCKDB_TYPE_LIST;
     duckdb_destroy_logical_type(&type);
-    if (!is_list) return !valid(vector, 0);
+    /* Only an untyped NULL stands in for a missing axis; the type decides, not the first row. */
+    if (!is_list) return type_id == DUCKDB_TYPE_SQLNULL;
     axis->entries = duckdb_vector_get_data(vector);
     axis->records = duckdb_list_vector_get_child(vector);
     type = duckdb_vector_get_column_type(axis->records);

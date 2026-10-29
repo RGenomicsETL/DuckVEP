@@ -1,6 +1,13 @@
 library(DBI)
 library(duckdb)
-root <- "/root/duckvep/data/gnomad-v4.1/sv-sites"
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
+root <- duckvep_data("gnomad-v4.1/sv-sites")
 if (!file.exists(file.path(root, "source.tsv"))) stop("SV source is not verified")
 output <- file.path(root, "geometry.parquet")
 if (file.exists(output)) stop("SV geometry already exists")

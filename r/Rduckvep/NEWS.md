@@ -1,5 +1,8 @@
 # Rduckvep
 
+- `rduckvep_haplotypes()` works on the C API v2 host: it stages the calls with `duckvep_haplotype_load_sql()` under a unique job name, runs the statements on the connection and reads `duckvep_haplotype_scan()`, dropping the job if staging fails. It called `duckvep_haplotypes()`, which the v2 host does not register.
+- `rduckvep_load()` falls back to the newest bundled artifact when none was built for the installed duckdb version. The artifact declares the stable C API v1.2.0, so upgrading duckdb no longer requires reinstalling Rduckvep before DuckVEP loads.
+- `overwrite = TRUE` in `rduckvep_haplotypes()`, `rduckvep_coding_transcripts()` and `rduckvep_coding_calls()` replaces the table only once the query succeeds; a failing query dropped the existing table first.
 - `rduckvep_vcf_events_sql()` wraps `duckvep_vcf_events_sql()`: it turns VCF records with `read_bcf` columns into the events relation as VEP 116 reads them, with a status and reason for records it cannot carry.
 - `rduckvep_prepare_sv_geometry()`, `rduckvep_prepare_breakend_pairs()`, `rduckvep_prepare_structural_hgvs()` and `rduckvep_prepare_expansionhunter()` take relations shaped like DuckHTS `read_bcf()` output (typed `INFO_*` and, for ExpansionHunter, `FORMAT_*` columns) instead of raw `info`, `format` and `sample` text. Geometry and structural HGVS read a symbolic span with `SVLEN` before `END`, as VEP does.
 - The bundled extension renders singleton source-record protein HGVS independently when raw Haplosaurus replay retains an ambiguous ALT only as `source_allele_skipped` evidence.

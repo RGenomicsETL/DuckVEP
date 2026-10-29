@@ -193,6 +193,12 @@ duckvep_targets_read_campaigns <- function(
     }
     row$micromamba <- normalizePath(micromamba, mustWork = TRUE)
     vep_prefix <- row$vep_prefix %||% vep_prefix_default
+    if (!nzchar(vep_prefix)) {
+      stop(
+        "set VEP_PREFIX or the campaign's vep_prefix to the VEP installation prefix",
+        call. = FALSE
+      )
+    }
     row$vep_prefix <- duckvep_targets_path(vep_prefix, root)
     row$gff_index_policy <- row$gff_index_policy %||% "ignore"
     if (!(row$gff_index_policy %in% c("require", "ignore"))) {

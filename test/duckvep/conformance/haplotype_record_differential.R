@@ -12,7 +12,7 @@ main <- function() {
     optparse::make_option('--context-per-stratum', dest='context_per_stratum', type='integer', default=0L),
     optparse::make_option('--pair-per-stratum', dest='pair_per_stratum', type='integer', default=0L),
     optparse::make_option('--extension-receipt', dest='extension_receipt', default=NULL),
-    optparse::make_option('--vep-prefix', dest='vep_prefix', default='/root/miniconda3/envs/vep')
+    optparse::make_option('--vep-prefix', dest='vep_prefix', default=Sys.getenv('VEP_PREFIX'))
   )))
   stopifnot(!is.na(opt$seed), opt$random_cases >= 0L, opt$random_cases <= 65536L-144L)
   stopifnot(!is.na(opt$rare_per_stratum), opt$rare_per_stratum >= 0L)
@@ -37,6 +37,7 @@ main <- function() {
     identical(duckvep_evidence_command('git', c('-C',mirrors[i],'rev-parse','HEAD'), 'oracle revision'),
       unname(pins[i])),
     !length(duckvep_evidence_command('git', c('-C',mirrors[i],'status','--porcelain'), 'oracle checkout')))
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix)
   environment <- duckvep_evidence_command('micromamba', c('list','-p',prefix,'--explicit'), 'oracle environment')
   writeLines(environment, file.path(out,'environment.txt'))

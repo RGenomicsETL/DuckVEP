@@ -203,7 +203,7 @@ edit_main <- function() {
     optparse::make_option('--evidence-out', dest = 'evidence_out', default = '',
       help = 'Retain a compact complete comparison bundle in a new directory'),
     optparse::make_option('--vep-prefix', dest = 'vep_prefix',
-      default = Sys.getenv('VEP_PREFIX', '/root/miniconda3/envs/vep'))
+      default = Sys.getenv('VEP_PREFIX'))
   )))
   stopifnot(opt$models >= length(edit_families), !is.na(opt$seed))
   revision <- duckvep_evidence_revision('.')
@@ -223,6 +223,7 @@ edit_main <- function() {
       !length(duckvep_evidence_command('git', c('-C', mirrors[[name]], 'status', '--porcelain'),
         'oracle checkout')))
   }
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix, mustWork = TRUE)
   out <- tempfile(paste0('peptide_edit_seed', opt$seed, '_'), 'test/duckvep/conformance/results')
   stopifnot(dir.create(out))

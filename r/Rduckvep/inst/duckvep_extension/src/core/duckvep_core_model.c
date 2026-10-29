@@ -361,13 +361,14 @@ duckvep_model_reserve_interval_features(duckvep_owned_model_t *model,
 
 static void duckvep_lifted_destroy(duckvep_lifted_model_t *);
 
-/* Frees an array the model owns; an array inside a snapshot's storage is released with it. */
+/* Frees an array the model owns; an array inside a snapshot's storage is released with it. A
+ * present empty array in the last section points one past the end, so the bound is inclusive. */
 static void
 duckvep_model_array_free(const duckvep_owned_model_t *model, void *array)
 {
 	const char *base = model->snapshot_base, *at = array;
 
-	if (base != NULL && at >= base && at < base + model->snapshot_bytes)
+	if (base != NULL && at >= base && at <= base + model->snapshot_bytes)
 		return;
 	duckvep_budget_free(array);
 }
@@ -2664,6 +2665,30 @@ duckvep_registry_pin(duckvep_registry_t *registry, const char *name)
 	return entry;
 }
 
+/* Publishes an installed model under its name; the caller holds the registry mutex. */
+void
+duckvep_registry_link_locked(duckvep_registry_t *registry,
+	duckvep_model_entry_t *entry)
+{
+	entry->generation = ++registry->last_generation;
+	entry->next = registry->models;
+	registry->models = entry;
+}
+
+/* The generation of the model now installed under `name`; 0 when there is none. */
+int
+duckvep_registry_generation(duckvep_registry_t *registry, const char *name,
+	uint64_t *generation)
+{
+	duckvep_model_entry_t *entry;
+
+	pthread_mutex_lock(&registry->mutex);
+	entry = duckvep_registry_find_locked(registry, name);
+	*generation = entry != NULL ? entry->generation : 0;
+	pthread_mutex_unlock(&registry->mutex);
+	return entry != NULL;
+}
+
 void
 duckvep_registry_unpin(duckvep_registry_t *registry,
 	duckvep_model_entry_t *entry)
@@ -3251,8 +3276,7 @@ duckvep_core_model_install(duckvep_registry_t *registry, const char *name,
 		(void)snprintf(final_error, final_error_size, "%s: model name was created concurrently", label);
 		return 0;
 	}
-	entry->next = registry->models;
-	registry->models = entry;
+	duckvep_registry_link_locked(registry, entry);
 	pthread_mutex_unlock(&registry->mutex);
 	return 1;
 }

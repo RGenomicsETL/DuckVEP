@@ -78,6 +78,30 @@ revision_ancestry <- suppressWarnings(system2(
   stdout = TRUE,
   stderr = FALSE
 ))
+# Runs from before the extraction record DuckHTS revisions, which are never ancestors of a
+# DuckVEP HEAD; map them through design/duckhts-commit-map.txt (as scripts/readme-evidence.R
+# does). Runs recorded since carry DuckVEP revisions and are used as they are.
+commit_map_lines <- readLines(file.path(root, "design", "duckhts-commit-map.txt"))
+commit_map_lines <- commit_map_lines[
+  !startsWith(commit_map_lines, "#") & !startsWith(commit_map_lines, "old ")
+]
+commit_map_fields <- do.call(rbind, strsplit(commit_map_lines, " +"))
+commit_map <- setNames(commit_map_fields[, 2L], commit_map_fields[, 1L])
+commit_map[commit_map == strrep("0", 40L)] <- NA_character_
+# Which entries of `revisions` belong to the newest run that is an ancestor of HEAD; the last
+# recorded run when none is.
+newest_tested <- function(revisions) {
+  if (!length(revisions)) return(logical())
+  mapped <- ifelse(
+    revisions %in% revision_ancestry, revisions, unname(commit_map[revisions])
+  )
+  tested <- revision_ancestry[revision_ancestry %in% mapped]
+  if (length(tested) > 0L) {
+    !is.na(mapped) & mapped == tested[[1L]]
+  } else {
+    revisions == revisions[[length(revisions)]]
+  }
+}
 corpus_labels <- c(
   final_dbsnp157_windows_seed29 = "GRCh38 dbSNP",
   final_giab_grch38_seed71 = "GRCh38 GIAB",
@@ -92,15 +116,7 @@ corpus_labels <- c(
 latest_runs <- do.call(rbind, lapply(names(corpus_labels), function(corpus) {
   rows <- overall[overall$corpus == corpus, , drop = FALSE]
   if (!nrow(rows)) return(NULL)
-  tested_ancestors <- revision_ancestry[
-    revision_ancestry %in% rows$source_revision
-  ]
-  revision <- if (length(tested_ancestors) > 0L) {
-    tested_ancestors[[1L]]
-  } else {
-    rows$source_revision[[nrow(rows)]]
-  }
-  rows[rows$source_revision == revision, , drop = FALSE]
+  rows[newest_tested(rows$source_revision), , drop = FALSE]
 }))
 latest_runs$corpus_label <- unname(corpus_labels[latest_runs$corpus])
 latest_runs <- latest_runs[order(
@@ -111,20 +127,16 @@ state_overall <- overall[
   ,
   drop = FALSE
 ]
-state_revisions <- unique(state_overall$source_revision)
-state_ancestry <- revision_ancestry[revision_ancestry %in% state_revisions]
-latest_state_revision <- if (length(state_ancestry) > 0L) {
-  state_ancestry[[1L]]
-} else if (nrow(state_overall)) {
-  state_overall$source_revision[[nrow(state_overall)]]
-} else {
-  ""
-}
 latest_state_runs <- state_overall[
-  state_overall$source_revision == latest_state_revision,
+  newest_tested(state_overall$source_revision),
   ,
   drop = FALSE
 ]
+latest_state_revision <- if (nrow(latest_state_runs)) {
+  latest_state_runs$source_revision[[1L]]
+} else {
+  ""
+}
 hgvs_bound_history <- hgvs_history[
   hgvs_history$extension_build_binding == "htslib_distclean_make_release" &
     grepl("^[0-9a-f]{64}$", hgvs_history$extension_sha256) &
@@ -145,17 +157,7 @@ if (nrow(hgvs_runs)) {
   groups <- interaction(hgvs_runs$corpus, hgvs_runs$model, drop = TRUE)
   latest_hgvs_run_ids <- do.call(rbind, lapply(
     split(hgvs_runs, groups),
-    function(rows) {
-      tested_ancestors <- revision_ancestry[
-        revision_ancestry %in% rows$source_revision
-      ]
-      revision <- if (length(tested_ancestors) > 0L) {
-        tested_ancestors[[1L]]
-      } else {
-        rows$source_revision[[nrow(rows)]]
-      }
-      rows[rows$source_revision == revision, , drop = FALSE]
-    }
+    function(rows) rows[newest_tested(rows$source_revision), , drop = FALSE]
   ))
 }
 nmd_history <- history[
@@ -178,17 +180,7 @@ if (nrow(nmd_history)) {
   )
   latest_nmd_run_ids <- do.call(rbind, lapply(
     split(nmd_runs, groups),
-    function(rows) {
-      tested_ancestors <- revision_ancestry[
-        revision_ancestry %in% rows$source_revision
-      ]
-      revision <- if (length(tested_ancestors) > 0L) {
-        tested_ancestors[[1L]]
-      } else {
-        rows$source_revision[[nrow(rows)]]
-      }
-      rows[rows$source_revision == revision, , drop = FALSE]
-    }
+    function(rows) rows[newest_tested(rows$source_revision), , drop = FALSE]
   ))
 }
 upper95 <- function(k, n) {

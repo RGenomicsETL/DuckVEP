@@ -1,9 +1,10 @@
 # Evidence shown in README.Rmd, computed from the committed ledgers and benchmark receipts.
 #
-# Ledgers record the DuckHTS source revision that produced each run. DuckVEP's
-# history was extracted with git filter-repo, so revisions are translated through
-# design/duckhts-commit-map.txt before choosing, per corpus, the newest run whose
-# revision is an ancestor of HEAD (the same rule as benchmarks/duckvep_conformance.Rmd).
+# Runs from before the extraction record the DuckHTS source revision that produced
+# them. DuckVEP's history was extracted with git filter-repo, so those revisions are
+# translated through design/duckhts-commit-map.txt; runs recorded since carry DuckVEP
+# revisions and are used as they are. Per corpus, the newest run whose revision is an
+# ancestor of HEAD is chosen (the same rule as benchmarks/duckvep_conformance.Rmd).
 
 readme_evidence <- function(root = ".") {
   path <- function(...) file.path(root, ...)
@@ -15,7 +16,9 @@ readme_evidence <- function(root = ".") {
   commit_map[commit_map == strrep("0", 40L)] <- NA_character_
   ancestry <- system2("git", c("-C", shQuote(root), "rev-list", "--topo-order", "HEAD"),
     stdout = TRUE)
-  translate <- function(revision) unname(commit_map[revision])
+  translate <- function(revision) {
+    ifelse(revision %in% ancestry, revision, unname(commit_map[revision]))
+  }
 
   latest <- function(rows) {
     mapped <- translate(rows$source_revision)
@@ -49,7 +52,7 @@ readme_evidence <- function(root = ".") {
     data.frame(corpora[i, c("label", "assembly")], oracle = paste("VEP", run$oracle_version[[1L]]),
       pairs = sum(run$n), exact = sum(run$exact_agree), unresolved = sum(run$unresolved),
       differences = sum(run$n) - sum(run$exact_agree) - sum(run$unresolved),
-      stringsAsFactors = FALSE)
+      run_date = max(run$run_date), stringsAsFactors = FALSE)
   }))
 
   hgvs <- read.csv(path("test", "duckvep", "conformance", "data", "hgvs_history.csv"),
@@ -84,7 +87,10 @@ readme_evidence <- function(root = ".") {
   # Repeated measurements of one configuration: keep the last recorded.
   public <- public[!duplicated(public[c("output_mode", "threads")], fromLast = TRUE), ]
 
-  list(conformance = conformance, hgvs = hgvs_summary, public = public)
+  # The newest run the README reports, so it can say what the counts do not yet cover.
+  newest_run <- max(c(conformance$run_date, hgvs_runs$run_date))
+
+  list(conformance = conformance, hgvs = hgvs_summary, public = public, newest_run = newest_run)
 }
 
 # DuckDB box tables printed into a log, as data frames (first table whose header has `first`).
@@ -107,12 +113,20 @@ read_box <- function(path, first) {
   stop("no table starting with ", first, " in ", path)
 }
 
-# Newest benchmark directory (by its receipt's modification time) among `pattern` under `dir`.
+# Newest benchmark directory among `pattern` under `dir`, by the commit time of the source
+# revision its name carries (e.g. hg002_2417ac9). File modification times are checkout
+# times in a fresh clone, so they cannot order receipts.
 newest_dir <- function(dir, pattern, receipt) {
   dirs <- list.files(dir, pattern = pattern, full.names = TRUE)
   dirs <- dirs[file.exists(file.path(dirs, receipt))]
-  stopifnot(length(dirs) > 0L)
-  dirs[which.max(file.mtime(file.path(dirs, receipt)))]
+  revisions <- sub("^.*?([0-9a-f]{7,40}).*$", "\\1", basename(dirs), perl = TRUE)
+  when <- vapply(revisions, function(rev) {
+    out <- suppressWarnings(system2("git", c("show", "-s", "--format=%ct", rev),
+      stdout = TRUE, stderr = FALSE))
+    if (length(out) == 1L && grepl("^[0-9]+$", out)) as.numeric(out) else NA_real_
+  }, numeric(1))
+  stopifnot(any(!is.na(when)))
+  dirs[which.max(when)]
 }
 
 speed_evidence <- function(root = ".") {

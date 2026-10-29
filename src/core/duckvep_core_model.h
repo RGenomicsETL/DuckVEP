@@ -174,6 +174,9 @@ typedef struct duckvep_model_entry {
 	duckvep_owned_model_t model;
 	duckvep_workspace_cache_t *workspaces;
 	size_t pins;
+	/* Distinct for every model installed in a registry, so a query can tell
+	 * the model it started with from one dropped and reloaded under its name. */
+	uint64_t generation;
 	struct duckvep_model_entry *next;
 } duckvep_model_entry_t;
 
@@ -189,6 +192,7 @@ typedef struct duckvep_registry {
 	size_t admitted;
 	void (*annotation_state_pool_destroy)(void *);
 	size_t references;
+	uint64_t last_generation;
 } duckvep_registry_t;
 
 void duckvep_sql_set_error(char *, size_t, const char *);
@@ -201,6 +205,8 @@ void duckvep_registry_release(void *);
 duckvep_model_entry_t *duckvep_registry_pin(duckvep_registry_t *,
 	const char *);
 void duckvep_registry_unpin(duckvep_registry_t *, duckvep_model_entry_t *);
+void duckvep_registry_link_locked(duckvep_registry_t *, duckvep_model_entry_t *);
+int duckvep_registry_generation(duckvep_registry_t *, const char *, uint64_t *);
 duckvep_workspace_cache_t *duckvep_registry_workspace_take(
 	duckvep_registry_t *, duckvep_model_entry_t *, char *, size_t);
 void duckvep_registry_workspace_return(duckvep_registry_t *,

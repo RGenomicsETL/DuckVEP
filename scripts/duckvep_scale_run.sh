@@ -16,7 +16,6 @@ SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 REPO="$(dirname "$SCRIPT_DIR")"
 GIB=$((1024 * 1024 * 1024))
-PANEL_ROOT="${DUCKVEP_GNOMAD_ROOT:-/root/duckvep/data/gnomad-v4.1}/panels"
 
 usage() {
   cat <<'EOF'
@@ -26,7 +25,7 @@ usage: duckvep_scale_run.sh --jobs N --panel PANEL --out DIR [options]
   --panel P                1M, 5M, 25M, 100M, exome2M, structural, or a Parquet path
   --out DIR                output directory (receipt, summary, per-job files); must be empty or new
   --model PATH             GRCh38 model DuckDB file
-                           (default $DUCKVEP_SCALE_MODEL or /root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb)
+                           (default $DUCKVEP_SCALE_MODEL or $DUCKVEP_DATA/models/homo_sapiens_116_GRCh38_final.duckdb)
   --extension PATH         duckvep.duckdb_extension (default build/release/extension/duckvep/duckvep.duckdb_extension).
                            It is copied to OUT/artifacts/ and only the copy is loaded. A path under a build
                            directory is refused unless --allow-live-extension is given.
@@ -117,7 +116,7 @@ if [[ "${1:-}" == "--self-test" ]] || [[ " $* " == *" --self-test "* ]]; then
 fi
 
 # ---------------------------------------------------------------- arguments
-JOBS=1 PANEL="" OUT="" MODEL="${DUCKVEP_SCALE_MODEL:-/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb}"
+JOBS=1 PANEL="" OUT="" MODEL="${DUCKVEP_SCALE_MODEL:-}"
 EXTENSION="$REPO/build/release/extension/duckvep/duckvep.duckdb_extension"
 ALLOW_LIVE=0 THREADS=6 CGROUP=auto ALLOW_UNENFORCED=0 OVERSUBSCRIBE=0 MODES="compact,complete17" SPILL_PARENT="" KEEP=0
 MIN_FREE_GIB=10 REGULATION=1 RETRY=0 LIMIT_ROWS="" MEMORY_MAX=16G DUCKDB_LIMIT=8GB MAX_TEMP=32GiB BUDGET_MIB=4096 WORKERS=6 SCRATCH_MIB=128 EMIT_MIB=256
@@ -170,6 +169,11 @@ size_bytes() {  # 16G, 512M, 8GB, 32GiB, plain bytes
 
 # Panel names resolve through the symlinks that scripts/gnomad_build_panels.sh maintains.
 resolve_panel() {
+  local PANEL_ROOT
+  case "$1" in
+    1M|5M|25M|100M|exome2M|structural)
+      PANEL_ROOT="${DUCKVEP_GNOMAD_ROOT:-${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}/gnomad-v4.1}/panels" ;;
+  esac
   case "$1" in
     1M) echo "$PANEL_ROOT/genomes-1M.parquet" ;; 5M) echo "$PANEL_ROOT/genomes-5M.parquet" ;;
     25M) echo "$PANEL_ROOT/genomes-25M.parquet" ;; 100M) echo "$PANEL_ROOT/genomes-100M.parquet" ;;
@@ -180,6 +184,7 @@ resolve_panel() {
 PANEL_FILE="$(resolve_panel "$PANEL")"
 [[ -e "$PANEL_FILE" ]] || die "panel $PANEL not found ($PANEL_FILE); build it with scripts/gnomad_build_panels.sh (a 100M panel needs every genome shard)"
 PANEL_FILE="$(readlink -f "$PANEL_FILE")"
+[[ -n "$MODEL" ]] || MODEL="${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}/models/homo_sapiens_116_GRCh38_final.duckdb"
 [[ -r "$MODEL" ]] || die "model not readable: $MODEL"
 [[ -r "$EXTENSION" ]] || die "extension not found: $EXTENSION (run make release or pass --extension)"
 EXTENSION="$(readlink -f "$EXTENSION")"

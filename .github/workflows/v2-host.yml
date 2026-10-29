@@ -9,6 +9,9 @@ on:
     paths:
       - 'host_v2/**'
       - 'src/kernel/**'
+      - 'src/core/**'
+      - 'src/duckvep_reference.*'
+      - 'third_party/cgranges/**'
       - 'duckdb_capi_v2/**'
       - 'duckvep-package.json'
       - 'test/sql_v2/**'
@@ -22,6 +25,9 @@ on:
     paths:
       - 'host_v2/**'
       - 'src/kernel/**'
+      - 'src/core/**'
+      - 'src/duckvep_reference.*'
+      - 'third_party/cgranges/**'
       - 'duckdb_capi_v2/**'
       - 'duckvep-package.json'
       - 'test/sql_v2/**'

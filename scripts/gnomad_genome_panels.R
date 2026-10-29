@@ -1,6 +1,13 @@
 library(DBI)
 library(duckdb)
-root <- Sys.getenv("DUCKVEP_GNOMAD_ROOT", "/root/duckvep/data/gnomad-v4.1")
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
+root <- duckvep_data("gnomad-v4.1", "DUCKVEP_GNOMAD_ROOT")
 shards <- list.dirs(root, recursive = FALSE, full.names = TRUE)
 shards <- shards[grepl("/genomes-chr(1[0-9]|2[0-2]|[1-9]|X|Y)$", shards)]
 if (length(shards) == 0L || any(!file.exists(file.path(shards, "source.tsv")))) {
@@ -37,7 +44,7 @@ source(file.path(dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE)
 panel_spill_setup(execute, q)
 paths <- paste(vapply(files, q, character(1L)), collapse = ",")
 execute(paste0("CREATE TEMP VIEW source_alleles AS SELECT * FROM read_parquet([", paths, "])"))
-model <- Sys.getenv("DUCKVEP_SCALE_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
+model <- duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb", "DUCKVEP_SCALE_MODEL")
 execute(paste0("ATTACH ", q(normalizePath(model)), " AS model (READ_ONLY)"))
 if (get("SELECT count(*) AS n FROM source_alleles a
   LEFT JOIN model.duckvep_sequence_regions r ON r.name = regexp_replace(a.chrom, '^chr', '')

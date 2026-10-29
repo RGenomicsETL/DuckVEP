@@ -1533,8 +1533,9 @@ than cgranges' 16-byte core interval. Count-only payload elision and chromosome 
 are valid future optimizations. Exact dbSNP, TOPMed, REVEL, AlphaMissense, ClinVar, and
 frequency sources stay sorted/partitioned Parquet streams. The measured storage, serving
 RSS, interval-index density, real multi-provider plan, join-count stress, and
-twelve-provider logical-time envelope live in
-`benchmarks/benchmark_variantkey_join_overlap.md`.
+twelve-provider logical-time envelope were measured before DuckVEP was extracted from
+DuckHTS, and the report stayed there:
+[`benchmarks/benchmark_variantkey_join_overlap.md`](https://github.com/RGenomicsETL/duckhts/blob/main/benchmarks/benchmark_variantkey_join_overlap.md).
 
 Supplementary source plumbing does not belong as ignored arguments in the
 consequence-kernel API.

@@ -118,7 +118,7 @@ For VCF or BCF input, [`duckvep_coding_calls(model, path)`](docs/functions.md#du
 
 ## How close to VEP
 
-Across 9 recorded corpora, executable Ensembl VEP and DuckVEP agree on **1,486,561 of 1,486,561 transcript and feature pairs**; 0 are unresolved and 0 differ. The corpora cover GRCh37 and GRCh38, *Plasmodium falciparum* genetic codes, small variants, exact structural events, paired breakends, and regulatory and motif features. HGVS against VEP `--hgvs`: 357,806 of 357,806 HGVSc and 357,806 of 357,806 HGVSp pairs agree, 56,998 of them from ClinVar chromosome 21.
+Across 9 recorded corpora, executable Ensembl VEP and DuckVEP agree on **1,486,561 of 1,486,561 transcript and feature pairs**; 0 are unresolved and 0 differ. The corpora cover GRCh37 and GRCh38, *Plasmodium falciparum* genetic codes, small variants, exact structural events, paired breakends, and regulatory and motif features. HGVS against VEP `--hgvs`: 357,806 of 357,806 HGVSc and 357,806 of 357,806 HGVSp pairs agree, 56,998 of them from ClinVar chromosome 21. The newest of these runs is dated 2026-09-07; changes merged after it are not covered until the corpora are rerun.
 
 The [conformance report](benchmarks/duckvep_conformance.md) has the methods and term-level results; the [consequence](test/duckvep/conformance/data/conformance_history.csv) and [HGVS](test/duckvep/conformance/data/hgvs_history.csv) ledgers hold every run with its source revision.
 
@@ -127,17 +127,17 @@ The [conformance report](benchmarks/duckvep_conformance.md) has the methods and 
 Per-corpus counts
 </summary>
 
-| Corpus                                 | Assembly        | Oracle  |   Pairs |   Exact | Unresolved | Different |
-|:---------------------------------------|:----------------|:--------|--------:|--------:|-----------:|----------:|
-| dbSNP 157 windows                      | GRCh38          | VEP 116 |  73,620 |  73,620 |          0 |         0 |
-| GIAB HG002 small variants              | GRCh38          | VEP 116 |  54,905 |  54,905 |          0 |         0 |
-| ClinVar coding                         | GRCh38          | VEP 116 | 287,836 | 287,836 |          0 |         0 |
-| ClinVar, all chromosomes               | GRCh38          | VEP 116 | 316,397 | 316,397 |          0 |         0 |
-| GRCh37 cache corpus                    | GRCh37          | VEP 116 | 486,464 | 486,464 |          0 |         0 |
-| *P. falciparum* (Ensembl Genomes 63)   | GCA_000002765v3 | VEP 116 |  40,732 |  40,732 |          0 |         0 |
-| Paired breakends, multi-chromosome     | GRCh38          | VEP 116 |  91,428 |  91,428 |          0 |         0 |
-| GIAB + regulatory and motif features   | GRCh38          | VEP 116 |  14,955 |  14,955 |          0 |         0 |
-| Exact structural variants + regulation | GRCh38          | VEP 116 | 120,224 | 120,224 |          0 |         0 |
+| Corpus                                 | Assembly        | Oracle  |   Pairs |   Exact | Unresolved | Different | Run date   |
+|:---------------------------------------|:----------------|:--------|--------:|--------:|-----------:|----------:|:-----------|
+| dbSNP 157 windows                      | GRCh38          | VEP 116 |  73,620 |  73,620 |          0 |         0 | 2026-07-14 |
+| GIAB HG002 small variants              | GRCh38          | VEP 116 |  54,905 |  54,905 |          0 |         0 | 2026-07-14 |
+| ClinVar coding                         | GRCh38          | VEP 116 | 287,836 | 287,836 |          0 |         0 | 2026-07-16 |
+| ClinVar, all chromosomes               | GRCh38          | VEP 116 | 316,397 | 316,397 |          0 |         0 | 2026-07-16 |
+| GRCh37 cache corpus                    | GRCh37          | VEP 116 | 486,464 | 486,464 |          0 |         0 | 2026-07-15 |
+| *P. falciparum* (Ensembl Genomes 63)   | GCA_000002765v3 | VEP 116 |  40,732 |  40,732 |          0 |         0 | 2026-07-15 |
+| Paired breakends, multi-chromosome     | GRCh38          | VEP 116 |  91,428 |  91,428 |          0 |         0 | 2026-07-16 |
+| GIAB + regulatory and motif features   | GRCh38          | VEP 116 |  14,955 |  14,955 |          0 |         0 | 2026-07-16 |
+| Exact structural variants + regulation | GRCh38          | VEP 116 | 120,224 | 120,224 |          0 |         0 | 2026-07-16 |
 
 </details>
 

@@ -6,17 +6,27 @@
 #' @export
 rduckvep_load <- function(con, extension_path = NULL) {
   if (is.null(extension_path)) {
-    extension_path <- system.file(
-      "duckvep_extension", "artifacts",
-      paste0("v", as.character(utils::packageVersion("duckdb"))),
-      "duckvep.duckdb_extension", package = "Rduckvep"
-    )
+    extension_path <- .duckvep_bundled_artifact(as.character(utils::packageVersion("duckdb")))
   }
   if (!length(extension_path) || !nzchar(extension_path) || !file.exists(extension_path)) {
     stop("DuckVEP artifact for installed DuckDB is not available", call. = FALSE)
   }
   DBI::dbExecute(con, paste("LOAD", as.character(DBI::dbQuoteString(con, extension_path))))
   invisible(con)
+}
+
+# The artifact built for the installed duckdb, else the newest one bundled. Artifacts declare the
+# stable C API v1.2.0, so one built against an older duckdb still loads after duckdb is upgraded;
+# DuckDB itself refuses a footer it cannot load.
+.duckvep_bundled_artifact <- function(duckdb_version) {
+  artifacts <- system.file("duckvep_extension", "artifacts", package = "Rduckvep")
+  exact <- file.path(artifacts, paste0("v", duckdb_version), "duckvep.duckdb_extension")
+  if (nzchar(artifacts) && file.exists(exact)) return(exact)
+  found <- Sys.glob(file.path(artifacts, "v*", "duckvep.duckdb_extension"))
+  if (!nzchar(artifacts) || !length(found)) return("")
+  versions <- package_version(sub("^v", "", basename(dirname(found))), strict = FALSE)
+  if (all(is.na(versions))) return(found[[1L]])
+  found[order(versions, decreasing = TRUE, na.last = TRUE)][[1L]]
 }
 
 #' Open DuckDB with DuckVEP loaded

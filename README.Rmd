@@ -134,7 +134,7 @@ For VCF or BCF input, [`duckvep_coding_calls(model, path)`](docs/functions.md#du
 
 ## How close to VEP
 
-Across `r n(nrow(conf))` recorded corpora, executable Ensembl VEP and DuckVEP agree on **`r n(sum(conf$exact))` of `r n(sum(conf$pairs))` transcript and feature pairs**; `r n(sum(conf$unresolved))` are unresolved and `r n(sum(conf$differences))` differ. The corpora cover GRCh37 and GRCh38, *Plasmodium falciparum* genetic codes, small variants, exact structural events, paired breakends, and regulatory and motif features. HGVS against VEP `--hgvs`: `r n(hgvs$exact[hgvs$field == "HGVSc"])` of `r n(hgvs$pairs[hgvs$field == "HGVSc"])` HGVSc and `r n(hgvs$exact[hgvs$field == "HGVSp"])` of `r n(hgvs$pairs[hgvs$field == "HGVSp"])` HGVSp pairs agree, `r n(hgvs$clinvar_pairs[[1L]])` of them from ClinVar chromosome 21.
+Across `r n(nrow(conf))` recorded corpora, executable Ensembl VEP and DuckVEP agree on **`r n(sum(conf$exact))` of `r n(sum(conf$pairs))` transcript and feature pairs**; `r n(sum(conf$unresolved))` are unresolved and `r n(sum(conf$differences))` differ. The corpora cover GRCh37 and GRCh38, *Plasmodium falciparum* genetic codes, small variants, exact structural events, paired breakends, and regulatory and motif features. HGVS against VEP `--hgvs`: `r n(hgvs$exact[hgvs$field == "HGVSc"])` of `r n(hgvs$pairs[hgvs$field == "HGVSc"])` HGVSc and `r n(hgvs$exact[hgvs$field == "HGVSp"])` of `r n(hgvs$pairs[hgvs$field == "HGVSp"])` HGVSp pairs agree, `r n(hgvs$clinvar_pairs[[1L]])` of them from ClinVar chromosome 21. The newest of these runs is dated `r evidence$newest_run`; changes merged after it are not covered until the corpora are rerun.
 
 The [conformance report](benchmarks/duckvep_conformance.md) has the methods and term-level results; the [consequence](test/duckvep/conformance/data/conformance_history.csv) and [HGVS](test/duckvep/conformance/data/hgvs_history.csv) ledgers hold every run with its source revision.
 
@@ -147,8 +147,9 @@ shown$pairs <- n(shown$pairs)
 shown$exact <- n(shown$exact)
 shown$unresolved <- n(shown$unresolved)
 shown$differences <- n(shown$differences)
-knitr::kable(shown, col.names = c("Corpus", "Assembly", "Oracle", "Pairs", "Exact", "Unresolved", "Different"),
-  align = c("l", "l", "l", "r", "r", "r", "r"), format = "pipe")
+knitr::kable(shown, col.names = c("Corpus", "Assembly", "Oracle", "Pairs", "Exact", "Unresolved", "Different",
+    "Run date"),
+  align = c("l", "l", "l", "r", "r", "r", "r", "l"), format = "pipe")
 ```
 </details>
 

@@ -1,11 +1,11 @@
 library(targets)
 
 duckvep_root <- normalizePath(
-  Sys.getenv("DUCKHTS_ROOT", unset = "."),
+  Sys.getenv("DUCKVEP_ROOT", unset = Sys.getenv("DUCKHTS_ROOT", unset = ".")),
   mustWork = TRUE
 )
-if (!file.exists(file.path(duckvep_root, "ARCHITECTURE.md"))) {
-  stop("run the DuckVEP targets workflow from the DuckHTS repository root")
+if (!file.exists(file.path(duckvep_root, "pipelines", "duckvep", "_targets.R"))) {
+  stop("run the DuckVEP targets workflow from the DuckVEP repository root, or set DUCKVEP_ROOT")
 }
 source(file.path(duckvep_root, "scripts", "duckvep_evidence.R"))
 source(file.path(duckvep_root, "pipelines", "duckvep", "R", "pipeline.R"))
@@ -32,10 +32,7 @@ extension_receipt <- file.path(
   "extension.tsv"
 )
 default_micromamba <- Sys.getenv("MICROMAMBA", unset = "micromamba")
-default_vep_prefix <- Sys.getenv(
-  "VEP_PREFIX",
-  unset = "/root/miniconda3/envs/vep"
-)
+default_vep_prefix <- Sys.getenv("VEP_PREFIX")
 
 tar_option_set(
   packages = "blit",

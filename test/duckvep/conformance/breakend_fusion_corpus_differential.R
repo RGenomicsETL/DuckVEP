@@ -11,10 +11,17 @@
 # expected gene at each FusionCatcher endpoint is the caller's own GENS5/GENS3
 # INFO field. Loads an immutable copy of the extension; writes no receipt.
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 source("r/Rduckvep/R/builders.R")
 source("r/Rduckvep/R/structural_identity.R")
 data_dir <- "test/duckvep/conformance/data/breakend_fusion"
-model <- Sys.getenv("DUCKVEP_GRCH38_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
+model <- duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb", "DUCKVEP_GRCH38_MODEL")
 results_file <- file.path(data_dir, "fusioncatcher_v1.20_endpoint_genes.tsv")
 
 provenance <- read.delim(file.path(data_dir, "PROVENANCE.tsv"), stringsAsFactors = FALSE)

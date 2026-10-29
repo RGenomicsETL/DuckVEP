@@ -16,10 +16,7 @@ main <- function() {
       optparse::make_option(
         "--vep-prefix",
         dest = "vep_prefix",
-        default = Sys.getenv(
-          "VEP_PREFIX",
-          "/root/miniconda3/envs/vep"
-        )
+        default = Sys.getenv("VEP_PREFIX")
       ),
       optparse::make_option(
         "--vep-git",
@@ -79,6 +76,7 @@ main <- function() {
     )
     stopifnot(identical(revision, revisions[[name]]), !length(dirty))
   }
+  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix, mustWork = TRUE)
   conda <- function(...) {
     do.call(
