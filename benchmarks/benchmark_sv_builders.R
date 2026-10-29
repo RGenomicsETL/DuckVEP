@@ -10,6 +10,14 @@
 # on an already-materialized input table; input generation is outside it. Each
 # pair is timed three times and the median is reported.
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKHTS_CACHE_DIR (the DuckHTS benchmark cache).
+duckhts_cache <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKHTS_CACHE_DIR")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "),
+    "DUCKHTS_CACHE_DIR to the DuckHTS benchmark cache directory", call. = FALSE)
+  file.path(root, path)
+}
 args <- commandArgs(trailingOnly = TRUE)
 rss <- function(field) {
   line <- grep(paste0("^", field, ":"), readLines("/proc/self/status"), value = TRUE)
@@ -148,7 +156,7 @@ if (grepl("/build/release/", extension, fixed = TRUE)) {
 output <- args[[2L]]
 n <- if (length(args) >= 3L) as.integer(args[[3L]]) else 100000L
 sniffles <- if (length(args) >= 4L) normalizePath(args[[4L]], mustWork = TRUE) else
-  "/root/.cache/duckhts/corpora/duckvep/sniffles2_1kgp/sniffles2_joint_chr22_sites.vcf.gz"
+  duckhts_cache("corpora/duckvep/sniffles2_1kgp/sniffles2_joint_chr22_sites.vcf.gz")
 script <- normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)))
 plain <- tempfile(fileext = ".vcf"); writeLines(system2("gzip", c("-dc", shQuote(sniffles)), stdout = TRUE), plain)
 plan <- list(c("sv_geometry", "sniffles2_chr22"), c("breakend_pairs", "sniffles2_chr22"),

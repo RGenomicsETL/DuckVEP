@@ -4,7 +4,7 @@ source('scripts/duckvep_evidence.R')
 source('test/duckvep/conformance/haplotype_observations.R')
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
-    optparse::make_option('--vep-prefix', dest = 'prefix', default = '/root/miniconda3/envs/vep'),
+    optparse::make_option('--vep-prefix', dest = 'prefix', default = Sys.getenv('VEP_PREFIX')),
     optparse::make_option('--oracle', default = 'test/duckvep/conformance/haplotype_grouped_flags.pl'))))
   root <- normalizePath('.')
   pins <- c(vep = '57ea5c52340acc1f156267f810ad162e26597082', variation = '2fb834b987ede3824e200197a838ce11e91aeb4b')
@@ -12,6 +12,7 @@ main <- function() {
   for (i in seq_along(pins)) stopifnot(
     identical(duckvep_evidence_command('git', c('-C', mirrors[i], 'rev-parse', 'HEAD'), 'oracle revision'), unname(pins[i])),
     !length(duckvep_evidence_command('git', c('-C', mirrors[i], 'status', '--porcelain'), 'oracle checkout')))
+  if (!nzchar(opt$prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$prefix)
   environment <- duckvep_evidence_command('micromamba', c('list', '-p', prefix, '--explicit'), 'oracle environment')
   stopifnot(identical(duckvep_evidence_explicit_packages(environment),

@@ -3,7 +3,7 @@
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--vep-prefix", dest = "vep_prefix",
-      default = Sys.getenv("VEP_PREFIX", "/root/miniconda3/envs/vep")),
+      default = Sys.getenv("VEP_PREFIX")),
     optparse::make_option("--evidence-out", dest = "evidence_out", default = "",
       help = "Retain complete comparison pairs and raw oracle in a new directory")
   )))
@@ -17,6 +17,7 @@ main <- function() {
   for (name in names(revisions)) stopifnot(
     identical(system2("git", c("-C", mirrors[[name]], "rev-parse", "HEAD"), stdout = TRUE), revisions[[name]]),
     !length(system2("git", c("-C", mirrors[[name]], "status", "--porcelain"), stdout = TRUE)))
+  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix, mustWork = TRUE)
   out <- tempfile("reference_translation_", tmpdir = "test/duckvep/conformance/results")
   dir.create(out)

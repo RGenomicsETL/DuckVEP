@@ -28,7 +28,8 @@ here <- normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), v
 scale_dir <- dirname(here)
 root <- normalizePath(file.path(scale_dir, "..", ".."))
 extension <- Sys.getenv("DUCKVEP_SCALE_EXTENSION", file.path(root, "build", "release", "duckvep.duckdb_extension"))
-data <- Sys.getenv("DUCKVEP_DATA", "/root/duckvep/data")
+data <- Sys.getenv("DUCKVEP_DATA")
+if (!nzchar(data)) stop("set DUCKVEP_DATA", call. = FALSE)
 hg002 <- file.path(data, "hg002-csq", "hg002.ens.vcf.gz")
 ledger <- Sys.getenv("DUCKVEP_HG002_LEDGER", file.path(work, "hg002_domain.counts.tsv.records.tsv.gz"))
 seed <- 20260929L
@@ -104,7 +105,7 @@ if (!built("qual5m_calls.parquet"))
 # longest coding sequence, at most one per 16-base block and only in the first 8 bases of a block (so no two edits overlap), phased
 # in one phase set: thousands of edits on one haplotype of a 100 kb coding sequence, indels included. Low-sharing: one variant
 # per MANE transcript, so no two calls share a transcript and nothing shares an edit path.
-sql("ATTACH '/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb' AS m (READ_ONLY)")
+sql(paste0("ATTACH '", file.path(data, "models/homo_sapiens_116_GRCh38_final.duckdb"), "' AS m (READ_ONLY)"))
 sql("CREATE TABLE mane_exons AS SELECT t.transcript_stable_id, t.seq_region_name AS chrom, greatest(e.exon_start, t.cds_start) AS s, least(e.exon_end, t.cds_end) AS en,
   octet_length(t.cds_sequence) AS cds_bytes FROM m.model_transcripts t, unnest(t.exons) u(e)
   WHERE t.mane_select_refseq IS NOT NULL AND t.cds_sequence IS NOT NULL AND greatest(e.exon_start, t.cds_start) <= least(e.exon_end, t.cds_end)")

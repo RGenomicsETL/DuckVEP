@@ -63,7 +63,7 @@ main <- function() {
     optparse::make_option('--seed', type = 'integer', default = 173L),
     optparse::make_option('--rare-per-stratum', dest = 'quota', type = 'integer', default = 1L),
     optparse::make_option('--extension-receipt', dest = 'extension_receipt', default = NULL),
-    optparse::make_option('--vep-prefix', dest = 'prefix', default = '/root/miniconda3/envs/vep'))))
+    optparse::make_option('--vep-prefix', dest = 'prefix', default = Sys.getenv('VEP_PREFIX')))))
   stopifnot(!is.na(opt$seed), !is.na(opt$quota), opt$quota >= 1L, opt$quota <= 32768L %/% 360L)
   root <- normalizePath('.')
   revision <- duckvep_evidence_revision(root)
@@ -81,6 +81,7 @@ main <- function() {
   for (i in seq_along(pins)) stopifnot(
     identical(duckvep_evidence_command('git', c('-C', mirrors[i], 'rev-parse', 'HEAD'), 'revision'), unname(pins[i])),
     !length(duckvep_evidence_command('git', c('-C', mirrors[i], 'status', '--porcelain'), 'clean oracle')))
+  if (!nzchar(opt$prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$prefix)
   environment <- duckvep_evidence_command('micromamba', c('list', '-p', prefix, '--explicit'), 'environment')
   stopifnot(identical(duckvep_evidence_explicit_packages(environment),

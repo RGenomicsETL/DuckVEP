@@ -309,7 +309,7 @@ op <- add_option(
   op,
   "--vep-prefix",
   dest = "vep_prefix",
-  default = Sys.getenv("VEP_PREFIX", "/root/miniconda3/envs/vep"),
+  default = Sys.getenv("VEP_PREFIX"),
   help = "micromamba environment prefix containing VEP 116 [%default]"
 )
 op <- add_option(
@@ -2779,6 +2779,7 @@ micromamba <- if (file.exists(opt$micromamba)) {
 if (!nzchar(micromamba)) {
   die("micromamba is unavailable: {opt$micromamba}")
 }
+if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
 if (!dir.exists(opt$vep_prefix)) {
   die("VEP environment prefix does not exist: {opt$vep_prefix}")
 }

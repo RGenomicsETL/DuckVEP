@@ -5,13 +5,20 @@
 #
 #   Rscript benchmarks/haplotype_scale/verify_discovery.R WORK/hg002_domain.counts.tsv.records.tsv.gz [EXTENSION]
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 args <- commandArgs(trailingOnly = TRUE)
 ledger <- args[[1L]]
 here <- normalizePath(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1L]))
 root <- normalizePath(file.path(dirname(here), "..", ".."))
 extension <- if (length(args) >= 2L) args[[2L]] else file.path(root, "build", "release", "duckvep.duckdb_extension")
-vcf <- "/root/duckvep/data/hg002-csq/hg002.ens.vcf.gz"
-model <- "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb"
+vcf <- duckvep_data("hg002-csq/hg002.ens.vcf.gz")
+model <- duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb")
 con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extensions = "true", threads = "4")))
 on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
 q <- function(x) as.character(dbQuoteString(con, x))

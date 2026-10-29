@@ -9,7 +9,7 @@
 # threads, seconds (the CLI's timer around the load statement), peak RSS (KiB, GNU time) and CPU.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
-model=${1:-/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb}; runs=${2:-3}
+model=${1:-${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}/models/homo_sapiens_116_GRCh38_final.duckdb}; runs=${2:-3}
 ext=$root/build/release/duckvep.duckdb_extension
 out=$root/benchmarks/data/duckvep_model_load.csv
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT

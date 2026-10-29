@@ -32,10 +32,7 @@ extension_receipt <- file.path(
   "extension.tsv"
 )
 default_micromamba <- Sys.getenv("MICROMAMBA", unset = "micromamba")
-default_vep_prefix <- Sys.getenv(
-  "VEP_PREFIX",
-  unset = "/root/miniconda3/envs/vep"
-)
+default_vep_prefix <- Sys.getenv("VEP_PREFIX")
 
 tar_option_set(
   packages = "blit",

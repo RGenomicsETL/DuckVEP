@@ -10,7 +10,7 @@
 # (paths per prediction status and reason).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/../.." && pwd)
-data=${DATA:-/root/duckvep/data}
+data=${DATA:-${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}}
 vcf=$data/hg002-csq/hg002.ens.vcf.gz
 gff=$data/hg002-csq/Homo_sapiens.GRCh38.116.gff3.gz
 fasta=$data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa

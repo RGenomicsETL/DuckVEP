@@ -4,7 +4,7 @@
 #
 #   HF_TOKEN=... bash scripts/publish-benchmark-inputs.sh [--public] [--dry-run] REPO_ID
 #
-# Inputs (environment, defaults under /root/duckvep/data):
+# Inputs (environment, defaults under $DUCKVEP_DATA; CORPUS_VCF defaults under $DUCKHTS_CACHE_DIR):
 #   HG002_VCF     hg002.ens.vcf.gz from benchmarks/prepare_hg002.sh
 #   QUAL5M_VCF    qual5m.vcf.gz from benchmarks/haplotype_scale/prepare_inputs.R
 #   CONTROLS_DIR  dense.vcf.gz and low_sharing.vcf.gz from the same script
@@ -21,13 +21,13 @@ while [[ $# -gt 0 && $1 == --* ]]; do
     shift
 done
 repo=${1:?usage: publish-benchmark-inputs.sh [--public] [--dry-run] REPO_ID}
-data=/root/duckvep/data
+data=${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}
 hg002=${HG002_VCF:-$data/hg002-csq/hg002.ens.vcf.gz}
 qual5m=${QUAL5M_VCF:-$data/haplotype-scale/qual5m.vcf.gz}
 controls=${CONTROLS_DIR:-$data/haplotype-scale}
 corpus=${CORPUS_DB:-$data/scale5/corpus.duckdb}
 model=${MODEL_DB:-$data/models/homo_sapiens_116_GRCh38_final.duckdb}
-corpus_vcf=${CORPUS_VCF:-/root/.cache/duckhts/benchmarks/variantkey-providers/raw/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz}
+corpus_vcf=${CORPUS_VCF:-${DUCKHTS_CACHE_DIR:?set DUCKHTS_CACHE_DIR to the DuckHTS benchmark cache directory}/benchmarks/variantkey-providers/raw/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz}
 duckdb_bin=${DUCKDB:-duckdb}; bcftools=${BCFTOOLS:-bcftools}
 [[ $dry_run == 1 || -n ${HF_TOKEN:-} ]] || { echo "set HF_TOKEN" >&2; exit 1; }
 stage=${STAGE:-$(mktemp -d)}; mkdir -p "$stage"; work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
