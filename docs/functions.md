@@ -130,11 +130,11 @@ SELECT * FROM query(duckvep_ensembl_transcripts_sql(
 
 ### duckvep_ensembl_rna_edits_sql
 
-Builds a typed transcript SeqEdit query from an Ensembl core schema and reference chunks. The original raw-cDNA coding start/end (`UBIGINT`) and explicit genetic code (`UTINYINT`) travel with each programme; the producer must supply all three together. Optional compatibility CDS/code columns may be NULL. SeqEdit coordinates refer to original cDNA, not edited CDS. The query's two source names must be nonempty; its optional options STRUCT is currently unsupported.
+Builds a typed transcript SeqEdit query from an Ensembl core schema and a prepared transcripts relation, which must carry `transcript_index`, `source_transcript_id` and the spliced `cdna_sequence` the edits apply to. The original raw-cDNA coding start/end (`UBIGINT`) and explicit genetic code (`UTINYINT`) travel with each programme; the producer must supply all three together. Optional compatibility CDS/code columns may be NULL. SeqEdit coordinates refer to original cDNA, not edited CDS. The query's two source names must be nonempty; its optional options STRUCT is currently unsupported.
 
 ```sql
 SELECT left(duckvep_ensembl_rna_edits_sql(
-  'duckvep_core', 'duckvep_reference_chunks'), 120) AS query_prefix;
+  'duckvep_core', 'prepared_transcripts'), 120) AS query_prefix;
 ```
 
 <a id="duckvep_ensembl_regulation_features_sql"></a>
