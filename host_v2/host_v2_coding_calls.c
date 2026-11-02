@@ -36,14 +36,14 @@ static void cc_bind_destroy(void *pointer) {
     free(b);
 }
 
-static char *argument_text(duckdb_v2_table_function_bind_info_handle info, idx_t index,
+static char *argument_text(duckdb_v2_function_bind_info_handle info, idx_t index,
                            duckdb_v2_error_info_handle *error) {
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_value_handle value = NULL;
     duckdb_v2_str text;
     char *copy = NULL;
     bool is_null = false;
-    DUCKDB_CALL(duckdb_v2_table_function_bind_get_arg_value(info, index, &value, &detail));
+    DUCKDB_CALL(duckdb_v2_function_bind_get_arg_value(info, index, &value, &detail));
     DUCKDB_CALL(duckdb_v2_value_is_null(value, &is_null, &detail));
     if (!is_null) {
         DUCKDB_CALL(duckdb_v2_value_get_varchar(value, &text, &detail));
@@ -59,7 +59,8 @@ cleanup:
     return copy;
 }
 
-static void cc_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckdb_v2_context_handle context,
+static void cc_bind_exec(duckdb_v2_function_bind_info_handle info,
+                         duckdb_v2_table_function_bind_info_handle result, duckdb_v2_context_handle context,
                          duckdb_v2_error_info_handle *error) {
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_logical_type_handle type = NULL;
@@ -72,7 +73,7 @@ static void cc_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckdb_
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, CC "out of memory");
         return;
     }
-    DUCKDB_CALL(duckdb_v2_table_function_bind_get_user_data(info, (void **)&state, &detail));
+    DUCKDB_CALL(duckdb_v2_function_bind_get_user_data(info, (void **)&state, &detail));
     b->state = state;
     host_v2_state_retain(state);
     name = argument_text(info, 0, error);
@@ -89,13 +90,12 @@ static void cc_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckdb_
     }
     for (unsigned i = 0; i < DUCKVEP_CC_COLUMNS; ++i) {
         DUCKDB_CALL(make_type(context, duckvep_cc_column_type(i), &type, &detail));
-        DUCKDB_CALL(duckdb_v2_table_function_bind_add_result_column(
-            info, string_view(duckvep_cc_column_name(i)), type, &detail));
+        DUCKDB_CALL(add_result_column(result, duckvep_cc_column_name(i), type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
     {
         duckdb_v2_opaque data = {b, cc_bind_destroy, NULL};
-        DUCKDB_CALL(duckdb_v2_table_function_bind_set_bind_data(info, &data, &detail));
+        DUCKDB_CALL(duckdb_v2_function_bind_set_bind_data(info, &data, &detail));
         owned = true;
     }
 cleanup:
@@ -243,12 +243,14 @@ bool host_v2_register_coding_calls(duckdb_v2_extension_handle extension, duckdb_
     duckdb_v2_logical_type_handle type = NULL;
     duckdb_v2_str name = string_view("duckvep_coding_calls");
     bool success = false, retained = false;
-    DUCKDB_CALL(duckdb_v2_table_function_create_with_extension(extension, &function, &detail));
+    duckdb_v2_factory_handle factory = NULL;
+    DUCKDB_CALL(duckdb_v2_context_get_factory(context, &factory, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_create(factory, &function, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_name(function, &name, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_get_signature(function, &signature, &detail));
     DUCKDB_CALL(make_type(context, "VARCHAR", &type, &detail));
-    DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(signature, string_view("model"), type, NULL, &detail));
-    DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(signature, string_view("path"), type, NULL, &detail));
+    DUCKDB_CALL(add_parameter(signature, "model", type, &detail));
+    DUCKDB_CALL(add_parameter(signature, "path", type, &detail));
     {
         duckdb_v2_opaque data = {state, host_v2_state_release, NULL};
         host_v2_state_retain(state);
@@ -259,7 +261,7 @@ bool host_v2_register_coding_calls(duckdb_v2_extension_handle extension, duckdb_
     DUCKDB_CALL(duckdb_v2_table_function_set_bind_callback(function, cc_bind_exec, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_init_global_callback(function, cc_init_exec, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_exec_callback(function, cc_exec, &detail));
-    DUCKDB_CALL(duckdb_v2_table_function_register(function, &detail));
+    DUCKDB_CALL(duckdb_v2_extension_register_table_function(extension, function, &detail));
     success = true;
 cleanup:
     if (retained) {

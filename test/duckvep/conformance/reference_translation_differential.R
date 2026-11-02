@@ -7,6 +7,7 @@ main <- function() {
     optparse::make_option("--evidence-out", dest = "evidence_out", default = "",
       help = "Retain complete comparison pairs and raw oracle in a new directory")
   )))
+  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   source("scripts/duckvep_evidence.R", local = TRUE)
   root <- normalizePath(".")
   revision <- duckvep_evidence_revision(root)
@@ -17,7 +18,6 @@ main <- function() {
   for (name in names(revisions)) stopifnot(
     identical(system2("git", c("-C", mirrors[[name]], "rev-parse", "HEAD"), stdout = TRUE), revisions[[name]]),
     !length(system2("git", c("-C", mirrors[[name]], "status", "--porcelain"), stdout = TRUE)))
-  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix, mustWork = TRUE)
   out <- tempfile("reference_translation_", tmpdir = "test/duckvep/conformance/results")
   dir.create(out)

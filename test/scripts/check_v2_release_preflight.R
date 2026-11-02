@@ -192,8 +192,8 @@ live_status <- function() {
     sprintf("GitHub tag=%s CRAN duckdb=%s", release_json$tag_name, cran["duckdb", "Version"]))
 }
 
-write_bad_footer <- function(path) {
-  fields <- c("4", "linux", "v2.0.0", "duckvep", "C_STRUCT_UNSTABLE", "", "", "")
+write_test_footer <- function(path, abi, version) {
+  fields <- c("4", "linux", version, "duckvep", abi, "", "", "")
   bytes <- raw(512L)
   for (i in seq_along(fields)) {
     value <- charToRaw(fields[[length(fields) - i + 1L]])
@@ -211,13 +211,19 @@ selftest <- function() {
   directory <- tempfile("release-preflight-")
   dir.create(directory)
   on.exit(unlink(directory, recursive = TRUE), add = TRUE)
-  footer <- file.path(directory, "wrong-footer.duckdb_extension")
-  write_bad_footer(footer)
+  footer <- file.path(directory, "test-footer.duckdb_extension")
   old <- Sys.getenv("DUCKVEP_V2_EXTENSION", unset = NA_character_)
   on.exit(if (is.na(old)) Sys.unsetenv("DUCKVEP_V2_EXTENSION") else Sys.setenv(DUCKVEP_V2_EXTENSION = old), add = TRUE)
   Sys.setenv(DUCKVEP_V2_EXTENSION = footer)
+  write_test_footer(footer, "C_STRUCT", pin$target_duckdb_version)
   footer_check <- run("python3", c(file.path(root, "test", "scripts", "check_v2_host.py"), "footer"))
-  stopifnot(!footer_check$ok, any(grepl("C_STRUCT_UNSTABLE", footer_check$output, fixed = TRUE)))
+  stopifnot(!footer_check$ok, any(grepl("expected C_STRUCT_UNSTABLE", footer_check$output, fixed = TRUE)))
+  write_test_footer(footer, "C_STRUCT_UNSTABLE", "v2.0.1")
+  footer_check <- run("python3", c(file.path(root, "test", "scripts", "check_v2_host.py"), "footer"))
+  stopifnot(!footer_check$ok, any(grepl("footer version", footer_check$output, fixed = TRUE)))
+  write_test_footer(footer, pin$abi_type, pin$target_duckdb_version)
+  footer_check <- run("python3", c(file.path(root, "test", "scripts", "check_v2_host.py"), "footer"))
+  stopifnot(footer_check$ok)
   missing <- hg002_checks(tempfile("missing-hg002-"), pin$duckdb_sdk_revision, footer, pin$duckdb_sdk_revision)
   stopifnot(!all(missing))
   rows <- file.path(directory, "comparison.csv")
@@ -291,7 +297,7 @@ if (!is.null(options$extension) && file.exists(options$extension)) {
   on.exit(if (is.na(old)) Sys.unsetenv("DUCKVEP_V2_EXTENSION") else Sys.setenv(DUCKVEP_V2_EXTENSION = old), add = TRUE)
   Sys.setenv(DUCKVEP_V2_EXTENSION = normalizePath(options$extension))
   footer <- run("python3", c(file.path(root, "test", "scripts", "check_v2_host.py"), "footer"))
-  add_check("actual extension footer has stable v2 ABI", footer$ok, paste(footer$output, collapse = "\n"))
+  add_check("actual extension footer matches the pinned v2 ABI", footer$ok, paste(footer$output, collapse = "\n"))
   if (!is.null(options$v2_cli) && file.exists(options$v2_cli)) {
     escaped <- gsub("'", "''", normalizePath(options$extension), fixed = TRUE)
     load <- run(options$v2_cli, c("-unsigned", "-no-init", "-batch", "-bail", "-c", sprintf("LOAD '%s';", escaped)))
@@ -300,7 +306,7 @@ if (!is.null(options$extension) && file.exists(options$extension)) {
     add_check("actual extension loads in the supplied CLI", FALSE, "--v2-cli is not available")
   }
 } else {
-  add_check("actual extension footer has stable v2 ABI", FALSE, "--extension is missing or unreadable")
+  add_check("actual extension footer matches the pinned v2 ABI", FALSE, "--extension is missing or unreadable")
   add_check("actual extension loads in the supplied CLI", FALSE, "no extension artifact supplied")
 }
 

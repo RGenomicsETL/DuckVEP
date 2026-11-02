@@ -6,7 +6,26 @@ Run the build, binary, static and SQL gates with a DuckDB CLI built at the SDK r
 DUCKVEP_V2_DUCKDB=/path/to/pinned/duckdb make test_v2
 ```
 
-The runtime suite checks `LOAD` twice on writable and read-only databases, no catalog or database-file changes, v2-only assertions, model-sink and native-budget behavior, and the 585 equality cases in `equality_golden.json.gz` (gzip). The golden contains v1-host results; if a v1 extension exists at `build/release/duckvep.duckdb_extension`, the runner compares it with the live v1 host too. A case named `... error` must produce a DuckVEP error; other cases must succeed. The suite and API pin are detailed in [the v2 host guide](../../docs/v2-host.md).
+The runtime suite checks `LOAD` twice on writable and read-only databases, no catalog or database-file changes, v2-only assertions, model-sink and native-budget behavior, and the equality cases in `equality_golden.json.gz` (gzip). The golden contains v1-host results; if a v1 extension exists at `build/release/duckvep.duckdb_extension`, the runner compares it with the live v1 host too. A case named `... error` must produce a DuckVEP error; other cases must succeed. The suite and API pin are detailed in [the v2 host guide](../../docs/v2-host.md).
+
+## Concurrent staging
+
+The C stress test uses two connections to one DuckDB database. It checks exact-key
+replacement and verifies that a failed publish for one key preserves the other key.
+It requires a shared
+DuckDB 2.0.0 library and POSIX threads; set `DUCKDB_SHARED` to that library and
+make its runtime dependencies available to the loader:
+
+```sh
+cc -std=c11 -O2 -pthread -I duckdb_capi test/scripts/v2_concurrent_staging.c \
+  "$DUCKDB_SHARED" -o /tmp/v2_concurrent_staging
+/tmp/v2_concurrent_staging "$(pwd)/build/release_v2/duckvep.duckdb_extension"
+```
+
+Distinct load keys isolate model workflows that use the same model name. Installed
+names remain unique, and duplicate-name publication fails. Do not execute one key's
+statements concurrently. Unkeyed loads and same-name haplotype jobs require complete
+workflow serialization. See [the v2 host guide](../../docs/v2-host.md).
 
 ## Whole-HG002 parity
 

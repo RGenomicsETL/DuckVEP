@@ -16,7 +16,7 @@ typedef struct {
     duckdb_v2_error_info_handle *error;
     duckdb_v2_error_info_handle detail;
     idx_t rows;
-    uint32_t argc;
+    idx_t argc;
     column args[MAX_ARGS];
     duckdb_v2_vector_handle output;
     duckdb_v2_arena_handle arena;
@@ -33,7 +33,7 @@ static bool call_open(duckdb_v2_scalar_function_exec_info_handle info, idx_t str
     memset(c, 0, sizeof(*c));
     c->error = error;
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &c->rows, &detail));
-    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &c->argc, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &c->argc, NULL, NULL, NULL, &detail));
     for (idx_t i = 0; i < strings && i < c->argc; ++i) {
         duckdb_v2_vector_handle vector = NULL;
         DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg(info, i, &vector, &detail));

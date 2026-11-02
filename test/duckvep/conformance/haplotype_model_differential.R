@@ -539,6 +539,7 @@ main <- function() {
   )))
   if (!is.null(opt$publish_artifact)) return(publish_model_history(
     opt$publish_artifact, opt$history, opt$attestation_bundle))
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   source('scripts/duckvep_evidence.R', local = TRUE)
   root <- normalizePath('.')
   seed <- opt$seed
@@ -573,7 +574,6 @@ main <- function() {
   for (i in seq_along(pins)) stopifnot(
     identical(duckvep_evidence_command('git', c('-C', mirrors[i], 'rev-parse', 'HEAD'), 'revision'), unname(pins[i])),
     !length(duckvep_evidence_command('git', c('-C', mirrors[i], 'status', '--porcelain'), 'clean oracle')))
-  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix)
   environment <- duckvep_evidence_command('micromamba', c('list', '-p', prefix, '--explicit'), 'environment')
   stopifnot(identical(duckvep_evidence_explicit_packages(environment),

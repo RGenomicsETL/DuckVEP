@@ -353,6 +353,7 @@ main <- function() {
       default = Sys.getenv('VEP_PREFIX'))
   )))
   stopifnot(opt$variant_family %in% c('snv', 'indel'))
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   indel <- opt$variant_family == 'indel'
   revision <- duckvep_evidence_revision('.')
   extension <- normalizePath(opt$extension, mustWork = TRUE)
@@ -372,7 +373,6 @@ main <- function() {
       !length(duckvep_evidence_command('git', c('-C', mirrors[[name]], 'status', '--porcelain'),
         'oracle checkout')))
   }
-  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix, mustWork = TRUE)
   out <- tempfile(if (indel) 'ambiguous_indel_' else 'ambiguous_codon_',
     'test/duckvep/conformance/results')

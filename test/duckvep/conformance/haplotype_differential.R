@@ -31,6 +31,7 @@ main <- function() {
     )
   ))
   stopifnot(opt$cases >= 10L, opt$cases <= 100000L, !is.na(opt$seed))
+  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   root <- normalizePath(system2(
     "git",
     c("rev-parse", "--show-toplevel"),
@@ -76,7 +77,6 @@ main <- function() {
     )
     stopifnot(identical(revision, revisions[[name]]), !length(dirty))
   }
-  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix, mustWork = TRUE)
   conda <- function(...) {
     do.call(

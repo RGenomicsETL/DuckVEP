@@ -976,6 +976,38 @@ SELECT * FROM query(duckvep_model_receipt_sql(
   {regulation_features_table: 'duckvep_prepared_regulation'}
 ));
 
+# Receipt relations quote each schema and table component.
+statement ok
+CREATE SCHEMA "receipt""schema";
+
+statement ok
+CREATE VIEW "receipt""schema"."regions""table" AS SELECT * FROM duckvep_prepared_regions;
+
+statement ok
+CREATE VIEW "receipt""schema"."transcripts""table" AS SELECT * FROM duckvep_prepared_transcripts;
+
+statement ok
+CREATE VIEW "receipt""schema"."regulation""table" AS SELECT * FROM duckvep_prepared_regulation;
+
+query I
+SELECT model_sha256 = (SELECT model_sha256 FROM duckvep_prepared_receipt)
+FROM query(duckvep_model_receipt_sql(
+  'receipt"schema.regions"table', 'receipt"schema.transcripts"table',
+  'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64),
+  'all current transcripts on FASTA-covered assembly regions',
+  {regulation_features_table: 'receipt"schema.regulation"table'}
+));
+----
+true
+
+statement error
+SELECT duckvep_model_receipt_sql(
+  'receipt..regions', 'duckvep_prepared_transcripts',
+  'Ensembl', '116', 'GRCh38', repeat('a', 64), repeat('b', 64), 'all'
+);
+----
+invalid relation name
+
 query IIIIIII
 SELECT region_count, transcript_count, gene_count, coding_transcript_count,
        sequence_backed_transcript_count, sequence_withheld_transcript_count,

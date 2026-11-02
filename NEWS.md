@@ -4,23 +4,27 @@ No DuckVEP release has been tagged yet; everything below is unreleased.
 
 ## A model replaced mid-query is an error
 
-- An annotation query pins its model one chunk at a time, so `duckvep_model_drop` could
-  remove it between chunks and a reload under the same name would annotate the rest of
-  the query against the new model, mixing two models' `transcript_index` values in one
-  result. Every installed model now carries a load generation; the annotation builders
-  read it once when the query starts (`_duckvep_model_generation`), and each chunk
-  refuses a model whose generation differs with `the model was dropped or reloaded while
-  the query ran`. Table functions (`duckvep_haplotypes`, `duckvep_coding_calls`) already
-  held their model for the whole query.
+- Annotation builders capture a numeric model generation once per query. Each chunk
+  pins its model and checks that generation. A drop or reload before a later chunk fails
+  with `the model was dropped or reloaded while the query ran`. Ordinary and projected
+  annotations use this guard. Model names remain literal strings. Table functions
+  (`duckvep_haplotypes`, `duckvep_coding_calls`) retain their model for the whole query.
 
 ## Concurrent v2 model loads cannot mix relations
 
-- Staged relations on the v2 host are shared by every connection, keyed by model name, so
-  two sessions loading one name could publish a model built from both sessions' rows.
-  Each `duckvep_model_load_sql` script now stages and publishes under its own key (the
-  name, U+001F and a sequence number); the publish installs under the bare name, reads only
-  its own relations and discards others staged for the name, so the second publish fails
-  instead. A hand-written COPY with a bare name and `duckvep_model_publish(name)` still pair.
+- Each `duckvep_model_load_sql` script uses a separate `LOAD_KEY`, independent of the
+  literal model name. Publish atomically detaches and consumes only that key's relations,
+  including on failure. Other keyed loads and haplotype jobs remain available.
+  `duckvep_model_stage_discard(name, key)` cleans up a stopped script. The R wrapper
+  performs this cleanup on exit. Execute one key's statements sequentially. Installed
+  model names remain unique, and unkeyed workflows require serialization.
+
+## Released DuckDB 2.0 host support
+
+- The default stable-v1 host runs on DuckDB 2.0. The experimental native-v2 host uses the
+  released SDK and a `C_STRUCT_UNSTABLE` footer locked to DuckDB 2.0.0. Native-v2 CI checks
+  the released runtime against the SDK revision. R artifact fallback checks platform and
+  stable-v1 metadata rather than selecting a version-locked native-v2 binary.
 
 ## Input hardening
 

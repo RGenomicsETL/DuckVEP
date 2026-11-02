@@ -7,7 +7,24 @@ output: github_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
-root <- normalizePath(Sys.getenv("DUCKHTS_REPO_ROOT", getwd()), mustWork = TRUE)
+find_duckvep_root <- function(path) {
+  candidate <- normalizePath(path, mustWork = TRUE)
+  repeat {
+    required <- c(
+      "scripts/readme-evidence.R",
+      "test/duckvep/conformance/data/conformance_history.csv"
+    )
+    if (all(file.exists(file.path(candidate, required)))) return(candidate)
+    parent <- dirname(candidate)
+    if (identical(parent, candidate)) break
+    candidate <- parent
+  }
+  stop("could not locate the DuckVEP evidence root")
+}
+configured_root <- c(Sys.getenv("DUCKVEP_REPO_ROOT"), Sys.getenv("DUCKHTS_REPO_ROOT"))
+configured_root <- configured_root[nzchar(configured_root)]
+root <- find_duckvep_root(if (length(configured_root)) configured_root[[1L]] else getwd())
+source(file.path(root, "scripts", "readme-evidence.R"))
 dir.create(file.path(root, "benchmarks/figures"), showWarnings = FALSE)
 history_path <- file.path(
   root, "test", "duckvep", "conformance", "data", "conformance_history.csv"
@@ -88,19 +105,9 @@ commit_map_lines <- commit_map_lines[
 commit_map_fields <- do.call(rbind, strsplit(commit_map_lines, " +"))
 commit_map <- setNames(commit_map_fields[, 2L], commit_map_fields[, 1L])
 commit_map[commit_map == strrep("0", 40L)] <- NA_character_
-# Which entries of `revisions` belong to the newest run that is an ancestor of HEAD; the last
-# recorded run when none is.
+# Which entries of `revisions` belong to the newest run that maps to an ancestor of HEAD.
 newest_tested <- function(revisions) {
-  if (!length(revisions)) return(logical())
-  mapped <- ifelse(
-    revisions %in% revision_ancestry, revisions, unname(commit_map[revisions])
-  )
-  tested <- revision_ancestry[revision_ancestry %in% mapped]
-  if (length(tested) > 0L) {
-    !is.na(mapped) & mapped == tested[[1L]]
-  } else {
-    revisions == revisions[[length(revisions)]]
-  }
+  duckvep_newest_tested(revisions, revision_ancestry, commit_map)
 }
 corpus_labels <- c(
   final_dbsnp157_windows_seed29 = "GRCh38 dbSNP",
@@ -342,10 +349,10 @@ is an engine status, not an agreement category; unresolved pairs remain in the
 full denominator. Engine-extra and engine-missing pairs contribute to non-exact
 counts, not to exact agreement.
 
-Each row is the newest tested ancestor of the current source when the ledger
-contains an ancestor for that corpus; otherwise it is the last recorded row for
-that corpus. Expensive corpora do not inherit evidence from a later run of another
-corpus, and a newly tested corpus does not hide older still-applicable evidence.
+Each row is the newest tested ancestor of the current source. A corpus with no
+mapped ancestor is omitted. Expensive corpora do not inherit evidence from a later
+run of another corpus, and a newly tested corpus does not hide older still-applicable
+evidence.
 The SO and impact tables keep the same runs separate so the largest corpus cannot
 hide a smaller species- or assembly-specific frontier.
 

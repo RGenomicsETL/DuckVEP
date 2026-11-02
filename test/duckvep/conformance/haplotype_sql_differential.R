@@ -37,6 +37,7 @@ main <- function() {
     optparse::make_option("--noncoding-contributors", dest = "noncoding_contributors",
       action = "store_true", default = FALSE)
   )))
+  if (!nzchar(Sys.getenv("VEP_PREFIX"))) stop("VEP_PREFIX is required", call. = FALSE)
   source("scripts/duckvep_evidence.R", local = TRUE)
   root <- normalizePath(".")
   revision <- duckvep_evidence_revision(root)
@@ -242,7 +243,6 @@ main <- function() {
       !anyDuplicated(vapply(fields, `[[`, "", 3L)))
     augmented_vcf <- file.path(out, "noncoding.vcf")
     writeLines(c(vcf[startsWith(vcf, "#")], records[order(chrom_order, positions)]), augmented_vcf)
-    if (!nzchar(Sys.getenv("VEP_PREFIX"))) stop("VEP_PREFIX is required", call. = FALSE)
     prefix <- normalizePath(Sys.getenv("VEP_PREFIX"), mustWork = TRUE)
     mirrors <- c(vep = ".sync/ensembl-vep", variation = ".sync/ensembl-variation")
     for (name in names(mirrors)) {

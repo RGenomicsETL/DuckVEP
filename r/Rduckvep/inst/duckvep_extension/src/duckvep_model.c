@@ -125,7 +125,6 @@ duckvep_query_count(duckdb_connection connection, const char *query,
 		duckvep_sql_set_error(error, error_size, "out of memory counting model rows");
 		return 0;
 	}
-	/* The newline ends a trailing -- comment in the caller's query before the closing parenthesis. */
 	(void)sprintf(sql, "SELECT CAST(count(*) AS UBIGINT) FROM (%s\n) q", query);
 	memset(&result, 0, sizeof(result));
 	state = duckdb_query(connection, sql, &result);
@@ -256,6 +255,7 @@ duckvep_query_source_init(duckvep_query_source_t *query, duckvep_source_t *sourc
 	source->column_type = duckvep_qs_type;
 	source->next = duckvep_qs_next;
 	source->close = duckvep_qs_close;
+	source->status = NULL;
 }
 
 
@@ -856,28 +856,25 @@ duckvep_model_fingerprint_scalar(duckdb_function_info info,
 	}
 }
 
-/* Internal: the load generation of the model now under a name, NULL for none. The annotation
- * builders read it once per query so a model dropped and reloaded mid-query is an error. */
+/* Annotation builders capture the installed generation once per query. */
 static void
 duckvep_model_generation_scalar(duckdb_function_info info,
 	duckdb_data_chunk input, duckdb_vector output)
 {
-	duckvep_registry_t *registry;
-	duckdb_vector name_vector;
-	uint64_t *values;
-	idx_t row, rows;
+	duckvep_registry_t *registry = duckdb_scalar_function_get_extra_info(info);
+	duckdb_vector names = duckdb_data_chunk_get_vector(input, 0);
+	uint64_t *validity = duckdb_vector_get_validity(names);
+	uint64_t *values = duckdb_vector_get_data(output);
+	idx_t rows = duckdb_data_chunk_get_size(input);
 
-	registry = duckdb_scalar_function_get_extra_info(info);
-	rows = duckdb_data_chunk_get_size(input);
-	name_vector = duckdb_data_chunk_get_vector(input, 0);
-	values = duckdb_vector_get_data(output);
 	duckdb_vector_ensure_validity_writable(output);
-	for (row = 0; row < rows; row++) {
-		char *name;
-		int found;
-
-		name = duckvep_vector_string(name_vector, row);
-		found = name != NULL && duckvep_registry_generation(registry, name, &values[row]);
+	for (idx_t row = 0; row < rows; row++) {
+		char *name = duckvep_vector_string(names, row);
+		if (name == NULL && (validity == NULL || duckdb_validity_row_is_valid(validity, row))) {
+			duckdb_scalar_function_set_error(info, "out of memory reading model name");
+			return;
+		}
+		int found = name != NULL && duckvep_registry_generation(registry, name, &values[row]);
 		duckvep_budget_free(name);
 		if (!found)
 			duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
@@ -1014,8 +1011,7 @@ duckvep_register_model_functions(duckdb_connection connection,
 		duckdb_scalar_function_set_volatile(scalar);
 		duckdb_scalar_function_set_special_handling(scalar);
 		duckvep_registry_retain(registry);
-		duckdb_scalar_function_set_extra_info(scalar, registry,
-		    duckvep_registry_release);
+		duckdb_scalar_function_set_extra_info(scalar, registry, duckvep_registry_release);
 		duckdb_scalar_function_set_function(scalar, duckvep_model_generation_scalar);
 		(void)duckdb_register_scalar_function(connection, scalar);
 		duckdb_destroy_scalar_function(&scalar);

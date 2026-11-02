@@ -1,25 +1,25 @@
 # DuckDB hosts
 
-DuckVEP has two independently built hosts for DuckDB's C APIs. **The stable C API v1 host is the default build** and the one the R package and distribution CI use. CI runs the full SQL suite on DuckDB 1.5.6 and R `duckdb`, and builds Linux and macOS (x86_64 and ARM64), Windows MinGW x86_64 and wasm; the same artifact loads in DuckDB 2.0.0. The v2 host is a preview with a pinned SDK snapshot; making it the default is [#48](https://github.com/RGenomicsETL/DuckVEP/issues/48).
+DuckVEP has two independently built hosts for DuckDB's C APIs. **The stable C API v1 host is the default build** and the one the R package and distribution CI use. The v2 host uses the released DuckDB 2.0.0 SDK and its version-locked unstable API. It is an experimental build; its platform and workload qualification are separate from the v1 host.
 
 ## Host and distribution boundaries
 
 | | v1 host | v2 host |
 | --- | --- | --- |
-| Extension API | `v1.2.0` | `v2.0.0`, footer ABI `C_STRUCT` |
+| Extension API | `v1.2.0` | unstable v2 API, footer ABI `C_STRUCT_UNSTABLE`, DuckDB `v2.0.0` |
 | Build | `make release` | `make release_v2` |
 | Artifact | `build/release/duckvep.duckdb_extension` | `build/release_v2/duckvep.duckdb_extension` |
 | Headers | `duckdb_capi/` | pinned `duckdb_capi_v2/` |
 
-The R package builds and loads the v1 host and stamps it with the same stable `v1.2.0` footer, so one package build serves R `duckdb` 1.5 and 2.0. The footer names the C API version, not a DuckDB release the SQL suite ran on. Switching the default to v2 needs the v2 host qualified on released DuckDB and R `duckdb` 2.0 ([#48](https://github.com/RGenomicsETL/DuckVEP/issues/48)); parity with the preview snapshot is not enough.
+The R package builds the v1 host and stamps it with the stable `v1.2.0` footer. If an exact-version artifact is absent, the loader can select a stable-v1 artifact for the same platform. DuckDB verifies compatibility when it loads the artifact. The native v2 host is version-locked and is not used as this fallback.
 
 `host_v2/` is a separate CMake project. A v1 build does not compile or link its sources. Both hosts compile the host-neutral implementation in `src/kernel/` and `src/core/`; the v1 adapter is in `src/`, and the v2 adapter is in `host_v2/`. The adapters translate DuckDB vectors and callbacks to the shared row logic and write host-specific results.
 
 ## v2 SDK pin and ABI
 
-`duckvep-package.json` pins revision `fece4143738e2b1d05a851d5c5dc036838aff8ec` and the SHA-256 values of `duckdb_v2.h` and `duckdb_extension_v2.h`. `duckdb_capi_v2/REVISION` records the same commit. `make check-v2-sdk` verifies these files. The host compiles with `DUCKDB_V2_API_ALLOW_UNSTABLE=0` and `DUCKDB_V2_API_ALLOW_DEPRECATED=0`.
+`duckvep-package.json` pins the DuckDB 2.0.0 release revision `d54cbbe3df17e8e5ce68312f483b4155836112aa` and the SHA-256 values of `duckdb_v2.h` and `duckdb_extension_v2.h`. `duckdb_capi_v2/REVISION` records the same commit. `make check-v2-sdk` verifies these files. The host compiles with `DUCKDB_V2_API_ALLOW_UNSTABLE=1` and `DUCKDB_V2_API_ALLOW_DEPRECATED=0`.
 
-The v2 ABI is tied to the SDK snapshot, not just the `v2.0.0` API label. The test runner checks that the DuckDB CLI's `source_id` matches the pinned revision. Measured PyPI preview builds had snapshot-specific outcomes: source `ca15f79c32` (`2.0.0.dev2609250715`) segfaulted while loading the extension; `dev2609221243` and `dev2609222040` failed initialization with out-of-memory errors. The v2 test host is built at the pinned revision (`scripts/stage-v2-duckdb.py`); those observations do not characterize other builds.
+DuckDB 2.0.0 has no stable v2 extension API surface. Its unstable v2 ABI requires an extension built for the matching DuckDB version. The test runner also checks that the CLI `source_id` matches the pinned revision. Use `scripts/stage-v2-duckdb.py` to build the test CLI at that revision.
 
 ## Build and gates
 
@@ -31,13 +31,13 @@ python3 scripts/stage-v2-duckdb.py
 DUCKVEP_V2_DUCKDB=.deps-v2/duckdb-build/duckdb make test_v2
 ```
 
-`make test_v2` checks the SDK pin, builds the separate host, verifies that the binary exports only `duckvep_init_c_api_v2` and imports no `duckdb_*` symbols, checks the `C_STRUCT` / `v2.0.0` footer, and runs `test/scripts/check_v2_host.py static`. The static gate confirms that v2 calls are stable functions from the pinned header and that `src/core/` and `src/kernel/` contain no DuckDB API calls.
+`make test_v2` checks the SDK pin, builds the separate host, verifies that the binary exports only `duckvep_init_c_api_v2` and imports no `duckdb_*` symbols, and checks the `C_STRUCT_UNSTABLE` / `v2.0.0` footer. The static gate checks the permitted API symbols and confirms that `src/core/` and `src/kernel/` contain no DuckDB API calls.
 
-The runtime suite tests repeated `LOAD` on writable and read-only databases, with no catalog DDL or database-file changes; v2-only SQL assertions; model and budget behavior; and the 601 cases in `test/sql_v2/equality_golden.json.gz` (gzip). The golden records v1 results. When `build/release/duckvep.duckdb_extension` exists, the runner also checks those results against the live v1 extension. `test/sql_v2/README.md` documents the SQL and the separate whole-HG002 check.
+The runtime suite tests repeated `LOAD` on writable and read-only databases, with no catalog DDL or database-file changes; v2-only SQL assertions; model and budget behavior; and the recorded cases in `test/sql_v2/equality_golden.json.gz` (gzip). The golden records v1 results. When `build/release/duckvep.duckdb_extension` exists, the runner also checks those results against the live v1 extension. `test/sql_v2/README.md` documents the SQL and the separate whole-HG002 check.
 
 ## Release preflight
 
-`make check-v2-release-selftest` runs offline negative controls. A release admission uses `make check-v2-release-preflight` with concrete arguments for the extension, pinned CLI, R library, and completed HG002 output directory. The preflight checks the SDK manifest and headers, the actual extension footer and load, runtime and source revisions, and the complete hashed HG002 comparison receipt. It contacts GitHub and CRAN only with explicit `--live-status`. The current preview manifest is blocked; the command can emit `READY_TO_QUALIFY` after upstream releases are visible but before local artifacts and qualification outputs are inspected. Details and the required invocation are in [`test/sql_v2/release-readiness.md`](../test/sql_v2/release-readiness.md).
+`make check-v2-release-selftest` runs offline negative controls. A release admission uses `make check-v2-release-preflight` with concrete arguments for the extension, pinned CLI, R library, and completed HG002 output directory. The preflight checks the SDK manifest and headers, the actual extension footer and load, runtime and source revisions, and the complete hashed HG002 comparison receipt. It contacts GitHub and CRAN only with explicit `--live-status`. The current experimental manifest is blocked from release admission; the command can emit `READY_TO_QUALIFY` when upstream versions are visible but qualification artifacts are incomplete. Details and the required invocation are in [`test/sql_v2/release-readiness.md`](../test/sql_v2/release-readiness.md).
 
 `LOAD` registers the native functions without executing SQL or creating persistent catalog objects. The read-only database test covers this contract.
 
@@ -49,7 +49,7 @@ The v2 callback's error-info handle is borrowed. Each fallible API call returns 
 
 Vector resizing can invalidate data and validity pointers. The adapter reacquires them after `vector_set_size`; nested child pointers are taken after sizing their vectors. Dictionary reads can flatten an aliased child, so `load_views` takes the returned views twice and uses the second set. Returned owned logical-type, value and error-detail handles are destroyed by their owner.
 
-Registration user data carries destructors and reference counts. The model registry is mutex-protected; table-function scans pin model entries for the duration of use, so a pinned entry remains alive while a scan reads it. Annotation pins per chunk and checks the model's load generation, recorded once when the query starts, so a model dropped or reloaded mid-query is an error rather than a silent switch. Staged model relations and haplotype jobs are shared state protected by the v2 host's mutex. Cursor-bearing scans (`duckvep_so_terms`, haplotype scan and record-plan scan, and `duckvep_coding_calls`) set their global table-function state to one thread. Annotation workers use the shared process-wide native budget and worker limits.
+Registration user data carries destructors and reference counts. The model registry is mutex-protected; table-function scans pin model entries for the duration of use, so a pinned entry remains alive while a scan reads it. Annotation builders capture a numeric model generation once per query. Each annotation chunk pins the model and checks that generation. A drop or reload before a later chunk is an error. Completed chunks retain their original results. Model names remain literal strings; generations are separate arguments. Staged model relations and haplotype jobs are shared state protected by the v2 host's mutex. Cursor-bearing scans (`duckvep_so_terms`, haplotype scan and record-plan scan, and `duckvep_coding_calls`) set their global table-function state to one thread. Annotation workers use the shared process-wide native budget and worker limits.
 
 ## Model loading
 
@@ -63,7 +63,20 @@ SELECT unnest(duckvep_model_load_sql(
 -- Execute each returned statement in order, including the COPY statements and publish call.
 ```
 
-For v2, TEMP tables and uncommitted rows visible to the caller's COPY can supply the model. Staged rows live in DuckDB-managed column collections, which can spill under DuckDB's memory limit; model arrays and indexes are charged to DuckVEP's native-memory budget. A failed or cancelled COPY stages no rows. A completed COPY replaces the staged relation of the same name. Staged relations are shared by every connection to the database, so each `duckvep_model_load_sql` script stages and publishes under its own key, the model name followed by an ASCII unit separator (0x1F) and a sequence number. Its publish installs the model under the bare name, reads only that script's relations and discards any others staged for the name. Two concurrent loads of one name therefore cannot publish each other's rows: the second publish fails (`is not staged` or `model name already exists`). A hand-written COPY with a bare `MODEL` name and `duckvep_model_publish(name)` still pair as before. `duckvep_model_publish` consumes the staged relations on success or failure, validates and installs the model through the same core loaders as v1. Model installation is extension state, not SQL transaction state: a surrounding transaction rollback does not remove a published model on either host. Use `duckvep_model_drop` to release it.
+For v2, TEMP tables and uncommitted rows visible to the caller's COPY can supply the model. Staged rows use DuckDB-managed column collections and can spill under DuckDB's memory limit. Model arrays and indexes use DuckVEP's native-memory budget.
+
+Each `duckvep_model_load_sql` invocation generates a separate load key. Its COPY statements use the literal `MODEL` name, `LOAD_KEY`, and `RELATION`. Publish receives the key in its `load_key` option. A completed COPY atomically replaces only the matching model/key/relation. A failed COPY publishes no replacement relation. Publish detaches all of that key's model relations together and consumes them on success or failure. It does not remove another key's staged relations. Installed model names remain unique: publishing a model whose name already exists fails.
+
+A caller can supply `load_key` in the builder's options to manage cleanup. Keys must be nonempty strings without NUL bytes. Execute each key's COPY statements sequentially; do not reuse one key concurrently. After a failed or abandoned script has stopped, call `duckvep_model_stage_discard(name, load_key)`. This idempotent function returns true and removes only that key's staged model relations. It does not drop an installed model or cancel a running COPY. The R model wrapper performs this cleanup on exit.
+
+```sql
+-- After a stopped script created with load_key := 'attempt-1':
+SELECT duckvep_model_stage_discard('my_model', 'attempt-1');
+```
+
+Manual COPY statements without `LOAD_KEY` pair with `duckvep_model_publish(name)`. Serialize each complete unkeyed workflow for a model name. `duckvep_model_drop` releases an installed model and unkeyed model stages, but preserves keyed loads and haplotype jobs. Haplotype jobs do not accept `LOAD_KEY`; use distinct job names or serialize each complete job workflow.
+
+Validation uses the same core loaders as v1. Model installation is extension state, not SQL transaction state. A surrounding transaction rollback does not remove a published model on either host. Use `duckvep_model_drop` to release it.
 
 The visible workflow differs by host: v1 performs loading in one table-function call; v2 returns SQL for the caller to run and then publishes the staged rows. Validation uses the shared core loaders. `duckvep_model_save` and `duckvep_model_restore` use the shared snapshot implementation on both hosts.
 

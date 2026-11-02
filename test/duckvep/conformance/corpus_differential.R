@@ -363,6 +363,7 @@ op <- add_option(
 opt <- parse_args(op)
 
 die <- function(...) stop(glue(..., .envir = parent.frame()), call. = FALSE)
+if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
 root <- normalizePath(root[[1L]], mustWork = TRUE)
 source(file.path(root, "scripts", "duckvep_evidence.R"), local = TRUE)
 if (!(opt$event_mode %in% c("small", "structural", "breakend"))) {
@@ -2779,7 +2780,6 @@ micromamba <- if (file.exists(opt$micromamba)) {
 if (!nzchar(micromamba)) {
   die("micromamba is unavailable: {opt$micromamba}")
 }
-if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
 if (!dir.exists(opt$vep_prefix)) {
   die("VEP environment prefix does not exist: {opt$vep_prefix}")
 }

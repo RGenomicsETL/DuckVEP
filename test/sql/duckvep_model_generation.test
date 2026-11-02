@@ -40,6 +40,13 @@ SELECT loaded FROM duckvep_model_load('gen',
   'SELECT * FROM gen_transcripts ORDER BY seq_region, transcript_start',
   'SELECT * FROM gen_exons ORDER BY transcript_index, exon_start');
 
+# An explicitly captured missing generation cannot disable the guard.
+statement error
+SELECT _duckvep_annotate_small_compact('gen', 1::UINTEGER, 124::UBIGINT, 'T', 'C',
+  5000::UBIGINT, 5000::UBIGINT, 0::UBIGINT);
+----
+unknown model name
+
 statement ok
 SET VARIABLE gen_started = (SELECT _duckvep_model_generation('gen'));
 
@@ -80,6 +87,28 @@ SELECT count(*) FROM query(replace(duckvep_annotate_projected_sql('gen_events', 
   '_duckvep_model_generation(CAST(''gen'' AS VARCHAR))', getvariable('gen_started')::VARCHAR));
 ----
 the model was dropped or reloaded while the query ran
+
+# Internal generation arguments do not change literal model names.
+statement ok
+SELECT loaded FROM duckvep_model_load('gen' || chr(31) || '123',
+  'SELECT * FROM gen_regions ORDER BY seq_region',
+  'SELECT * FROM gen_transcripts ORDER BY seq_region, transcript_start',
+  'SELECT * FROM gen_exons ORDER BY transcript_index, exon_start');
+
+query I
+SELECT count(*) FROM query(duckvep_annotate_sql('gen_events', 'gen' || chr(31) || '123'));
+----
+1
+
+query I
+SELECT len(_duckvep_annotate_small_compact('gen' || chr(31) || '123', 1::UINTEGER, 124::UBIGINT, 'T', 'C')) > 0;
+----
+true
+
+query I
+SELECT duckvep_model_drop('gen' || chr(31) || '123');
+----
+true
 
 # Dropped and not reloaded: the started query is refused the same way, not as an unknown model.
 statement ok

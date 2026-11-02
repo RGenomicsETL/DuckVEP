@@ -206,6 +206,7 @@ edit_main <- function() {
       default = Sys.getenv('VEP_PREFIX'))
   )))
   stopifnot(opt$models >= length(edit_families), !is.na(opt$seed))
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   revision <- duckvep_evidence_revision('.')
   extension <- normalizePath(opt$extension, mustWork = TRUE)
   sources <- c('test/duckvep/conformance/peptide_edit_differential.R',
@@ -223,7 +224,6 @@ edit_main <- function() {
       !length(duckvep_evidence_command('git', c('-C', mirrors[[name]], 'status', '--porcelain'),
         'oracle checkout')))
   }
-  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix, mustWork = TRUE)
   out <- tempfile(paste0('peptide_edit_seed', opt$seed, '_'), 'test/duckvep/conformance/results')
   stopifnot(dir.create(out))

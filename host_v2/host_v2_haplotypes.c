@@ -437,9 +437,11 @@ static bool job_scan_open(job_scan *scan, duckdb_v2_context_handle context, char
         scan->done = true; /* no rows were staged */
         return true;
     }
-    if (duckdb_v2_column_data_collection_shared_scan_state_create(s->collection, &scan->shared, &detail) ||
+    duckdb_v2_factory_handle factory = NULL;
+    if (duckdb_v2_context_get_factory(context, &factory, &detail) ||
+        duckdb_v2_column_data_collection_shared_scan_state_create(s->collection, &scan->shared, &detail) ||
         duckdb_v2_column_data_collection_worker_scan_state_create(s->collection, &scan->worker, &detail) ||
-        duckdb_v2_data_chunk_create_with_context(context, s->types, s->columns, &scan->chunk, &detail)) {
+        duckdb_v2_data_chunk_create(factory, s->types, s->columns, &scan->chunk, &detail)) {
         duckdb_v2_str text = {"could not scan the staged rows", 30};
         if (detail) {
             (void)duckdb_v2_error_info_get_text(detail, &text);
@@ -534,14 +536,14 @@ static void scan_state_destroy(void *pointer) {
     free(s);
 }
 
-static char *bind_argument(duckdb_v2_table_function_bind_info_handle info, idx_t index,
+static char *bind_argument(duckdb_v2_function_bind_info_handle info, idx_t index,
                            duckdb_v2_error_info_handle *error) {
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_value_handle value = NULL;
     duckdb_v2_str text;
     char *copy = NULL;
     bool is_null = false;
-    DUCKDB_CALL(duckdb_v2_table_function_bind_get_arg_value(info, index, &value, &detail));
+    DUCKDB_CALL(duckdb_v2_function_bind_get_arg_value(info, index, &value, &detail));
     DUCKDB_CALL(duckdb_v2_value_is_null(value, &is_null, &detail));
     if (!is_null) {
         DUCKDB_CALL(duckdb_v2_value_get_varchar(value, &text, &detail));
@@ -553,7 +555,8 @@ cleanup:
     return copy;
 }
 
-static void scan_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckdb_v2_context_handle context,
+static void scan_bind_exec(duckdb_v2_function_bind_info_handle info,
+                           duckdb_v2_table_function_bind_info_handle result, duckdb_v2_context_handle context,
                            duckdb_v2_error_info_handle *error) {
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_logical_type_handle type = NULL;
@@ -567,7 +570,7 @@ static void scan_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckd
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_haplotype_scan: out of memory");
         return;
     }
-    DUCKDB_CALL(duckdb_v2_table_function_bind_get_user_data(info, (void **)&state, &detail));
+    DUCKDB_CALL(duckdb_v2_function_bind_get_user_data(info, (void **)&state, &detail));
     bind->job = bind_argument(info, 0, error);
     if (!bind->job || !*bind->job) {
         INPUT_ERROR("duckvep_haplotype_scan: job must be a non-empty string");
@@ -581,13 +584,12 @@ static void scan_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckd
     bind->source_records = config.source_records;
     for (unsigned i = 0; i < DUCKVEP_HAP_OUTPUT_COLUMNS; ++i) {
         DUCKDB_CALL(make_type(context, duckvep_hap_column_type(i, bind->source_records), &type, &detail));
-        DUCKDB_CALL(duckdb_v2_table_function_bind_add_result_column(
-            info, string_view(duckvep_hap_column_name(i)), type, &detail));
+        DUCKDB_CALL(add_result_column(result, duckvep_hap_column_name(i), type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
     {
         duckdb_v2_opaque data = {bind, scan_bind_destroy, NULL};
-        DUCKDB_CALL(duckdb_v2_table_function_bind_set_bind_data(info, &data, &detail));
+        DUCKDB_CALL(duckdb_v2_function_bind_set_bind_data(info, &data, &detail));
         owned = true;
     }
 cleanup:
@@ -835,7 +837,8 @@ static void arrangement_scan_state_destroy(void *pointer) {
     free(s);
 }
 
-static void arrangement_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckdb_v2_context_handle context,
+static void arrangement_bind_exec(duckdb_v2_function_bind_info_handle info,
+                                  duckdb_v2_table_function_bind_info_handle result, duckdb_v2_context_handle context,
                                   duckdb_v2_error_info_handle *error) {
     static const char *const names[DUCKVEP_ARRANGEMENT_COLUMN_COUNT] = {
         "hypothesis_id", "hypothesis_lane", "hypothesis_reference_lane", "event_index", "seq_region", "position",
@@ -861,7 +864,7 @@ static void arrangement_bind_exec(duckdb_v2_table_function_bind_info_handle info
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "duckvep_haplotype_arrangements: out of memory");
         return;
     }
-    DUCKDB_CALL(duckdb_v2_table_function_bind_get_user_data(info, (void **)&state, &detail));
+    DUCKDB_CALL(duckdb_v2_function_bind_get_user_data(info, (void **)&state, &detail));
     bind->job = bind_argument(info, 0, error);
     if (!bind->job || !*bind->job) INPUT_ERROR("duckvep_haplotype_arrangements: job must be a non-empty string");
     staged = host_v2_stage_acquire(state, bind->job, HAP_RELATION_ARRANGEMENTS);
@@ -875,12 +878,12 @@ static void arrangement_bind_exec(duckdb_v2_table_function_bind_info_handle info
     staged = NULL;
     for (unsigned i = 0; i < DUCKVEP_ARRANGEMENT_COLUMN_COUNT; ++i) {
         DUCKDB_CALL(make_type(context, types[i], &type, &detail));
-        DUCKDB_CALL(duckdb_v2_table_function_bind_add_result_column(info, string_view(names[i]), type, &detail));
+        DUCKDB_CALL(add_result_column(result, names[i], type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
     {
         duckdb_v2_opaque data = {bind, scan_bind_destroy, NULL};
-        DUCKDB_CALL(duckdb_v2_table_function_bind_set_bind_data(info, &data, &detail));
+        DUCKDB_CALL(duckdb_v2_function_bind_set_bind_data(info, &data, &detail));
         owned = true;
     }
 cleanup:
@@ -1051,7 +1054,8 @@ static void plan_state_destroy(void *pointer) {
     free(s);
 }
 
-static void plan_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckdb_v2_context_handle context,
+static void plan_bind_exec(duckdb_v2_function_bind_info_handle info,
+                           duckdb_v2_table_function_bind_info_handle result, duckdb_v2_context_handle context,
                            duckdb_v2_error_info_handle *error) {
     static const char *const names[4] = {"event_index", "buffer_id", "ordinal", "source_ordinal"};
     duckdb_v2_error_info_handle detail = NULL;
@@ -1066,7 +1070,7 @@ static void plan_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckd
         set_error(*error, DUCKDB_V2_ERROR_RESOURCE_OUT_OF_MEMORY, "_duckvep_haplotype_plan: out of memory");
         return;
     }
-    DUCKDB_CALL(duckdb_v2_table_function_bind_get_user_data(info, (void **)&state, &detail));
+    DUCKDB_CALL(duckdb_v2_function_bind_get_user_data(info, (void **)&state, &detail));
     job = bind_argument(info, 0, error);
     if (!job || !*job) {
         INPUT_ERROR("_duckvep_haplotype_plan: job must be a non-empty string");
@@ -1083,12 +1087,12 @@ static void plan_bind_exec(duckdb_v2_table_function_bind_info_handle info, duckd
     }
     for (unsigned i = 0; i < 4; ++i) {
         DUCKDB_CALL(make_type(context, "UBIGINT", &type, &detail));
-        DUCKDB_CALL(duckdb_v2_table_function_bind_add_result_column(info, string_view(names[i]), type, &detail));
+        DUCKDB_CALL(add_result_column(result, names[i], type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
     {
         duckdb_v2_opaque data = {bind, scan_bind_destroy, NULL};
-        DUCKDB_CALL(duckdb_v2_table_function_bind_set_bind_data(info, &data, &detail));
+        DUCKDB_CALL(duckdb_v2_function_bind_set_bind_data(info, &data, &detail));
         owned = true;
     }
 cleanup:
@@ -1251,7 +1255,7 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
     uint64_t *list_validity = NULL;
     duckdb_v2_arena_handle arena = NULL;
     idx_t rows = 0, at = 0;
-    uint32_t argc = 0;
+    idx_t argc = 0;
     hap_script *scripts = NULL;
     size_t total = 0;
     keys[0] = "phase_policy";
@@ -1264,7 +1268,7 @@ static void load_sql_exec(duckdb_v2_scalar_function_exec_info_handle info, duckd
         kinds[3 + i] = DUCKVEP_CORE_OPTION_INTEGER;
     }
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &rows, &detail));
-    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, NULL, NULL, NULL, &detail));
     for (uint32_t i = 0; i < argc; ++i) {
         DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg(info, i, &arguments[i], &detail));
     }
@@ -1445,7 +1449,7 @@ static void arrangement_load_sql_exec(duckdb_v2_scalar_function_exec_info_handle
     uint64_t *list_validity = NULL;
     duckdb_v2_arena_handle arena = NULL;
     idx_t rows = 0;
-    uint32_t argc = 0;
+    idx_t argc = 0;
     hap_script *scripts = NULL;
     (void)context;
     for (unsigned i = 0; i < ARRANGEMENT_SCRIPT_OPTIONS; ++i) {
@@ -1453,7 +1457,7 @@ static void arrangement_load_sql_exec(duckdb_v2_scalar_function_exec_info_handle
         kinds[i] = DUCKVEP_CORE_OPTION_INTEGER;
     }
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &rows, &detail));
-    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, NULL, NULL, NULL, &detail));
     for (uint32_t i = 0; i < argc; ++i) {
         DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg(info, i, &arguments[i], &detail));
     }
@@ -1747,13 +1751,14 @@ static bool register_scalar_with_state(duckdb_v2_extension_handle extension, duc
     duckdb_v2_logical_type_handle type = NULL;
     duckdb_v2_str text = string_view(name);
     bool success = false, retained = false;
-    DUCKDB_CALL(duckdb_v2_scalar_function_create_with_extension(extension, &function, &detail));
+    duckdb_v2_factory_handle factory = NULL;
+    DUCKDB_CALL(duckdb_v2_context_get_factory(context, &factory, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_create(factory, &function, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_set_name(function, &text, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_get_signature(function, &signature, &detail));
     for (idx_t i = 0; i < parameter_count; ++i) {
         DUCKDB_CALL(make_type(context, parameter_types[i], &type, &detail));
-        DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(signature, string_view(parameter_names[i]), type,
-                                                               NULL, &detail));
+        DUCKDB_CALL(add_parameter(signature, parameter_names[i], type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
     DUCKDB_CALL(make_type(context, return_type, &type, &detail));
@@ -1771,7 +1776,7 @@ static bool register_scalar_with_state(duckdb_v2_extension_handle extension, duc
         retained = false;
     }
     DUCKDB_CALL(duckdb_v2_scalar_function_set_exec_callback(function, callback, &detail));
-    DUCKDB_CALL(duckdb_v2_scalar_function_register(function, &detail));
+    DUCKDB_CALL(duckdb_v2_extension_register_scalar_function(extension, function, &detail));
     success = true;
 cleanup:
     if (retained) {
@@ -1794,11 +1799,13 @@ static bool register_job_table(duckdb_v2_extension_handle extension, duckdb_v2_c
     duckdb_v2_logical_type_handle type = NULL;
     duckdb_v2_str text = string_view(name);
     bool success = false, retained = false;
-    DUCKDB_CALL(duckdb_v2_table_function_create_with_extension(extension, &function, &detail));
+    duckdb_v2_factory_handle factory = NULL;
+    DUCKDB_CALL(duckdb_v2_context_get_factory(context, &factory, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_create(factory, &function, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_name(function, &text, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_get_signature(function, &signature, &detail));
     DUCKDB_CALL(make_type(context, "VARCHAR", &type, &detail));
-    DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(signature, string_view("job"), type, NULL, &detail));
+    DUCKDB_CALL(add_parameter(signature, "job", type, &detail));
     {
         duckdb_v2_opaque data = {state, host_v2_state_release, NULL};
         host_v2_state_retain(state);
@@ -1809,7 +1816,7 @@ static bool register_job_table(duckdb_v2_extension_handle extension, duckdb_v2_c
     DUCKDB_CALL(duckdb_v2_table_function_set_bind_callback(function, bind, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_init_global_callback(function, init, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_exec_callback(function, exec, &detail));
-    DUCKDB_CALL(duckdb_v2_table_function_register(function, &detail));
+    DUCKDB_CALL(duckdb_v2_extension_register_table_function(extension, function, &detail));
     success = true;
 cleanup:
     if (retained) {

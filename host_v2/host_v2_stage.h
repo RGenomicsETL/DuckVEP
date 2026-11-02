@@ -1,7 +1,6 @@
 /* The staging area of the v2 host, shared by the model sink (host_v2_model.c) and the haplotype job sink and scans
  * (host_v2_haplotypes.c): typed caller rows captured by COPY into DuckDB-managed column collections (they spill under the
- * memory limit), keyed by (name, relation). A model's relations are staged under the model name, a haplotype job's under
- * the job name. */
+ * memory limit), keyed by (literal model name, optional load key, relation). Haplotype jobs remain unkeyed. */
 #ifndef DUCKVEP_HOST_V2_STAGE_H
 #define DUCKVEP_HOST_V2_STAGE_H
 
@@ -21,7 +20,8 @@
 #define HAP_RELATION_ARRANGEMENTS "haplotype_arrangements"
 
 typedef struct stage {
-    char *model;    /* the staging key: a model name, or a job name */
+    char *model;    /* literal model name, or an unkeyed job name */
+    char *load_key; /* NULL for unkeyed manual stages and haplotype jobs */
     char *relation;
     duckdb_v2_column_data_collection_handle collection; /* NULL: no rows */
     size_t columns;
@@ -46,10 +46,17 @@ struct model_state {
 
 /* Drops one reference; the last one frees the stage and its rows. */
 void host_v2_stage_destroy(stage *s);
-/* A new reference to the stage of (key, relation) that leaves it staged, or NULL. */
-stage *host_v2_stage_acquire(model_state *state, const char *key, const char *relation);
-/* Removes and returns the stage of (key, relation), or NULL. */
-stage *host_v2_stage_take(model_state *state, const char *key, const char *relation);
+/* A new reference to the unkeyed stage of (model, relation) that leaves it staged, or NULL. */
+stage *host_v2_stage_acquire(model_state *state, const char *model, const char *relation);
+/* Removes and returns the unkeyed stage of (model, relation), or NULL. */
+stage *host_v2_stage_take(model_state *state, const char *model, const char *relation);
+/* Removes and returns the stage of (model, load_key, relation), or NULL. */
+stage *host_v2_stage_take_key(model_state *state, const char *model, const char *load_key,
+                              const char *relation);
+/* Remove all non-job stages belonging to exactly (model, load_key). */
+void host_v2_stage_discard_key(model_state *state, const char *model, const char *load_key);
+/* Remove only unkeyed, non-job stages belonging to model. */
+void host_v2_stage_discard_unkeyed_model(model_state *state, const char *model);
 /* Copies the settings of a staged job without removing it; false when the relation is not staged. The model name is a
  * heap copy (free). */
 bool host_v2_stage_peek_job(model_state *state, const char *job, const char *relation, char **model,

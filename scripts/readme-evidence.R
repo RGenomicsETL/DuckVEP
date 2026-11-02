@@ -6,6 +6,18 @@
 # revisions and are used as they are. Per corpus, the newest run whose revision is an
 # ancestor of HEAD is chosen (the same rule as benchmarks/duckvep_conformance.Rmd).
 
+duckvep_translate_revision <- function(revision, ancestry, commit_map) {
+  ifelse(revision %in% ancestry, revision, unname(commit_map[revision]))
+}
+
+duckvep_newest_tested <- function(revisions, ancestry, commit_map) {
+  if (length(revisions) == 0L) return(logical())
+  mapped <- duckvep_translate_revision(revisions, ancestry, commit_map)
+  tested <- ancestry[ancestry %in% mapped]
+  if (length(tested) == 0L) return(rep(FALSE, length(revisions)))
+  !is.na(mapped) & mapped == tested[[1L]]
+}
+
 readme_evidence <- function(root = ".") {
   path <- function(...) file.path(root, ...)
 
@@ -16,17 +28,8 @@ readme_evidence <- function(root = ".") {
   commit_map[commit_map == strrep("0", 40L)] <- NA_character_
   ancestry <- system2("git", c("-C", shQuote(root), "rev-list", "--topo-order", "HEAD"),
     stdout = TRUE)
-  translate <- function(revision) {
-    ifelse(revision %in% ancestry, revision, unname(commit_map[revision]))
-  }
-
   latest <- function(rows) {
-    mapped <- translate(rows$source_revision)
-    tested <- ancestry[ancestry %in% mapped]
-    if (length(tested) > 0L) {
-      return(rows[!is.na(mapped) & mapped == tested[[1L]], , drop = FALSE])
-    }
-    rows[rows$source_revision == rows$source_revision[[nrow(rows)]], , drop = FALSE]
+    rows[duckvep_newest_tested(rows$source_revision, ancestry, commit_map), , drop = FALSE]
   }
 
   history <- read.csv(path("test", "duckvep", "conformance", "data", "conformance_history.csv"),
@@ -49,17 +52,21 @@ readme_evidence <- function(root = ".") {
     rows <- history[history$corpus == corpora$corpus[[i]], , drop = FALSE]
     if (!nrow(rows)) return(NULL)
     run <- latest(rows)
+    if (nrow(run) == 0L) return(NULL)
     data.frame(corpora[i, c("label", "assembly")], oracle = paste("VEP", run$oracle_version[[1L]]),
       pairs = sum(run$n), exact = sum(run$exact_agree), unresolved = sum(run$unresolved),
       differences = sum(run$n) - sum(run$exact_agree) - sum(run$unresolved),
       run_date = max(run$run_date), stringsAsFactors = FALSE)
   }))
 
+  if (is.null(conformance)) stop("No conformance runs map to this checkout's history")
+
   hgvs <- read.csv(path("test", "duckvep", "conformance", "data", "hgvs_history.csv"),
     colClasses = c(source_revision = "character", extension_sha256 = "character"))
   hgvs <- hgvs[hgvs$extension_build_binding == "htslib_distclean_make_release" &
     grepl("^[0-9a-f]{64}$", hgvs$extension_sha256), ]
   hgvs_runs <- do.call(rbind, lapply(split(hgvs, hgvs$corpus), latest))
+  if (is.null(hgvs_runs) || nrow(hgvs_runs) == 0L) stop("No HGVS runs map to this checkout's history")
   hgvs_summary <- do.call(rbind, lapply(split(hgvs_runs, hgvs_runs$metric), function(x) {
     total <- sum(x$n)
     exact <- sum(x$n[x$comparison %in% c("match", "both_absent")])
@@ -76,21 +83,24 @@ readme_evidence <- function(root = ".") {
     colClasses = c(source_revision = "character"))
   public <- public[public$workload == "ensembl116_grch38_giab_hg002_v4_2_1_full_literal_public_relation", ]
   in_history <- vapply(public$source_revision, function(rev) {
-    system2("git", c("merge-base", "--is-ancestor", rev, "HEAD"), stdout = FALSE, stderr = FALSE) == 0L
+    system2("git", c("-C", shQuote(root), "merge-base", "--is-ancestor", shQuote(rev), "HEAD"), stdout = FALSE, stderr = FALSE) == 0L
   }, logical(1))
   public <- public[in_history, ]
   stopifnot(nrow(public) > 0L)
   when <- vapply(public$source_revision, function(rev) {
-    as.numeric(system2("git", c("show", "-s", "--format=%ct", rev), stdout = TRUE))
+    as.numeric(system2("git", c("-C", shQuote(root), "show", "-s", "--format=%ct", shQuote(rev)), stdout = TRUE))
   }, numeric(1))
   public <- public[when == max(when), ]
   # Repeated measurements of one configuration: keep the last recorded.
   public <- public[!duplicated(public[c("output_mode", "threads")], fromLast = TRUE), ]
 
-  # The newest run the README reports, so it can say what the counts do not yet cover.
-  newest_run <- max(c(conformance$run_date, hgvs_runs$run_date))
-
-  list(conformance = conformance, hgvs = hgvs_summary, public = public, newest_run = newest_run)
+  list(
+    conformance = conformance,
+    hgvs = hgvs_summary,
+    public = public,
+    newest_conformance_run = max(conformance$run_date),
+    newest_hgvs_run = max(hgvs_runs$run_date)
+  )
 }
 
 # DuckDB box tables printed into a log, as data frames (first table whose header has `first`).

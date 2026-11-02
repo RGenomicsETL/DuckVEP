@@ -14,7 +14,7 @@ extern const char *const duckvep_model_relations[7];
  * interval_features, rna_edits (NULL when absent). coverage: -1 absent, 0 false, 1 true.
  * Fills out[0..*count). Returns false on allocation failure. */
 bool duckvep_core_model_script(const char *name, const char *const queries[7],
-    const char *reference_fasta, int coverage, duckvep_sql_text out[DUCKVEP_MODEL_SCRIPT_MAX],
-    size_t *count);
+    const char *reference_fasta, int coverage, const char *load_key,
+    duckvep_sql_text out[DUCKVEP_MODEL_SCRIPT_MAX], size_t *count);
 
 #endif

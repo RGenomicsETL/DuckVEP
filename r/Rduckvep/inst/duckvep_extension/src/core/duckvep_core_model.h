@@ -260,6 +260,8 @@ typedef struct duckvep_source {
 	duckvep_ctype_t (*column_type)(void *, size_t);
 	duckvep_batch_t *(*next)(void *);
 	void (*close)(void *);
+	/* Optional status after close: distinguish a scan failure from end of input. */
+	int (*status)(void *, char *, size_t);
 } duckvep_source_t;
 
 static inline int duckvep_source_count(duckvep_source_t *s, size_t *n, char *e, size_t es) { return s->count(s->context, n, e, es); }

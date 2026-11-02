@@ -150,10 +150,10 @@ static void repeat_exec(duckdb_v2_scalar_function_exec_info_handle info,
     element_buffer buffers[2] = {{NULL, 0}, {NULL, 0}};
     bool well_formed[2] = {true, true};
     idx_t rows = 0;
-    uint32_t argc = 0;
+    idx_t argc = 0;
     bool opened = false;
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &rows, &detail));
-    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, NULL, NULL, NULL, &detail));
     for (uint32_t i = 0; i < argc; ++i) {
         DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg(info, i, &arguments[i], &detail));
     }
@@ -326,13 +326,13 @@ static void phase_exec(duckdb_v2_scalar_function_exec_info_handle info,
     options option;
     bool allele_list, phase_list;
     idx_t rows = 0, at = 0;
-    uint32_t argc = 0;
+    idx_t argc = 0;
     size_t total = 0;
     phase_row row_state;
     memset(&row_state, 0, sizeof row_state);
     row_state.error = error;
     DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_row_count(info, &rows, &detail));
-    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg_count(info, &argc, NULL, NULL, NULL, &detail));
     for (uint32_t i = 0; i < argc; ++i) {
         DUCKDB_CALL(duckdb_v2_scalar_function_exec_get_arg(info, i, &arguments[i], &detail));
     }

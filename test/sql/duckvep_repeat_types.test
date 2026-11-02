@@ -1,0 +1,20 @@
+# Repeat axes require list types even when the first value is NULL.
+require duckvep
+
+query T
+SELECT duckvep_repeat_alleles(NULL, NULL, false).status;
+----
+summary_only
+
+statement error
+SELECT duckvep_repeat_alleles(NULL::INTEGER, NULL, false);
+----
+expected lists
+
+statement ok
+CREATE TABLE invalid_repeat_axis AS SELECT value FROM (VALUES (NULL::INTEGER), (7)) t(value);
+
+statement error
+SELECT duckvep_repeat_alleles(value, NULL, false) FROM invalid_repeat_axis;
+----
+expected lists

@@ -9,11 +9,16 @@ rduckvep_load(con, extension_path = NULL)
 \arguments{
 \item{con}{An open DuckDB connection with unsigned extension loading enabled.}
 
-\item{extension_path}{Optional extension artifact for this DuckDB version.}
+\item{extension_path}{Optional locally built extension artifact.}
 }
 \value{
 Invisibly, the connection.
 }
 \description{
 Load the bundled DuckVEP extension
+}
+\details{
+If an exact-version artifact is unavailable, the loader tries bundled
+  stable v1 artifacts for the same DuckDB platform. DuckDB checks their API
+  compatibility. Version-locked artifacts are not used as fallbacks.
 }

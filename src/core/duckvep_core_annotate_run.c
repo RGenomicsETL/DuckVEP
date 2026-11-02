@@ -623,6 +623,13 @@ duckvep_scalar_state_release(duckvep_scalar_state_t *state)
 		duckvep_scalar_state_destroy(state);
 }
 
+/* Release callback ownership on both C returns and host exception unwinding. */
+static void
+duckvep_scalar_state_cleanup(duckvep_scalar_state_t **state)
+{
+	duckvep_scalar_state_release(*state);
+}
+
 static int
 duckvep_validity_is_null(const uint64_t *validity, size_t row)
 {
@@ -647,27 +654,19 @@ duckvep_vector_string_equals(duckvep_h_vector vector,
 
 static int
 duckvep_scalar_select_model(duckvep_scalar_state_t *state,
-	duckvep_h_vector model_vector, size_t row, char *error, size_t error_size)
+	duckvep_h_vector model_vector, size_t row, uint64_t expected,
+	char *error, size_t error_size)
 {
 	static const char replaced[] =
 	    "duckvep_annotate: the model was dropped or reloaded while the query ran";
 	duckvep_model_entry_t *entry;
-	uint64_t expected = 0;
-	char *name, *separator;
+	char *name;
 
 	name = duckvep_h_string(model_vector, row);
 	if (name == NULL && duckvep_h_string_wellformed(model_vector, row)) {
 		duckvep_sql_set_error(error, error_size,
 		    "duckvep_annotate: out of memory copying the model name");
 		return 0;
-	}
-	/* The builders pass "name<US>generation", the generation read once when the query
-	 * started; the model is re-resolved for every chunk, so a mismatch means it changed. */
-	separator = name != NULL ? strrchr(name, '\x1f') : NULL;
-	if (separator != NULL && separator[1] != '\0' &&
-	    strspn(separator + 1, "0123456789") == strlen(separator + 1)) {
-		expected = strtoull(separator + 1, NULL, 10);
-		*separator = '\0';
 	}
 	if (name == NULL || *name == '\0') {
 		duckvep_budget_free(name);
@@ -3441,10 +3440,12 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 	duckvep_h_chunk input, duckvep_h_vector output, int compact, int with_hgvs,
 	int with_projection, duckvep_scalar_event_family_t event_family)
 {
-	duckvep_scalar_state_t *state;
+	__attribute__((cleanup(duckvep_scalar_state_cleanup)))
+	duckvep_scalar_state_t *state = NULL;
 	duckvep_variant_batch_t batch;
 	duckvep_h_vector model_vector, upstream_distance_vector;
-	duckvep_h_vector downstream_distance_vector;
+	duckvep_h_vector downstream_distance_vector, generation_vector;
+	uint64_t *generations, *generation_validity;
 	uint64_t *model_validity, *upstream_distance_validity;
 	uint64_t *downstream_distance_validity;
 	uint16_t *regions;
@@ -3494,6 +3495,10 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 	positions = state->positions;
 	column_count = duckvep_h_chunk_columns(input);
 	distance_column = event_family == DUCKVEP_SCALAR_STRUCTURAL ? 6 : 5;
+	generation_vector = column_count > distance_column + 2 ?
+	    duckvep_h_chunk_vector(input, distance_column + 2) : NULL;
+	generations = generation_vector != NULL ? duckvep_h_data(generation_vector) : NULL;
+	generation_validity = generation_vector != NULL ? duckvep_h_validity(generation_vector) : NULL;
 	upstream_distance_vector = column_count > distance_column ?
 	    duckvep_h_chunk_vector(input, distance_column) : NULL;
 	downstream_distance_vector = column_count > distance_column + 1 ?
@@ -3516,8 +3521,18 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 		uint64_t downstream_distance;
 		size_t end;
 
+		if (generations != NULL && duckvep_validity_is_null(generation_validity, begin)) {
+			duckvep_sql_set_error(error, sizeof(error),
+			    "duckvep_annotate: model generation must be non-NULL");
+			goto failed;
+		}
+		if (generations != NULL && generations[begin] == 0) {
+			duckvep_sql_set_error(error, sizeof(error),
+			    "duckvep_annotate: unknown model name");
+			goto failed;
+		}
 		if (!duckvep_scalar_select_model(state, model_vector, (size_t)begin,
-		    error, sizeof(error)))
+		    generations != NULL ? generations[begin] : 0, error, sizeof(error)))
 			goto failed;
 		if (event_family != DUCKVEP_SCALAR_SMALL &&
 		    state->entry->model.lifted != NULL) {
@@ -3545,6 +3560,10 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 			uint64_t next_upstream_distance;
 			uint64_t next_downstream_distance;
 
+			if (generations != NULL &&
+			    (duckvep_validity_is_null(generation_validity, end) ||
+			    generations[end] != generations[begin]))
+				break;
 			if ((upstream_distance_vector != NULL &&
 			    duckvep_validity_is_null(upstream_distance_validity,
 			    (size_t)end)) ||
@@ -3588,11 +3607,9 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 	    state, output, rows, with_hgvs ? 36u : 29u,
 	    error, sizeof(error)))
 		goto failed;
-	duckvep_scalar_state_release(state);
 	return;
 
 failed:
-	duckvep_scalar_state_release(state);
 	duckvep_h_set_error(info,
 	    duckvep_sql_final_error(final_error, sizeof(final_error), error,
 	    "duckvep_annotate failed"));

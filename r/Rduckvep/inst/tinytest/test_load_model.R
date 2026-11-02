@@ -32,4 +32,8 @@ expect_error(rduckvep_restore_model(con, "lm_missing", tempfile()), "cannot open
 expect_true(dbGetQuery(con, "SELECT duckvep_model_drop('lm_restored') AS dropped")$dropped)
 unlink(snapshot)
 expect_true(dbGetQuery(con, "SELECT duckvep_model_drop('lm') AS dropped")$dropped)
+expect_true(rduckvep_load_model(con, "lm_comment", "SELECT * FROM lm_regions ORDER BY seq_region",
+  "SELECT * FROM lm_transcripts ORDER BY seq_region, transcript_start -- transcripts",
+  "SELECT * FROM lm_exons ORDER BY transcript_index, exon_start"))
+expect_true(dbGetQuery(con, "SELECT duckvep_model_drop('lm_comment') AS dropped")$dropped)
 dbDisconnect(con, shutdown = TRUE)

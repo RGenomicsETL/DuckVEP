@@ -13,19 +13,62 @@ COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' 
 COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'temp-model', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
 SELECT CASE WHEN duckvep_model_publish('temp-model') THEN true ELSE error('publish of a TEMP-table model') END;
 SELECT CASE WHEN _duckvep_model_fingerprint('temp-model') = 16162758230738989510 THEN true ELSE error('TEMP model equals the README model fingerprint') END;
--- Two load scripts for one model name stage under their own keys (name<US>sequence), so one
--- script's publish never reads the other's rows; it installs under the bare name and discards
--- the rest, and the other script's publish then fails loudly instead of mixing relations.
-SELECT CASE WHEN contains(duckvep_model_load_sql('k', 'a', 'b', 'c')[1], E'MODEL ''k\x1f') AND starts_with(duckvep_model_load_sql('k', 'a', 'b', 'c')[4], E'SELECT duckvep_model_publish(''k\x1f') AND duckvep_model_load_sql('k', 'a', 'b', 'c')[1] <> duckvep_model_load_sql('k', 'a', 'b', 'c')[1] THEN true ELSE error('each load script stages under its own key') END;
-COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL E'race\x1f901', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
-COPY (SELECT * FROM (VALUES (0::UINTEGER), (1::UINTEGER), (2::UINTEGER)) t(seq_region)) TO 'x' (FORMAT duckvep_stage, MODEL E'race\x1f902', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
-COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL E'race\x1f901', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
-COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL E'race\x1f901', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
-SELECT CASE WHEN duckvep_model_publish(E'race\x1f901') THEN true ELSE error('publish of a script key') END;
-SELECT CASE WHEN _duckvep_model_fingerprint('race') = 16162758230738989510 AND _duckvep_model_fingerprint(E'race\x1f901') IS NULL THEN true ELSE error('the script installs its own rows under the bare name') END;
--- expect error: is not staged
-SELECT duckvep_model_publish(E'race\x1f902');
-SELECT CASE WHEN duckvep_model_drop('race') THEN true ELSE error('drop race') END;
+-- An explicitly missing captured generation cannot disable the annotation guard.
+-- expect error: unknown model name
+SELECT _duckvep_annotate_small_compact('temp-model', 1::UINTEGER, 124::UBIGINT, 'T', 'C',
+  5000::UBIGINT, 5000::UBIGINT, 0::UBIGINT);
+-- Generated load scripts use independent opaque keys. Literal model names remain separate from keys.
+SELECT CASE WHEN contains(duckvep_model_load_sql('k', 'a', 'b', 'c')[1], 'MODEL ''k''') AND
+                      contains(duckvep_model_load_sql('k', 'a', 'b', 'c')[1], 'LOAD_KEY') AND
+                      duckvep_model_load_sql('k', 'a', 'b', 'c')[1] <> duckvep_model_load_sql('k', 'a', 'b', 'c')[1]
+            THEN true ELSE error('each load script has an independent load key') END;
+-- Interleaved complete loads for one literal model never mix. The registry policy requires dropping A before B.
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL 'race', LOAD_KEY 'A', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL 'race', LOAD_KEY 'A', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'race', LOAD_KEY 'A', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL 'race', LOAD_KEY 'B', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * REPLACE (4::UBIGINT AS transcript_flags) FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL 'race', LOAD_KEY 'B', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'race', LOAD_KEY 'B', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN duckvep_model_publish('race', {'load_key': 'A'}) THEN true ELSE error('publish A') END;
+SELECT CASE WHEN _duckvep_model_fingerprint('race') = 16162758230738989510 THEN true ELSE error('A rows are exact') END;
+SELECT CASE WHEN duckvep_model_drop('race') THEN true ELSE error('drop A') END;
+SELECT CASE WHEN duckvep_model_publish('race', {'load_key': 'B'}) THEN true ELSE error('publish B') END;
+SELECT CASE WHEN _duckvep_model_fingerprint('race') <> 16162758230738989510 THEN true ELSE error('B rows are exact') END;
+SELECT CASE WHEN duckvep_model_drop('race') THEN true ELSE error('drop B') END;
+-- An incomplete publish consumes only its own key, so the other complete key remains usable.
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL 'incomplete', LOAD_KEY 'bad', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL 'incomplete', LOAD_KEY 'good', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL 'incomplete', LOAD_KEY 'good', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'incomplete', LOAD_KEY 'good', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+-- expect error: relation 'transcripts' is not staged
+SELECT duckvep_model_publish('incomplete', {'load_key': 'bad'});
+SELECT CASE WHEN duckvep_model_publish('incomplete', {'load_key': 'good'}) THEN true ELSE error('incomplete publish kept the other key') END;
+SELECT CASE WHEN duckvep_model_drop('incomplete') THEN true ELSE error('drop incomplete') END;
+-- A failed COPY has no stage. Exact discard is idempotent and cannot discard another key.
+-- expect error: boom
+COPY (SELECT error('boom')::UINTEGER) TO 'x' (FORMAT duckvep_stage, MODEL 'discard', LOAD_KEY 'failed', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL 'discard', LOAD_KEY 'other', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL 'discard', LOAD_KEY 'other', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'discard', LOAD_KEY 'other', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN duckvep_model_stage_discard('discard', 'failed') AND duckvep_model_stage_discard('discard', 'failed') THEN true ELSE error('keyed discard is idempotent') END;
+SELECT CASE WHEN duckvep_model_publish('discard', {'load_key': 'other'}) THEN true ELSE error('discard retained another key') END;
+SELECT CASE WHEN duckvep_model_drop('discard') THEN true ELSE error('drop discard') END;
+-- Quotes and unit-separator-plus-digits remain part of the literal model name.
+COPY (SELECT * FROM m_regions ORDER BY seq_region) TO 'x' (FORMAT duckvep_stage, MODEL E'quoted''\x1f123', LOAD_KEY E'key\x1f9', RELATION 'regions', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL E'quoted''\x1f123', LOAD_KEY E'key\x1f9', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+COPY (SELECT * FROM m_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL E'quoted''\x1f123', LOAD_KEY E'key\x1f9', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
+SELECT CASE WHEN duckvep_model_publish(E'quoted''\x1f123', {'load_key': E'key\x1f9'}) AND _duckvep_model_fingerprint(E'quoted''\x1f123') = 16162758230738989510 THEN true ELSE error('literal model identity') END;
+SELECT CASE WHEN duckvep_model_drop(E'quoted''\x1f123') THEN true ELSE error('drop quoted model') END;
+-- expect error: LOAD_KEY must be a non-empty string
+COPY (SELECT * FROM m_regions) TO 'x' (FORMAT duckvep_stage, MODEL 'invalid-key', LOAD_KEY '', RELATION 'regions', USE_TMP_FILE FALSE);
+-- expect error: LOAD_KEY must be a non-empty string
+COPY (SELECT * FROM m_regions) TO 'x' (FORMAT duckvep_stage, MODEL 'invalid-key', LOAD_KEY chr(0), RELATION 'regions', USE_TMP_FILE FALSE);
+-- expect error: load_key must be a non-empty string
+SELECT duckvep_model_load_sql('invalid-key', 'a', 'b', 'c', {'load_key': ''});
+-- expect error: load_key must be a non-empty string
+SELECT duckvep_model_publish('invalid-key', {'load_key': ''});
+-- expect error: load_key must be a non-empty string
+SELECT duckvep_model_publish('invalid-key', {'load_key': chr(0)});
 -- Snapshots: the same core as v1. A saved model restores to the same arrays; bad input is refused.
 SELECT CASE WHEN duckvep_model_save('temp-model', 'build/v2_temp_model.dvsnap') AND duckvep_model_restore('temp-snapshot', 'build/v2_temp_model.dvsnap') THEN true ELSE error('snapshot round trip') END;
 SELECT CASE WHEN _duckvep_model_fingerprint('temp-snapshot') = 16162758230738989510 THEN true ELSE error('restored model equals the README model fingerprint') END;
@@ -41,6 +84,8 @@ SELECT CASE WHEN duckvep_model_drop('temp-snapshot') THEN true ELSE error('drop 
 -- Haplotype jobs (slice 5): options and the job lifecycle. The published temp-model is the model.
 -- expect error: the JOB and MODEL options are required
 COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', USE_TMP_FILE FALSE);
+-- expect error: LOAD_KEY cannot be used with JOB
+COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'keyed-job', MODEL 'temp-model', LOAD_KEY 'key', USE_TMP_FILE FALSE);
 -- expect error: unknown model name
 COPY (SELECT 1) TO 'x' (FORMAT duckvep_stage, JOB 'j', MODEL 'no-such-model', USE_TMP_FILE FALSE);
 -- expect error: STAGE must be
@@ -206,7 +251,10 @@ COPY (SELECT 0::UINTEGER transcript_index, 1::UINTEGER cdna_start, 1::UINTEGER c
              'transcript_attrib:SeqEdit'::VARCHAR evidence_name, 0::UTINYINT boundary_overrides)
   TO 'x' (FORMAT duckvep_stage, MODEL 'rna-typed', RELATION 'rna_edits', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
 SELECT CASE WHEN duckvep_model_publish('rna-typed') AND duckvep_model_drop('rna-typed') THEN true ELSE error('typed RNA source did not publish and release') END;
-SELECT CASE WHEN starts_with(x[4], 'SELECT duckvep_model_publish(''it''''s' || chr(31)) AND ends_with(x[4], ''')') AND contains(x[1], 'MODEL ' || x[4][30:-2] || ', RELATION') THEN true ELSE error('publish statement text') END FROM (SELECT duckvep_model_load_sql('it''s', 'SELECT 1 -- c', 'SELECT 2', 'SELECT 3') AS x);
+SELECT CASE WHEN starts_with(x[4], 'SELECT duckvep_model_publish(''it''''s'', {''load_key'': ') AND
+                      contains(x[1], 'MODEL ''it''''s'', RELATION') AND contains(x[1], ', LOAD_KEY ')
+            THEN true ELSE error('publish statement text') END
+FROM (SELECT duckvep_model_load_sql('it''s', 'SELECT 1 -- c', 'SELECT 2', 'SELECT 3') AS x);
 SELECT CASE WHEN contains(duckvep_model_load_sql('m', 'SELECT 1 -- c', 'SELECT 2', 'SELECT 3')[1], E'-- c\n) TO ''duckvep_stage''') THEN true ELSE error('trailing comment stays inside the parentheses') END;
 -- expect error: arguments must be non-empty strings
 SELECT duckvep_model_load_sql('m', '', 'SELECT 2', 'SELECT 3');

@@ -1,11 +1,11 @@
-# DuckVEP v2 host (preview): a self-contained build of the stable C API v2
-# extension. It is deliberately a separate CMake project so the v1 build
-# (../../CMakeLists.txt, the distributed extension) is not touched by it.
+# DuckVEP native host for the DuckDB v2.0.0 exact-version unstable C API.
+# This separate project leaves the default stable-v1 build unchanged.
 #
 #   cmake -S host_v2 -B build/cmake_v2 -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build/cmake_v2
 #
-# `make release_v2` from the repository root runs these and appends the footer.
+# The raw library requires a C_STRUCT_UNSTABLE footer with DuckDB version
+# v2.0.0. See ../duckdb_capi_v2/README.md for the SDK and packaging contract.
 cmake_minimum_required(VERSION 3.5...3.29)
 project(duckvep_v2 LANGUAGES C)
 
@@ -43,7 +43,7 @@ target_include_directories(duckvep PRIVATE
     "${DUCKVEP_ROOT}/third_party/cgranges")
 target_include_directories(duckvep SYSTEM PRIVATE "${DUCKDB_CAPI_V2_DIR}")
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    target_compile_options(duckvep PRIVATE -Wall -Wextra -Wpedantic -Wformat=2 -Wstrict-prototypes
+    target_compile_options(duckvep PRIVATE -fexceptions -Wall -Wextra -Wpedantic -Wformat=2 -Wstrict-prototypes
         "-ffile-prefix-map=${DUCKVEP_ROOT}=." -ffunction-sections -fdata-sections -Werror)
 endif()
 # Indexed-FASTA validation of the model needs HTSlib (local faidx and zlib only), as in v1.

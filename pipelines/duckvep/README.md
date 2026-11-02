@@ -13,7 +13,9 @@ split is:
 - the DuckVEP conformance scripts own sampling, model/oracle identity, complete pair
   denominators, semantic receipts, and fail-closed acceptance.
 
-Run the checked-in witness campaign from the repository root (or set `DUCKVEP_ROOT`):
+Run the checked-in witness campaign from any working directory. The wrapper infers the
+repository root from its own location in a complete extracted checkout. Set `DUCKVEP_ROOT`
+to override that root; `DUCKHTS_ROOT` remains a compatibility fallback.
 
 ```sh
 Rscript pipelines/duckvep/run.R
@@ -68,13 +70,8 @@ uses a clean process environment, but it does not hash every installed package f
 
 The chromosome-21 ClinVar campaigns can acquire their complete cache region through the
 benchmark registry without storing the full compressed release archive. The registry
-(`r/duckhtsbench`) stayed in the [DuckHTS](https://github.com/RGenomicsETL/duckhts)
-repository when DuckVEP was extracted, and the staging script below is no longer present in
-either repository, so this acquisition path currently has no runner. It was invoked as:
-
-```sh
-Rscript r/duckhtsbench/scripts/stage_vep_cache.R
-```
+(`r/duckhtsbench`) is in the [DuckHTS](https://github.com/RGenomicsETL/duckhts)
+repository. No in-tree staging runner is available for this acquisition path.
 
 The registry owns the exact release URL, content checksum, ETag/byte identity, region selection and cache
 destination. Streaming still transfers the entire archive, but extracts every file below

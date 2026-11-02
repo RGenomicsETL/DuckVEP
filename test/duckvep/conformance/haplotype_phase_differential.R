@@ -474,6 +474,7 @@ main <- function() {
     optparse::make_option("--history", default = "test/duckvep/conformance/data/haplotype_phase_history.csv")
   )))
   if (!is.null(opt$publish_artifact)) return(publish_phase_history(opt$publish_artifact, opt$history))
+  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   stopifnot(opt$max_ploidy >= 2L, opt$max_ploidy <= 4L)
   source("scripts/duckvep_evidence.R", local = TRUE)
   root <- normalizePath(".")
@@ -495,7 +496,6 @@ main <- function() {
       !length(duckvep_evidence_command("git", c("-C", mirrors[[name]], "status",
         "--porcelain"), "oracle worktree")))
   }
-  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix)
   out <- tempfile("haplotype_phase_", tmpdir = "test/duckvep/conformance/results")
   dir.create(out)

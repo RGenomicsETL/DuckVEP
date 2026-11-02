@@ -18,6 +18,7 @@ main <- function() {
   stopifnot(!is.na(opt$rare_per_stratum), opt$rare_per_stratum >= 0L)
   stopifnot(!is.na(opt$context_per_stratum), opt$context_per_stratum >= 0L)
   stopifnot(!is.na(opt$pair_per_stratum), opt$pair_per_stratum >= 0L)
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   source('scripts/duckvep_evidence.R', local=TRUE)
   root <- normalizePath('.')
   revision <- duckvep_evidence_revision(root)
@@ -37,7 +38,6 @@ main <- function() {
     identical(duckvep_evidence_command('git', c('-C',mirrors[i],'rev-parse','HEAD'), 'oracle revision'),
       unname(pins[i])),
     !length(duckvep_evidence_command('git', c('-C',mirrors[i],'status','--porcelain'), 'oracle checkout')))
-  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix)
   environment <- duckvep_evidence_command('micromamba', c('list','-p',prefix,'--explicit'), 'oracle environment')
   writeLines(environment, file.path(out,'environment.txt'))

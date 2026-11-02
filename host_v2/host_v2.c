@@ -1,12 +1,6 @@
-/* DuckDB C API v2 host for DuckVEP (preview; slice 1 of issue #8).
- *
- * This file is a v2-only implementation: it includes duckdb_extension_v2.h,
- * calls only duckdb_v2_* functions, compiles with the unstable and deprecated
- * surfaces disabled, and runs no SQL at LOAD. The row logic lives in
- * src/core/ and src/kernel/, which do not mention DuckDB.
- *
- * Ported so far: duckvep_so_terms (table), duckvep_allele_geometry and
- * duckvep_breakend_geometry (scalars); host_v2_nested.c adds the nested family. See docs/v2-host.md. */
+/* DuckDB v2.0.0 exact-version C API host for DuckVEP.
+ * Registration uses the unstable v2 API and runs no SQL at LOAD.
+ * The row logic lives in the shared src/core/ and src/kernel/ layers. */
 #include "host_v2_common.h"
 
 #include "core/duckvep_core_geometry.h"
@@ -42,14 +36,15 @@ typedef struct {
     size_t offset;
 } so_scan;
 
-static void so_bind(duckdb_v2_table_function_bind_info_handle info,
+static void so_bind(duckdb_v2_function_bind_info_handle info,
+                    duckdb_v2_table_function_bind_info_handle result,
                     duckdb_v2_context_handle context, duckdb_v2_error_info_handle *error) {
+    (void)info;
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_logical_type_handle type = NULL;
     for (idx_t column = 0; column < SO_COLUMNS; ++column) {
         DUCKDB_CALL(make_type(context, so_types[column], &type, &detail));
-        DUCKDB_CALL(duckdb_v2_table_function_bind_add_result_column(
-            info, string_view(so_names[column]), type, &detail));
+        DUCKDB_CALL(add_result_column(result, so_names[column], type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
 cleanup:
@@ -128,18 +123,20 @@ cleanup:
     (void)duckdb_v2_error_info_destroy(&detail);
 }
 
-static bool register_so_terms(duckdb_v2_extension_handle extension,
+static bool register_so_terms(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
                               duckdb_v2_error_info_handle *error) {
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_table_function_handle function = NULL;
     bool success = false;
     duckdb_v2_str name = string_view("duckvep_so_terms");
-    DUCKDB_CALL(duckdb_v2_table_function_create_with_extension(extension, &function, &detail));
+    duckdb_v2_factory_handle factory = NULL;
+    DUCKDB_CALL(duckdb_v2_context_get_factory(context, &factory, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_create(factory, &function, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_name(function, &name, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_bind_callback(function, so_bind, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_init_global_callback(function, so_init, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_exec_callback(function, so_exec, &detail));
-    DUCKDB_CALL(duckdb_v2_table_function_register(function, &detail));
+    DUCKDB_CALL(duckdb_v2_extension_register_table_function(extension, function, &detail));
     success = true;
 cleanup:
     (void)duckdb_v2_table_function_destroy(&function);
@@ -308,7 +305,7 @@ static bool register_breakend_geometry(duckdb_v2_extension_handle extension,
  * nothing is written to the catalog, so a read-only primary database works. */
 DUCKDB_EXTENSION_ENTRYPOINT(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
                             duckdb_v2_error_info_handle *error) {
-    if (!register_so_terms(extension, error)) {
+    if (!register_so_terms(extension, context, error)) {
         return;
     }
     if (!register_allele_geometry(extension, context, error)) {

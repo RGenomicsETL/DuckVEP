@@ -22,13 +22,15 @@ static void scan_destroy(void *pointer) {
     free(pointer);
 }
 
-static void budget_bind(duckdb_v2_table_function_bind_info_handle info, duckdb_v2_context_handle context,
+static void budget_bind(duckdb_v2_function_bind_info_handle info,
+                        duckdb_v2_table_function_bind_info_handle result, duckdb_v2_context_handle context,
                         duckdb_v2_error_info_handle *error) {
+    (void)info;
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_logical_type_handle type = NULL;
     for (unsigned i = 0; i < 6; ++i) {
         DUCKDB_CALL(make_type(context, i == 0 ? "VARCHAR" : "UBIGINT", &type, &detail));
-        DUCKDB_CALL(duckdb_v2_table_function_bind_add_result_column(info, string_view(table_names[i]), type, &detail));
+        DUCKDB_CALL(add_result_column(result, table_names[i], type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
 cleanup:
@@ -185,12 +187,14 @@ static bool register_bigint_scalar(duckdb_v2_extension_handle extension, duckdb_
     duckdb_v2_logical_type_handle type = NULL;
     duckdb_v2_str text = string_view(name);
     bool success = false;
-    DUCKDB_CALL(duckdb_v2_scalar_function_create_with_extension(extension, &function, &detail));
+    duckdb_v2_factory_handle factory = NULL;
+    DUCKDB_CALL(duckdb_v2_context_get_factory(context, &factory, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_create(factory, &function, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_set_name(function, &text, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_get_signature(function, &signature, &detail));
     for (idx_t i = 0; i < parameters; ++i) {
         DUCKDB_CALL(make_type(context, types[i], &type, &detail));
-        DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(signature, string_view(names[i]), type, NULL, &detail));
+        DUCKDB_CALL(add_parameter(signature, names[i], type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
     DUCKDB_CALL(make_type(context, return_type, &type, &detail));
@@ -198,7 +202,7 @@ static bool register_bigint_scalar(duckdb_v2_extension_handle extension, duckdb_
     DUCKDB_CALL(duckdb_v2_scalar_function_set_property(
         function, DUCKDB_V2_FUNCTION_PROPERTY_STABILITY, DUCKDB_V2_FUNCTION_PROPERTY_STABILITY_VOLATILE, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_set_exec_callback(function, callback, &detail));
-    DUCKDB_CALL(duckdb_v2_scalar_function_register(function, &detail));
+    DUCKDB_CALL(duckdb_v2_extension_register_scalar_function(extension, function, &detail));
     success = true;
 cleanup:
     (void)duckdb_v2_logical_type_destroy(&type);
@@ -213,12 +217,14 @@ bool host_v2_register_budget(duckdb_v2_extension_handle extension, duckdb_v2_con
     duckdb_v2_table_function_handle function = NULL;
     duckdb_v2_str name = string_view("duckvep_native_budget");
     bool success = false;
-    DUCKDB_CALL(duckdb_v2_table_function_create_with_extension(extension, &function, &detail));
+    duckdb_v2_factory_handle factory = NULL;
+    DUCKDB_CALL(duckdb_v2_context_get_factory(context, &factory, &detail));
+    DUCKDB_CALL(duckdb_v2_table_function_create(factory, &function, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_name(function, &name, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_bind_callback(function, budget_bind, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_init_global_callback(function, budget_init, &detail));
     DUCKDB_CALL(duckdb_v2_table_function_set_exec_callback(function, budget_exec, &detail));
-    DUCKDB_CALL(duckdb_v2_table_function_register(function, &detail));
+    DUCKDB_CALL(duckdb_v2_extension_register_table_function(extension, function, &detail));
     success = register_bigint_scalar(extension, context, "duckvep_native_budget_set", 1, "BIGINT", set_exec, error) &&
               register_bigint_scalar(extension, context, "duckvep_worker_limits_set", 4, "BOOLEAN", limits_exec,
                                      error) &&

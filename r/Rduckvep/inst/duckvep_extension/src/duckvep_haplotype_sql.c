@@ -420,7 +420,6 @@ static int input_open(haplotype_state_t *s, const haplotype_bind_t *b, char *err
     }
     char *sql = duckvep_budget_malloc(DUCKVEP_OWNER_CONTROL, qlen + overhead);
     if (!sql) return 0;
-    /* The newline ends a trailing -- comment in the caller's query before the closing parenthesis. */
     snprintf(sql, qlen + overhead, "%s%s\n%s%s%s", prefix, b->query, middle, domain, suffix);
     duckdb_prepared_statement statement = NULL;
     if (!duckvep_registry_query_acquire(b->registry, error, error_size)) { duckvep_budget_free(sql); return 0; }

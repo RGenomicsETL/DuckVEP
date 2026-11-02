@@ -361,14 +361,13 @@ duckvep_model_reserve_interval_features(duckvep_owned_model_t *model,
 
 static void duckvep_lifted_destroy(duckvep_lifted_model_t *);
 
-/* Frees an array the model owns; an array inside a snapshot's storage is released with it. A
- * present empty array in the last section points one past the end, so the bound is inclusive. */
+/* Snapshot-backed arrays include empty arrays at the end of the storage. */
 static void
 duckvep_model_array_free(const duckvep_owned_model_t *model, void *array)
 {
-	const char *base = model->snapshot_base, *at = array;
+	uintptr_t base = (uintptr_t)model->snapshot_base, at = (uintptr_t)array;
 
-	if (base != NULL && at >= base && at <= base + model->snapshot_bytes)
+	if (model->snapshot_base != NULL && at >= base && at - base <= model->snapshot_bytes)
 		return;
 	duckvep_budget_free(array);
 }
@@ -3015,6 +3014,16 @@ duckvep_core_model_load_relations(duckvep_owned_model_t *model,
 	    model, error, error_size)) &&
 	    (sources->rna_edits == NULL ||
 	    duckvep_load_rna_edits(sources->rna_edits, model, error, error_size));
+	duckvep_source_t *inputs[] = {
+		sources->regions, sources->transcripts, sources->exons,
+		sources->mature_mirna, sources->peptide_edits,
+		sources->interval_features, sources->rna_edits
+	};
+	for (size_t i = 0; i < sizeof(inputs) / sizeof(inputs[0]); i++) {
+		if (inputs[i] != NULL && inputs[i]->status != NULL &&
+		    !inputs[i]->status(inputs[i]->context, error, error_size))
+			return 0;
+	}
 	return ok;
 }
 

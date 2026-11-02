@@ -8,6 +8,7 @@ main <- function() {
     optparse::make_option("--vep-prefix", dest = "vep_prefix",
       default = Sys.getenv("VEP_PREFIX"))
   )))
+  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   source("scripts/duckvep_evidence.R", local = TRUE)
   root <- normalizePath(".")
   revision <- duckvep_evidence_revision(root)
@@ -41,7 +42,6 @@ main <- function() {
   code_hashes <- vapply(code, duckvep_evidence_sha256, "")
   binding <- if (length(duckvep_evidence_tracked_changes(root)) ||
     length(duckvep_evidence_untracked_build_inputs(root))) "diagnostic_unbound" else "clean_checkout"
-  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix, mustWork = TRUE)
   conda <- function(...) do.call(blit::conda,
     c(as.list(duckvep_blit_quote(c(...))), list(conda = duckvep_blit_quote("micromamba"))))
