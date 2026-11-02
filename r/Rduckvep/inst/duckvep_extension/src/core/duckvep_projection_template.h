@@ -34,7 +34,9 @@ static const char *const duckvep_projection_parts[] = {
     "  SELECT t.* EXCLUDE(cds_sequence, post_cds_sequence),\n",
     "    upper(decode(t.cds_sequence)) AS cds_sequence,\n",
     "    upper(decode(t.post_cds_sequence)) AS post_cds_sequence\n",
-    "  FROM transcripts t SEMI JOIN annotations a USING(transcript_index)\n",
+    /* Bound membership to transcript keys; output annotations retain multiplicity. */
+    "  FROM transcripts t SEMI JOIN\n",
+    "    (SELECT DISTINCT transcript_index FROM annotations) a USING(transcript_index)\n",
     "), joined AS NOT MATERIALIZED (\n",
     "  SELECT a.event_index, a.transcript_index, a.consequence_mask,\n",
     "    e.reference, e.alternate, e.position,\n",

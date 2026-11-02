@@ -40,6 +40,14 @@ jobs:
           args: 'c("--no-manual", "--as-cran")'
           build_args: 'c("--no-manual", "--no-build-vignettes")'
           error-on: '"warning"'
+      - name: Check host OOM and projection recovery
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mapfile -t artifacts < <(find . -path '*/Rduckvep.Rcheck/Rduckvep/duckvep_extension/artifacts/*/duckvep.duckdb_extension')
+          test "${#artifacts[@]}" -eq 1
+          bash test/scripts/test_host_oom.sh "${artifacts[0]}"
+          timeout -k 2 120 Rscript test/scripts/check_projection_parallel.R "${artifacts[0]}"
 
   wasm:
     runs-on: ubuntu-latest

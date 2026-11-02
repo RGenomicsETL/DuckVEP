@@ -43,7 +43,7 @@ target_include_directories(duckvep PRIVATE
     "${DUCKVEP_ROOT}/third_party/cgranges")
 target_include_directories(duckvep SYSTEM PRIVATE "${DUCKDB_CAPI_V2_DIR}")
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    target_compile_options(duckvep PRIVATE -Wall -Wextra -Wpedantic -Wformat=2 -Wstrict-prototypes
+    target_compile_options(duckvep PRIVATE -fexceptions -Wall -Wextra -Wpedantic -Wformat=2 -Wstrict-prototypes
         "-ffile-prefix-map=${DUCKVEP_ROOT}=." -ffunction-sections -fdata-sections -Werror)
 endif()
 # Indexed-FASTA validation of the model needs HTSlib (local faidx and zlib only), as in v1.

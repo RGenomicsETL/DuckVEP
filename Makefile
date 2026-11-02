@@ -64,6 +64,13 @@ build_fault_injection: check_configure
 test_fault_injection: build_fault_injection
 	python3 test/scripts/test_fault_injection.py
 
+# Linux integration checks run in bounded subprocesses against a supplied artifact.
+DUCKVEP_TEST_EXTENSION ?= $(PROJ_DIR)/build/release/duckvep.duckdb_extension
+.PHONY: test-runtime-recovery
+test-runtime-recovery:
+	bash test/scripts/test_host_oom.sh "$(DUCKVEP_TEST_EXTENSION)"
+	timeout -k 2 120 Rscript test/scripts/check_projection_parallel.R "$(DUCKVEP_TEST_EXTENSION)"
+
 # Pure policy fixtures run offline. The full-release receipt needs the external
 # Parquet output and is invoked explicitly after building a staged release.
 test_mane_grch37:

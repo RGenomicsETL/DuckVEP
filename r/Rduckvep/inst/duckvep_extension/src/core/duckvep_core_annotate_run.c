@@ -620,6 +620,13 @@ duckvep_scalar_state_release(duckvep_scalar_state_t *state)
 		duckvep_scalar_state_destroy(state);
 }
 
+/* Release callback ownership on both C returns and host exception unwinding. */
+static void
+duckvep_scalar_state_cleanup(duckvep_scalar_state_t **state)
+{
+	duckvep_scalar_state_release(*state);
+}
+
 static int
 duckvep_validity_is_null(const uint64_t *validity, size_t row)
 {
@@ -3418,7 +3425,8 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 	duckvep_h_chunk input, duckvep_h_vector output, int compact, int with_hgvs,
 	int with_projection, duckvep_scalar_event_family_t event_family)
 {
-	duckvep_scalar_state_t *state;
+	__attribute__((cleanup(duckvep_scalar_state_cleanup)))
+	duckvep_scalar_state_t *state = NULL;
 	duckvep_variant_batch_t batch;
 	duckvep_h_vector model_vector, upstream_distance_vector;
 	duckvep_h_vector downstream_distance_vector;
@@ -3565,11 +3573,9 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 	    state, output, rows, with_hgvs ? 36u : 29u,
 	    error, sizeof(error)))
 		goto failed;
-	duckvep_scalar_state_release(state);
 	return;
 
 failed:
-	duckvep_scalar_state_release(state);
 	duckvep_h_set_error(info,
 	    duckvep_sql_final_error(final_error, sizeof(final_error), error,
 	    "duckvep_annotate failed"));
