@@ -4,8 +4,9 @@ source('scripts/duckvep_evidence.R')
 source('test/duckvep/conformance/haplotype_observations.R')
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
-    optparse::make_option('--vep-prefix', dest = 'prefix', default = '/root/miniconda3/envs/vep'),
+    optparse::make_option('--vep-prefix', dest = 'prefix', default = Sys.getenv('VEP_PREFIX')),
     optparse::make_option('--oracle', default = 'test/duckvep/conformance/haplotype_grouped_flags.pl'))))
+  if (!nzchar(opt$prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   root <- normalizePath('.')
   pins <- c(vep = '57ea5c52340acc1f156267f810ad162e26597082', variation = '2fb834b987ede3824e200197a838ce11e91aeb4b')
   mirrors <- normalizePath(c('.sync/ensembl-vep', '.sync/ensembl-variation'))

@@ -9,7 +9,9 @@
 #' model. One visible difference remains: on v2 the queries run on `con` in its
 #' own transaction, so temporary tables and uncommitted rows are visible to
 #' them; on v1 the queries run on a separate connection and see only committed,
-#' permanent relations.
+#' permanent relations. Each v2 load uses its own staging key. The wrapper cleans
+#' up that key on exit, including after a failed COPY, without removing another
+#' load's staged relations.
 #'
 #' @param con A DBI connection with DuckVEP loaded.
 #' @param name Model name (non-empty, not yet loaded).
@@ -36,12 +38,15 @@ rduckvep_load_model <- function(con, name, regions_query, transcripts_query, exo
                    rna_edit_query = rna_edit_query)
   optional <- optional[!vapply(optional, is.null, NA)]
   if (.duckvep_is_v2(con)) {
+    load_key <- basename(tempfile("duckvep-stage-"))
+    optional$load_key <- load_key
     args <- vapply(required, function(value) .duckvep_builder_literal(con, value), "")
-    if (length(optional) > 0L) {
-      fields <- paste0(as.character(DBI::dbQuoteIdentifier(con, names(optional))), " := ",
-                       vapply(optional, function(value) .duckvep_builder_literal(con, value), ""))
-      args <- c(args, paste0("struct_pack(", paste(fields, collapse = ", "), ")"))
-    }
+    fields <- paste0(as.character(DBI::dbQuoteIdentifier(con, names(optional))), " := ",
+                     vapply(optional, function(value) .duckvep_builder_literal(con, value), ""))
+    args <- c(args, paste0("struct_pack(", paste(fields, collapse = ", "), ")"))
+    cleanup <- paste0("SELECT duckvep_model_stage_discard(", .duckvep_builder_literal(con, name), ", ",
+                      .duckvep_builder_literal(con, load_key), ")")
+    on.exit(try(DBI::dbGetQuery(con, cleanup), silent = TRUE), add = TRUE)
     statements <- DBI::dbGetQuery(con, paste0("SELECT unnest(duckvep_model_load_sql(",
                                               paste(args, collapse = ", "), ")) AS statement"))$statement
     for (statement in statements) DBI::dbExecute(con, statement)

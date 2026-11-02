@@ -1,9 +1,16 @@
 # Shared by the panel builders. DuckDB spill goes to $DUCKVEP_SCALE_TMP (default
-# /root/duckvep/data/scale-tmp), never under the staged gnomAD tree, and is removed when the
+# $DUCKVEP_DATA/scale-tmp), never under the staged gnomAD tree, and is removed when the
 # process ends. The spill quota is capped so that at least DUCKVEP_MIN_FREE_GIB (50) GiB stay
 # free on the filesystem; the build refuses to start if less than 2 GiB of quota would remain.
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 panel_spill_setup <- function(execute, q) {
-  scale_tmp <- Sys.getenv("DUCKVEP_SCALE_TMP", "/root/duckvep/data/scale-tmp")
+  scale_tmp <- duckvep_data("scale-tmp", "DUCKVEP_SCALE_TMP")
   dir.create(scale_tmp, recursive = TRUE, showWarnings = FALSE)
   spill <- tempfile("panel-spill-", tmpdir = scale_tmp)
   dir.create(spill)

@@ -336,7 +336,7 @@ duckvep_register_annotate_scalar(duckdb_connection connection,
 		name = compact ? "_duckvep_annotate_small_compact" :
 		    "_duckvep_annotate_small_rich";
 	functions = duckdb_create_scalar_function_set(name);
-	for (int distance_parameters = 0; distance_parameters <= 2; distance_parameters++) {
+	for (int distance_parameters = 0; distance_parameters <= 3; distance_parameters++) {
 		duckdb_scalar_function scalar = duckdb_create_scalar_function();
 		duckdb_scalar_function_set_name(scalar, name);
 		duckdb_scalar_function_add_parameter(scalar, varchar_type);
@@ -372,6 +372,8 @@ duckvep_register_annotate_scalar(duckdb_connection connection,
 		else
 			duckdb_scalar_function_set_function(scalar, compact ?
 			    duckvep_annotate_compact_scalar : duckvep_annotate_scalar);
+		if (distance_parameters >= 3)
+			duckdb_scalar_function_add_parameter(scalar, ubigint_type);
 		ok = duckdb_add_scalar_function_to_set(functions, scalar) == DuckDBSuccess && ok;
 		duckdb_destroy_scalar_function(&scalar);
 	}
@@ -394,7 +396,7 @@ duckvep_register_hgvs_scalar(duckdb_connection connection,
 	duckdb_logical_type result_type = rich ? duckvep_annotation_list_type(1, 0) :
 	    duckvep_hgvs_annotation_list_type();
 
-	for (int distance_parameters = 0; distance_parameters <= 2; distance_parameters++) {
+	for (int distance_parameters = 0; distance_parameters <= 3; distance_parameters++) {
 		duckdb_scalar_function scalar = duckdb_create_scalar_function();
 		duckdb_scalar_function_set_name(scalar, name);
 		duckdb_scalar_function_add_parameter(scalar, varchar_type);
@@ -413,6 +415,8 @@ duckvep_register_hgvs_scalar(duckdb_connection connection,
 		    duckvep_registry_release);
 		duckdb_scalar_function_set_function(scalar, rich ?
 		    duckvep_annotate_rich_hgvs_scalar : duckvep_annotate_hgvs_scalar);
+		if (distance_parameters >= 3)
+			duckdb_scalar_function_add_parameter(scalar, ubigint_type);
 		ok = duckdb_add_scalar_function_to_set(functions, scalar) == DuckDBSuccess && ok;
 		duckdb_destroy_scalar_function(&scalar);
 	}
@@ -434,7 +438,7 @@ duckvep_register_projected_scalar(duckdb_connection connection,
 	duckdb_scalar_function_set functions = duckdb_create_scalar_function_set(name);
 	duckdb_logical_type result_type = duckvep_annotation_list_type(with_hgvs, 1);
 
-	for (int distance_parameters = 0; distance_parameters <= 2; distance_parameters++) {
+	for (int distance_parameters = 0; distance_parameters <= 3; distance_parameters++) {
 		duckdb_scalar_function scalar = duckdb_create_scalar_function();
 		duckdb_scalar_function_set_name(scalar, name);
 		duckdb_scalar_function_add_parameter(scalar, varchar_type);
@@ -454,6 +458,8 @@ duckvep_register_projected_scalar(duckdb_connection connection,
 		duckdb_scalar_function_set_function(scalar, with_hgvs ?
 		    duckvep_annotate_projected_hgvs_scalar :
 		    duckvep_annotate_projected_scalar);
+		if (distance_parameters >= 3)
+			duckdb_scalar_function_add_parameter(scalar, ubigint_type);
 		ok = duckdb_add_scalar_function_to_set(functions, scalar) == DuckDBSuccess && ok;
 		duckdb_destroy_scalar_function(&scalar);
 	}

@@ -1,6 +1,13 @@
 #!/usr/bin/env Rscript
 # One-core five-replicate wall times for the fixed scale workloads.
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 args <- commandArgs(TRUE)
 if (!length(args) %in% 2:3 || !args[[2L]] %in% c("bench", "gnomad1m") ||
     (length(args) == 3L && args[[3L]] != "--fingerprint-only")) {
@@ -8,9 +15,9 @@ if (!length(args) %in% 2:3 || !args[[2L]] %in% c("bench", "gnomad1m") ||
 }
 source_root <- normalizePath(args[[1L]])
 corpus <- args[[2L]]
-model <- "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb"
+model <- duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb")
 metadata <- file.path(source_root, "benchmarks/data/scale_contracts/canonical-metadata.parquet")
-panel <- "/root/duckvep/data/gnomad-v4.1/panels/genomes-v1-77d2cdff65171780/panel-1000000.parquet"
+panel <- if (corpus == "gnomad1m") duckvep_data("gnomad-v4.1/panels/genomes-v1-77d2cdff65171780/panel-1000000.parquet")
 extension <- file.path(source_root, "build/release/extension/duckvep/duckvep.duckdb_extension")
 source(file.path(source_root, "benchmarks/duckvep_field_projection.R"), local = TRUE)
 version <- if (identical(source_root, normalizePath(getwd()))) "after" else "main"

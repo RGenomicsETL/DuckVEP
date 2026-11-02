@@ -255,6 +255,7 @@ duckvep_query_source_init(duckvep_query_source_t *query, duckvep_source_t *sourc
 	source->column_type = duckvep_qs_type;
 	source->next = duckvep_qs_next;
 	source->close = duckvep_qs_close;
+	source->status = NULL;
 }
 
 
@@ -660,8 +661,7 @@ duckvep_model_load_init(duckdb_init_info info)
 		    "duckvep_model_load: model name was created concurrently");
 		return;
 	}
-	entry->next = registry->models;
-	registry->models = entry;
+	duckvep_registry_link_locked(registry, entry);
 	pthread_mutex_unlock(&registry->mutex);
 	duckdb_init_set_init_data(info, state, duckvep_model_load_state_destroy);
 }
@@ -856,6 +856,31 @@ duckvep_model_fingerprint_scalar(duckdb_function_info info,
 	}
 }
 
+/* Annotation builders capture the installed generation once per query. */
+static void
+duckvep_model_generation_scalar(duckdb_function_info info,
+	duckdb_data_chunk input, duckdb_vector output)
+{
+	duckvep_registry_t *registry = duckdb_scalar_function_get_extra_info(info);
+	duckdb_vector names = duckdb_data_chunk_get_vector(input, 0);
+	uint64_t *validity = duckdb_vector_get_validity(names);
+	uint64_t *values = duckdb_vector_get_data(output);
+	idx_t rows = duckdb_data_chunk_get_size(input);
+
+	duckdb_vector_ensure_validity_writable(output);
+	for (idx_t row = 0; row < rows; row++) {
+		char *name = duckvep_vector_string(names, row);
+		if (name == NULL && (validity == NULL || duckdb_validity_row_is_valid(validity, row))) {
+			duckdb_scalar_function_set_error(info, "out of memory reading model name");
+			return;
+		}
+		int found = name != NULL && duckvep_registry_generation(registry, name, &values[row]);
+		duckvep_budget_free(name);
+		if (!found)
+			duckdb_validity_set_row_invalid(duckdb_vector_get_validity(output), row);
+	}
+}
+
 static void
 duckvep_v1_registry_release(duckvep_registry_t *registry)
 {
@@ -976,6 +1001,18 @@ duckvep_register_model_functions(duckdb_connection connection,
 		duckdb_scalar_function_set_extra_info(scalar, registry,
 		    duckvep_registry_release);
 		duckdb_scalar_function_set_function(scalar, duckvep_model_fingerprint_scalar);
+		(void)duckdb_register_scalar_function(connection, scalar);
+		duckdb_destroy_scalar_function(&scalar);
+
+		scalar = duckdb_create_scalar_function();
+		duckdb_scalar_function_set_name(scalar, "_duckvep_model_generation");
+		duckdb_scalar_function_add_parameter(scalar, varchar_type);
+		duckdb_scalar_function_set_return_type(scalar, ubigint_type);
+		duckdb_scalar_function_set_volatile(scalar);
+		duckdb_scalar_function_set_special_handling(scalar);
+		duckvep_registry_retain(registry);
+		duckdb_scalar_function_set_extra_info(scalar, registry, duckvep_registry_release);
+		duckdb_scalar_function_set_function(scalar, duckvep_model_generation_scalar);
 		(void)duckdb_register_scalar_function(connection, scalar);
 		duckdb_destroy_scalar_function(&scalar);
 		duckdb_destroy_logical_type(&ubigint_type);

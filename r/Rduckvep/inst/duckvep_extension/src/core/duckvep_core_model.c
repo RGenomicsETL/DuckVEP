@@ -2664,6 +2664,30 @@ duckvep_registry_pin(duckvep_registry_t *registry, const char *name)
 	return entry;
 }
 
+/* Publishes an installed model under its name; the caller holds the registry mutex. */
+void
+duckvep_registry_link_locked(duckvep_registry_t *registry,
+	duckvep_model_entry_t *entry)
+{
+	entry->generation = ++registry->last_generation;
+	entry->next = registry->models;
+	registry->models = entry;
+}
+
+/* The generation of the model now installed under `name`; 0 when there is none. */
+int
+duckvep_registry_generation(duckvep_registry_t *registry, const char *name,
+	uint64_t *generation)
+{
+	duckvep_model_entry_t *entry;
+
+	pthread_mutex_lock(&registry->mutex);
+	entry = duckvep_registry_find_locked(registry, name);
+	*generation = entry != NULL ? entry->generation : 0;
+	pthread_mutex_unlock(&registry->mutex);
+	return entry != NULL;
+}
+
 void
 duckvep_registry_unpin(duckvep_registry_t *registry,
 	duckvep_model_entry_t *entry)
@@ -2990,6 +3014,16 @@ duckvep_core_model_load_relations(duckvep_owned_model_t *model,
 	    model, error, error_size)) &&
 	    (sources->rna_edits == NULL ||
 	    duckvep_load_rna_edits(sources->rna_edits, model, error, error_size));
+	duckvep_source_t *inputs[] = {
+		sources->regions, sources->transcripts, sources->exons,
+		sources->mature_mirna, sources->peptide_edits,
+		sources->interval_features, sources->rna_edits
+	};
+	for (size_t i = 0; i < sizeof(inputs) / sizeof(inputs[0]); i++) {
+		if (inputs[i] != NULL && inputs[i]->status != NULL &&
+		    !inputs[i]->status(inputs[i]->context, error, error_size))
+			return 0;
+	}
 	return ok;
 }
 
@@ -3251,8 +3285,7 @@ duckvep_core_model_install(duckvep_registry_t *registry, const char *name,
 		(void)snprintf(final_error, final_error_size, "%s: model name was created concurrently", label);
 		return 0;
 	}
-	entry->next = registry->models;
-	registry->models = entry;
+	duckvep_registry_link_locked(registry, entry);
 	pthread_mutex_unlock(&registry->mutex);
 	return 1;
 }

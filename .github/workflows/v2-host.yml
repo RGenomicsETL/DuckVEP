@@ -1,14 +1,15 @@
-name: DuckDB C API v2 host (preview)
+name: DuckDB C API v2 host (experimental)
 
-# Builds host_v2/ against the pinned v2 SDK and tests it on a DuckDB built at that same
-# revision (the preview v2 ABI is not frozen across snapshots). The distributed v1 extension
-# is built and tested by MainDistributionPipeline and is not touched here.
+# Builds host_v2/ against the pinned released SDK and tests the version-locked unstable ABI.
+# The distributed v1 extension is built and tested by MainDistributionPipeline.
 on:
   push:
     branches: [main]
     paths:
       - 'host_v2/**'
-      - 'src/kernel/**'
+      - 'src/**'
+      - 'cmake/**'
+      - 'third_party/**'
       - 'duckdb_capi_v2/**'
       - 'duckvep-package.json'
       - 'test/sql_v2/**'
@@ -16,12 +17,15 @@ on:
       - 'test/scripts/check_v2_host.py'
       - 'scripts/fetch-v2-sdk.py'
       - 'scripts/stage-v2-duckdb.py'
+      - 'test/scripts/v2_concurrent_staging.c'
       - 'Makefile'
       - '.github/workflows/v2-host.yml'
   pull_request:
     paths:
       - 'host_v2/**'
-      - 'src/kernel/**'
+      - 'src/**'
+      - 'cmake/**'
+      - 'third_party/**'
       - 'duckdb_capi_v2/**'
       - 'duckvep-package.json'
       - 'test/sql_v2/**'
@@ -29,6 +33,7 @@ on:
       - 'test/scripts/check_v2_host.py'
       - 'scripts/fetch-v2-sdk.py'
       - 'scripts/stage-v2-duckdb.py'
+      - 'test/scripts/v2_concurrent_staging.c'
       - 'Makefile'
       - '.github/workflows/v2-host.yml'
   workflow_dispatch:
@@ -49,15 +54,20 @@ jobs:
       - name: Pinned SDK revision
         id: pin
         run: echo "revision=$(python3 -c 'import json; print(json.load(open("duckvep-package.json"))["v2_host"]["duckdb_sdk_revision"])')" >> "$GITHUB_OUTPUT"
-      - name: Cache the DuckDB CLI built at the pinned revision
+      - name: Cache the released DuckDB CLI
         id: duckdb-cache
         uses: actions/cache@v4
         with:
           path: .deps-v2/duckdb-build/duckdb
-          key: duckdb-v2-ubuntu24.04-${{ runner.arch }}-${{ steps.pin.outputs.revision }}-json-shell-v1
-      - name: Build DuckDB at the pinned revision
+          key: duckdb-v2-ubuntu24.04-${{ runner.arch }}-${{ steps.pin.outputs.revision }}-released-c6507206
+      - name: Download and verify the released DuckDB CLI
         if: steps.duckdb-cache.outputs.cache-hit != 'true'
-        run: python3 scripts/stage-v2-duckdb.py
+        run: |
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/duckdb-cli.tar.gz" \
+            https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-cli-linux-amd64.tar.gz
+          echo "c6507206baf7793c6013dbd82368469a45f20dc0e17a6f92f204602f652ed2bc  $RUNNER_TEMP/duckdb-cli.tar.gz" | sha256sum -c -
+          mkdir -p .deps-v2/duckdb-build
+          tar -xzf "$RUNNER_TEMP/duckdb-cli.tar.gz" -C .deps-v2/duckdb-build duckdb
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -74,3 +84,18 @@ jobs:
         env:
           DUCKVEP_V2_DUCKDB: ${{ github.workspace }}/.deps-v2/duckdb-build/duckdb
         run: python3 test/scripts/run_v2_tests.py
+      - name: Stress staging ownership and streamed generations
+        run: |
+          python -m pip install --no-deps --target "$RUNNER_TEMP/duckdb-v2" 'duckdb==2.0.0'
+          wheel="$(PYTHONPATH="$RUNNER_TEMP/duckdb-v2" python -c 'import _duckdb; print(_duckdb.__file__)')"
+          libdir="$(python -c 'import sysconfig; print(sysconfig.get_config_var("LIBDIR"))')"
+          cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -I duckdb_capi \
+            test/scripts/v2_concurrent_staging.c "$wheel" $(python3-config --embed --ldflags) \
+            -pthread -o "$RUNNER_TEMP/v2_concurrent_staging"
+          LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+            "$RUNNER_TEMP/v2_concurrent_staging" "$GITHUB_WORKSPACE/build/release_v2/duckvep.duckdb_extension"
+          cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -I duckdb_capi \
+            test/scripts/model_generation_stream.c "$wheel" $(python3-config --embed --ldflags) \
+            -pthread -o "$RUNNER_TEMP/model_generation_stream"
+          LD_LIBRARY_PATH="$libdir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+            timeout -k 2 120 "$RUNNER_TEMP/model_generation_stream" "$GITHUB_WORKSPACE/build/release_v2/duckvep.duckdb_extension"

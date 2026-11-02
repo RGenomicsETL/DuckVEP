@@ -10,9 +10,16 @@
 # A panel that cannot be built yet (too few distinct alleles until every genome shard lands) is
 # recorded with its status and no checksum, and its link is removed.
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 args <- commandArgs(TRUE)
 if (length(args) < 2L) stop("usage: Rscript scripts/gnomad_panel_receipts.R GENOME_DIR EXOME_DIR [STRUCTURAL_PARQUET]")
-root <- Sys.getenv("DUCKVEP_GNOMAD_ROOT", "/root/duckvep/data/gnomad-v4.1")
+root <- duckvep_data("gnomad-v4.1", "DUCKVEP_GNOMAD_ROOT")
 panels_root <- file.path(root, "panels")
 repo <- normalizePath(file.path(dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE)[1L])), ".."))
 out_dir <- file.path(repo, "benchmarks/data/scale_contracts/panels")

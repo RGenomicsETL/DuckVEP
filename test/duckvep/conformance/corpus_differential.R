@@ -309,7 +309,7 @@ op <- add_option(
   op,
   "--vep-prefix",
   dest = "vep_prefix",
-  default = Sys.getenv("VEP_PREFIX", "/root/miniconda3/envs/vep"),
+  default = Sys.getenv("VEP_PREFIX"),
   help = "micromamba environment prefix containing VEP 116 [%default]"
 )
 op <- add_option(
@@ -363,6 +363,7 @@ op <- add_option(
 opt <- parse_args(op)
 
 die <- function(...) stop(glue(..., .envir = parent.frame()), call. = FALSE)
+if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
 root <- normalizePath(root[[1L]], mustWork = TRUE)
 source(file.path(root, "scripts", "duckvep_evidence.R"), local = TRUE)
 if (!(opt$event_mode %in% c("small", "structural", "breakend"))) {

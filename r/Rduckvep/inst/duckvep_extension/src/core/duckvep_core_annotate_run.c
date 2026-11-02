@@ -1,6 +1,9 @@
 /* The resident annotation natives (_duckvep_annotate_*): batch preparation, the kernel run and
  * the result writers. DuckDB is reached only through the duckvep_h_* host layer of
  * "duckvep_host.h", so both the v1 and the v2 host compile this file unchanged. */
+#include <stdlib.h>
+#include <string.h>
+
 #include "duckvep_host.h"
 
 #include "core/duckvep_core_model.h"
@@ -651,8 +654,11 @@ duckvep_vector_string_equals(duckvep_h_vector vector,
 
 static int
 duckvep_scalar_select_model(duckvep_scalar_state_t *state,
-	duckvep_h_vector model_vector, size_t row, char *error, size_t error_size)
+	duckvep_h_vector model_vector, size_t row, uint64_t expected,
+	char *error, size_t error_size)
 {
+	static const char replaced[] =
+	    "duckvep_annotate: the model was dropped or reloaded while the query ran";
 	duckvep_model_entry_t *entry;
 	char *name;
 
@@ -670,13 +676,22 @@ duckvep_scalar_select_model(duckvep_scalar_state_t *state,
 	}
 	if (state->entry != NULL && strcmp(state->entry->name, name) == 0) {
 		duckvep_budget_free(name);
+		if (expected != 0 && state->entry->generation != expected) {
+			duckvep_sql_set_error(error, error_size, replaced);
+			return 0;
+		}
 		return 1;
 	}
 	entry = duckvep_registry_pin(state->registry, name);
 	duckvep_budget_free(name);
 	if (entry == NULL) {
-		duckvep_sql_set_error(error, error_size,
+		duckvep_sql_set_error(error, error_size, expected != 0 ? replaced :
 		    "duckvep_annotate: unknown model name");
+		return 0;
+	}
+	if (expected != 0 && entry->generation != expected) {
+		duckvep_registry_unpin(state->registry, entry);
+		duckvep_sql_set_error(error, error_size, replaced);
 		return 0;
 	}
 	duckvep_scalar_release_model(state);
@@ -3429,7 +3444,8 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 	duckvep_scalar_state_t *state = NULL;
 	duckvep_variant_batch_t batch;
 	duckvep_h_vector model_vector, upstream_distance_vector;
-	duckvep_h_vector downstream_distance_vector;
+	duckvep_h_vector downstream_distance_vector, generation_vector;
+	uint64_t *generations, *generation_validity;
 	uint64_t *model_validity, *upstream_distance_validity;
 	uint64_t *downstream_distance_validity;
 	uint16_t *regions;
@@ -3479,6 +3495,10 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 	positions = state->positions;
 	column_count = duckvep_h_chunk_columns(input);
 	distance_column = event_family == DUCKVEP_SCALAR_STRUCTURAL ? 6 : 5;
+	generation_vector = column_count > distance_column + 2 ?
+	    duckvep_h_chunk_vector(input, distance_column + 2) : NULL;
+	generations = generation_vector != NULL ? duckvep_h_data(generation_vector) : NULL;
+	generation_validity = generation_vector != NULL ? duckvep_h_validity(generation_vector) : NULL;
 	upstream_distance_vector = column_count > distance_column ?
 	    duckvep_h_chunk_vector(input, distance_column) : NULL;
 	downstream_distance_vector = column_count > distance_column + 1 ?
@@ -3501,8 +3521,18 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 		uint64_t downstream_distance;
 		size_t end;
 
+		if (generations != NULL && duckvep_validity_is_null(generation_validity, begin)) {
+			duckvep_sql_set_error(error, sizeof(error),
+			    "duckvep_annotate: model generation must be non-NULL");
+			goto failed;
+		}
+		if (generations != NULL && generations[begin] == 0) {
+			duckvep_sql_set_error(error, sizeof(error),
+			    "duckvep_annotate: unknown model name");
+			goto failed;
+		}
 		if (!duckvep_scalar_select_model(state, model_vector, (size_t)begin,
-		    error, sizeof(error)))
+		    generations != NULL ? generations[begin] : 0, error, sizeof(error)))
 			goto failed;
 		if (event_family != DUCKVEP_SCALAR_SMALL &&
 		    state->entry->model.lifted != NULL) {
@@ -3530,6 +3560,10 @@ duckvep_annotate_scalar_execute(duckvep_h_info info,
 			uint64_t next_upstream_distance;
 			uint64_t next_downstream_distance;
 
+			if (generations != NULL &&
+			    (duckvep_validity_is_null(generation_validity, end) ||
+			    generations[end] != generations[begin]))
+				break;
 			if ((upstream_distance_vector != NULL &&
 			    duckvep_validity_is_null(upstream_distance_validity,
 			    (size_t)end)) ||

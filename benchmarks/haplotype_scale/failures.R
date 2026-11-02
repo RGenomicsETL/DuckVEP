@@ -10,12 +10,19 @@
 #   haplotype_budget      budget = resident model + 64 MiB before duckvep_haplotypes (workspace allocation)
 #   alignment_capacity    default max_alignment_cells (16,777,216) on the calls of the longest transcripts
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 4L) stop("usage: Rscript failures.R EXTENSION CALLS.parquet OUT_DIR RECEIPT.tsv")
 extension <- normalizePath(args[[1L]], mustWork = TRUE); calls <- normalizePath(args[[2L]], mustWork = TRUE)
 out_dir <- args[[3L]]; receipt <- args[[4L]]
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-model_path <- "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb"
+model_path <- duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb")
 con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extensions = "true", threads = "1")))
 on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
 q <- function(x) as.character(dbQuoteString(con, x))

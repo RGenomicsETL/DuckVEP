@@ -5,10 +5,10 @@
            (a v2 extension reaches DuckDB only through the function table it is handed, so
            an imported DuckDB symbol would mean a v1-style or unstable linkage); mirrors
            `make test-extension-symbols` for the v1 binary
-  footer   the appended metadata is ABI C_STRUCT (stable), extension API v2.0.0
-  static   the host_v2 sources use only stable, non-deprecated duckdb_v2_* functions from the pinned
-           headers, defines the unstable/deprecated opt-ins as 0, never includes the v1
-           headers, and keeps src/core and src/kernel free of DuckDB
+  footer   the appended ABI and runtime version match the repository v2 manifest
+  static   the host_v2 sources use declared, non-deprecated duckdb_v2_* functions from the pinned
+           headers, follow the manifest's unstable opt-in, never include the v1 headers, and keep
+           src/core and src/kernel free of DuckDB
 """
 import hashlib
 import json
@@ -51,16 +51,20 @@ def symbols():
 
 def footer():
     data = BINARY.read_bytes()
+    if len(data) < 512:
+        fail("extension is too short to contain a footer")
     # append_extension_metadata.py writes FIELD8 first and FIELD1 (signature) last, then 256 signature bytes.
     fields = [data[-512 + 32 * i:-512 + 32 * (i + 1)].rstrip(b"\0").decode() for i in range(8)][::-1]
     signature, platform, engine, version, abi = fields[:5]
+    expected_abi = PIN["abi_type"]
+    expected_engine = PIN["target_duckdb_version"] if expected_abi == "C_STRUCT_UNSTABLE" else PIN["extension_api_version"]
     if signature != "4":
         fail(f"footer signature {signature!r}")
-    if abi != "C_STRUCT":
-        fail(f"footer ABI type {abi!r}; expected C_STRUCT (C_STRUCT_UNSTABLE pins one DuckDB build)")
-    if engine != PIN["extension_api_version"]:
-        fail(f"footer API version {engine!r}; expected {PIN['extension_api_version']}")
-    print(f"footer: abi={abi} api={engine} platform={platform} extension={version}")
+    if abi != expected_abi:
+        fail(f"footer ABI type {abi!r}; expected {expected_abi}")
+    if engine != expected_engine:
+        fail(f"footer version {engine!r}; expected {expected_engine}")
+    print(f"footer: abi={abi} version={engine} platform={platform} extension={version}")
 
 
 def static():
@@ -70,7 +74,9 @@ def static():
     for name, expected in PIN["duckdb_sdk_sha256"].items():
         if hashlib.sha256((ROOT / PIN["headers"] / name).read_bytes()).hexdigest() != expected:
             fail(f"{name} does not match its pinned checksum")
-    for needle in ('#include "duckdb_extension_v2.h"', "#define DUCKDB_V2_API_ALLOW_UNSTABLE 0",
+    unstable = PIN["allow_unstable_symbols"]
+    for needle in ('#include "duckdb_extension_v2.h"',
+                   f"#define DUCKDB_V2_API_ALLOW_UNSTABLE {int(unstable)}",
                    "#define DUCKDB_V2_API_ALLOW_DEPRECATED 0"):
         if needle not in source:
             fail(f"host_v2 sources lack {needle}")
@@ -87,15 +93,18 @@ def static():
             fail(f"{name} is not declared in the pinned header")
         doc = header[header.rfind("/*!", 0, declaration.start()):declaration.start()]
         history = doc.split("history:")[-1].split("@param")[0]
-        if "- stable: v2.0.0" not in history or re.search(r"unstable|deprecated", history, re.I):
-            fail(f"{name} is not stable v2.0.0 in the pinned header: {history.strip()}")
+        allowed = [f"- stable: {PIN['extension_api_version']}"]
+        if unstable:
+            allowed.append(f"- unstable: {PIN['extension_api_version']}")
+        if not any(marker in history for marker in allowed) or re.search(r"deprecated", history, re.I):
+            fail(f"{name} is not permitted by the pinned API contract: {history.strip()}")
     # duckdb_ext_api is the function table; no other DuckDB name may appear in host-neutral code.
     for directory in ("src/core", "src/kernel"):
         for path in (ROOT / directory).rglob("*"):
             if path.suffix in (".c", ".h", ".inc") and re.search(r'duckdb(_extension)?\.h|\bduckdb_[a-z]+_?[a-z_]*\s*\(', path.read_text()):
                 fail(f"{path.relative_to(ROOT)} mentions the DuckDB API; it must stay host-neutral")
-    print(f"static: {len(called)} duckdb_v2_* functions, all stable v2.0.0; unstable/deprecated opt-ins off; "
-          "src/core and src/kernel host-neutral")
+    print(f"static: {len(called)} duckdb_v2_* functions match the pinned API; "
+          f"unstable={'on' if unstable else 'off'}, deprecated=off; src/core and src/kernel host-neutral")
 
 
 if __name__ == "__main__":

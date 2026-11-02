@@ -2,13 +2,20 @@ library(DBI)
 library(duckdb)
 library(Rsamtools)
 library(GenomicRanges)
-root <- "/root/duckvep/data/gnomad-v4.1"
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
+root <- duckvep_data("gnomad-v4.1")
 out <- file.path(root, "structural-controls.parquet")
 if (file.exists(out)) {
   cat(out, "\n")
   quit(save = "no", status = 0L)
 }
-reference <- "/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+reference <- duckvep_data("reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa")
 index <- read.delim(paste0(reference, ".fai"), header = FALSE)
 lengths <- setNames(index$V2, index$V1)
 contigs <- c(as.character(1:22), "X", "Y")
@@ -60,7 +67,7 @@ data <- data.frame(source_object = "synthetic:structural-controls-v1",
   mateid = ifelse(bnd, paste0(rows$event_id, "-", 3L - rows$side), NA_character_),
   event = rows$event_id)
 con <- dbConnect(duckdb(shared_home = FALSE))
-dbExecute(con, "ATTACH '/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb' AS model (READ_ONLY)")
+dbExecute(con, paste0("ATTACH '", duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb"), "' AS model (READ_ONLY)"))
 regions <- dbGetQuery(con, "SELECT name, seq_region FROM model.duckvep_sequence_regions")
 data$seq_region <- unname(setNames(as.integer(regions$seq_region), regions$name)[data$chrom])
 if (anyNA(data$seq_region)) stop("control contig is absent from model")

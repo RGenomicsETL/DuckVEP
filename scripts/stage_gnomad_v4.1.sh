@@ -20,7 +20,7 @@ case "$lane:$chrom" in
 esac
 repo=$(git rev-parse --show-toplevel)
 manifest="$repo/benchmarks/data/gnomad-v4.1-manifest.tsv"
-root=/root/duckvep/data/gnomad-v4.1
+root=${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}/gnomad-v4.1
 mkdir -p "$root"
 exec 9> "$root/.stage.lock"
 if ! flock -n 9; then echo 'another source object is streaming' >&2; exit 1; fi

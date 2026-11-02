@@ -1,4 +1,45 @@
-# DuckVEP
+# DuckVEP 1.5.2.9002 (development version)
+
+No DuckVEP release has been tagged yet; everything below is unreleased.
+
+## A model replaced mid-query is an error
+
+- Annotation builders capture a numeric model generation once per query. Each chunk
+  pins its model and checks that generation. A drop or reload before a later chunk fails
+  with `the model was dropped or reloaded while the query ran`. Ordinary and projected
+  annotations use this guard. Model names remain literal strings. Table functions
+  (`duckvep_haplotypes`, `duckvep_coding_calls`) retain their model for the whole query.
+
+## Concurrent v2 model loads cannot mix relations
+
+- Each `duckvep_model_load_sql` script uses a separate `LOAD_KEY`, independent of the
+  literal model name. Publish atomically detaches and consumes only that key's relations,
+  including on failure. Other keyed loads and haplotype jobs remain available.
+  `duckvep_model_stage_discard(name, key)` cleans up a stopped script. The R wrapper
+  performs this cleanup on exit. Execute one key's statements sequentially. Installed
+  model names remain unique, and unkeyed workflows require serialization.
+
+## Released DuckDB 2.0 host support
+
+- The default stable-v1 host runs on DuckDB 2.0. The experimental native-v2 host uses the
+  released SDK and a `C_STRUCT_UNSTABLE` footer locked to DuckDB 2.0.0. Native-v2 CI checks
+  the released runtime against the SDK revision. R artifact fallback checks platform and
+  stable-v1 metadata rather than selecting a version-locked native-v2 binary.
+
+## Input hardening
+
+- `duckvep_model_receipt_sql` quotes its region, transcript and `regulation_features_table`
+  names as relations, so `schema.table` works as documented; it quoted each as one
+  identifier, so `'main.regions'` named a table called `main.regions`. An empty or
+  doubly qualified name is now refused when the SQL is built.
+- On the v1 host, a model-load or `duckvep_haplotypes` query that ends in a `--` comment
+  no longer swallows the closing parenthesis, as on the v2 host.
+- `duckvep_model_restore` refuses a snapshot whose RNA programme lacks its cDNA offsets or
+  lengths, or whose interval features lack their kinds, instead of reading through a NULL
+  array. Destroying a model whose last snapshot section is a present empty array no longer
+  frees a pointer one past the mapping.
+- `duckvep_repeat_alleles` treats only an untyped `NULL` as a missing axis. A non-list
+  argument whose first row was NULL was accepted, and every row read as missing.
 
 ## Events from VCF records
 

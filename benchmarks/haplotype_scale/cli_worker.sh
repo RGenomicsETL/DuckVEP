@@ -12,13 +12,14 @@
 # Prints one line per stage, "STAGE <name> <seconds>" (the CLI's own wall timer), and with --audit the output's
 # row count and full-output checksum (sum(hash(row)) over the Parquet, as in worker.R), "AUDIT rows=.. checksum=..".
 set -euo pipefail
-ext=; mode=F; vcf=; out=; model=/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb
+ext=; mode=F; vcf=; out=; model=
 budget=4294967296; spill=${TMPDIR:-/tmp}/duckvep-cli-spill; audit=0
 while [[ $# -gt 0 ]]; do case $1 in
     --extension) ext=$2; shift 2;; --mode) mode=$2; shift 2;; --vcf) vcf=$2; shift 2;; --out) out=$2; shift 2;;
     --model-file) model=$2; shift 2;; --native-budget) budget=$2; shift 2;; --spill) spill=$2; shift 2;;
     --audit) audit=1; shift;; *) echo "unknown option $1" >&2; exit 2;; esac; done
 [[ -n $ext && -n $vcf && -n $out ]] || { echo "need --extension, --vcf and --out" >&2; exit 2; }
+[[ -n $model ]] || model=${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}/models/homo_sapiens_116_GRCh38_final.duckdb
 mkdir -p "$spill"; rm -f "$out" "$out.partial"
 duckdb_bin=${DUCKDB:-duckdb}
 skip=0; [[ $mode == B ]] && skip=$(zcat "$vcf" 2>/dev/null | head -n 5000 | grep -c '^#' || true)

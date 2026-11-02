@@ -1,8 +1,15 @@
 library(DBI)
 library(duckdb)
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 
 check_stage <- function() {
-  root <- "/root/duckvep/data/gnomad-v4.1"
+  root <- duckvep_data("gnomad-v4.1")
   output <- tempfile("stage-contract-", tmpdir = root)
   dir.create(output)
   on.exit(unlink(output, recursive = TRUE), add = TRUE)

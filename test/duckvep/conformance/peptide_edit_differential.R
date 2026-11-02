@@ -203,9 +203,10 @@ edit_main <- function() {
     optparse::make_option('--evidence-out', dest = 'evidence_out', default = '',
       help = 'Retain a compact complete comparison bundle in a new directory'),
     optparse::make_option('--vep-prefix', dest = 'vep_prefix',
-      default = Sys.getenv('VEP_PREFIX', '/root/miniconda3/envs/vep'))
+      default = Sys.getenv('VEP_PREFIX'))
   )))
   stopifnot(opt$models >= length(edit_families), !is.na(opt$seed))
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   revision <- duckvep_evidence_revision('.')
   extension <- normalizePath(opt$extension, mustWork = TRUE)
   sources <- c('test/duckvep/conformance/peptide_edit_differential.R',

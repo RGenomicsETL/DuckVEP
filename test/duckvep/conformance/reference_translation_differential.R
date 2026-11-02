@@ -3,10 +3,11 @@
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--vep-prefix", dest = "vep_prefix",
-      default = Sys.getenv("VEP_PREFIX", "/root/miniconda3/envs/vep")),
+      default = Sys.getenv("VEP_PREFIX")),
     optparse::make_option("--evidence-out", dest = "evidence_out", default = "",
       help = "Retain complete comparison pairs and raw oracle in a new directory")
   )))
+  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   source("scripts/duckvep_evidence.R", local = TRUE)
   root <- normalizePath(".")
   revision <- duckvep_evidence_revision(root)

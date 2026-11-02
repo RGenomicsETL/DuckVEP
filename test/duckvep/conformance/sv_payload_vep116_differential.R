@@ -1,11 +1,26 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages({ library(DBI); library(duckdb); library(jsonlite) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
+# A path from its own variable when set, else under DUCKHTS_CACHE_DIR (the DuckHTS benchmark cache).
+duckhts_cache <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKHTS_CACHE_DIR")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "),
+    "DUCKHTS_CACHE_DIR to the DuckHTS benchmark cache directory", call. = FALSE)
+  file.path(root, path)
+}
 source("r/Rduckvep/R/builders.R")
 source("r/Rduckvep/R/structural_geometry.R")
 vcf <- "test/duckvep/conformance/data/sv_payload_grch38.vcf"
-fasta <- Sys.getenv("DUCKVEP_GRCH38_FASTA", "/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa")
-cache <- Sys.getenv("DUCKVEP_GRCH38_VEP_CACHE", "/root/.cache/duckhts/vep/cache-grch38-chr21")
-model <- Sys.getenv("DUCKVEP_GRCH38_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
+fasta <- duckvep_data("reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa", "DUCKVEP_GRCH38_FASTA")
+cache <- duckhts_cache("vep/cache-grch38-chr21", "DUCKVEP_GRCH38_VEP_CACHE")
+model <- duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb", "DUCKVEP_GRCH38_MODEL")
 stopifnot(identical(tail(system2("samtools", c("faidx", fasta,
   "21:13546123-13546123"), stdout = TRUE), 1L), "G"))
 lines <- grep("^21\\t", readLines(vcf), value = TRUE)

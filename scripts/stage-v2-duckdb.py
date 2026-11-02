@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build a DuckDB CLI at the pinned v2 SDK revision into .deps-v2/duckdb-build/duckdb.
 
-The preview v2 extension ABI is not frozen across snapshots, so the v2 host must run on a
-DuckDB built at the revision its headers came from (duckvep-package.json). Prints the path.
+The unstable v2 extension ABI is version-locked. Build the CLI at the revision pinned in
+`duckvep-package.json` and print its path.
 """
 from pathlib import Path
 import json

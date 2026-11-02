@@ -12,12 +12,13 @@ main <- function() {
     optparse::make_option('--context-per-stratum', dest='context_per_stratum', type='integer', default=0L),
     optparse::make_option('--pair-per-stratum', dest='pair_per_stratum', type='integer', default=0L),
     optparse::make_option('--extension-receipt', dest='extension_receipt', default=NULL),
-    optparse::make_option('--vep-prefix', dest='vep_prefix', default='/root/miniconda3/envs/vep')
+    optparse::make_option('--vep-prefix', dest='vep_prefix', default=Sys.getenv('VEP_PREFIX'))
   )))
   stopifnot(!is.na(opt$seed), opt$random_cases >= 0L, opt$random_cases <= 65536L-144L)
   stopifnot(!is.na(opt$rare_per_stratum), opt$rare_per_stratum >= 0L)
   stopifnot(!is.na(opt$context_per_stratum), opt$context_per_stratum >= 0L)
   stopifnot(!is.na(opt$pair_per_stratum), opt$pair_per_stratum >= 0L)
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   source('scripts/duckvep_evidence.R', local=TRUE)
   root <- normalizePath('.')
   revision <- duckvep_evidence_revision(root)

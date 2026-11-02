@@ -419,37 +419,20 @@ longer-allele spaces.
 
 `r/duckhtsbench/inst/benchmark_registry.tsv` is the sole authority for the HPRC v2
 African-four carried-allele, Sniffles2 1KGP, and dbVar GRCh38 chr22 sources and
-derivations. Stage all three with:
-
-```sh
-Rscript r/duckhtsbench/scripts/stage_duckvep_conformance_corpora.R --corpus all
-```
-
-Use `--corpus hprc-african4-chr22`, `--corpus sniffles2-chr22`, or
-`--corpus dbvar-chr22` for one lane, and `--plan` to inspect its complete registry
-closure. The complete cohort VCFs are read through registered HTTPS range sources;
-the stage stores their pinned source indexes, source-identity receipts, deterministic
-sites-only chr22 VCFs, tabix indexes, and adjacent provenance under
-`DUCKHTS_CACHE_DIR`. The source receipts retain the HPRC S3 object versions, the
-Sniffles2 ETag/release, and the dbVar dated publisher-manifest MD5. Derived VCF and
-index checksums remain fail-closed.
-
-`scripts/stage_duckvep_conformance_corpora.sh [OUTPUT_DIR] [CORPUS]` remains a
-positional compatibility launcher, but it forwards to the R entry point and does not
-own locators, identities, paths, or transformations. New callers should use the R CLI
-and obtain an individual path from the registry when composing a campaign, for example:
-
-```sh
-DBVAR_CHR22=$(Rscript -e '
-  Sys.setenv(DUCKHTSBENCH_REGISTRY="r/duckhtsbench/inst/benchmark_registry.tsv")
-  source("r/duckhtsbench/R/registry.R")
-  cat(duckhts_bench_artifact_path("duckvep_dbvar_grch38_20260127_chr22"))
-')
-```
-
-Pass that VCF to the differential command below together with its receipt-matched
-model, reference, and VEP oracle. Staging establishes source and derivation identity;
+derivations. This checkout contains no registry staging or artifact-path runner. Supply a
+staged VCF with registry provenance and receipt-matched model, reference, and VEP oracle
+to the differential command below. Staging establishes source and derivation identity;
 it does not by itself establish executable-VEP conformance.
+
+For a separately supplied registry runner, set `DUCKVEP_CORPUS_STAGER` to its R script.
+The compatibility entry point forwards the output directory and corpus selection:
+
+```sh
+DUCKVEP_CORPUS_STAGER=/path/to/registry/stage_duckvep_conformance_corpora.R \
+  scripts/stage_duckvep_conformance_corpora.sh /path/to/output dbvar-chr22
+```
+
+Without an available runner, the entry point fails before staging data.
 
 For a large VCF, prepare an ordinary DuckDB database containing
 `duckvep_sequence_regions`, `duckvep_transcripts`, `duckvep_exons`, and

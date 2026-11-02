@@ -7,22 +7,22 @@
     "note": "Distributed host (CRAN, community repository); pinned by TARGET_DUCKDB_VERSION and DUCKDB_HEADER_VERSION in the Makefile"
   },
   "v2_host": {
-    "status": "preview",
+    "status": "experimental",
+    "target_duckdb_version": "v2.0.0",
     "duckdb_c_api_major": 2,
     "extension_api_version": "v2.0.0",
-    "abi_type": "C_STRUCT",
-    "allow_unstable_symbols": false,
+    "abi_type": "C_STRUCT_UNSTABLE",
+    "allow_unstable_symbols": true,
     "allow_deprecated": false,
     "headers": "duckdb_capi_v2",
-    "duckdb_sdk_revision": "fece4143738e2b1d05a851d5c5dc036838aff8ec",
+    "duckdb_sdk_revision": "d54cbbe3df17e8e5ce68312f483b4155836112aa",
     "duckdb_sdk_sha256": {
-      "duckdb_v2.h": "0f134bd33f1ee1a511f21d5ad122213d5897320c301d5dca9d5fb24a658acd73",
-      "duckdb_extension_v2.h": "0f69df71d9de3d1d707a95ff8403a6aebbde2e29077a035d201affe73b91cc2f"
+      "duckdb_v2.h": "73026a28e5b55952afb6e2e9ce80fd4f76614afedce329da895ccaf85a4a8be6",
+      "duckdb_extension_v2.h": "fa0871d3f5b8e5da9a686c019fcaf8210349440831d5e9228720cbba31ccaa51"
     },
     "validation_host": {
-      "note": "Headers and a DuckDB CLI built at the same revision; the PyPI preview wheel is a different snapshot and is a secondary check",
-      "engine_revision": "fece4143738e2b1d05a851d5c5dc036838aff8ec",
-      "pypi_preview": "duckdb>=2.0.0.dev0 (pip install --pre)"
+      "note": "Released DuckDB v2.0.0 CLI and headers from its exact tag. This host uses the unstable C API, not a stable v2 ABI. Full-suite and release validation remain separate gates.",
+      "engine_revision": "d54cbbe3df17e8e5ce68312f483b4155836112aa"
     }
   }
 }

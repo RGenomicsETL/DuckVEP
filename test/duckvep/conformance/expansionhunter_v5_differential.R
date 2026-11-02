@@ -1,5 +1,12 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 source("r/Rduckvep/R/builders.R")
 source("r/Rduckvep/R/expansionhunter.R")
 vcf <- readLines("test/duckvep/conformance/data/expansionhunter_v5_example.vcf")
@@ -72,7 +79,7 @@ for (i in 1:2) {
 als <- strsplit(tail(readLines(
   "test/duckvep/conformance/data/expansionhunter_v5_documented_als.vcf"), 1L),
   "\t", fixed = TRUE)[[1L]]
-fasta37 <- Sys.getenv("DUCKVEP_GRCH37_FASTA", "/root/duckvep/data/mane-grch37/Homo_sapiens.GRCh37.dna.primary_assembly.fa")
+fasta37 <- duckvep_data("mane-grch37/Homo_sapiens.GRCh37.dna.primary_assembly.fa", "DUCKVEP_GRCH37_FASTA")
 anchor <- tail(system2("samtools", c("faidx", fasta37,
   "9:27573526-27573526"), stdout = TRUE), 1L)
 literal <- tail(system2("samtools", c("faidx", fasta37,

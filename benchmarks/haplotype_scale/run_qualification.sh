@@ -19,7 +19,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 : "${WORK:?set WORK to the prepared inputs directory}"
 OUT=${OUT:-$WORK/results}; CORE=${CORE:-6}; ROUNDS=${ROUNDS:-3}; export DUCKVEP_LOAD_MAX=${LOAD_MAX:-4}
-data=/root/duckvep/data
+data=${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}
 vcf=$data/hg002-csq/hg002.ens.vcf.gz
 fasta=$data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa
 gff=$data/hg002-csq/Homo_sapiens.GRCh38.116.gff3.gz

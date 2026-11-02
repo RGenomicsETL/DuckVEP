@@ -873,8 +873,7 @@ duckvep_core_model_snapshot_install(duckvep_registry_t *registry, const char *na
 		(void)snprintf(final_error, final_error_size, "%s: model name was created concurrently", label);
 		return 0;
 	}
-	entry->next = registry->models;
-	registry->models = entry;
+	duckvep_registry_link_locked(registry, entry);
 	pthread_mutex_unlock(&registry->mutex);
 	return 1;
 }

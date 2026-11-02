@@ -48,5 +48,7 @@ extension provides and hides the difference; the result is the same resident
 model. One visible difference remains: on v2 the queries run on `con` in its
 own transaction, so temporary tables and uncommitted rows are visible to
 them; on v1 the queries run on a separate connection and see only committed,
-permanent relations.
+permanent relations. Each v2 load uses its own staging key. The wrapper cleans
+up that key on exit, including after a failed COPY, without removing another
+load's staged relations.
 }

@@ -467,13 +467,14 @@ main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
     optparse::make_option("--max-ploidy", dest = "max_ploidy", type = "integer", default = 4L),
     optparse::make_option("--vep-prefix", dest = "vep_prefix",
-      default = Sys.getenv("VEP_PREFIX", "/root/miniconda3/envs/vep")),
+      default = Sys.getenv("VEP_PREFIX")),
     optparse::make_option("--extension", default = Sys.getenv("DUCKVEP_EXT", "build/release/duckvep.duckdb_extension")),
     optparse::make_option("--extension-receipt", dest = "extension_receipt", default = NULL),
     optparse::make_option("--publish-artifact", dest = "publish_artifact", default = NULL),
     optparse::make_option("--history", default = "test/duckvep/conformance/data/haplotype_phase_history.csv")
   )))
   if (!is.null(opt$publish_artifact)) return(publish_phase_history(opt$publish_artifact, opt$history))
+  if (!nzchar(opt$vep_prefix)) stop("--vep-prefix or VEP_PREFIX is required", call. = FALSE)
   stopifnot(opt$max_ploidy >= 2L, opt$max_ploidy <= 4L)
   source("scripts/duckvep_evidence.R", local = TRUE)
   root <- normalizePath(".")

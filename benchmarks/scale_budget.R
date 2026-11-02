@@ -7,13 +7,20 @@
 #
 # EXTENSION must be an immutable copy named duckvep.duckdb_extension.
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 args <- commandArgs(TRUE)
 if (!length(args) %in% 1:2) stop("usage: Rscript benchmarks/scale_budget.R EXTENSION [gnomad1m|bench]")
 extension <- normalizePath(args[[1L]], mustWork = TRUE)
 corpus <- if (length(args) == 2L) args[[2L]] else "gnomad1m"
 stopifnot(corpus %in% c("gnomad1m", "bench"))
-model <- Sys.getenv("DUCKVEP_SCALE_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
-panel <- "/root/duckvep/data/gnomad-v4.1/panels/genomes-v1-77d2cdff65171780/panel-1000000.parquet"
+model <- duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb", "DUCKVEP_SCALE_MODEL")
+panel <- if (corpus == "gnomad1m") duckvep_data("gnomad-v4.1/panels/genomes-v1-77d2cdff65171780/panel-1000000.parquet")
 metadata <- "benchmarks/data/scale_contracts/canonical-metadata.parquet"
 source("benchmarks/duckvep_field_projection.R", local = TRUE)
 con <- dbConnect(duckdb(shared_home = FALSE, config = list(allow_unsigned_extensions = "true")))

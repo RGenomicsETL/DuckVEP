@@ -17,6 +17,13 @@
 # --memory-limit (default 8GB), --spill DIR, --max-spill (default 32GiB), --calls-filter SQL (restrict calls in
 # mode A, for ad-hoc partitions), --passes N (one cold pass and N - 1 warm ones), --order-load.
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 args <- commandArgs(trailingOnly = TRUE)
 opt <- function(name, default = NA_character_) {
   i <- match(paste0("--", name), args)
@@ -34,7 +41,7 @@ budget_bytes <- opt("native-budget", "4294967296")
 memory_limit <- opt("memory-limit", "8GB"); max_spill <- opt("max-spill", "32GiB")
 spill <- opt("spill", file.path(tempdir(), "duckvep-spill")); calls_filter <- opt("calls-filter", "")
 audit <- !flag("no-audit")
-model_path <- opt("model-file", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
+model_path <- opt("model-file", duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb"))
 discovery <- opt("discovery", "scalar")   # scalar: duckvep_coding_transcripts; annotate: the annotation builder (region_mask & 16), the pre-scalar method, for the A/B
 decoder <- opt("decoder", "duckdb")   # duckdb: read_csv inflates the .vcf.gz itself; bgzip: `bgzip -dc` (htslib, libdeflate) feeds it through a FIFO
 order_load <- flag("order-load")   # add ORDER BY to the model queries of the full model (the stored model is already in load order)

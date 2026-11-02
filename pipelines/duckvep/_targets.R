@@ -1,12 +1,31 @@
+targets_file <- local({
+  frame_files <- vapply(sys.frames(), function(frame) {
+    if (is.null(frame$ofile) || length(frame$ofile) != 1L) return("")
+    as.character(frame$ofile)
+  }, character(1))
+  frame_scripts <- vapply(sys.frames(), function(frame) {
+    if (!exists("script", envir = frame, inherits = FALSE)) return("")
+    script <- get("script", envir = frame, inherits = FALSE)
+    if (!is.character(script) || length(script) != 1L) return("")
+    script
+  }, character(1))
+  argument_files <- sub(
+    "^--file=",
+    "",
+    grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  )
+  candidates <- c(frame_files, frame_scripts, argument_files)
+  candidates <- candidates[nzchar(candidates) & basename(candidates) == "_targets.R"]
+  if (length(candidates) == 0L) {
+    stop("could not locate _targets.R; set DUCKVEP_ROOT to a DuckVEP checkout")
+  }
+  normalizePath(candidates[[length(candidates)]], mustWork = TRUE)
+})
+source(file.path(dirname(targets_file), "R", "root.R"))
+duckvep_root <- duckvep_targets_root(targets_file)
+
 library(targets)
 
-duckvep_root <- normalizePath(
-  Sys.getenv("DUCKHTS_ROOT", unset = "."),
-  mustWork = TRUE
-)
-if (!file.exists(file.path(duckvep_root, "ARCHITECTURE.md"))) {
-  stop("run the DuckVEP targets workflow from the DuckHTS repository root")
-}
 source(file.path(duckvep_root, "scripts", "duckvep_evidence.R"))
 source(file.path(duckvep_root, "pipelines", "duckvep", "R", "pipeline.R"))
 
@@ -32,10 +51,7 @@ extension_receipt <- file.path(
   "extension.tsv"
 )
 default_micromamba <- Sys.getenv("MICROMAMBA", unset = "micromamba")
-default_vep_prefix <- Sys.getenv(
-  "VEP_PREFIX",
-  unset = "/root/miniconda3/envs/vep"
-)
+default_vep_prefix <- Sys.getenv("VEP_PREFIX")
 
 tar_option_set(
   packages = "blit",

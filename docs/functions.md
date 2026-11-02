@@ -130,11 +130,11 @@ SELECT * FROM query(duckvep_ensembl_transcripts_sql(
 
 ### duckvep_ensembl_rna_edits_sql
 
-Builds a typed transcript SeqEdit query from an Ensembl core schema and reference chunks. The original raw-cDNA coding start/end (`UBIGINT`) and explicit genetic code (`UTINYINT`) travel with each programme; the producer must supply all three together. Optional compatibility CDS/code columns may be NULL. SeqEdit coordinates refer to original cDNA, not edited CDS. The query's two source names must be nonempty; its optional options STRUCT is currently unsupported.
+Builds a typed transcript SeqEdit query from an Ensembl core schema and a prepared transcripts relation, which must carry `transcript_index`, `source_transcript_id` and the spliced `cdna_sequence` the edits apply to. The original raw-cDNA coding start/end (`UBIGINT`) and explicit genetic code (`UTINYINT`) travel with each programme; the producer must supply all three together. Optional compatibility CDS/code columns may be NULL. SeqEdit coordinates refer to original cDNA, not edited CDS. The query's two source names must be nonempty; its optional options STRUCT is currently unsupported.
 
 ```sql
 SELECT left(duckvep_ensembl_rna_edits_sql(
-  'duckvep_core', 'duckvep_reference_chunks'), 120) AS query_prefix;
+  'duckvep_core', 'prepared_transcripts'), 120) AS query_prefix;
 ```
 
 <a id="duckvep_ensembl_regulation_features_sql"></a>
@@ -251,7 +251,9 @@ Signature:
 duckvep_model_drop(name VARCHAR) -> BOOLEAN
 ```
 
-Returns true when the model was dropped. Returns false when no model has that name or when the model is pinned by a running query. An empty name is an error.
+Returns true when the model was dropped. Returns false when the model is absent or a table function or annotation chunk is using it. An empty name is an error.
+
+Annotation builders capture the model's generation once per query and check it when each chunk acquires the model. A drop or reload before a later chunk fails with `the model was dropped or reloaded while the query ran`. The query cannot mix rows from different model generations. Changes after the final annotation chunk do not invalidate results already computed.
 
 ```sql
 SELECT loaded FROM duckvep_model_load('scratch',

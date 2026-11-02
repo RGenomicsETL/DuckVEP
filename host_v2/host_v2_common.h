@@ -5,7 +5,7 @@
 #define DUCKVEP_HOST_V2_COMMON_H
 
 #define DUCKDB_EXTENSION_NAME duckvep
-#define DUCKDB_V2_API_ALLOW_UNSTABLE 0
+#define DUCKDB_V2_API_ALLOW_UNSTABLE 1
 #define DUCKDB_V2_API_ALLOW_DEPRECATED 0
 #include "duckdb_extension_v2.h"
 
@@ -18,8 +18,8 @@
 #if DUCKDB_EXTENSION_HEADER_VERSION != 2 || DUCKDB_V2_API_VERSION_MAJOR != 2
 #error "host_v2 requires the DuckDB C API v2 SDK"
 #endif
-#if DUCKDB_V2_API_ALLOW_UNSTABLE || DUCKDB_V2_API_ALLOW_DEPRECATED
-#error "host_v2 must compile with the unstable and deprecated surfaces disabled"
+#if !DUCKDB_V2_API_ALLOW_UNSTABLE || DUCKDB_V2_API_ALLOW_DEPRECATED
+#error "host_v2 requires the exact-version unstable API, with deprecated APIs disabled"
 #endif
 
 DUCKDB_EXTENSION_EXTERN
@@ -37,7 +37,8 @@ static inline duckdb_v2_str string_view(const char *text) {
  * `detail` slot, copied into the callback's handle and destroyed. */
 static inline void set_error(duckdb_v2_error_info_handle target, DUCKDB_V2_ERROR code, const char *text) {
     (void)duckdb_v2_error_info_set_code(target, code);
-    (void)duckdb_v2_error_info_set_text(target, string_view(text));
+    duckdb_v2_str view = string_view(text);
+    (void)duckdb_v2_error_info_set_text(target, &view);
 }
 
 static inline void copy_duckdb_error(duckdb_v2_error_info_handle target, DUCKDB_V2_ERROR code,
@@ -47,7 +48,7 @@ static inline void copy_duckdb_error(duckdb_v2_error_info_handle target, DUCKDB_
         (void)duckdb_v2_error_info_get_text(source, &text);
     }
     (void)duckdb_v2_error_info_set_code(target, code);
-    (void)duckdb_v2_error_info_set_text(target, text);
+    (void)duckdb_v2_error_info_set_text(target, &text);
 }
 
 /* Requires locals `error` (duckdb_v2_error_info_handle *), `detail`
@@ -191,12 +192,32 @@ cleanup:
 static inline DUCKDB_V2_ERROR make_type(duckdb_v2_context_handle context, const char *text,
                                  duckdb_v2_logical_type_handle *type,
                                  duckdb_v2_error_info_handle *detail) {
+    duckdb_v2_factory_handle factory = NULL;
+    duckdb_v2_str view = string_view(text);
+    DUCKDB_V2_ERROR status = duckdb_v2_context_get_factory(context, &factory, detail);
+    if (status != DUCKDB_V2_ERROR_NONE) return status;
     /* ANY is a signature wildcard; it has no text form. */
     if (strcmp(text, "ANY") == 0) {
-        return duckdb_v2_context_create_type_from_id(context, DUCKDB_V2_LOGICAL_TYPE_ID_ANY, NULL,
-                                                     NULL, 0, type, detail);
+        return duckdb_v2_factory_create_type_from_id(factory, DUCKDB_V2_LOGICAL_TYPE_ID_ANY, NULL,
+                                                    NULL, 0, type, detail);
     }
-    return duckdb_v2_context_create_type_from_text(context, string_view(text), type, detail);
+    return duckdb_v2_factory_create_type_from_text(factory, &view, type, detail);
+}
+
+/* All DuckVEP parameters are required, fixed parameters, passed by position or name. */
+static inline DUCKDB_V2_ERROR add_parameter(duckdb_v2_function_signature_handle signature,
+                                           const char *name, duckdb_v2_logical_type_handle type,
+                                           duckdb_v2_error_info_handle *detail) {
+    duckdb_v2_str view = string_view(name);
+    return duckdb_v2_function_signature_add_parameter(
+        signature, &view, type, NULL, DUCKDB_V2_FUNCTION_PARAMETER_KIND_STANDARD, detail);
+}
+
+static inline DUCKDB_V2_ERROR add_result_column(duckdb_v2_table_function_bind_info_handle result,
+                                               const char *name, duckdb_v2_logical_type_handle type,
+                                               duckdb_v2_error_info_handle *detail) {
+    duckdb_v2_str view = string_view(name);
+    return duckdb_v2_table_function_bind_add_result_column(result, &view, type, detail);
 }
 
 static inline bool register_scalar(duckdb_v2_extension_handle extension, duckdb_v2_context_handle context,
@@ -211,13 +232,14 @@ static inline bool register_scalar(duckdb_v2_extension_handle extension, duckdb_
     duckdb_v2_logical_type_handle type = NULL;
     bool success = false;
     duckdb_v2_str name = string_view(name_text);
-    DUCKDB_CALL(duckdb_v2_scalar_function_create_with_extension(extension, &function, &detail));
+    duckdb_v2_factory_handle factory = NULL;
+    DUCKDB_CALL(duckdb_v2_context_get_factory(context, &factory, &detail));
+    DUCKDB_CALL(duckdb_v2_scalar_function_create(factory, &function, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_set_name(function, &name, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_get_signature(function, &signature, &detail));
     for (idx_t parameter = 0; parameter < parameter_count; ++parameter) {
         DUCKDB_CALL(make_type(context, parameter_types[parameter], &type, &detail));
-        DUCKDB_CALL(duckdb_v2_function_signature_add_parameter(
-            signature, string_view(parameter_names[parameter]), type, NULL, &detail));
+        DUCKDB_CALL(add_parameter(signature, parameter_names[parameter], type, &detail));
         DUCKDB_CALL(duckdb_v2_logical_type_destroy(&type));
     }
     DUCKDB_CALL(make_type(context, return_type_text, &type, &detail));
@@ -227,7 +249,7 @@ static inline bool register_scalar(duckdb_v2_extension_handle extension, duckdb_
         function, DUCKDB_V2_FUNCTION_PROPERTY_NULL_HANDLING,
         DUCKDB_V2_FUNCTION_PROPERTY_NULL_HANDLING_SPECIAL, &detail));
     DUCKDB_CALL(duckdb_v2_scalar_function_set_exec_callback(function, callback, &detail));
-    DUCKDB_CALL(duckdb_v2_scalar_function_register(function, &detail));
+    DUCKDB_CALL(duckdb_v2_extension_register_scalar_function(extension, function, &detail));
     success = true;
 cleanup:
     (void)duckdb_v2_logical_type_destroy(&type);

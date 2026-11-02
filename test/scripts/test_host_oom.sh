@@ -50,3 +50,8 @@ done
   exit 1
 }
 printf 'Host OOM recovery passed: %s host failures, %s native failures; pins released.\n' "$host_failures" "$native_failures"
+"${CC:-cc}" -std=c11 -O0 -g -Wall -Wextra -Werror -I "$root/duckdb_capi" \
+  "$root/test/scripts/model_generation_stream.c" "$shared" "${rflags[@]}" \
+  -Wl,-rpath,"$(R RHOME)/lib" -Wl,-rpath,"$(dirname "$shared")" \
+  -pthread -o "$work/generation"
+timeout -k 2 120 "$work/generation" "$extension"

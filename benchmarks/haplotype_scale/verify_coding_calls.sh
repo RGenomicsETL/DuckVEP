@@ -5,7 +5,7 @@
 #   verify_coding_calls.sh EXT VCF [MODEL.duckdb]
 # Prints "calls_reader=N calls_modeB=M only_reader=a only_modeB=b" and "IDENTICAL" when a = b = 0 and N = M.
 set -euo pipefail
-ext=$1; vcf=$2; model=${3:-/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb}
+ext=$1; vcf=$2; model=${3:-${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}/models/homo_sapiens_116_GRCh38_final.duckdb}
 skip=$(zcat "$vcf" 2>/dev/null | head -n 5000 | grep -c '^#' || true)
 sql=$(mktemp)
 cat > "$sql" <<SQL

@@ -2,7 +2,7 @@
 # Generate variants at transcript boundaries and coding positions where rare
 # consequence states occur.
 #
-# Ported from /root/duckvep-c@9f922c8. It reads
+# Ported from the duckvep-c repository at 9f922c8. It reads
 # a transcript's exon/CDS structure from a GFF and the reference bases from a FASTA range,
 # then covers the positions where consequence bugs hide — each exon/intron
 # boundary (donor / acceptor / 5th base / region), the start and stop codons, exon edges

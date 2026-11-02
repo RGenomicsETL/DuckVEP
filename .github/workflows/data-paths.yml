@@ -1,0 +1,52 @@
+name: Data paths and evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pipelines/duckvep/**'
+      - 'scripts/readme-evidence.R'
+      - 'scripts/stage_duckvep_conformance_corpora.sh'
+      - 'test/scripts/pr66_paths.R'
+      - 'test/duckvep/conformance/**'
+      - 'benchmarks/data/**'
+      - 'design/duckhts-commit-map.txt'
+      - '.github/workflows/data-paths.yml'
+  pull_request:
+    paths:
+      - 'pipelines/duckvep/**'
+      - 'scripts/readme-evidence.R'
+      - 'scripts/stage_duckvep_conformance_corpora.sh'
+      - 'test/scripts/pr66_paths.R'
+      - 'test/duckvep/conformance/**'
+      - 'benchmarks/data/**'
+      - 'design/duckhts-commit-map.txt'
+      - '.github/workflows/data-paths.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  paths:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            any::targets
+            any::DBI
+            any::duckdb
+            any::glue
+            any::optparse
+      - name: Check paths, configuration failures, and evidence selection
+        run: Rscript test/scripts/pr66_paths.R
+      - name: Check the corpus staging entry point
+        run: shellcheck scripts/stage_duckvep_conformance_corpora.sh

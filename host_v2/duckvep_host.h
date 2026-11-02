@@ -230,7 +230,7 @@ static inline int duckvep_h_list_extend(v2_vec *list, size_t count, duckdb_v2_li
 static inline void duckvep_h_assign_string(v2_vec *v, size_t row, const char *text, size_t length) {
     duckdb_v2_error_info_handle detail = NULL;
     duckdb_v2_str view = {text, (idx_t)length};
-    DUCKDB_V2_ERROR status = duckdb_v2_validate_utf8(view, NULL);
+    DUCKDB_V2_ERROR status = duckdb_v2_validate_utf8(&view, NULL);
     if (status != DUCKDB_V2_ERROR_NONE) {
         v->validity[row >> 6] &= ~(UINT64_C(1) << (row & 63));
         return;

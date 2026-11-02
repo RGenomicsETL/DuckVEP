@@ -3,12 +3,13 @@
 
 main <- function() {
   opt <- optparse::parse_args(optparse::OptionParser(option_list = list(
-    optparse::make_option('--vep-prefix', dest = 'vep_prefix', default = '/root/miniconda3/envs/vep'),
+    optparse::make_option('--vep-prefix', dest = 'vep_prefix', default = Sys.getenv('VEP_PREFIX')),
     optparse::make_option('--oracle', default = 'test/duckvep/conformance/haplotype_oracle.pl')
   )))
   source('scripts/duckvep_evidence.R', local = TRUE)
   source('test/duckvep/conformance/haplotype_observations.R', local = TRUE)
   root <- normalizePath('.')
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   prefix <- normalizePath(opt$vep_prefix)
   pins <- c(vep = '57ea5c52340acc1f156267f810ad162e26597082',
     variation = '2fb834b987ede3824e200197a838ce11e91aeb4b')

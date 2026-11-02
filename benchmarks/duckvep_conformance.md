@@ -129,13 +129,12 @@ Unresolved is an engine status, not an agreement category; unresolved
 pairs remain in the full denominator. Engine-extra and engine-missing
 pairs contribute to non-exact counts, not to exact agreement.
 
-Each row is the newest tested ancestor of the current source when the
-ledger contains an ancestor for that corpus; otherwise it is the last
-recorded row for that corpus. Expensive corpora do not inherit evidence
-from a later run of another corpus, and a newly tested corpus does not
-hide older still-applicable evidence. The SO and impact tables keep the
-same runs separate so the largest corpus cannot hide a smaller species-
-or assembly-specific frontier.
+Each row is the newest tested ancestor of the current source. A corpus
+with no mapped ancestor is omitted. Expensive corpora do not inherit
+evidence from a later run of another corpus, and a newly tested corpus
+does not hide older still-applicable evidence. The SO and impact tables
+keep the same runs separate so the largest corpus cannot hide a smaller
+species- or assembly-specific frontier.
 
 <details>
 <summary>

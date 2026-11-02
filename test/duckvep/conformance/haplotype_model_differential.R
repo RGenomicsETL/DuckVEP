@@ -535,10 +535,11 @@ main <- function() {
     optparse::make_option('--attestation-bundle', dest = 'attestation_bundle', default = NULL),
     optparse::make_option('--output-dir', dest = 'output_dir', default = NULL),
     optparse::make_option('--history', default = 'test/duckvep/conformance/data/haplotype_length_history.csv'),
-    optparse::make_option('--vep-prefix', dest = 'vep_prefix', default = '/root/miniconda3/envs/vep')
+    optparse::make_option('--vep-prefix', dest = 'vep_prefix', default = Sys.getenv('VEP_PREFIX'))
   )))
   if (!is.null(opt$publish_artifact)) return(publish_model_history(
     opt$publish_artifact, opt$history, opt$attestation_bundle))
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   source('scripts/duckvep_evidence.R', local = TRUE)
   root <- normalizePath('.')
   seed <- opt$seed

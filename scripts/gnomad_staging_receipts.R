@@ -1,13 +1,20 @@
 library(DBI)
 library(duckdb)
-root <- "/root/duckvep/data/gnomad-v4.1"
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
+root <- duckvep_data("gnomad-v4.1")
 manifest <- read.delim("benchmarks/data/gnomad-v4.1-manifest.tsv", header = FALSE,
   col.names = c("object", "bytes", "generation", "md5", "crc32c"),
   colClasses = "character")
 objects <- manifest[grepl("(\\.vcf\\.bgz|\\.vcf\\.gz)$", manifest$object), ]
 if (nrow(objects) != 49L || anyDuplicated(objects$object)) stop("frozen manifest does not have 49 VCF objects")
 sha256 <- function(path) substr(system2("sha256sum", path, stdout = TRUE), 1L, 64L)
-model <- Sys.getenv("DUCKVEP_SCALE_MODEL", "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb")
+model <- duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb", "DUCKVEP_SCALE_MODEL")
 model_sha <- sha256(model)
 pin <- read.delim("benchmarks/data/scale_contracts/inputs.tsv", colClasses = "character")
 if (!identical(pin$value[pin$object == "model"], model_sha)) stop("model receipt differs")
@@ -167,7 +174,7 @@ if (file.exists(control)) {
   write.table(orientations, "benchmarks/data/gnomad-v4.1-bnd-orientations.tsv",
     sep = "\t", row.names = FALSE, quote = FALSE)
   summary$parquet_sha256 <- sha256(control)
-  summary$reference_sha256 <- sha256("/root/duckvep/data/reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa")
+  summary$reference_sha256 <- sha256(duckvep_data("reference/ensembl-116/Homo_sapiens.GRCh38.dna.primary_assembly.fa"))
   write.table(summary, "benchmarks/data/gnomad-v4.1-controls.tsv", sep = "\t",
     row.names = FALSE, quote = FALSE)
 }

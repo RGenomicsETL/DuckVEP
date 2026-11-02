@@ -350,9 +350,10 @@ main <- function() {
     optparse::make_option('--variant-family', dest = 'variant_family', default = 'snv',
       help = 'snv or indel: complete declared original-allele matrix'),
     optparse::make_option('--vep-prefix', dest = 'vep_prefix',
-      default = Sys.getenv('VEP_PREFIX', '/root/miniconda3/envs/vep'))
+      default = Sys.getenv('VEP_PREFIX'))
   )))
   stopifnot(opt$variant_family %in% c('snv', 'indel'))
+  if (!nzchar(opt$vep_prefix)) stop('--vep-prefix or VEP_PREFIX is required', call. = FALSE)
   indel <- opt$variant_family == 'indel'
   revision <- duckvep_evidence_revision('.')
   extension <- normalizePath(opt$extension, mustWork = TRUE)

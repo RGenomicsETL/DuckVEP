@@ -16,6 +16,13 @@
 # Writes JOBDIR/result.tsv (one row per mode) and never leaves a partial Parquet behind. The
 # outcome is ok, capacity_error (an explicit native or DuckDB capacity error) or failed.
 suppressPackageStartupMessages({ library(DBI); library(duckdb) })
+# A path from its own variable when set, else under DUCKVEP_DATA (models/, reference/, gnomad-v4.1/, ...).
+duckvep_data <- function(path, variable = NULL) {
+  if (!is.null(variable) && nzchar(Sys.getenv(variable))) return(Sys.getenv(variable))
+  root <- Sys.getenv("DUCKVEP_DATA")
+  if (!nzchar(root)) stop("set ", if (!is.null(variable)) paste0(variable, " or "), "DUCKVEP_DATA", call. = FALSE)
+  file.path(root, path)
+}
 
 parse_args <- function(argv) {
   flags <- c("keep-output", "retry-after-capacity", "regulation", "no-regulation")
@@ -45,8 +52,7 @@ modes <- strsplit(get_opt("modes", "compact,complete17"), ",", fixed = TRUE)[[1L
 if (!all(modes %in% c("compact", "complete17"))) stop("--modes: compact and/or complete17")
 job_id <- get_opt("job-id", "1")
 threads <- as.integer(get_opt("threads", "6"))
-model <- get_opt("model", Sys.getenv("DUCKVEP_SCALE_MODEL",
-  "/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb"))
+model <- get_opt("model", duckvep_data("models/homo_sapiens_116_GRCh38_final.duckdb", "DUCKVEP_SCALE_MODEL"))
 extension <- get_opt("extension", file.path(repo, "build/release/extension/duckvep/duckvep.duckdb_extension"))
 memory_limit <- get_opt("memory-limit", "8GB")
 max_temp <- get_opt("max-temp", "32GiB")

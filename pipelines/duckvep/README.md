@@ -13,10 +13,12 @@ split is:
 - the DuckVEP conformance scripts own sampling, model/oracle identity, complete pair
   denominators, semantic receipts, and fail-closed acceptance.
 
-Run the checked-in witness campaign from the repository root:
+Run the checked-in witness campaign from any working directory. The wrapper infers the
+repository root from its own location in a complete extracted checkout. Set `DUCKVEP_ROOT`
+to override that root; `DUCKHTS_ROOT` remains a compatibility fallback.
 
 ```sh
-make duckvep-targets
+Rscript pipelines/duckvep/run.R
 ```
 
 The workflow is optional development infrastructure. Install `{targets}` from CRAN and
@@ -54,9 +56,9 @@ Set `DUCKVEP_TARGETS_CAMPAIGNS` to another tab-separated manifest and
 `DUCKVEP_TARGETS_OUTPUT` to another result root. Campaign IDs must be unique and path-safe.
 Columns use the long option names from `corpus_differential.R` with underscores instead of
 hyphens. Boolean fields contain `true` or `false`. Paths may be absolute or relative to the
-DuckHTS root. A cache-backed campaign must provide the cache's `cache_info` and
+repository root. A cache-backed campaign must provide the cache's `cache_info` and
 `cache_receipt` files. Create the receipt once after checksum- or
-immutable-object-verified acquisition with `make duckvep-cache-receipt`. It binds the exact
+immutable-object-verified acquisition with `Rscript scripts/duckvep_cache_receipt.R`. It binds the exact
 species/release/assembly leaf, source identity, `info.txt`, file count, byte total, and a
 deterministic relative-path/size/modification/change-time inventory. Each `tar_make()`
 restates that inventory, which detects incomplete, replaced, or ordinarily edited shards without rereading tens of
@@ -67,11 +69,9 @@ lock and `conda-meta/history`, and the runner verifies the installed package URL
 uses a clean process environment, but it does not hash every installed package file.
 
 The chromosome-21 ClinVar campaigns can acquire their complete cache region through the
-benchmark registry without storing the full compressed release archive:
-
-```sh
-Rscript r/duckhtsbench/scripts/stage_vep_cache.R
-```
+benchmark registry without storing the full compressed release archive. The registry
+(`r/duckhtsbench`) is in the [DuckHTS](https://github.com/RGenomicsETL/duckhts)
+repository. No in-tree staging runner is available for this acquisition path.
 
 The registry owns the exact release URL, content checksum, ETag/byte identity, region selection and cache
 destination. Streaming still transfers the entire archive, but extracts every file below
@@ -90,7 +90,7 @@ The archive SHA-256 is a maintainer-recorded digest of a complete HTTPS transfer
 checked against Ensembl's published BSD `sum` and block count, not a claimed
 publisher-supplied SHA-256. Subsequent acquisitions must match that fixed content pin.
 
-Other caches with verified acquisitions can use `make duckvep-cache-receipt` with their
+Other caches with verified acquisitions can use `scripts/duckvep_cache_receipt.R` with their
 source URL and identity. Supported identities are `sha256:HEX`, `md5:HEX`,
 `bsd-sum:SUM:BLOCKS`, or `http-etag:ETAG:BYTES`. Acquisition and extraction stay outside
 the network-free extension build.
