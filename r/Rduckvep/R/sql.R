@@ -17,10 +17,13 @@ build_param_str <- function(params) {
   }
 }
 
+.duckvep_is_v2 <- function(con) {
+  nrow(DBI::dbGetQuery(con, "SELECT 1 FROM duckdb_functions()
+    WHERE function_name = 'duckvep_model_publish' LIMIT 1")) > 0L
+}
+
 .duckvep_create_table <- function(con, table_name, query, overwrite) {
   name <- as.character(DBI::dbQuoteIdentifier(con, table_name))
-  if (overwrite && DBI::dbExistsTable(con, table_name)) {
-    DBI::dbExecute(con, paste("DROP TABLE", name))
-  }
-  DBI::dbExecute(con, paste("CREATE TABLE", name, "AS", query))
+  create <- if (overwrite) "CREATE OR REPLACE TABLE" else "CREATE TABLE"
+  DBI::dbExecute(con, paste(create, name, "AS", query))
 }

@@ -11,9 +11,18 @@ local({
     "1::UINTEGER alt_index,0::UINTEGER transcript_index,",
     "0::UBIGINT sample_index,[0,1]::INTEGER[] alleles,",
     "[false,true]::BOOLEAN[] phase_before,NULL::BIGINT phase_set")
-  haplotypes <- rduckvep_haplotypes(con, calls, "tinytest")
+  haplotypes <- rduckvep_haplotypes(con, paste(calls, "-- calls"), "tinytest")
   expect_true(is.data.frame(haplotypes))
   expect_true("carriers" %in% names(haplotypes))
   expect_true(nrow(haplotypes) > 0L)
+  rduckvep_haplotypes(con, calls, "tinytest", table_name = 'haplotype"output')
+  expect_identical(DBI::dbReadTable(con, 'haplotype"output'), haplotypes)
+  expect_error(rduckvep_haplotypes(con, "SELECT * FROM missing_calls", "tinytest",
+    table_name = 'haplotype"output', overwrite = TRUE), "missing_calls")
+  expect_identical(DBI::dbReadTable(con, 'haplotype"output'), haplotypes)
+  expect_error(rduckvep_haplotypes(con, calls, "tinytest", table_name = 'haplotype"output'),
+    "already exists")
+  rduckvep_haplotypes(con, calls, "tinytest", table_name = 'haplotype"output', overwrite = TRUE)
+  expect_identical(DBI::dbReadTable(con, 'haplotype"output'), haplotypes)
   expect_true(DBI::dbGetQuery(con, "SELECT duckvep_model_drop('tinytest') AS dropped")$dropped)
 })

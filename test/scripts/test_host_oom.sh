@@ -13,9 +13,16 @@ read -r -a rflags <<< "$(R CMD config --ldflags)"
   "$root/test/scripts/v1_annotation_oom.c" "$shared" "${rflags[@]}" \
   -Wl,-rpath,"$(R RHOME)/lib" -Wl,-rpath,"$(dirname "$shared")" \
   -pthread -o "$work/probe"
+# The standalone probe needs the shared-library paths used by the R launcher.
+LD_LIBRARY_PATH="$(Rscript -e 'cat(Sys.getenv("LD_LIBRARY_PATH"))')"
+export LD_LIBRARY_PATH
 export MALLOC_ARENA_MAX=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
 ulimit -c 0
-timeout -k 1 10 "$work/probe" "$extension" -1 10000 recover > "$work/control.log" 2>&1
+if ! timeout -k 1 10 "$work/probe" "$extension" -1 10000 recover > "$work/control.log" 2>&1; then
+  printf 'Unrestricted annotation control failed:\n' >&2
+  grep . "$work/control.log" >&2 || true
+  exit 1
+fi
 grep -q '^annotation=ok' "$work/control.log"
 grep -q '^recovery=ok' "$work/control.log"
 grep -q '^drop=true' "$work/control.log"
@@ -25,7 +32,7 @@ for kb in $(seq 1024 32 8192); do
   log="$work/$kb.log"
   if ! timeout -k 1 10 "$work/probe" "$extension" "$kb" 10000 recover > "$log" 2>&1; then
     printf 'Annotation did not recover with %s KiB additional address space.\n' "$kb" >&2
-    grep -E 'pid=|annotation=|recovery|drop=|error' "$log" >&2 || true
+    grep . "$log" >&2 || true
     exit 1
   fi
   grep -q '^recovery=ok' "$log"

@@ -164,4 +164,7 @@ Preparation reads committed objects on the registry's retained connection;
 caller-local temporary objects and uncommitted changes are not visible. One
 preparation may run per registry at a time. Nested or concurrent preparation
 returns a busy error; completed scans use independent native workspaces.
+The native-v2 host stages calls on `con` with `duckvep_haplotype_load_sql`
+and reads them with `duckvep_haplotype_scan`. Caller-local temporary objects
+are therefore visible to preparation on that host.
 }

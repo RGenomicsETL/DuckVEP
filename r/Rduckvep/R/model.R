@@ -35,9 +35,7 @@ rduckvep_load_model <- function(con, name, regions_query, transcripts_query, exo
                    transcript_coverage_complete = transcript_coverage_complete,
                    rna_edit_query = rna_edit_query)
   optional <- optional[!vapply(optional, is.null, NA)]
-  v2 <- nrow(DBI::dbGetQuery(con, "SELECT 1 FROM duckdb_functions()
-    WHERE function_name = 'duckvep_model_publish' LIMIT 1")) > 0L
-  if (v2) {
+  if (.duckvep_is_v2(con)) {
     args <- vapply(required, function(value) .duckvep_builder_literal(con, value), "")
     if (length(optional) > 0L) {
       fields <- paste0(as.character(DBI::dbQuoteIdentifier(con, names(optional))), " := ",

@@ -548,7 +548,8 @@ snap_validate(duckvep_owned_model_t *m)
 	    (m->rna_presence == NULL && (m->rna_offsets != NULL || m->rna_boundary_overrides != NULL ||
 	        m->rna_alt_bytes_length != 0)) ||
 	    (m->rna_presence != NULL && (m->rna_offsets == NULL || m->rna_boundary_overrides == NULL ||
-	        m->cdna_sequence_bytes == NULL)) ||
+	        m->cdna_sequence_bytes == NULL || m->cdna_sequence_offsets == NULL ||
+	        m->cdna_sequence_lengths == NULL)) ||
 	    (m->rna_alt_bytes_length != 0 && m->rna_alt_bytes == NULL))
 		return "RNA programme arrays are incomplete";
 	for (i = 0; m->rna_presence != NULL && i < transcripts; i++) {
@@ -795,7 +796,8 @@ snap_load(duckvep_owned_model_t *model, const char *path, const char *label, cha
 		goto fail;
 	}
 	if ((model->interval_feature_count != 0 && (model->interval_feature_seq_regions == NULL ||
-	    model->interval_feature_starts == NULL || model->interval_feature_ends == NULL)) ||
+	    model->interval_feature_starts == NULL || model->interval_feature_ends == NULL ||
+	    model->interval_feature_kinds == NULL)) ||
 	    (problem = snap_validate(model)) != NULL) {
 		if (problem == NULL)
 			problem = "the snapshot lacks a required array";

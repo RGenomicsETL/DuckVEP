@@ -970,12 +970,12 @@ bool duckvep_core_receipt_sql(const char *const values[8], const char *option_ta
     /* Region relations prepared before circular topology existed have no
      * circular column; treat its absence as a non-circular region. */
     if (ok) ok = duckvep_sql_append(sql, "), regions AS MATERIALIZED (SELECT * REPLACE (coalesce(circular, false) AS circular) FROM (SELECT NULL::BOOLEAN AS circular WHERE false UNION ALL BY NAME SELECT * FROM ");
-    if (ok) ok = duckvep_sql_identifier(sql, values[0]);
+    if (ok) ok = duckvep_sql_relation(sql, values[0]);
     if (ok) ok = duckvep_sql_append(sql, ")");
     if (ok) ok = duckvep_sql_append(sql, "), model AS MATERIALIZED (SELECT NULL::BLOB AS cdna_sequence WHERE false UNION ALL BY NAME SELECT * FROM ");
-    if (ok) ok = duckvep_sql_identifier(sql, values[1]);
+    if (ok) ok = duckvep_sql_relation(sql, values[1]);
     if (ok) ok = duckvep_sql_append(sql, "), regulation AS MATERIALIZED (SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM ");
-    if (ok && option_table) ok = duckvep_sql_identifier(sql, option_table);
+    if (ok && option_table) ok = duckvep_sql_relation(sql, option_table);
     else if (ok) ok = duckvep_sql_append(sql, "(SELECT NULL::UINTEGER AS regulation_feature_index, NULL::UINTEGER AS seq_region, NULL::UINTEGER AS feature_start, NULL::UINTEGER AS feature_end, NULL::UTINYINT AS feature_kind WHERE false)");
     if (ok) ok = duckvep_sql_append(sql, "), ");
     for (size_t i = 0; ok && i < sizeof(receipt_body) / sizeof(receipt_body[0]); i++)

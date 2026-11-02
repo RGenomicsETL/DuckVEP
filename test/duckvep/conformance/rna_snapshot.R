@@ -64,7 +64,8 @@ if (nzchar(legacy_fixture)) {
 dbExecute(con, "CREATE TABLE authority_regions AS SELECT 0::UINTEGER seq_region, 12::UBIGINT sequence_length")
 dbExecute(con, "CREATE TABLE authority_transcripts AS SELECT 0::UINTEGER transcript_index, 0::UINTEGER seq_region, 1::UBIGINT transcript_start, 12::UBIGINT transcript_end, -1::TINYINT strand, 0::UINTEGER gene_index, 0::UBIGINT transcript_flags, 4::UBIGINT cds_start, 12::UBIGINT cds_end, 'ATGCCCTAA'::BLOB cds_sequence, 2::UTINYINT codon_table, ''::BLOB pre_cds_sequence, 'AGG'::BLOB post_cds_sequence, 'ATGCCCTAAAGG'::BLOB cdna_sequence, 1::UBIGINT rna_cds_cdna_start, 9::UBIGINT rna_cds_cdna_end, 2::UTINYINT rna_codon_table")
 dbExecute(con, "CREATE TABLE authority_exons AS SELECT 0::UINTEGER transcript_index, 1::UBIGINT exon_start, 12::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 12::UBIGINT exon_cdna_end, 0::TINYINT phase, 0::TINYINT end_phase")
-load <- "SELECT loaded FROM duckvep_model_load('authority', 'SELECT * FROM authority_regions', 'SELECT * FROM authority_transcripts', 'SELECT * FROM authority_exons')"
+dbExecute(con, "CREATE TABLE authority_features AS SELECT 0::UINTEGER regulation_feature_index, 0::UINTEGER seq_region, 2::UINTEGER feature_start, 3::UINTEGER feature_end, 1::UTINYINT feature_kind")
+load <- "SELECT loaded FROM duckvep_model_load('authority', 'SELECT * FROM authority_regions', 'SELECT * FROM authority_transcripts', 'SELECT * FROM authority_exons', interval_feature_query := 'SELECT * FROM authority_features')"
 stopifnot(sql(load)[[1L]])
 authority_wire <- file.path(tmp, "authority.dvsnap")
 stopifnot(sql(paste0("SELECT duckvep_model_save('authority', ", q(authority_wire), ")"))[[1L]])
@@ -81,6 +82,15 @@ source <- file.path(root, "test/duckvep/conformance/rna_snapshot_rehash.c")
 includes <- file.path(root, c("src", "src/include", "src/kernel/include", "third_party/cgranges", "third_party/htslib", "duckdb_capi"))
 stopifnot(system2(Sys.getenv("CC", "cc"), c("-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections", paste0("-I", shQuote(includes)), shQuote(source), "-o", shQuote(checker))) == 0L)
 number <- function(raw, at) sum(as.numeric(raw[at + 0:7]) * 256^(0:7))
+for (section in c(cdna_offsets = 15L, cdna_lengths = 16L, feature_kinds = 41L)) {
+  path <- file.path(tmp, paste0("missing-", section, ".dvsnap"))
+  stopifnot(file.copy(authority_wire, path), system2(checker, c(shQuote(path), section)) == 0L)
+  failure <- tryCatch(sql(paste0("SELECT duckvep_model_restore('bad', ", q(path), ")"))[[1L]], error = conditionMessage)
+  expected <- if (section == 41L) "snapshot lacks a required array" else "snapshot cDNA flag does not match its arrays"
+  stopifnot(is.character(failure), grepl(expected, failure, fixed = TRUE),
+            !sql("SELECT duckvep_model_drop('bad')")[[1L]],
+            identical(base, sql("SELECT owner, current_bytes FROM duckvep_native_budget() ORDER BY owner")))
+}
 for (mode in c("start", "end", "code", "presence", "length", "offset", "short")) {
   payload <- readBin(authority_wire, "raw", n = file.info(authority_wire)$size)
   offsets <- 609L + 8L * 51:53
@@ -106,6 +116,22 @@ for (mode in c("start", "end", "code", "presence", "length", "offset", "short"))
 }
 stopifnot(sql(paste0("SELECT duckvep_model_restore('authority', ", q(authority_wire), ")"))[[1L]],
           sql("SELECT duckvep_model_drop('authority')")[[1L]])
+
+# A present zero-length array may point exactly at the end of snapshot storage.
+stopifnot(sql(paste0("SELECT duckvep_model_restore('empty', ",
+  q(fixture), ")"))[[1L]])
+empty_wire <- file.path(tmp, "empty.dvsnap")
+stopifnot(sql(paste0("SELECT duckvep_model_save('empty', ", q(empty_wire), ")"))[[1L]],
+          sql("SELECT duckvep_model_drop('empty')")[[1L]])
+for (section in 51:54) stopifnot(system2(checker, c(shQuote(empty_wire), section)) == 0L)
+payload <- readBin(empty_wire, "raw", n = file.info(empty_wire)$size)
+stopifnot(number(payload, 609L + 8L * 49L) == length(payload),
+          number(payload, 1057L + 8L * 49L) == 0)
+payload[[159L]] <- as.raw(bitwOr(as.integer(payload[[159L]]), 2L))
+writeBin(payload, empty_wire)
+stopifnot(system2(checker, shQuote(empty_wire)) == 0L,
+          sql(paste0("SELECT duckvep_model_restore('empty', ", q(empty_wire), ")"))[[1L]],
+          sql("SELECT duckvep_model_drop('empty')")[[1L]])
 stopifnot(identical(origin, sql("SELECT owner, current_bytes FROM duckvep_native_budget() ORDER BY owner")))
 cat("RNA authority snapshots, migration, rejection and ownership: OK\n")
 }

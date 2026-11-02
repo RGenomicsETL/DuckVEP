@@ -40,7 +40,7 @@ jobs:
           args: 'c("--no-manual", "--as-cran")'
           build_args: 'c("--no-manual", "--no-build-vignettes")'
           error-on: '"warning"'
-      - name: Check host OOM and projection recovery
+      - name: Check host recovery and snapshot validation
         if: runner.os == 'Linux'
         shell: bash
         run: |
@@ -48,6 +48,7 @@ jobs:
           test "${#artifacts[@]}" -eq 1
           bash test/scripts/test_host_oom.sh "${artifacts[0]}"
           timeout -k 2 120 Rscript test/scripts/check_projection_parallel.R "${artifacts[0]}"
+          DUCKVEP_RNA_TEST_EXTENSION="${artifacts[0]}" timeout -k 2 120 Rscript test/duckvep/conformance/rna_snapshot.R
 
   wasm:
     runs-on: ubuntu-latest

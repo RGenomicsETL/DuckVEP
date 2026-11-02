@@ -400,7 +400,7 @@ static void receipt_exec(duckdb_v2_scalar_function_exec_info_handle info,
         }
         ok = duckvep_core_receipt_sql((const char *const *)values, option_table, &sql);
         if (!ok) {
-            report(*error, "duckvep_model_receipt_sql: allocation failed");
+            report(*error, "duckvep_model_receipt_sql: invalid relation name or allocation failure");
         } else {
             ok = write_sql(&c, row, &sql);
         }

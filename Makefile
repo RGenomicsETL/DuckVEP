@@ -66,10 +66,15 @@ test_fault_injection: build_fault_injection
 
 # Linux integration checks run in bounded subprocesses against a supplied artifact.
 DUCKVEP_TEST_EXTENSION ?= $(PROJ_DIR)/build/release/duckvep.duckdb_extension
-.PHONY: test-runtime-recovery
+DUCKVEP_TEST_V2_EXTENSION ?= $(PROJ_DIR)/build/release_v2/duckvep.duckdb_extension
+.PHONY: test-runtime-recovery test-r-v2-haplotypes
 test-runtime-recovery:
 	bash test/scripts/test_host_oom.sh "$(DUCKVEP_TEST_EXTENSION)"
 	timeout -k 2 120 Rscript test/scripts/check_projection_parallel.R "$(DUCKVEP_TEST_EXTENSION)"
+	DUCKVEP_RNA_TEST_EXTENSION="$(DUCKVEP_TEST_EXTENSION)" timeout -k 2 120 Rscript test/duckvep/conformance/rna_snapshot.R
+
+test-r-v2-haplotypes:
+	timeout -k 2 120 Rscript test/scripts/check_r_v2_haplotypes.R "$(DUCKVEP_TEST_EXTENSION)" "$(DUCKVEP_TEST_V2_EXTENSION)"
 
 # Pure policy fixtures run offline. The full-release receipt needs the external
 # Parquet output and is invoked explicitly after building a staged release.
