@@ -1,0 +1,77 @@
+# name: test/sql/duckvep_hgvs_short_intron.test
+# description: Protein HGVS at short-intron boundaries on both strands
+# group: [duckvep]
+
+require duckvep
+
+# VEP 116 GFF3 oracle: the reference CDS, spliced sequence, exon phases,
+# translation, and unshifted coding predicates were checked for each model.
+# The 2- and 13-base introns admit coding predicates; the 14-base introns and
+# 5-prime UTR control do not. The input insertions shift across the intron.
+statement ok
+CREATE TABLE short_sources AS SELECT * FROM (VALUES
+  (0, 'SP2', 2, 1, false), (1, 'SP13', 13, 1, false),
+  (2, 'SP14', 14, 1, false), (3, 'SM2', 2, -1, false),
+  (4, 'SM13', 13, -1, false), (5, 'SM14', 14, -1, false),
+  (6, 'UTR2', 2, 1, true)
+) s(i, name, intron_length, strand, utr);
+
+statement ok
+CREATE TABLE short_transcripts AS SELECT i::UINTEGER transcript_index,
+  i::UINTEGER seq_region, 1501::UBIGINT transcript_start,
+  (1560 + intron_length)::UBIGINT transcript_end, strand::TINYINT strand,
+  i::UINTEGER gene_index, 3::UBIGINT transcript_flags,
+  (CASE WHEN utr THEN 1531 + intron_length ELSE 1501 END)::UBIGINT cds_start,
+  (1560 + intron_length)::UBIGINT cds_end,
+  (CASE WHEN utr THEN '' ELSE 'ATG' || repeat('GCC', 8) || 'GCG' END ||
+   'CAA' || repeat('GCC', 8) || 'TAA')::BLOB cds_sequence,
+  1::UTINYINT codon_table,
+  (CASE WHEN utr THEN 'ATG' || repeat('GCC', 8) || 'GCG' ELSE '' END)::BLOB pre_cds_sequence,
+  ''::BLOB post_cds_sequence
+FROM short_sources;
+
+statement ok
+CREATE TABLE short_exons AS SELECT i::UINTEGER transcript_index,
+  (CASE WHEN (rank = 1) = (strand = 1) THEN 1501 ELSE 1531 + intron_length END)::UBIGINT exon_start,
+  (CASE WHEN (rank = 1) = (strand = 1) THEN 1530 ELSE 1560 + intron_length END)::UBIGINT exon_end,
+  (1 + (rank - 1) * 30)::UBIGINT exon_cdna_start,
+  (rank * 30)::UBIGINT exon_cdna_end,
+  (CASE WHEN utr AND rank = 1 THEN -1 ELSE 0 END)::TINYINT phase,
+  (CASE WHEN rank = 2 OR utr THEN -1 ELSE 0 END)::TINYINT end_phase
+FROM short_sources CROSS JOIN (VALUES (1), (2)) r(rank);
+
+query I
+SELECT loaded FROM duckvep_model_load('short-intron-hgvs',
+  'SELECT i::UINTEGER seq_region, (3060 + intron_length)::UBIGINT sequence_length, name seq_region_name FROM short_sources ORDER BY i',
+  'SELECT * FROM short_transcripts ORDER BY transcript_index',
+  'SELECT * FROM short_exons ORDER BY transcript_index, exon_cdna_start',
+  reference_fasta := '__WORKING_DIRECTORY__/test/data/duckvep/short_intron_hgvs.fa');
+----
+1
+
+statement ok
+CREATE TABLE short_events AS SELECT (i + 1)::UBIGINT event_index, i::UINTEGER seq_region,
+  (CASE WHEN strand = 1 THEN 1531 ELSE 1529 + intron_length END)::UBIGINT AS position,
+  'G' reference, (CASE WHEN strand = 1 THEN 'GC' ELSE 'GG' END) alternate,
+  NULL::UBIGINT end_position, NULL::VARCHAR structural_type, NULL::VARCHAR copy_change,
+  NULL::UINTEGER mate_seq_region, NULL::UBIGINT mate_position FROM short_sources;
+
+query ITTTII
+SELECT event_index, transcript_hgvs, protein_hgvs, protein_hgvs_status,
+  consequence_mask, hgvs_shift
+FROM query(duckvep_annotate_sql('short_events', 'short-intron-hgvs', struct_pack(
+  hgvs := true, upstream_distance := 0, downstream_distance := 0)))
+ORDER BY event_index;
+----
+1	c.31dup	p.Gln11ProfsTer?	supported	2048	2
+2	c.31dup	p.Gln11ProfsTer?	supported	2048	13
+3	c.31dup	NULL	not_applicable	1048832	14
+4	c.31dup	p.Gln11ProfsTer?	supported	2048	2
+5	c.31dup	p.Gln11ProfsTer?	supported	2048	13
+6	c.31dup	NULL	not_applicable	1048832	14
+7	c.1dup	NULL	not_applicable	8	2
+
+query I
+SELECT duckvep_model_drop('short-intron-hgvs');
+----
+1

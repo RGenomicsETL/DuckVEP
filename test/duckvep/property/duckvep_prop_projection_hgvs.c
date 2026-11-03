@@ -3700,6 +3700,63 @@ TEST hgvs_alternate_cds_preserves_reference_codon_table(void) {
     PASS();
 }
 
+TEST hgvs_frameshift_first_residue_termination(void) {
+    static const uint8_t ref_cds[] = "AAACCTCAATAA";
+    static const uint8_t alt_first[] = "ACAACCTCAATAA";
+    static const uint8_t alt_later[] = "AAAGCCTCAATAA";
+    static const uint8_t ref_peptide[] = "KPQ*";
+    static const uint8_t first_peptide[] = "TTSI";
+    static const uint8_t later_peptide[] = "KASI";
+    static const uint8_t post_cds[] = "AATAA";
+    duckvep_coding_context_t context;
+    duckvep_sequence_delta_t delta;
+    duckvep_hgvs_protein_fact_t fact;
+    int strand;
+    int later;
+    int profile;
+
+    for (strand = -1; strand <= 1; strand += 2) {
+        for (later = 0; later <= 1; later++) {
+            memset(&context, 0, sizeof context);
+            memset(&delta, 0, sizeof delta);
+            context.ref_cds = ref_cds;
+            context.ref_cds_len = sizeof ref_cds - 1u;
+            context.alt_cds = later ? alt_later : alt_first;
+            context.alt_cds_len = sizeof alt_first - 1u;
+            context.ref_peptide = ref_peptide;
+            context.ref_peptide_len = sizeof ref_peptide - 1u;
+            context.alt_peptide = later ? later_peptide : first_peptide;
+            context.alt_peptide_len = sizeof first_peptide - 1u;
+            context.post_cds_bases = post_cds;
+            context.post_cds_length = sizeof post_cds - 1u;
+            context.post_cds_complete = 1u;
+            context.codon_table = (uint8_t)DUCKVEP_CODON_TABLE_STANDARD;
+            context.transcript_strand = (int8_t)strand;
+            delta.valid = 1u;
+            delta.frameshift = 1u;
+            for (profile = DUCKVEP_COMPAT_VEP_116; profile <= DUCKVEP_COMPAT_STRICT; profile++) {
+                /* Strict truncates the incomplete CDS codon before the tail. */
+                int known = later && profile == DUCKVEP_COMPAT_VEP_116;
+                context.compatibility_profile = (uint8_t)profile;
+                ASSERT_EQ(DUCKVEP_HGVS_OK,
+                          duckvep_hgvs_protein_fact_build(&context, &delta, &fact));
+                ASSERT_EQ(DUCKVEP_HGVS_PROTEIN_FRAMESHIFT, fact.shape);
+                ASSERT_EQ(later ? 2u : 1u, fact.first_position1);
+                ASSERT_EQ(known, fact.termination_known);
+                ASSERT_EQ(known ? 5u : 0u, fact.termination_distance);
+                fact.termination_known = 1u;
+                fact.termination_distance = 99u;
+                ASSERT_EQ(DUCKVEP_HGVS_OK,
+                          duckvep_hgvs_protein_frameshift_termination_replay(
+                              &context, &fact));
+                ASSERT_EQ(known, fact.termination_known);
+                ASSERT_EQ(known ? 5u : 0u, fact.termination_distance);
+            }
+        }
+    }
+    PASS();
+}
+
 TEST hgvs_late_stop_search_reproduces_vep_standard_table_and_precedence(void) {
     static const uint8_t mt_alt_cds[12] = {
         'A','T','G', 'T','G','A', 'G','C','C', 'T','A','A'

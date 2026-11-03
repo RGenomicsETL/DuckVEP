@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # The Makefile includes extension-ci-tools unconditionally.
           submodules: true
@@ -56,7 +56,7 @@ jobs:
       DUCKDB_CLI_VERSION: v1.5.1
       DUCKDB_CLI_SHA256: 7414b29d4e77ae833ff170a489a59b74331f96d3fde72aa3bb8437dedbcea180
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           submodules: true
           persist-credentials: false

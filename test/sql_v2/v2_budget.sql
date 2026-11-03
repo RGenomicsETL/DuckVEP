@@ -67,7 +67,7 @@ COPY (SELECT seq_region, 1000::UBIGINT sequence_length, ('c' || seq_region) seq_
 COPY (SELECT * FROM b_transcripts ORDER BY seq_region, transcript_start) TO 'x' (FORMAT duckvep_stage, MODEL 'budget-cc', RELATION 'transcripts', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
 COPY (SELECT * FROM b_exons ORDER BY transcript_index, exon_start) TO 'x' (FORMAT duckvep_stage, MODEL 'budget-cc', RELATION 'exons', USE_TMP_FILE FALSE, PRESERVE_ORDER TRUE);
 SELECT CASE WHEN duckvep_model_publish('budget-cc') THEN true ELSE error('publish') END;
-SELECT CASE WHEN (SELECT count(*) >= 0 FROM duckvep_coding_calls('budget-cc', 'test/data/coding_calls/cases.vcf')) THEN true ELSE error('coding_calls under the default budget') END;
+SELECT CASE WHEN (SELECT count(*) = 4 AND list(position ORDER BY position) = [203, 210, 215, 229] AND bool_and(coalesce(seq_region = 1 AND transcript_index = 0, false)) FROM duckvep_coding_calls('budget-cc', 'test/data/coding_calls/cases.vcf')) THEN true ELSE error('coding_calls under the default budget') END;
 SET VARIABLE b_before = (SELECT current_bytes FROM duckvep_native_budget() WHERE owner = 'total');
 SELECT CASE WHEN duckvep_native_budget_set(getvariable('b_before') + 4096) > 0 THEN true ELSE error('budget set') END;
 -- expect error: capacity error

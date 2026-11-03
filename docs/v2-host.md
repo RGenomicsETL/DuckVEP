@@ -37,6 +37,9 @@ The runtime suite tests repeated `LOAD` on writable and read-only databases, wit
 
 ## Release preflight
 
+The [release checklist](release-checklist.md) covers biological evidence, CRAN, citation metadata, and distribution.
+Stable-v1 remains the default host on DuckDB 2.0.
+
 `make check-v2-release-selftest` runs offline negative controls. A release admission uses `make check-v2-release-preflight` with concrete arguments for the extension, pinned CLI, R library, and completed HG002 output directory. The preflight checks the SDK manifest and headers, the actual extension footer and load, runtime and source revisions, and the complete hashed HG002 comparison receipt. It contacts GitHub and CRAN only with explicit `--live-status`. The current experimental manifest is blocked from release admission; the command can emit `READY_TO_QUALIFY` when upstream versions are visible but qualification artifacts are incomplete. Details and the required invocation are in [`test/sql_v2/release-readiness.md`](../test/sql_v2/release-readiness.md).
 
 `LOAD` registers the native functions without executing SQL or creating persistent catalog objects. The read-only database test covers this contract.

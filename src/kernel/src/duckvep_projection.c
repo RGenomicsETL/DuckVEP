@@ -548,6 +548,27 @@ int duckvep_project_feature_has_coding_precondition_unshifted(
             return 1;
         }
     }
+    /* VEP stretches exon overlaps by 12 bases when the transcript has an
+     * intron of at most 13 bases. A CDS mapper gap still counts as coding. */
+    if (high >= transcripts->cds_start1[tx_idx] &&
+        low <= transcripts->cds_end1[tx_idx]) {
+        int short_intron = 0;
+        for (i = offset + 1u; i < offset + count; i++) {
+            int64_t gap = transcripts->strand[tx_idx] > 0
+                ? (int64_t)exons->start1[i] - exons->end1[i - 1u] - 1
+                : (int64_t)exons->start1[i - 1u] - exons->end1[i] - 1;
+            if (gap > 0 && gap <= 13) {
+                short_intron = 1;
+                break;
+            }
+        }
+        if (short_intron) {
+            for (i = offset; i < offset + count; i++) {
+                if ((int64_t)high >= (int64_t)exons->start1[i] - 12 &&
+                    (int64_t)low <= (int64_t)exons->end1[i] + 12) return 1;
+            }
+        }
+    }
     return 0;
 }
 
