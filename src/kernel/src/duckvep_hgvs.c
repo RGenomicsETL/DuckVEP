@@ -2772,7 +2772,9 @@ static duckvep_hgvs_status_t hgvs_protein_frameshift_fact(
             DUCKVEP_COMPAT_HGVS_XAA_AS_TER)))
         ? (uint8_t)DUCKVEP_HGVS_PROTEIN_SUBSTITUTION
         : (uint8_t)DUCKVEP_HGVS_PROTEIN_FRAMESHIFT;
-    if (fact->shape == (uint8_t)DUCKVEP_HGVS_PROTEIN_FRAMESHIFT) {
+    /* VEP's frameshift stop search rejects start - 1 when it is zero. */
+    if (fact->shape == (uint8_t)DUCKVEP_HGVS_PROTEIN_FRAMESHIFT &&
+        fact->first_position1 != 1u) {
         hgvs_protein_stop_distance(
             context, &fact->reference, fact->first_position1, alternate_offset, 1,
             &fact->termination_distance, &fact->termination_known);
@@ -4147,6 +4149,8 @@ duckvep_hgvs_status_t duckvep_hgvs_protein_pair_build(
     duckvep_sequence_delta_t delta;
     duckvep_event_t shifted_event;
     duckvep_haplotype_edit_t shifted_edit;
+    duckvep_hgvs_dna_fact_t protein_dna;
+    const duckvep_hgvs_dna_fact_t *replay_dna = dna;
     int delta_ready = 0, shifted_edit_ready = 0;
     duckvep_variant_coding_context_status_t context_status;
     int original_frameshift_excluded = 0;
@@ -4207,10 +4211,41 @@ duckvep_hgvs_status_t duckvep_hgvs_protein_pair_build(
         context_status = DUCKVEP_VARIANT_CODING_CONTEXT_OK;
         if (facts->delta) { delta = *facts->delta; delta_ready = delta.valid != 0u; }
     } else if ((dna->ref_length == 0u) != (dna->alt_length == 0u)) {
-        *allele_required = dna->ref_length ? (size_t)dna->ref_length : (size_t)dna->alt_length + 1u;
+        /* For an incomplete CDS start, HGVSc clamps an external feature to
+         * the transcript before shifting. Protein replay uses the complete
+         * shifted feature when it maps entirely within the CDS. */
+        if ((transcripts->flags[tx] & DUCKVEP_TX_CDS_START_NF) &&
+            dna->shift_offset > 0 && dna->ref_length && !dna->alt_length &&
+            event->kind == DUCKVEP_KIND_DEL &&
+            ((transcripts->strand[tx] > 0 && event->feature_start1 < transcripts->start1[tx]) ||
+             (transcripts->strand[tx] < 0 && event->feature_end1 > transcripts->end1[tx]))) {
+            int64_t displacement = (int64_t)transcripts->strand[tx] * dna->shift_offset;
+            int64_t first = (int64_t)event->feature_start1 + displacement;
+            int64_t last = (int64_t)event->feature_end1 + displacement;
+            uint64_t length = (uint64_t)event->feature_end1 - event->feature_start1 + 1u;
+            uint32_t first_cdna, last_cdna, first_exon, last_exon;
+            if (reference && reference->bases && first >= 1 && last >= first &&
+                last <= UINT32_MAX && length <= UINT16_MAX &&
+                first >= transcripts->cds_start1[tx] && last <= transcripts->cds_end1[tx] &&
+                first >= reference->start1 &&
+                (uint64_t)last - reference->start1 < reference->length &&
+                duckvep_project_genomic_to_cdna(transcripts, exons, tx, (uint32_t)first,
+                                                 &first_cdna, &first_exon) &&
+                duckvep_project_genomic_to_cdna(transcripts, exons, tx, (uint32_t)last,
+                                                 &last_cdna, &last_exon) &&
+                first_exon == last_exon) {
+                protein_dna = *dna;
+                protein_dna.placed_start1 = (uint32_t)first;
+                protein_dna.placed_end1 = (uint32_t)last;
+                protein_dna.ref_length = (uint16_t)length;
+                protein_dna.ref = reference->bases + (size_t)(first - reference->start1);
+                replay_dna = &protein_dna;
+            }
+        }
+        *allele_required = replay_dna->ref_length ? (size_t)replay_dna->ref_length : (size_t)replay_dna->alt_length + 1u;
         if (*allele_required > allele_capacity) return DUCKVEP_HGVS_BUFFER_TOO_SMALL;
         status = duckvep_hgvs_shifted_cds_edit_build(transcripts, exons, sequences,
-            reference, &edit, dna, allele_scratch, allele_capacity, allele_required,
+            reference, &edit, replay_dna, allele_scratch, allele_capacity, allele_required,
             &shifted_event, &shifted_edit);
         if (status != DUCKVEP_HGVS_OK) return status;
         shifted_edit_ready = 1;

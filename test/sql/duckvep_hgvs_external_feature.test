@@ -1,0 +1,87 @@
+# name: test/sql/duckvep_hgvs_external_feature.test
+# description: Protein HGVS replay of shifted features crossing transcript starts
+# group: [duckvep]
+
+require duckvep
+
+# VEP 116 places the complete deletion inside the CDS on both strands.
+# HGVSc uses the independently clamped transcript span.
+statement ok
+CREATE TABLE external_feature_transcripts AS SELECT
+  i::UINTEGER transcript_index, (i // 2)::UINTEGER seq_region,
+  (CASE i // 2 WHEN 0 THEN 1136 ELSE 1133 END)::UBIGINT transcript_start,
+  (CASE i // 2 WHEN 0 THEN 1288 ELSE 1285 END)::UBIGINT transcript_end,
+  (CASE i // 2 WHEN 0 THEN 1 ELSE -1 END)::TINYINT strand,
+  i::UINTEGER gene_index, (CASE WHEN i % 2 = 0 THEN 65557 ELSE 65541 END)::UBIGINT transcript_flags,
+  transcript_start cds_start, transcript_end cds_end,
+  'GCGGCGCGGCGGCTGCGGGACGCGGCCCAACAGGCCGCCCTGCAGCGGGGCCGGGGCACCGAGCCCCCGCGCCTGCCGCGCCTGCTCCCGCCCCAGGTGAGGCGTCGGGAGGGACGTGGGGAAACTGAGGCCCGAAGGGGGCCGACGCCCCGC'::BLOB cds_sequence,
+  1::UTINYINT codon_table, ''::BLOB pre_cds_sequence, ''::BLOB post_cds_sequence
+FROM range(4) t(i);
+
+query I
+SELECT loaded FROM duckvep_model_load('hgvs-external-feature',
+  'SELECT i::UINTEGER seq_region, 2420::UBIGINT sequence_length,
+   CASE i WHEN 0 THEN ''plus'' ELSE ''minus'' END seq_region_name FROM range(2) t(i)',
+  'SELECT * FROM external_feature_transcripts ORDER BY transcript_index',
+  'SELECT transcript_index, transcript_start exon_start, transcript_end exon_end,
+   1::UBIGINT exon_cdna_start, 153::UBIGINT exon_cdna_end,
+   0::TINYINT phase, 0::TINYINT end_phase FROM external_feature_transcripts ORDER BY transcript_index',
+  reference_fasta := '__WORKING_DIRECTORY__/test/data/duckvep/hgvs_external_feature.fa');
+----
+1
+
+statement ok
+CREATE TABLE external_feature_events AS SELECT event_index::UBIGINT event_index,
+  seq_region::UINTEGER seq_region, position::UBIGINT position, reference, alternate,
+  NULL::UBIGINT end_position, NULL::VARCHAR structural_type,
+  NULL::VARCHAR copy_change, NULL::UINTEGER mate_seq_region,
+  NULL::UBIGINT mate_position
+FROM (VALUES
+  (0, 0, 1125, 'TGCTGCGGGACGCGGCGCGGCG', 'T'),
+  (1, 1, 1275, 'CGCCGCGCCGCGTCCCGCAGCA', 'A'),
+  (2, 0, 1160, 'G', 'A'),
+  (3, 1, 1255, 'G', 'A')
+) t(event_index,seq_region,position,reference,alternate);
+
+query ITTTTI
+SELECT event_index, transcript_hgvs, transcript_hgvs_status,
+  protein_hgvs, protein_hgvs_status, coalesce(hgvs_shift, 0)
+FROM query(duckvep_annotate_sql('external_feature_events', 'hgvs-external-feature', struct_pack(
+  hgvs := true, upstream_distance := 0, downstream_distance := 0)))
+WHERE transcript_index % 2 = 0
+ORDER BY event_index;
+----
+0	c.16_26del	supported	p.Arg3_Ala9del	supported	15
+1	c.16_26del	supported	p.Arg3_Ala9del	supported	15
+2	c.25G>A	supported	p.Ala9Thr	supported	0
+3	c.31C>T	supported	p.Gln11Ter	supported	0
+
+query IT
+SELECT a.event_index,
+  (SELECT string_agg(t.consequence, '&' ORDER BY t.consequence)
+   FROM duckvep_so_terms() t WHERE (a.consequence_mask & t.consequence_mask) <> 0)
+FROM query(duckvep_annotate_sql('external_feature_events', 'hgvs-external-feature', struct_pack(
+  hgvs := true, upstream_distance := 0, downstream_distance := 0))) a
+WHERE a.transcript_index % 2 = 0
+ORDER BY a.event_index;
+----
+0	5_prime_UTR_variant&NMD_transcript_variant&coding_sequence_variant
+1	5_prime_UTR_variant&NMD_transcript_variant&coding_sequence_variant
+2	NMD_transcript_variant&missense_variant
+3	NMD_transcript_variant&stop_gained
+
+# Complete-CDS transcripts use the transcript-clipped protein edit.
+query ITTT
+SELECT event_index, transcript_hgvs, protein_hgvs, protein_hgvs_status
+FROM query(duckvep_annotate_sql('external_feature_events', 'hgvs-external-feature', struct_pack(
+  hgvs := true, upstream_distance := 0, downstream_distance := 0)))
+WHERE transcript_index % 2 = 1 AND event_index < 2
+ORDER BY event_index;
+----
+0	c.16_26del	p.Arg6ProfsTer34	supported
+1	c.16_26del	p.Arg6ProfsTer34	supported
+
+query I
+SELECT duckvep_model_drop('hgvs-external-feature');
+----
+1

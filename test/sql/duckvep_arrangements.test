@@ -1,0 +1,45 @@
+# Two unphased substitutions produce cis and trans hypothetical assignments.
+require duckvep
+
+query I
+SELECT loaded FROM duckvep_model_load('arrangements-sql',
+  'SELECT 0::UINTEGER seq_region',
+  $$SELECT 0::UINTEGER transcript_index, 0::UINTEGER seq_region,
+    1::UBIGINT transcript_start, 15::UBIGINT transcript_end, 1::TINYINT strand,
+    0::UINTEGER gene_index, 3::UBIGINT transcript_flags, 1::UBIGINT cds_start,
+    15::UBIGINT cds_end, 'ATGAAACCCGGGTAA'::BLOB cds_sequence,
+    1::UTINYINT codon_table, ''::BLOB pre_cds_sequence, ''::BLOB post_cds_sequence$$,
+  $$SELECT 0::UINTEGER transcript_index, 1::UBIGINT exon_start,
+    15::UBIGINT exon_end, 1::UBIGINT exon_cdna_start, 15::UBIGINT exon_cdna_end,
+    0::TINYINT phase, 0::TINYINT end_phase$$);
+----
+1
+
+statement ok
+CREATE TABLE arrangement_calls AS SELECT * FROM (VALUES
+  (1,0,4,'A','T',1,0,7,[0,1],NULL::BOOLEAN[],NULL::BIGINT),
+  (2,0,5,'A','T',1,0,7,[0,1],NULL::BOOLEAN[],NULL::BIGINT)
+) v(event_index,seq_region,position,reference,alternate,alt_index,transcript_index,sample_index,alleles,phase_before,phase_set);
+
+query IITIT
+SELECT hypothesis_id, hypothesis_lane, protein,
+       count(*) FILTER (WHERE contributes), prediction_semantics
+FROM duckvep_haplotype_arrangements('SELECT * FROM arrangement_calls', 'arrangements-sql')
+GROUP BY hypothesis_id, hypothesis_lane, protein, prediction_semantics
+ORDER BY hypothesis_id, hypothesis_lane;
+----
+1	1	MKPG*	0	reference_replay
+1	2	MLPG*	2	hypothetical_assignment
+2	1	MIPG*	1	hypothetical_assignment
+2	2	M*	1	hypothetical_assignment
+
+statement error
+SELECT * FROM duckvep_haplotype_arrangements('SELECT * FROM arrangement_calls',
+  'arrangements-sql', max_arrangements := 1, max_replays := 4);
+----
+phase arrangement status 8 before publication
+
+query I
+SELECT duckvep_model_drop('arrangements-sql');
+----
+1

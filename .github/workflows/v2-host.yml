@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # The Makefile includes extension-ci-tools, which also supplies the footer writer.
           submodules: true
@@ -56,7 +56,7 @@ jobs:
         run: echo "revision=$(python3 -c 'import json; print(json.load(open("duckvep-package.json"))["v2_host"]["duckdb_sdk_revision"])')" >> "$GITHUB_OUTPUT"
       - name: Cache the released DuckDB CLI
         id: duckdb-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .deps-v2/duckdb-build/duckdb
           key: duckdb-v2-ubuntu24.04-${{ runner.arch }}-${{ steps.pin.outputs.revision }}-released-c6507206
@@ -68,7 +68,7 @@ jobs:
           echo "c6507206baf7793c6013dbd82368469a45f20dc0e17a6f92f204602f652ed2bc  $RUNNER_TEMP/duckdb-cli.tar.gz" | sha256sum -c -
           mkdir -p .deps-v2/duckdb-build
           tar -xzf "$RUNNER_TEMP/duckdb-cli.tar.gz" -C .deps-v2/duckdb-build duckdb
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - name: Python tools for the footer writer

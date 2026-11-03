@@ -1,7 +1,7 @@
 require duckvep
 
 # Declared programmes preserve the original, independent genomic source operands.
-query TTTIIIIT
+query TTTIIIITTTTTI
 WITH scenarios AS (
   SELECT unnest([
     {id:'include', blocks:[{start1:1::UBIGINT,end1:9::UBIGINT},{start1:13::UBIGINT,end1:15::UBIGINT},{start1:19::UBIGINT,end1:27::UBIGINT},{start1:31::UBIGINT,end1:39::UBIGINT},{start1:43::UBIGINT,end1:45::UBIGINT}],rna:'ATGAAACCCAAATTTCCCTAAATGAAATAAAAA'},
@@ -22,8 +22,10 @@ WITH scenarios AS (
 )
 SELECT p.programme_id,p.allele_evidence,p.product_evidence,
        list_count(p.sources),list_count(p.source_effects),p.verified_sources,
-       p.source_effects[2].changed_rna_bases,p.conditional_nmd FROM products ORDER BY p.programme_id;
+       p.source_effects[2].changed_rna_bases,p.conditional_nmd,
+       p.reference_rna,p.alternate_rna,p.reference_peptide,p.alternate_peptide,
+       p.source_effects[1].changed_rna_bases FROM products ORDER BY p.programme_id;
 ----
-include	hypothetical_assignment	supplied_programme	2	2	2	0	unknown
-retain	hypothetical_assignment	supplied_programme	2	2	2	0	unknown
-skip	hypothetical_assignment	supplied_programme	2	2	2	0	unknown
+include	hypothetical_assignment	supplied_programme	2	2	2	0	unknown	ATGAAACCCAAATTTCCCTAAATGAAATAAAAA	ATGAAACCCCAATTTCCCTAAATGAAATAAAAA	MKPKFP*	MKPQFP*	1
+retain	hypothetical_assignment	supplied_programme	2	2	2	0	unknown	ATGAAACCCGGGAAATTTCCCTAAATGAAATAAAAA	ATGAAACCCGGGCAATTTCCCTAAATGAAATAAAAA	MKPGKFP*	MKPGQFP*	1
+skip	hypothetical_assignment	supplied_programme	2	2	2	0	unknown	ATGAAACCCTTTCCCTAAATGAAATAAAAA	ATGAAACCCTTTCCCTAAATGAAATAAAAA	MKPFP*	MKPFP*	0

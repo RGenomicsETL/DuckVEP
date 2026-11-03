@@ -49,7 +49,7 @@ CREATE TABLE b_events AS SELECT
   NULL::UBIGINT mate_position
 FROM b_transcripts;
 
-# Other test files leave models loaded in this process; measure relative to them.
+# Measure charges relative to any models already loaded in this process.
 statement ok
 SET VARIABLE b_models0 = (SELECT sum(current_bytes) FROM duckvep_native_budget() WHERE owner IN ('model', 'index'));
 
@@ -91,6 +91,27 @@ FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_di
 statement ok
 CREATE TABLE b_golden AS SELECT *
 FROM query(duckvep_annotate_sql('b_events', 'budget-ok', struct_pack(upstream_distance := 0, downstream_distance := 0)));
+
+# Reset the peak after transient annotation allocations have been released.
+query I
+SELECT high_water_bytes > current_bytes FROM duckvep_native_budget() WHERE owner = 'total';
+----
+1
+
+statement ok
+CREATE TEMP TABLE b_budget_before_reset AS SELECT * FROM duckvep_native_budget();
+
+query I
+SELECT duckvep_native_budget_reset_high_water();
+----
+1
+
+query II
+SELECT bool_and(a.high_water_bytes = a.current_bytes),
+       bool_and(a.limit_bytes = b.limit_bytes AND a.current_bytes = b.current_bytes)
+FROM duckvep_native_budget() a JOIN b_budget_before_reset b USING (owner);
+----
+1	1
 
 # --- Load over budget: explicit capacity error, nothing published, nothing leaked.
 statement ok
