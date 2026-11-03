@@ -32,7 +32,7 @@ SELECT loaded FROM duckvep_model_load('hgvs-external-feature',
 
 statement ok
 CREATE TABLE external_feature_events AS SELECT event_index::UBIGINT event_index,
-  seq_region::UINTEGER seq_region, position::UBIGINT position, reference, alternate,
+  seq_region::UINTEGER seq_region, position::UBIGINT AS position, reference, alternate,
   NULL::UBIGINT end_position, NULL::VARCHAR structural_type,
   NULL::VARCHAR copy_change, NULL::UINTEGER mate_seq_region,
   NULL::UBIGINT mate_position
@@ -70,7 +70,8 @@ ORDER BY a.event_index;
 2	NMD_transcript_variant&missense_variant
 3	NMD_transcript_variant&stop_gained
 
-# Complete-CDS transcripts use the transcript-clipped protein edit.
+# Flag-scope control: this synthetic CDS does not start with ATG.
+# The complete-CDS protein expectation is not VEP-verified.
 query ITTT
 SELECT event_index, transcript_hgvs, protein_hgvs, protein_hgvs_status
 FROM query(duckvep_annotate_sql('external_feature_events', 'hgvs-external-feature', struct_pack(

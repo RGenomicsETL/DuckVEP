@@ -9,9 +9,10 @@ No DuckVEP release has been tagged yet; everything below is unreleased.
   incomplete-CDS transcript-start case. HGVSc keeps its independently clipped span.
 - The protein coding precondition includes VEP's short-intron exon-overlap rule.
   The complete shifted-feature bounds check remains in place.
-- Regression fixtures cover both strands, short-intron thresholds, and circular
-  negative controls. See `test/duckvep/conformance/hgvs-boundary-findings.md` for
-  source identities, mechanisms, and comparison limits.
+- Regression fixtures cover both strands and short-intron thresholds. The circular
+  fixture retains its protein count. See
+  `test/duckvep/conformance/hgvs-boundary-findings.md` for source identities,
+  mechanisms, and comparison limits.
 
 ## Test and release checks
 
