@@ -72,6 +72,8 @@ FROM query(duckvep_annotate_sql('demo_events', 'demo', {hgvs: true}))
 
 An Ensembl release is compiled once into an immutable, resident transcript model that annotation functions then read by name. A model is loaded from ordinary relations: regions, transcripts (with their CDS and flanking sequence) and exons. In production the relations come from an Ensembl core database through the three `duckvep_ensembl_*_sql` builders; the examples here use the one-transcript fixture from `test/data/duckvep/readme.sql`.
 
+Prebuilt human models are published in the [duckvep-models](https://huggingface.co/datasets/RgenomicsETL/duckvep-models) dataset on Hugging Face; its card gives the load queries for [`duckvep_model_load`](#duckvep_model_load).
+
 <a id="duckvep_ensembl_regions_sql"></a>
 
 ### duckvep_ensembl_regions_sql

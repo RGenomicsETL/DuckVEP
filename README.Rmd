@@ -75,7 +75,26 @@ duckdb -unsigned -c "LOAD 'build/release/duckvep.duckdb_extension'"
 
 `LOAD` registers functions and nothing else: it downloads nothing and creates no tables. Transcript models come from Ensembl data you supply, or from a snapshot you saved earlier. Prebuilt Ensembl GRCh38 and GRCh37 models are published in the [duckvep-models](https://huggingface.co/datasets/RgenomicsETL/duckvep-models) dataset on Hugging Face; download one, or attach it in place with `httpfs` as `hf://datasets/RgenomicsETL/duckvep-models/...`. The extension links its own htslib (for indexed FASTA) and cgranges. From R, [Rduckvep](https://rgenomicsetl.github.io/DuckVEP/Rduckvep/) builds the same sources offline and adds connection, model and haplotype helpers.
 
-A second host built on DuckDB's C API v2 is available as a preview ([docs/v2-host.md](docs/v2-host.md)); making it the default is [#48](https://github.com/RGenomicsETL/DuckVEP/issues/48).
+An experimental host targets DuckDB 2.0.0's version-locked C API v2 ([docs/v2-host.md](docs/v2-host.md)). The stable-v1 host remains the default and also runs on DuckDB 2.0.0.
+
+### Prebuilt models
+
+The [duckvep-models](https://huggingface.co/datasets/RgenomicsETL/duckvep-models) dataset holds one DuckDB file per assembly. The [dataset card](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/blob/main/README.md) gives the load queries, and [`SHA256SUMS`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/blob/main/SHA256SUMS) lists the checksums.
+
+| Model | File | Size |
+|---|---|---:|
+| Human GRCh38 | [`homo_sapiens_116_GRCh38.duckdb`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/resolve/main/ensembl-116/homo_sapiens_116_GRCh38.duckdb) | 1.8 GB |
+| Human GRCh37 | [`homo_sapiens_116_GRCh37.duckdb`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/resolve/main/ensembl-116/homo_sapiens_116_GRCh37.duckdb) | 0.3 GB |
+| MANE on GRCh37 | [`mane-grch37/`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/tree/main/ensembl-116/mane-grch37) (mapping, transcript authorities, receipt) | 8 MB |
+
+Attach a file in place, or download it first:
+
+``` sql
+INSTALL httpfs; LOAD httpfs;
+ATTACH 'hf://datasets/RgenomicsETL/duckvep-models/ensembl-116/homo_sapiens_116_GRCh38.duckdb' AS src (READ_ONLY);
+```
+
+A download link without a revision follows the dataset's `main` branch. Record the dataset revision and the file checksum with any result you keep. [Publishing to Hugging Face](docs/publishing-hugging-face.md) describes how these files are staged, checked and uploaded.
 
 ## Try it
 
@@ -251,6 +270,7 @@ WHERE a.impact = 'HIGH';
 - **Design:** [implementation](design/duckvep.md); [haplotype contract](design/duckvep_haplotype_contract.md); [structural identity and HGVS](docs/structural-identity-hgvs.md); [corpus workflow](design/duckvep_corpus_workflow.md)
 - **Evidence:** [conformance](benchmarks/duckvep_conformance.md) and its [harness](test/duckvep/conformance/README.md); [errata](ERRATA.md); [haplotypes](benchmarks/duckvep_haplotypes.md)
 - **Performance:** [throughput](benchmarks/duckvep_throughput.md), [vep-rs comparison](benchmarks/benchmark_duckvep_vep_rs.md), [scale runner](docs/scale-runner.md)
+- **Publishing:** [manual Hugging Face publication](docs/publishing-hugging-face.md)
 
 The [project site](https://rgenomicsetl.github.io/DuckVEP/) publishes these pages.
 

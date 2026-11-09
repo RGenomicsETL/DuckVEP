@@ -1,69 +1,101 @@
 #!/usr/bin/env bash
 # Publish DuckVEP model databases to a Hugging Face dataset repository.
 #
-#   HF_TOKEN=... bash scripts/publish-models.sh [--public] [--dry-run] [--mane-grch37 DIR] REPO_ID MODEL.duckdb...
+#   HF_TOKEN=... bash scripts/publish-models.sh [--public] [--dry-run] [--complete-coverage] [--mane-grch37 DIR] REPO_ID MODEL.duckdb...
 #
-# Each model is exported to a database holding only what duckvep_model_load reads: model_regions,
-# model_transcripts and duckvep_regulation_features when present, with model_receipt recomputed by
-# duckvep_model_receipt_sql from the source receipt's identity. The export is accepted only when a native
-# snapshot saved from it is byte-identical to one saved from the source model.
+# Each export contains model_regions, model_transcripts, optional regulatory features and RNA edits,
+# and a recomputed model_receipt. Native snapshots compare the source and export under the load profile below.
+# --complete-coverage asserts that the input contains the complete transcript set for intergenic annotation.
 # --mane-grch37 DIR adds the downloaded mane-grch37 data release (verified against its SHA256SUMS) beside
 # the GRCh37 model, after checking that the exported model's model_sha256 is the release's join key.
 # The upload holds the exports under ensembl-<release>/, SHA256SUMS and a dataset card (README.md).
 # A new repository is private unless --public is given; an existing one keeps its visibility.
-# --dry-run stops after the exports, checks and card. STAGE (default a temporary directory) holds them.
+# --dry-run stops after the exports, checks and card. STAGE must be empty and defaults to a temporary directory.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
-visibility=--private; dry_run=0; mane=
+visibility=--private; dry_run=0; complete_coverage=0; mane=
 while [[ $# -gt 0 && $1 == --* ]]; do
     case $1 in
         --public) visibility=--public;; --dry-run) dry_run=1;;
-        --mane-grch37) mane=$(cd "$2" && pwd); shift;;
+        --complete-coverage) complete_coverage=1;;
+        --mane-grch37) [[ $# -ge 2 ]] || { echo "--mane-grch37 needs a directory" >&2; exit 2; }; mane=$(cd "$2" && pwd); shift;;
         *) echo "unknown option $1" >&2; exit 2;;
     esac
     shift
 done
-[[ $# -ge 2 ]] || { echo "usage: publish-models.sh [--public] [--dry-run] [--mane-grch37 DIR] REPO_ID MODEL.duckdb..." >&2; exit 2; }
+[[ $# -ge 2 ]] || { echo "usage: publish-models.sh [--public] [--dry-run] [--complete-coverage] [--mane-grch37 DIR] REPO_ID MODEL.duckdb..." >&2; exit 2; }
 repo=$1; shift
 duckdb_bin=${DUCKDB:-duckdb}
 ext=${DUCKVEP_EXTENSION:-$root/build/release/duckvep.duckdb_extension}
 [[ -f $ext ]] || { echo "build the extension first: $ext" >&2; exit 1; }
 [[ $dry_run == 1 || -n ${HF_TOKEN:-} ]] || { echo "set HF_TOKEN" >&2; exit 1; }
 stage=${STAGE:-$(mktemp -d)}; mkdir -p "$stage"
+[[ -z $(find "$stage" -mindepth 1 -maxdepth 1 -print -quit) ]] || { echo "STAGE must be an empty directory: $stage" >&2; exit 1; }
+stage=$(cd "$stage" && pwd -P)
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 sql_text() { printf "'%s'" "${1//\'/\'\'}"; }
 
 # The load duckvep_model_load performs from a model database attached as src.
-load_sql() { # name with_regulation
-    local regulation=""
-    [[ $2 == 1 ]] && regulation=", interval_feature_query := 'SELECT regulation_feature_index, seq_region, feature_start, feature_end, feature_kind FROM src.duckvep_regulation_features ORDER BY seq_region, feature_start, regulation_feature_index'"
+load_sql() { # name regulation circular cdna rna_authority rna_edits
+    local regulation="" rna="" regions="seq_region::UINTEGER AS seq_region, sequence_length, seq_region_name" transcripts="transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence" coverage=FALSE
+    [[ $2 == 1 ]] && regulation=", interval_feature_query := 'SELECT regulation_feature_index::UINTEGER AS regulation_feature_index, seq_region::UINTEGER AS seq_region, feature_start::UINTEGER AS feature_start, feature_end::UINTEGER AS feature_end, feature_kind::UTINYINT AS feature_kind FROM src.duckvep_regulation_features ORDER BY seq_region, feature_start, regulation_feature_index'"
+    [[ $3 == 1 ]] && regions+=", circular"
+    [[ $4 == 1 ]] && transcripts+=", cdna_sequence"
+    [[ $5 == 1 ]] && transcripts+=", rna_cds_cdna_start, rna_cds_cdna_end, rna_codon_table"
+    [[ $6 == 1 ]] && rna=", rna_edit_query := 'SELECT transcript_index, cdna_start, cdna_end, expected_substrate, alternate_sequence, operation_kind, programme_name, evidence_name, boundary_overrides FROM src.model_rna_edits ORDER BY transcript_index, cdna_start DESC'"
+    [[ $complete_coverage == 1 ]] && coverage=TRUE
     cat <<SQL
 SELECT loaded FROM duckvep_model_load('$1',
- 'SELECT seq_region::UINTEGER AS seq_region, sequence_length, seq_region_name FROM src.model_regions ORDER BY seq_region',
- 'SELECT transcript_index, seq_region, transcript_start, transcript_end, strand, gene_index, transcript_flags, cds_start, cds_end, cds_sequence, codon_table, pre_cds_sequence, post_cds_sequence FROM src.model_transcripts',
+ 'SELECT $regions FROM src.model_regions ORDER BY seq_region',
+ 'SELECT $transcripts FROM src.model_transcripts',
  'SELECT transcript_index, e.exon_start, e.exon_end, e.exon_cdna_start, e.exon_cdna_end, e.phase, e.end_phase FROM src.model_transcripts, unnest(exons) u(e)',
  mature_mirna_query := 'SELECT transcript_index, x.mature_mirna_start, x.mature_mirna_end FROM src.model_transcripts, unnest(mature_mirna_regions) u(x)',
  peptide_edit_query := 'SELECT transcript_index, x.protein_position, x.alternate_amino_acid, x.edit_code FROM src.model_transcripts, unnest(peptide_edits) u(x) ORDER BY 1, 2',
- transcript_coverage_complete := TRUE$regulation);
+ transcript_coverage_complete := $coverage$regulation$rna);
 SQL
 }
-snapshot() { # model.duckdb with_regulation out.dvsnap
+snapshot() { # source regulation circular cdna rna_authority rna_edits output
     "$duckdb_bin" -unsigned :memory: -bail -c "LOAD $(sql_text "$ext"); ATTACH $(sql_text "$1") AS src (READ_ONLY);
-$(load_sql m "$2") SELECT duckvep_model_save('m', $(sql_text "$3"));" > /dev/null
+$(load_sql m "$2" "$3" "$4" "$5" "$6") SELECT duckvep_model_save('m', $(sql_text "$7"));" > /dev/null
 }
 
-rows=()
+rows=(); example=; example_assembly=; example_regulation=0; example_circular=0; example_cdna=0; example_authority=0; example_rna=0
 for source in "$@"; do
+    [[ -f $source ]] || { echo "model file not found: $source" >&2; exit 1; }
     has_regulation=$("$duckdb_bin" -readonly -noheader -list "$source" -c \
-        "SELECT count(*) FROM duckdb_tables() WHERE table_name = 'duckvep_regulation_features'")
-    IFS=$'\t' read -r release assembly < <("$duckdb_bin" -readonly -noheader -separator $'\t' -list "$source" -c \
-        "SELECT source_version, assembly FROM model_receipt")
+        "SELECT count(*) FROM duckdb_tables() WHERE schema_name = 'main' AND table_name = 'duckvep_regulation_features'")
+    metadata=$("$duckdb_bin" -readonly -noheader -list "$source" -c "SELECT
+      count(*) FILTER (WHERE table_name = 'model_regions' AND column_name = 'circular'),
+      count(*) FILTER (WHERE table_name = 'model_transcripts' AND column_name = 'cdna_sequence'),
+      count(*) FILTER (WHERE table_name = 'model_transcripts' AND column_name IN ('rna_cds_cdna_start', 'rna_cds_cdna_end', 'rna_codon_table')),
+      (SELECT count(*) FROM duckdb_tables() WHERE schema_name = 'main' AND table_name = 'model_rna_edits')
+      FROM duckdb_columns() WHERE schema_name = 'main'")
+    IFS='|' read -r has_circular has_cdna authority_count has_rna <<< "$metadata"
+    [[ $authority_count == 0 || ( $authority_count == 3 && $has_cdna == 1 ) ]] || { echo "$source: incomplete RNA coding authority columns" >&2; exit 1; }
+    [[ $has_rna == 0 || $has_cdna == 1 ]] || { echo "$source: model_rna_edits requires cdna_sequence" >&2; exit 1; }
+    if [[ $has_rna == 0 ]]; then
+        # DUCKVEP_TX_RNA_EDIT is bit 8 in duckvep_kernel.h.
+        rna_flags=$("$duckdb_bin" -readonly -noheader -list "$source" -c 'SELECT count(*) FROM model_transcripts WHERE (transcript_flags & 256) != 0')
+        [[ $rna_flags == 0 ]] || { echo "$source: RNA-edit flags require model_rna_edits" >&2; exit 1; }
+    fi
+    has_authority=0; [[ $authority_count == 3 ]] && has_authority=1
+    [[ $("$duckdb_bin" -readonly -noheader -list "$source" -c 'SELECT count(*) FROM model_receipt') == 1 ]] || { echo "$source: model_receipt must have one row" >&2; exit 1; }
+    identity=$("$duckdb_bin" -readonly -noheader -separator $'\t' -list "$source" -c "SELECT source_version, assembly FROM model_receipt")
+    IFS=$'\t' read -r release assembly <<< "$identity"
+    [[ $release =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && -n $assembly ]] || { echo "$source: invalid release or assembly in model_receipt" >&2; exit 1; }
     name=$(basename "$source" .duckdb); name=${name%_final}
     dir=ensembl-$release; mkdir -p "$stage/$dir"
-    export_path=$stage/$dir/$name.duckdb; rm -f "$export_path" "$export_path.wal"
+    export_path=$stage/$dir/$name.duckdb
+    [[ ! -e $export_path && ! -L $export_path && ! -e $export_path.wal && ! -L $export_path.wal ]] || { echo "duplicate export path: $export_path" >&2; exit 1; }
+    if [[ -z $example || ( $assembly == GRCh38 && $example_assembly != GRCh38 ) ]]; then
+        example=$dir/$name.duckdb; example_assembly=$assembly; example_regulation=$has_regulation
+        example_circular=$has_circular; example_cdna=$has_cdna; example_authority=$has_authority; example_rna=$has_rna
+    fi
     tables="model_regions model_transcripts"; options=""
     if [[ $has_regulation == 1 ]]; then
         tables+=" duckvep_regulation_features"; options=", {regulation_features_table: 'duckvep_regulation_features'}"
     fi
+    [[ $has_rna == 1 ]] && tables+=" model_rna_edits"
     copy="SET preserve_insertion_order = true; LOAD $(sql_text "$ext"); ATTACH $(sql_text "$source") AS src (READ_ONLY);"
     copy+=" ATTACH $(sql_text "$export_path") AS out; USE out;"
     for table in $tables; do copy+=" CREATE TABLE $table AS SELECT * FROM src.$table;"; done
@@ -71,10 +103,10 @@ for source in "$@"; do
     copy+=" source_version, assembly, source_manifest_sha256, reference_sha256, transcript_filter$options) FROM src.model_receipt);"
     copy+=" CREATE TABLE model_receipt AS SELECT * FROM query(getvariable('receipt'));"
     "$duckdb_bin" -unsigned :memory: -bail -c "$copy USE memory; DETACH out;" > /dev/null
-    snapshot "$source" "$has_regulation" "$stage/source.dvsnap"
-    snapshot "$export_path" "$has_regulation" "$stage/export.dvsnap"
-    cmp -s "$stage/source.dvsnap" "$stage/export.dvsnap" || { echo "$name: exported model loads differently" >&2; exit 1; }
-    rm -f "$stage/source.dvsnap" "$stage/export.dvsnap"
+    snapshot "$source" "$has_regulation" "$has_circular" "$has_cdna" "$has_authority" "$has_rna" "$work/source.dvsnap"
+    snapshot "$export_path" "$has_regulation" "$has_circular" "$has_cdna" "$has_authority" "$has_rna" "$work/export.dvsnap"
+    cmp -s "$work/source.dvsnap" "$work/export.dvsnap" || { echo "$name: exported model loads differently" >&2; exit 1; }
+    rm -f "$work/source.dvsnap" "$work/export.dvsnap"
     IFS=$'\t' read -r transcripts regions regulation < <("$duckdb_bin" -readonly -noheader -separator $'\t' -list "$export_path" -c \
         "SELECT format('{:,}', transcript_count), format('{:,}', region_count), format('{:,}', coalesce(regulation_feature_count, 0)) FROM model_receipt")
     rows+=("| [\`$dir/$name.duckdb\`]($dir/$name.duckdb) | $assembly | $release | $transcripts | $regions | $regulation | $(du -h "$export_path" | cut -f1) |")
@@ -90,8 +122,7 @@ for source in "$@"; do
     echo "$name: exported and checked" >&2
 done
 [[ -z $mane || -n ${mane_dir:-} ]] || { echo "--mane-grch37 needs a GRCh37 model" >&2; exit 1; }
-(cd "$stage" && find . -type f \( -name '*.duckdb' -o -path './*/mane-grch37/*' \) -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS)
-example=$(grep -m1 GRCh38 "$stage/SHA256SUMS" | awk '{print $2}'); example=${example:-$(awk 'NR == 1 {print $2}' "$stage/SHA256SUMS")}
+(cd "$stage" && find . -type f \( -name '*.duckdb' -o -path './*/mane-grch37/*' \) -printf '%P\0' | sort -z | xargs -0 sha256sum > SHA256SUMS)
 
 {
 cat <<EOF
@@ -109,7 +140,7 @@ tags:
 
 # DuckVEP transcript models
 
-Transcript models for [DuckVEP](https://github.com/RGenomicsETL/DuckVEP), a DuckDB extension that annotates variant consequences the way Ensembl VEP does. Each file is a DuckDB database built from an Ensembl core database and the matching primary-assembly FASTA. It holds the regions, transcripts with their exons and coding and flanking sequence, and, where present, the regulatory and motif features that \`duckvep_model_load\` reads. The \`model_receipt\` table is the model's receipt from \`duckvep_model_receipt_sql\`: the source release, the transcript filter, the source and reference hashes, counts, and \`model_sha256\`, the model identity that external relations join on.
+Transcript models for [DuckVEP](https://github.com/RGenomicsETL/DuckVEP), a DuckDB extension that annotates variant consequences the way Ensembl VEP does. Each file is a DuckDB database built from an Ensembl core database and the matching primary-assembly FASTA. It holds regions, transcripts with their exons and sequences, and optional regulatory features and RNA edits. The \`model_receipt\` table records the source release, transcript filter, source and reference hashes, counts, and \`model_sha256\`. External transcript relations use that hash as a join key. Use the file checksum to identify the complete database, including optional data.
 
 | File | Assembly | Ensembl release | Transcripts | Regions | Regulatory features | Size |
 |---|---|---|---:|---:|---:|---:|
@@ -117,7 +148,7 @@ EOF
 printf '%s\n' "${rows[@]}"
 cat <<EOF
 
-\`SHA256SUMS\` lists the checksum of every file.
+\`SHA256SUMS\` lists the checksums of the data files.
 
 ## Use
 
@@ -131,11 +162,11 @@ hf download $repo $example --repo-type dataset --local-dir models
 LOAD 'duckvep.duckdb_extension';
 ATTACH 'models/$example' AS src (READ_ONLY);
 EOF
-load_sql grch38 "$(grep -q GRCh38 <<<"$example" && echo 1 || echo 0)"
+load_sql model "$example_regulation" "$example_circular" "$example_cdna" "$example_authority" "$example_rna"
 echo '```'
 echo
 cat <<EOF
-\`duckvep_model_save\` writes the loaded model to a snapshot that \`duckvep_model_restore\` maps back in under a second; snapshots belong to the extension build that wrote them, so they are not published here. The [function reference](https://github.com/RGenomicsETL/DuckVEP/blob/main/docs/functions.md) describes loading and annotation.
+The source and export are compared as native snapshots loaded with the queries above. This check covers that load profile. The exporter loads \`model_rna_edits\` when it is present; it does not derive edits from other source tables. It does not supply a reference FASTA. The publisher must assert complete transcript coverage separately. The [function reference](https://github.com/RGenomicsETL/DuckVEP/blob/main/docs/functions.md) describes loading and annotation.
 
 EOF
 if [[ -n ${mane_dir:-} ]]; then cat <<EOF

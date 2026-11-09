@@ -12,7 +12,7 @@
 #   MODEL_DB      the GRCh38 model whose model_regions name the corpus ordinals
 #   CORPUS_VCF    GIAB's HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz, the corpus source, used only to check it
 # Every Parquet relation has one row per ALT allele and is checked against an independent parse: bcftools query
-# of the VCF it comes from. A new repository is private unless --public is given. STAGE holds the staged files.
+# of the VCF it comes from. A new repository is private unless --public is given. STAGE must be empty.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 visibility=--private; dry_run=0
@@ -20,8 +20,9 @@ while [[ $# -gt 0 && $1 == --* ]]; do
     case $1 in --public) visibility=--public;; --dry-run) dry_run=1;; *) echo "unknown option $1" >&2; exit 2;; esac
     shift
 done
-repo=${1:?usage: publish-benchmark-inputs.sh [--public] [--dry-run] REPO_ID}
-data=${DUCKVEP_DATA:?set DUCKVEP_DATA to the DuckVEP data directory}
+[[ $# == 1 ]] || { echo "usage: publish-benchmark-inputs.sh [--public] [--dry-run] REPO_ID" >&2; exit 2; }
+repo=$1
+data=${DUCKVEP_DATA:-}
 hg002=${HG002_VCF:-$data/hg002-csq/hg002.ens.vcf.gz}
 qual5m=${QUAL5M_VCF:-$data/haplotype-scale/qual5m.vcf.gz}
 controls=${CONTROLS_DIR:-$data/haplotype-scale}
@@ -30,7 +31,10 @@ model=${MODEL_DB:-$data/models/homo_sapiens_116_GRCh38_final.duckdb}
 corpus_vcf=${CORPUS_VCF:-${DUCKHTS_CACHE_DIR:?set DUCKHTS_CACHE_DIR to the DuckHTS benchmark cache directory}/benchmarks/variantkey-providers/raw/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz}
 duckdb_bin=${DUCKDB:-duckdb}; bcftools=${BCFTOOLS:-bcftools}
 [[ $dry_run == 1 || -n ${HF_TOKEN:-} ]] || { echo "set HF_TOKEN" >&2; exit 1; }
-stage=${STAGE:-$(mktemp -d)}; mkdir -p "$stage"; work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+stage=${STAGE:-$(mktemp -d)}; mkdir -p "$stage"
+[[ -z $(find "$stage" -mindepth 1 -maxdepth 1 -print -quit) ]] || { echo "STAGE must be an empty directory: $stage" >&2; exit 1; }
+stage=$(cd "$stage" && pwd -P)
+work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
 sql_text() { printf "'%s'" "${1//\'/\'\'}"; }
 columns="{'c0':'VARCHAR','c1':'VARCHAR','c2':'VARCHAR','c3':'VARCHAR','c4':'VARCHAR','c5':'VARCHAR','c6':'VARCHAR','c7':'VARCHAR','c8':'VARCHAR','c9':'VARCHAR'}"
 
@@ -38,7 +42,7 @@ columns="{'c0':'VARCHAR','c1':'VARCHAR','c2':'VARCHAR','c3':'VARCHAR','c4':'VARC
 # alt_index (1-based), filter, gt and ps (raw sample text), and origin when an expression for it is given.
 alleles_sql() { # vcf [origin_expression]
     local skip origin=""
-    skip=$(zcat "$1" | head -n 100000 | grep -c '^#')
+    skip=$({ zcat "$1" || [[ $? == 141 ]]; } | awk '/^#/ {n++; next} {print n; exit} END {if (NR == n) print n}')
     [[ -n ${2:-} ]] && origin=", $2 AS origin"
     cat <<SQL
 SET threads = 1; SET preserve_insertion_order = true;
@@ -52,7 +56,7 @@ CREATE TEMP TABLE alleles AS SELECT record_index::UBIGINT AS record_index, chrom
 FROM records, range(1, len(alts) + 1) t(i) ORDER BY record_index, alt_index;
 SQL
 }
-# bcftools' parse of the same VCF, one row per ALT allele, as an order-independent fingerprint.
+# bcftools' parse of the same VCF, one row per ALT allele.
 check_sql() { # vcf
     "$bcftools" query -f '%CHROM\t%POS\t%REF\t%ALT\t%FILTER\t[%GT]\t[%PS]\n' "$1" |
         awk 'BEGIN { OFS = "\t" } { print NR - 1, $0 }' > "$work/check.tsv"
@@ -64,7 +68,6 @@ FROM read_csv($(sql_text "$work/check.tsv"), delim = '\t', header = false, quote
   range(1, len(string_split(c4, ',')) + 1) t(i);
 SQL
 }
-fingerprint="struct_pack(n := count(*), h := sum(hash(record_index, chrom, position, reference, alternate, alt_index, \"filter\", gt, coalesce(ps, '.'))::HUGEINT))"
 publish_vcf() { # vcf dir [origin_expression] [single]
     local vcf=$1 dir=$stage/$2 target
     mkdir -p "$dir"; cp "$vcf" "$vcf.tbi" "$dir/"
@@ -73,10 +76,22 @@ publish_vcf() { # vcf dir [origin_expression] [single]
     "$duckdb_bin" :memory: -bail -c "$(alleles_sql "$vcf" "${3:-}") $(check_sql "$vcf")
 COPY (FROM alleles) TO $target;
 CREATE TEMP TABLE published AS FROM read_parquet($(sql_text "$dir/**/*.parquet"), hive_partitioning = false);
-SELECT CASE WHEN (SELECT $fingerprint FROM published) = (SELECT $fingerprint FROM expected)
-  AND (SELECT count(*) FROM published) = (SELECT count(*) FROM alleles) THEN 'ok'
-  ELSE error('$2: Parquet differs from bcftools parse of the VCF') END;" > /dev/null
-    echo "$2: $("$duckdb_bin" -noheader -list :memory: -c "SELECT count(DISTINCT record_index) || ' records, ' || count(*) || ' ALT alleles' FROM read_parquet($(sql_text "$dir/**/*.parquet"), hive_partitioning = false)")" >&2
+SELECT CASE WHEN (SELECT count(*) FROM published) = (SELECT count(*) FROM expected)
+  AND NOT EXISTS (SELECT 1 FROM published p FULL OUTER JOIN expected e USING (record_index, alt_index)
+    WHERE p.record_index IS NULL OR e.record_index IS NULL OR p.chrom IS DISTINCT FROM e.chrom
+      OR p.position IS DISTINCT FROM e.position OR p.reference IS DISTINCT FROM e.reference
+      OR p.alternate IS DISTINCT FROM e.alternate OR p.\"filter\" IS DISTINCT FROM e.\"filter\"
+      OR p.gt IS DISTINCT FROM e.gt OR coalesce(p.ps, '.') IS DISTINCT FROM coalesce(e.ps, '.'))
+  THEN 'ok' ELSE error('$2: Parquet differs from bcftools parse of the VCF') END;" > /dev/null
+    local records alleles
+    IFS=, read -r records alleles <<< "$("$duckdb_bin" -noheader -csv :memory: -c "SELECT count(DISTINCT record_index), count(*) FROM read_parquet($(sql_text "$dir/**/*.parquet"), hive_partitioning = false)")"
+    case "$2" in
+        hg002) hg002_records=$records; hg002_alleles=$alleles;;
+        qual5m) qual_records=$records; qual_alleles=$alleles;;
+        controls/dense) dense_records=$records; dense_alleles=$alleles;;
+        controls/low_sharing) low_records=$records; low_alleles=$alleles;;
+    esac
+    echo "$2: $records records, $alleles ALT alleles" >&2
 }
 
 publish_vcf "$hg002" hg002
@@ -93,15 +108,27 @@ CREATE TEMP TABLE corpus AS SELECT (v.source_record_index - 1)::UBIGINT AS recor
   v.position::UBIGINT AS position, v.reference, v.alternate, v.source_alt_index::UTINYINT AS alt_index
 FROM c.bench_variants v JOIN m.model_regions r USING (seq_region) ORDER BY record_index, alt_index;
 COPY (FROM corpus) TO $(sql_text "$stage/throughput/alleles") (FORMAT parquet, PARTITION_BY (chrom), WRITE_PARTITION_COLUMNS true, COMPRESSION zstd, OVERWRITE true);
-SELECT CASE WHEN (SELECT count(*) FROM c.bench_variants) = (SELECT count(*) FROM read_parquet($(sql_text "$stage/throughput/alleles/**/*.parquet"), hive_partitioning = false))
+CREATE TEMP TABLE published AS FROM read_parquet($(sql_text "$stage/throughput/alleles/**/*.parquet"), hive_partitioning = false);
+SELECT CASE WHEN (SELECT count(*) FROM c.bench_variants) = (SELECT count(*) FROM published)
+  AND NOT EXISTS (SELECT 1 FROM corpus c FULL OUTER JOIN published p USING (record_index, alt_index)
+    WHERE c.record_index IS NULL OR p.record_index IS NULL OR c.chrom IS DISTINCT FROM p.chrom
+      OR c.position IS DISTINCT FROM p.position OR c.reference IS DISTINCT FROM p.reference
+      OR c.alternate IS DISTINCT FROM p.alternate)
   AND NOT EXISTS (SELECT record_index, chrom, position, reference, alternate, alt_index FROM corpus
-    EXCEPT SELECT record_index, replace(chrom, 'chr', ''), position, reference, alternate, alt_index FROM expected)
-  THEN 'ok' ELSE error('throughput: corpus rows are missing from the GIAB VCF or lost in Parquet') END;" > /dev/null
-echo "throughput: $("$duckdb_bin" -noheader -list :memory: -c "SELECT count(*) || ' ALT alleles' FROM read_parquet($(sql_text "$stage/throughput/alleles/**/*.parquet"), hive_partitioning = false)")" >&2
+    EXCEPT ALL SELECT record_index, regexp_replace(chrom, '^chr', ''), position, reference, alternate, alt_index FROM expected)
+  THEN 'ok' ELSE error('throughput: corpus rows are missing from the GIAB VCF or differ from Parquet') END;" > /dev/null
+IFS=, read -r throughput_records throughput_alleles <<< "$("$duckdb_bin" -noheader -csv :memory: -c "SELECT count(DISTINCT record_index), count(*) FROM read_parquet($(sql_text "$stage/throughput/alleles/**/*.parquet"), hive_partitioning = false)")"
+echo "throughput: $throughput_records records, $throughput_alleles ALT alleles" >&2
 
-(cd "$stage" && find . -type f ! -name README.md ! -name SHA256SUMS -printf '%P\n' | sort | xargs sha256sum > SHA256SUMS)
+(cd "$stage" && find . -type f ! -name README.md ! -name SHA256SUMS -printf '%P\0' | sort -z | xargs -0 sha256sum > "$work/SHA256SUMS")
+mv "$work/SHA256SUMS" "$stage/SHA256SUMS"
 cp "$root/scripts/benchmark-inputs-card.md" "$stage/README.md"
-sed -i "s|REPO_ID|$repo|g" "$stage/README.md"
+sed -i -e "s|REPO_ID|$repo|g" \
+  -e "s/@HG002_RECORDS@/$hg002_records/g" -e "s/@HG002_ALLELES@/$hg002_alleles/g" \
+  -e "s/@QUAL_RECORDS@/$qual_records/g" -e "s/@QUAL_ALLELES@/$qual_alleles/g" \
+  -e "s/@DENSE_RECORDS@/$dense_records/g" -e "s/@DENSE_ALLELES@/$dense_alleles/g" \
+  -e "s/@LOW_RECORDS@/$low_records/g" -e "s/@LOW_ALLELES@/$low_alleles/g" \
+  -e "s/@THROUGHPUT_RECORDS@/$throughput_records/g" -e "s/@THROUGHPUT_ALLELES@/$throughput_alleles/g" "$stage/README.md"
 echo "staged in $stage" >&2
 [[ $dry_run == 1 ]] && exit 0
 

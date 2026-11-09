@@ -56,7 +56,8 @@ documents <- c(
   throughput = "benchmarks/duckvep_throughput.md",
   throughput_evidence = "benchmarks/duckvep_throughput_evidence.md",
   vep_rs = "benchmarks/benchmark_duckvep_vep_rs.md",
-  `scale-runner` = "docs/scale-runner.md"
+  `scale-runner` = "docs/scale-runner.md",
+  `publishing-hugging-face` = "docs/publishing-hugging-face.md"
 )
 titles <- c(functions = "SQL function reference", errata = "Compatibility and errata",
   `v2-host` = "DuckDB hosts and release profile", design = "Design and implementation contract",
@@ -67,10 +68,11 @@ titles <- c(functions = "SQL function reference", errata = "Compatibility and er
   `haplotypes-indel` = "Haplotypes with indels", `haplotype-scale` = "Haplotype scale qualification",
   projection = "Transcript projection", throughput = "Throughput",
   throughput_evidence = "Throughput methods and receipts", vep_rs = "DuckVEP and vep-rs",
-  `scale-runner` = "Scale runner")
+  `scale-runner` = "Scale runner",
+  `publishing-hugging-face` = "Publishing models and benchmark inputs")
 # Sections of the docs index; every published document belongs to exactly one.
 sections <- list(
-  Reference = c("functions", "errata", "v2-host"),
+  Reference = c("functions", "errata", "v2-host", "publishing-hugging-face"),
   Contracts = c("design", "haplotype-contract", "structural-hgvs",
     "corpus-workflow", "mane-grch37"),
   Evidence = c("conformance", "haplotypes", "haplotypes-indel", "haplotype-scale", "projection"),

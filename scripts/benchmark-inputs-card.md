@@ -11,14 +11,15 @@ tags:
 
 # DuckVEP benchmark inputs
 
-The variant inputs of the [DuckVEP](https://github.com/RGenomicsETL/DuckVEP) benchmarks, as the VCFs the runners read and as Parquet with one file per chromosome. Each Parquet relation has one row per ALT allele and was checked, row for row, against `bcftools query` of the VCF it comes from. `SHA256SUMS` lists every file.
+The variant inputs of the [DuckVEP](https://github.com/RGenomicsETL/DuckVEP) benchmarks, as VCF and Parquet files. Each Parquet relation has one row per ALT allele. Its allele fields are checked against an independent `bcftools query` parse. The `origin` field is derived from the VCF FORMAT field. Throughput Parquet rows are compared with the source corpus, and corpus alleles are checked against the GIAB VCF. `SHA256SUMS` lists the data files.
 
 | Directory | Records | ALT alleles | Used by |
 |---|---:|---:|---|
-| `hg002/` | 4,023,088 | 4,070,522 | vep-rs comparison, haplotypes against `bcftools csq`, scale qualification |
-| `qual5m/` | 5,000,000 | 5,047,434 | 5M-record scale qualification |
-| `controls/dense`, `controls/low_sharing` | 4,000 and 19,065 | 4,000 and 19,065 | scale qualification stress controls |
-| `throughput/` | 4,048,342 | 4,095,611 | annotation throughput |
+| `hg002/` | @HG002_RECORDS@ | @HG002_ALLELES@ | vep-rs comparison, haplotypes against `bcftools csq`, scale qualification |
+| `qual5m/` | @QUAL_RECORDS@ | @QUAL_ALLELES@ | 5M-record scale qualification |
+| `controls/dense` | @DENSE_RECORDS@ | @DENSE_ALLELES@ | scale qualification stress control |
+| `controls/low_sharing` | @LOW_RECORDS@ | @LOW_ALLELES@ | scale qualification stress control |
+| `throughput/` | @THROUGHPUT_RECORDS@ | @THROUGHPUT_ALLELES@ | annotation throughput |
 
 ## Columns
 
