@@ -4154,6 +4154,7 @@ duckvep_hgvs_status_t duckvep_hgvs_protein_pair_build(
     int delta_ready = 0, shifted_edit_ready = 0;
     duckvep_variant_coding_context_status_t context_status;
     int original_frameshift_excluded = 0;
+    int original_peptide_unavailable = 0;
     if (dna->shift_offset && predicates_valid &&
         !(consequence->flags & (uint32_t)DUCKVEP_CONSEQUENCE_FLAG_FRAMESHIFT)) {
         /* VEP caches _get_peptide_alleles, partial_codon and stop_retained
@@ -4189,6 +4190,11 @@ duckvep_hgvs_status_t duckvep_hgvs_protein_pair_build(
         }
         original_frameshift_excluded =
             original_delta.partial_codon || original_delta.stop_retained;
+        /* An original feature that crosses a mapper gap has no cached peptide
+         * alleles. VEP's frameshift predicate, first evaluated on the shifted
+         * coordinates, then has no leading-stop exclusion and decides by
+         * length alone. */
+        original_peptide_unavailable = original_context == NULL;
         if (original_context != NULL && original_context->has_single_edit) {
             if (!duckvep_coding_context_peptide_window_open(
                     original_context, &original_window))
@@ -4304,6 +4310,13 @@ duckvep_hgvs_status_t duckvep_hgvs_protein_pair_build(
     if (!delta.valid) return DUCKVEP_HGVS_UNSUPPORTED_PROTEIN;
     if (predicates_valid) duckvep_sequence_delta_apply_consequence_flags(consequence->flags, &delta);
     if (original_frameshift_excluded) delta.frameshift = 0u;
+    if (original_peptide_unavailable && !original_frameshift_excluded &&
+        !delta.frameshift && !delta.partial_codon &&
+        ((int64_t)replay_dna->alt_length - (int64_t)replay_dna->ref_length) % 3 != 0) {
+        delta.frameshift = 1u;
+        delta.stop_retained = 0u;
+        delta.stop_lost = 0u;
+    }
     if (!predicates_valid && !duckvep_project_feature_overlaps_start_codon_unshifted(
             transcripts, exons, tx, &edit.event)) delta.start_lost = 0u;
     status = duckvep_hgvs_protein_fact_build(context, &delta, &protein);
@@ -4542,7 +4555,13 @@ static duckvep_hgvs_status_t hgvs_protein_render_part(
             /* _get_fs_peptides() can discover equality only at the synthetic
              * reference stop appended for its comparison.  That residue is
              * cached in the fact but is outside the local peptide window. */
-            if (fact->ref_length == 0u && fact->reference_first != 0u) {
+            if ((fact->ref_length == 0u && fact->reference_first != 0u) ||
+                (fact->reference_first == (uint8_t)'*' &&
+                 fact->reference_last == (uint8_t)'*' &&
+                 fact->first_position1 == fact->last_position1)) {
+                /* A frameshift that leaves every residue through the stop
+                 * unchanged is named at the stop (p.Ter308=), whatever local
+                 * window the deleted bases covered. */
                 if (!hgvs_writer_protein_residue(
                         &writer, fact->reference_first, profile)) {
                     return DUCKVEP_HGVS_INVALID_PROJECTION;
