@@ -104,6 +104,11 @@ PROPERTY_SOURCES := $(wildcard $(PROJ_DIR)test/duckvep/property/*.c) \
 	$(wildcard $(PROJ_DIR)test/duckvep/vendor/theft/src/*.c) $(wildcard $(PROJ_DIR)src/kernel/src/*.c) \
 	$(PROJ_DIR)src/core/duckvep_core_products.c $(PROJ_DIR)src/core/duckvep_core_product_scenario.c \
 	$(PROJ_DIR)src/core/duckvep_core_product_fields.c
+.PHONY: test-publication
+test-publication:
+	bash test/scripts/test_publish_models.sh
+	bash test/scripts/test_publish_benchmark_inputs.sh
+
 .PHONY: test_runner_contracts test_compound_hgvs_oracle test_compound_hgvs_fuzz test_phase_arrangements_oracle
 test_runner_contracts:
 	shellcheck scripts/check_v2_hg002.sh scripts/check_v2_hg002_selftest.sh benchmarks/benchmark_duckvep_vep_rs.sh benchmarks/benchmark_duckvep_vep_rs_selftest.sh

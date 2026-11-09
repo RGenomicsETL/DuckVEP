@@ -2,6 +2,15 @@
 
 No DuckVEP release has been tagged yet; everything below is unreleased.
 
+## Model and benchmark-input publication
+
+- `scripts/publish-models.sh` and `scripts/publish-benchmark-inputs.sh` stage a dataset,
+  check it against its source, and write the card and `SHA256SUMS`. `--dry-run` uploads
+  nothing. `make test-publication` runs both on temporary fixtures.
+- `docs/publishing-hugging-face.md` gives the staging, review and upload procedure.
+- The README links the prebuilt GRCh38, GRCh37 and MANE-on-GRCh37 files in the
+  `duckvep-models` dataset on Hugging Face.
+
 ## Protein HGVS boundaries
 
 - First-residue frameshifts use VEP 116's `Ter?` notation in ordinary and replay paths.

@@ -72,6 +72,7 @@ Linux OOM recovery evidence does not establish recovery on macOS, Windows, or We
 - Publish the tag, release assets, and submissions only with owner approval.
 
 The model repository is [RgenomicsETL/duckvep-models](https://huggingface.co/datasets/RgenomicsETL/duckvep-models).
+[Publishing to Hugging Face](publishing-hugging-face.md) gives the staging, review and upload procedure.
 A download URL alone does not identify a model revision.
 The closed community submission [#2970](https://github.com/duckdb/community-extensions/pull/2970) is not a current release submission.
 
