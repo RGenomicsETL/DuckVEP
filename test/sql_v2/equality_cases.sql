@@ -670,6 +670,27 @@ WITH recs("CHROM", "POS", "ID", "REF", "ALT", "INFO_END", "INFO_SVTYPE", "INFO_S
 regs(seq_region, seq_region_name) AS (VALUES (0::UINTEGER, 'c1'), (1::UINTEGER, 'c2'))
 SELECT * FROM query(duckvep_vcf_events_sql('recs', 'regs'))
 
+-- fixture: insertion subtype records
+CREATE TABLE eq_ins_records AS SELECT * FROM (VALUES ('c1', 19::BIGINT, 'A', ['<INS:ME:ALU>'], NULL::BIGINT, 'INS:ME:ALU'), ('c1', 19::BIGINT, 'A', ['<INS:ME>'], NULL::BIGINT, 'INS:ME'), ('c1', 19::BIGINT, 'A', ['<INS:SVA>'], 2::BIGINT, 'INS:SVA')) t(chrom, pos, ref, alt, info_svlen, info_svtype)
+
+-- fixture: insertion subtype regions
+CREATE TABLE eq_ins_regions AS SELECT 0::UINTEGER seq_region, 'c1'::VARCHAR seq_region_name
+
+-- case: insertion subtype geometry
+SELECT source_alt, structural_type, structural_geometry, position, end_position, event_status FROM query(duckvep_vcf_events_sql('eq_ins_records', 'eq_ins_regions')) ORDER BY source_alt
+
+-- fixture: typed insertion geometry events
+CREATE TABLE eq_ins_events AS SELECT * FROM (VALUES (0::UBIGINT, 0::UINTEGER, 200::UBIGINT, 'A', '<INS>', 200::UBIGINT, 'INS', 'UNKNOWN', NULL::UINTEGER, NULL::UBIGINT, 'structural_variant', NULL::VARCHAR), (1::UBIGINT, 0::UINTEGER, 200::UBIGINT, 'A', '<INS:ME>', 200::UBIGINT, 'INS', 'UNKNOWN', NULL::UINTEGER, NULL::UBIGINT, 'structural_variant', 'POINT')) t(event_index, seq_region, position, reference, alternate, end_position, structural_type, copy_change, mate_seq_region, mate_position, event_kind, structural_geometry)
+
+-- fixture: invalid point insertion span
+CREATE VIEW eq_ins_invalid AS SELECT * REPLACE (201::UBIGINT AS end_position) FROM eq_ins_events WHERE event_index = 1
+
+-- case: point and interbase insertion annotation
+SELECT event_index, transcript_index, consequence, duckvep_reason FROM query(duckvep_annotate_sql('eq_ins_events', 'rich', {'rich': true, 'upstream_distance': 0, 'downstream_distance': 0})) ORDER BY event_index, transcript_index
+
+-- case: point insertion invalid span error
+SELECT * FROM query(duckvep_annotate_sql('eq_ins_invalid', 'rich'))
+
 -- case: builder prepare sv many rows
 SELECT count(*) AS n, md5(string_agg(x, '' ORDER BY i)) AS h FROM (SELECT i, duckvep_prepare_sv_geometry_sql('t' || (i % 7)) AS x FROM range(2500) t(i))
 

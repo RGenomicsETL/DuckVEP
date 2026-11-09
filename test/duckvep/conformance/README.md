@@ -135,6 +135,83 @@ GNU Make control variables and optional property compiler flags, and rechecks al
 and untracked source inputs—including ignored compiler inputs in the complete C property
 source/vendor closure—after the final evidence input has been consumed.
 
+## VEP-rs structural boundaries
+
+`vep_rs_sv_boundary.R` compares lengthless symbolic insertion subtypes and
+cross-contig breakends with the VEP 116.2 JSON in the vep-rs golden corpus.
+It retains the source VCF records, endpoint coordinates, transcript IDs and
+consequence-term multiplicities. It checks the input hashes before it runs.
+This is a focused boundary comparison, not a comparison of the full corpus.
+
+Install the current `Rduckvep` package and the `DBI`, `digest` and `jsonlite`
+R packages. Stage the pinned upstream inputs in a temporary directory:
+
+```sh
+revision=70df135effe286bc96c8dc93381bb06f2e2979cf
+corpus="${TMPDIR:-/tmp}/duckvep-vep-rs-golden"
+for assembly in GRCh37 GRCh38; do
+  mkdir -p "$corpus/$assembly/expected"
+  for file in variants.vcf provenance.json expected/json.jsonl.gz; do
+    curl -fsSL "https://raw.githubusercontent.com/natera-open-source/vep-rs/$revision/tests/golden/116/$assembly/$file" \
+      -o "$corpus/$assembly/$file"
+  done
+done
+```
+
+Run the comparison with an Ensembl 116 model for the selected assembly.
+The output directory must be empty. Repeat the command for the other assembly.
+
+```sh
+Rscript test/duckvep/conformance/vep_rs_sv_boundary.R \
+  GRCh38 "$corpus" /path/to/GRCh38_model.duckdb /path/to/empty/output
+```
+
+The output includes the prepared events, both tuple sets, differences and a
+receipt. The receipt identifies the input, model, extension and script hashes.
+It also records the upstream VEP image and command, runtime and peak RSS where
+available. The VEP output and executable receipt come from the pinned upstream
+corpus. The comparison does not run VEP locally.
+
+### Complete-corpus diagnostic
+
+`vep_rs_full.R` accounts for every VCF record and ALT in the same pinned
+corpora. It retains missing captured VEP records, unsupported events, VEP
+intergenic/other-feature arrays and DuckVEP no-feature or unmapped annotations.
+Its transcript projection counts `(record, input ALT, transcript, sorted terms)`
+tuples and retains multiplicity. It is allele-agnostic: VEP may emit separate
+breakend endpoint alleles for one input ALT, while DuckVEP reports an event-level
+annotation. `breakend-alleles.tsv` identifies the VEP source-ALT and single-
+breakend rows. A projected tuple difference is not necessarily a consequence
+error. Single-ALT records map by provenance; multiallelic SNPs use an exact
+unique base match. Other unresolved multiallelic records are excluded and listed
+in the artifacts. VEP `variant_allele` spelling and location are compared only
+for literal SNPs; other normalization and geometry conventions are labelled
+uncomparable. Raw input, INFO, prepared endpoints and VEP locations are retained.
+The [116 corpus findings](vep-rs-116-findings.md) summarize one complete audit.
+Other-feature consequences, HGVS and haplotypes are not compared. An exit status
+of zero means the diagnostic completed, not that the engines agree.
+
+With the inputs staged as above, run each assembly in a fresh `/tmp` output
+location. The example bounds address space and elapsed time; DuckDB uses two
+threads and a 4 GB memory limit, which does not cap all process allocations.
+The installed extension is hashed, not assumed to match the Git revision.
+
+```sh
+model_dir=/path/to/models
+export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1
+ulimit -v 33554432
+for assembly in GRCh38 GRCh37; do
+  timeout 600 Rscript test/duckvep/conformance/vep_rs_full.R "$assembly" \
+    "$corpus" "$model_dir/homo_sapiens_116_${assembly}_final.duckdb" \
+    "/tmp/duckvep-veprs-full-${assembly}"
+done
+```
+
+The receipt records hashes, version and model identities, dirty worktree status,
+counts, skipped categories, timings and peak RSS. Inspect the per-allele scope,
+full annotation tables and differences alongside the receipt. Captured VEP JSON
+is the oracle; the diagnostic does not execute VEP or certify full parity.
+
 ## Upstream Ensembl test lineage
 
 The Ensembl suites are useful oracle checks, but they do not replace a DuckVEP

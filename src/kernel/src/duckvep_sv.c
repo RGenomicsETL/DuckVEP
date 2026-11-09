@@ -214,7 +214,7 @@ static int sv_cds_overlap_within_one_exon(
 int duckvep_sv_metadata_valid(duckvep_sv_type_t sv_type,
                               duckvep_copy_change_t copy_change) {
     if (sv_type <= DUCKVEP_SV_NONE ||
-        sv_type > DUCKVEP_SV_TANDEM_REPEAT ||
+        sv_type > DUCKVEP_SV_INSERTION_POINT ||
         copy_change < DUCKVEP_COPY_CHANGE_UNKNOWN ||
         copy_change > DUCKVEP_COPY_CHANGE_GAIN) {
         return 0;
@@ -230,6 +230,7 @@ int duckvep_sv_metadata_valid(duckvep_sv_type_t sv_type,
         return copy_change == DUCKVEP_COPY_CHANGE_UNKNOWN ||
                copy_change == DUCKVEP_COPY_CHANGE_GAIN;
     case DUCKVEP_SV_INSERTION:
+    case DUCKVEP_SV_INSERTION_POINT:
         return copy_change != DUCKVEP_COPY_CHANGE_LOSS;
     case DUCKVEP_SV_INVERSION:
     case DUCKVEP_SV_BREAKEND:
@@ -253,7 +254,7 @@ int duckvep_sv_geometry_valid(duckvep_sv_type_t sv_type,
          * SVLEN: a feature span of SVLEN reference bases from POS + 1. */
         return start1 != UINT32_MAX;
     }
-    if (sv_type == DUCKVEP_SV_BREAKEND) {
+    if (sv_type == DUCKVEP_SV_BREAKEND || sv_type == DUCKVEP_SV_INSERTION_POINT) {
         return start1 == end1;
     }
     return 1;
@@ -287,6 +288,7 @@ duckvep_sv_effect_t duckvep_sv_effect_fill(
                   st.copy_number_loss);
     st.insertion =
         (uint8_t)(event->sv_type == (uint8_t)DUCKVEP_SV_INSERTION ||
+                  event->sv_type == (uint8_t)DUCKVEP_SV_INSERTION_POINT ||
                   st.copy_number_gain);
     st.chromosome_breakpoint =
         (uint8_t)(event->sv_type == (uint8_t)DUCKVEP_SV_BREAKEND);

@@ -87,7 +87,9 @@ the loss-of-function relation: `gerp`, `ancestor`, `phylocsf`,
 Other builders accept no options. Each value must be a length-one string,
 logical, integer, double or `NA`.}
 
-\item{events_table}{Event relation name.}
+\item{events_table}{Event relation name. For an insertion, the optional
+`structural_geometry` column distinguishes a one-base feature (`"POINT"`)
+from an interbase site (NULL or absent).}
 
 \item{model_name}{Loaded model name.}
 
