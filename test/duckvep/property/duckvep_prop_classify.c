@@ -1049,6 +1049,46 @@ TEST splice_classify_insertion_interbase_scene(void) {
     PASS();
 }
 
+/* VEP evaluates splice predicates only for a feature that overlaps the
+ * transcript. A two-base terminal exon leaves the third base of the exonic
+ * splice-region window outside the transcript; a deletion there is
+ * downstream only. Witness: 21:33836989del beside ENST00000379960. */
+TEST splice_region_requires_within_feature(void) {
+    static uint16_t chrom[1]  = {0u};
+    static uint32_t tstart[1] = {100u};
+    static uint32_t tend[1]   = {302u};
+    static int8_t   strand[1] = {(int8_t)1};
+    static uint64_t flags[1]  = {0u};
+    static uint32_t exoff[1]  = {0u};
+    static uint16_t excnt[1]  = {2u};
+    static uint32_t cds_s[1]  = {0u};
+    static uint32_t cds_e[1]  = {0u};
+    static uint32_t es[2]     = {100u, 301u};
+    static uint32_t ee[2]     = {200u, 302u};
+    static const uint8_t ref2[2] = {'A', 'A'};
+    static const uint8_t alt1[1] = {'A'};
+    duckvep_transcript_model_t tx;
+    duckvep_exon_model_t ex;
+    duckvep_splice_state_t s;
+
+    memset(&tx, 0, sizeof tx); memset(&ex, 0, sizeof ex);
+    tx.chrom_id = chrom; tx.start1 = tstart; tx.end1 = tend; tx.strand = strand;
+    tx.flags = flags; tx.exon_offset = exoff; tx.exon_count = excnt;
+    tx.cds_start1 = cds_s; tx.cds_end1 = cds_e; tx.transcript_count = 1u;
+    ex.start1 = es; ex.end1 = ee; ex.exon_count = 2u;
+
+    s = duckvep_splice_classify_span(&tx, &ex, 0u, 302u, 302u, 0u);
+    ASSERT(s.splice_region);
+    s = duckvep_splice_classify_span(&tx, &ex, 0u, 303u, 303u, 0u);
+    ASSERT(!s.any);
+    s = duckvep_splice_classify_span(&tx, &ex, 0u, 302u, 303u, 0u);
+    ASSERT(s.splice_region);
+    s = duckvep_splice_classify_differing_regions(
+        &tx, &ex, 0u, 303u, ref2, 1u, alt1, 0u);
+    ASSERT(!s.any);
+    PASS();
+}
+
 /* ===================================================================== *
  * Polypyrimidine-tract exon gate. VEP's splice_polypyrimidine_tract_variant
  * OverlapConsequence carries include => { exon => 0, intron => 1 }: the tract
