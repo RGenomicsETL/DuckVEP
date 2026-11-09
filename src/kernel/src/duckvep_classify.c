@@ -591,6 +591,16 @@ uint32_t duckvep_region_mask(
                                         splice_exonic, splice_intronic).region_mask;
 }
 
+/* VEP evaluates intron and splice predicates only for a feature that overlaps
+ * the transcript (within_feature). The interval may be the reversed insertion
+ * interval P+1,P, which VEP's overlap() takes as given. */
+static int splice_feature_within_transcript(
+    const duckvep_transcript_model_t *transcripts, size_t tx_idx,
+    int64_t feature_start1, int64_t feature_end1) {
+    return feature_end1 >= (int64_t)transcripts->start1[tx_idx] &&
+           (int64_t)transcripts->end1[tx_idx] >= feature_start1;
+}
+
 duckvep_splice_state_t duckvep_splice_classify_span_with_windows(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t       *exons,
@@ -621,6 +631,9 @@ duckvep_splice_state_t duckvep_splice_classify_span_with_windows(
     int64_t hi_s = interbase ? irs : (int64_t)end1;
 
     memset(&acc, 0, sizeof acc);
+    if (!splice_feature_within_transcript(transcripts, tx_idx, irs, ire)) {
+        return splice_accum_finish(&acc, fwd);
+    }
 
     for (size_t k = 0u; k + 1u < cnt; k++) {
         (void)splice_accum_add_gap(exons, off + k, off + k + 1u,
@@ -682,6 +695,11 @@ duckvep_splice_state_t duckvep_splice_classify_differing_regions_with_windows(
         ? feature_end1 : (int64_t)feature_start1;
     feature_max1 = feature_end1 > (int64_t)feature_start1
         ? feature_end1 : (int64_t)feature_start1;
+    if (!splice_feature_within_transcript(transcripts, tx_idx,
+                                          (int64_t)feature_start1,
+                                          feature_end1)) {
+        return splice_accum_finish(&acc, fwd);
+    }
 
     if (feature_ref_length > 1u && feature_alt_length > 1u) {
         uint16_t length = feature_ref_length > feature_alt_length
@@ -1115,7 +1133,10 @@ void duckvep_classify_point_sorted(
             : point_exon_seek(
                 transcripts, exons, tx_idx, pos, *exon_rank_io);
         *exon_rank_io = (uint16_t)rank;
-        goto exact_splice;
+        /* VEP has no splice predicate outside the transcript. */
+        *region_out = region;
+        *splice_out = splice;
+        return;
     }
     if (pos > te) {
         region.region_mask = fwd ? (uint32_t)DUCKVEP_REGION_DOWNSTREAM
@@ -1134,7 +1155,9 @@ void duckvep_classify_point_sorted(
             : point_exon_seek(
                 transcripts, exons, tx_idx, pos, *exon_rank_io);
         *exon_rank_io = (uint16_t)rank;
-        goto exact_splice;
+        *region_out = region;
+        *splice_out = splice;
+        return;
     }
 
     region.within_feature = 1u;
@@ -1250,7 +1273,6 @@ void duckvep_classify_point_sorted(
         }
     }
 
-exact_splice:
     if (cnt >= 2u) {
         uint32_t pivot = rank == 0u ? 0u : rank - 1u;
         uint32_t g;
