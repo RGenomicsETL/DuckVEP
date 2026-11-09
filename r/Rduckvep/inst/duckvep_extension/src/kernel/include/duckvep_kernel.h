@@ -120,7 +120,10 @@ typedef enum duckvep_sv_type {
      * consequence predicates are the same gain/insertion predicates used by
      * a tandem duplication. Bounded repeats expanded to literal alleles enter
      * the ordinary small-variant path instead. */
-    DUCKVEP_SV_TANDEM_REPEAT
+    DUCKVEP_SV_TANDEM_REPEAT,
+    /* An insertion whose feature is one reference base, rather than an
+     * interbase insertion site. */
+    DUCKVEP_SV_INSERTION_POINT
 } duckvep_sv_type_t;
 
 typedef enum duckvep_copy_change {

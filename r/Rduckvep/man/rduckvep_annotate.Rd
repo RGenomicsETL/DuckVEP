@@ -9,7 +9,9 @@ rduckvep_annotate(con, events_table, model_name, ...)
 \arguments{
 \item{con}{A DBI connection with DuckVEP loaded.}
 
-\item{events_table}{Event relation name.}
+\item{events_table}{Event relation name. For an insertion, the optional
+`structural_geometry` column distinguishes a one-base feature (`"POINT"`)
+from an interbase site (NULL or absent).}
 
 \item{model_name}{Loaded model name.}
 

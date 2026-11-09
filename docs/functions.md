@@ -315,7 +315,8 @@ Annotation runs as SQL emitted by a builder and executed with `query()`. The eve
 | `seq_region` | Model-local region ordinal. |
 | `position` | One-based position: VCF `POS` for a small variant or a breakend; for a symbolic structural event, the first base of VEP's feature, `POS + 1`. |
 | `reference`, `alternate` | Literal REF and ALT alleles. |
-| `end_position`, `structural_type`, `copy_change` | Nullable single-locus structural span, type and copy direction. An `INS` row with `end_position = position` is the interbase site after that base; an `INS` row with a wider interval is VEP's reading of a symbolic insertion that carries SVLEN (a span of SVLEN reference bases from POS + 1, END ignored), annotated as that span with the insertion class. |
+| `end_position`, `structural_type`, `copy_change` | Nullable single-locus structural span, type and copy direction. An `INS` row with `end_position = position` is the interbase site after that base, unless `structural_geometry` is `POINT`. An `INS` row with a wider interval is the VEP insertion span. |
+| `structural_geometry` | Optional. `POINT` represents a one-base `INS` feature at `position`. The end must equal the position. A NULL or absent value uses the interbase or span geometry above. |
 | `mate_seq_region`, `mate_position` | Nullable mate coordinates for a paired breakend. |
 
 The relation is classified as a small variant, an exact structural event or a paired breakend, and dispatched to the matching native lane. Wide provenance (genotypes, raw ALT, confidence intervals) stays in the caller's table and is joined back by `event_index`.
@@ -351,12 +352,12 @@ Parameters: `records` names a relation with the columns of DuckHTS `read_bcf`: `
 Rules:
 
 - A record is structural when its alleles are not all `A`, `C`, `G` and `T` and it has `INFO/SVTYPE` or an ALT such as `<...>` or a breakend (`<*>` alone is not one). Other records are small variants: each ALT, including `*` and `<*>`, keeps `POS`, `REF` and its ALT.
-- A single-ALT symbolic record of type DEL, DUP, `DUP:TANDEM` (TDUP), INV, INS or CNV, taken from the ALT or else from SVTYPE, starts at `POS + 1` and ends at `POS + |SVLEN|`, else `INFO/END`, else at its start. An INS that ends at `POS` is the interbase site after `POS` (`position = end_position = POS`). `copy_change` is LOSS for DEL, GAIN for DUP and TDUP, NEUTRAL for INV and UNKNOWN otherwise.
+- A single-ALT symbolic record of type DEL, DUP, `DUP:TANDEM` (TDUP), INV, INS or CNV starts at `POS + 1`. Its end is `POS + |SVLEN|`, `INFO/END`, or its start, in that order. INS includes subtypes such as `<INS:ME:ALU>`. A one-base INS feature has `structural_geometry = 'POINT'`. An INS that ends at `POS` is the interbase site after `POS`. `copy_change` is LOSS for DEL, GAIN for DUP and TDUP, NEUTRAL for INV and UNKNOWN otherwise.
 - A single-ALT paired breakend keeps `POS`; the mate comes from the ALT through [`duckvep_breakend_geometry`](#duckvep_breakend_geometry).
 
 Returns: the events columns, then `event_kind` (`small_variant`, `structural_variant` or `breakend`), `event_status` (`ok` or `unsupported`), `event_reason`, and the source `source_chrom`, `source_pos`, `source_id`, `source_ref`, `source_alt` and one-based `alt_index`. Rows are in `event_index` order: `ok` rows by `seq_region` and `position`, then the others.
 
-An `unsupported` row keeps its source columns and has NULL event columns, so passing it to an annotation builder is an error. `event_reason` is one of `contig_not_in_model`, `ambiguous_contig`, `invalid_position`, `no_alternate_allele`, `missing_reference`, `multiallelic_structural_record` (VEP makes one feature for the record; a gVCF `A,<NON_REF>` record is one, and VEP skips it), `single_breakend`, `mate_contig_not_in_model`, `malformed_breakend`, `literal_alleles_with_svtype`, `unsupported_symbolic_allele` (for example `<DEL:ME:ALU>` or `<CN0>`), `unsupported_structural_type`, `invalid_end`, `invalid_svlen`, `incomplete_deletion` (VEP skips it), `empty_span`, `invalid_span` and `single_base_insertion_span` (VEP reads a one-base feature that the events relation cannot hold).
+An `unsupported` row keeps its source columns and has NULL event columns, so passing it to an annotation builder is an error. `event_reason` is one of `contig_not_in_model`, `ambiguous_contig`, `invalid_position`, `no_alternate_allele`, `missing_reference`, `multiallelic_structural_record` (VEP makes one feature for the record; a gVCF `A,<NON_REF>` record is one, and VEP skips it), `single_breakend`, `mate_contig_not_in_model`, `malformed_breakend`, `literal_alleles_with_svtype`, `unsupported_symbolic_allele` (for example `<DEL:ME:ALU>` or `<CN0>`), `unsupported_structural_type`, `invalid_end`, `invalid_svlen`, `incomplete_deletion` (VEP skips it), `empty_span` and `invalid_span`.
 
 Annotate the `ok` rows:
 

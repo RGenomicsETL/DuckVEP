@@ -96,32 +96,31 @@ FROM vcf_events WHERE event_status = 'ok' ORDER BY event_index;
 14	1	del_svlen_wins	<DEL>	ok	22	26	DEL	LOSS	NULL	NULL
 15	1	ins_svlen	<INS>	ok	24	31	INS	UNKNOWN	NULL	NULL
 16	1	bnd_b	]readthrough_x:20]C	ok	25	NULL	-	-	0	20
-17	1	del_small	G	ok	30	NULL	-	-	NULL	NULL
-18	1	del_star	A	ok	31	NULL	-	-	NULL	NULL
-19	1	del_star	*	ok	31	NULL	-	-	NULL	NULL
-20	1	del_past_end	<DEL>	ok	38	45	DEL	LOSS	NULL	NULL
+17	1	ins_no_length	<INS>	ok	25	25	INS	UNKNOWN	NULL	NULL
+18	1	del_small	G	ok	30	NULL	-	-	NULL	NULL
+19	1	del_star	A	ok	31	NULL	-	-	NULL	NULL
+20	1	del_star	*	ok	31	NULL	-	-	NULL	NULL
+21	1	del_past_end	<DEL>	ok	38	45	DEL	LOSS	NULL	NULL
 
 # Records VEP skips, and shapes whose VEP reading the events relation cannot
-# carry (one-base insertion spans, one feature for several symbolic ALTs) or
-# that the conformance lanes do not cover, keep a row with a reason and no
-# event coordinates.
+# carry or that the conformance lanes do not cover, keep a row with a reason
+# and no event coordinates.
 query ITTTTTI
 SELECT event_index, source_chrom, source_id, coalesce(source_alt, '-'), coalesce(event_kind, '-'),
   event_reason, (seq_region IS NULL AND position IS NULL)::INTEGER
 FROM vcf_events WHERE event_status = 'unsupported' ORDER BY event_index;
 ----
-21	chrZ	unknown_contig	G	small_variant	contig_not_in_model	1
-22	readthrough_x	snv_nonref	G	-	multiallelic_structural_record	1
-23	readthrough_x	snv_nonref	<NON_REF>	-	multiallelic_structural_record	1
-24	readthrough_x	del_me	<DEL:ME:ALU>	-	unsupported_symbolic_allele	1
-25	readthrough_x	cn0	<CN0>	-	unsupported_symbolic_allele	1
-26	readthrough_x	bnd_single	A.	breakend	single_breakend	1
-27	selenocysteine	del_end_eq_pos	<DEL>	structural_variant	incomplete_deletion	1
-28	selenocysteine	multi_sv	<DEL>	structural_variant	multiallelic_structural_record	1
-29	selenocysteine	multi_sv	<DUP>	structural_variant	multiallelic_structural_record	1
-30	selenocysteine	literal_n_svtype	GNNNN	-	literal_alleles_with_svtype	1
-31	selenocysteine	no_alt	-	small_variant	no_alternate_allele	1
-32	selenocysteine	ins_no_length	<INS>	structural_variant	single_base_insertion_span	1
+22	chrZ	unknown_contig	G	small_variant	contig_not_in_model	1
+23	readthrough_x	snv_nonref	G	-	multiallelic_structural_record	1
+24	readthrough_x	snv_nonref	<NON_REF>	-	multiallelic_structural_record	1
+25	readthrough_x	del_me	<DEL:ME:ALU>	-	unsupported_symbolic_allele	1
+26	readthrough_x	cn0	<CN0>	-	unsupported_symbolic_allele	1
+27	readthrough_x	bnd_single	A.	breakend	single_breakend	1
+28	selenocysteine	del_end_eq_pos	<DEL>	structural_variant	incomplete_deletion	1
+29	selenocysteine	multi_sv	<DEL>	structural_variant	multiallelic_structural_record	1
+30	selenocysteine	multi_sv	<DUP>	structural_variant	multiallelic_structural_record	1
+31	selenocysteine	literal_n_svtype	GNNNN	-	literal_alleles_with_svtype	1
+32	selenocysteine	no_alt	-	small_variant	no_alternate_allele	1
 
 statement ok
 CREATE VIEW vcf_events_ok AS SELECT * FROM vcf_events WHERE event_status = 'ok' ORDER BY event_index;
@@ -129,7 +128,6 @@ CREATE VIEW vcf_events_ok AS SELECT * FROM vcf_events WHERE event_status = 'ok' 
 # Consequences equal VEP's for every non-breakend event; del_past_end lies
 # beyond both transcripts, where VEP says intergenic_variant and DuckVEP reports
 # that the loaded model has no feature. The * allele has no row in either.
-# Breakend consequences are pinned by the breakend lane, not here.
 query TTTT
 SELECT e.source_id, e.alternate,
   coalesce((SELECT string_agg(t.consequence, '&' ORDER BY t.consequence) FROM duckvep_so_terms() t
@@ -155,9 +153,81 @@ del_inside	<DEL>	feature_truncation&frameshift_variant	-
 ins_end_eq_pos	<INS>	coding_sequence_variant&feature_elongation	-
 del_svlen_wins	<DEL>	feature_truncation&frameshift_variant	-
 ins_svlen	<INS>	coding_sequence_variant&feature_elongation	-
+ins_no_length	<INS>	coding_sequence_variant&feature_elongation	-
 del_small	G	inframe_deletion	-
 del_star	A	frameshift_variant&stop_lost	-
 del_past_end	<DEL>	-	no_feature_in_loaded_model
+
+# A cross-contig breakend annotates transcripts at both endpoints.
+query TIT
+SELECT e.source_id, a.transcript_index, a.consequence
+FROM vcf_events_ok e
+JOIN query(duckvep_annotate_sql('vcf_events_ok', 'vcf-events', struct_pack(rich := true,
+  upstream_distance := 0, downstream_distance := 0))) a USING (event_index)
+WHERE e.event_kind = 'breakend'
+ORDER BY e.source_id, a.transcript_index;
+----
+bnd_a	0	feature_truncation&coding_sequence_variant
+bnd_a	1	feature_truncation
+bnd_b	0	feature_truncation
+bnd_b	1	feature_truncation&coding_sequence_variant
+
+# Preserve insertion subtypes and distinguish a one-base feature from an
+# interbase insertion with the same position and end_position.
+statement ok
+CREATE TABLE point_records AS SELECT * FROM (VALUES
+  ('readthrough_x', 19::BIGINT, 'mobile_me', 'C', ['<INS:ME>'], NULL::INTEGER, NULL::INTEGER[]),
+  ('readthrough_x', 19, 'mobile_alu', 'C', ['<INS:ME:ALU>'], NULL, [1]),
+  ('readthrough_x', 19, 'mobile_sva', 'C', ['<INS:SVA>'], NULL, [2]),
+  ('readthrough_x', 19, 'interbase', 'C', ['<INS>'], 19, NULL),
+  ('readthrough_x', 19, 'invalid', 'C', ['<INS:>'], NULL, NULL),
+  ('readthrough_x', 19, 'invalid_tail', 'C', ['<INS:ME:>'], NULL, NULL)
+) t(CHROM, POS, ID, REF, ALT, INFO_END, INFO_SVLEN);
+
+statement ok
+CREATE TABLE point_events AS SELECT * FROM query(duckvep_vcf_events_sql('point_records', 'vcf_regions'));
+
+query TTTIITTT
+SELECT source_id, source_alt, event_status, position, end_position,
+  coalesce(structural_type, '-'), coalesce(structural_geometry, '-'), coalesce(event_reason, '-')
+FROM point_events ORDER BY source_id;
+----
+interbase	<INS>	ok	19	19	INS	-	-
+invalid	<INS:>	unsupported	NULL	NULL	-	-	unsupported_symbolic_allele
+invalid_tail	<INS:ME:>	unsupported	NULL	NULL	-	-	unsupported_symbolic_allele
+mobile_alu	<INS:ME:ALU>	ok	20	20	INS	POINT	-
+mobile_me	<INS:ME>	ok	20	20	INS	POINT	-
+mobile_sva	<INS:SVA>	ok	20	21	INS	-	-
+
+statement ok
+CREATE TABLE geometry_events AS SELECT * FROM (VALUES
+  (0::UBIGINT, 0::UINTEGER, 34::UBIGINT, 'A', '<INS>', 34::UBIGINT, 'INS', 'UNKNOWN', NULL::UINTEGER, NULL::UBIGINT, 'structural_variant', NULL::VARCHAR),
+  (1::UBIGINT, 0::UINTEGER, 34::UBIGINT, 'A', '<INS:ME>', 34::UBIGINT, 'INS', 'UNKNOWN', NULL::UINTEGER, NULL::UBIGINT, 'structural_variant', 'POINT')
+) t(event_index, seq_region, position, reference, alternate, end_position, structural_type, copy_change, mate_seq_region, mate_position, event_kind, structural_geometry);
+
+query IITT
+SELECT event_index, coalesce(transcript_index::BIGINT, -1), consequence, coalesce(duckvep_reason, '-')
+FROM query(duckvep_annotate_sql('geometry_events', 'vcf-events', struct_pack(rich := true,
+  upstream_distance := 0, downstream_distance := 0))) ORDER BY event_index;
+----
+0	-1	sequence_variant	no_feature_in_loaded_model
+1	0	feature_elongation&coding_sequence_variant	-
+
+statement ok
+CREATE VIEW invalid_point_range AS SELECT * REPLACE (35::UBIGINT AS end_position) FROM geometry_events WHERE event_index = 1;
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('invalid_point_range', 'vcf-events'));
+----
+POINT geometry requires a single-base INS feature
+
+statement ok
+CREATE VIEW invalid_point_type AS SELECT * REPLACE ('DEL' AS structural_type) FROM geometry_events WHERE event_index = 1;
+
+statement error
+SELECT * FROM query(duckvep_annotate_sql('invalid_point_type', 'vcf-events'));
+----
+POINT geometry requires a single-base INS feature
 
 # Optional INFO columns may be absent and names may differ in case. Without END
 # or SVLEN a DEL is incomplete for VEP and a DUP is a one-base span at POS + 1.

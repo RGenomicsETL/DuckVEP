@@ -7,7 +7,9 @@
 #' on `con` with [rduckvep_load()] before calling a builder.
 #'
 #' @param con A DBI connection with DuckVEP loaded.
-#' @param events_table Event relation name.
+#' @param events_table Event relation name. For an insertion, the optional
+#'   `structural_geometry` column distinguishes a one-base feature (`"POINT"`)
+#'   from an interbase site (NULL or absent).
 #' @param records_table VCF record relation name with `read_bcf` columns
 #'   (`CHROM`, `POS`, `REF`, `ALT`, and optionally `ID`, `INFO_END`,
 #'   `INFO_SVTYPE`, `INFO_SVLEN`).

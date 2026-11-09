@@ -783,6 +783,8 @@ duckvep_scalar_sv_type(const duckvep_string_t *value, uint8_t *result)
 	else if (duckvep_scalar_ascii_equals(value, "INS") ||
 	    duckvep_scalar_ascii_equals(value, "INSERTION"))
 		*result = (uint8_t)DUCKVEP_SV_INSERTION;
+	else if (duckvep_scalar_ascii_equals(value, "INS_POINT"))
+		*result = (uint8_t)DUCKVEP_SV_INSERTION_POINT;
 	else if (duckvep_scalar_ascii_equals(value, "CNV") ||
 	    duckvep_scalar_ascii_equals(value, "COPY_NUMBER_VARIATION"))
 		*result = (uint8_t)DUCKVEP_SV_CNV;
