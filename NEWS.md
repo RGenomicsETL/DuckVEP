@@ -11,6 +11,18 @@ No DuckVEP release has been tagged yet; everything below is unreleased.
 - The README links the prebuilt GRCh38, GRCh37 and MANE-on-GRCh37 files in the
   `duckvep-models` dataset on Hugging Face.
 
+## Stop-codon boundary deletions
+
+- No splice term is reported for a feature outside the transcript.
+- A deletion in a stop codon that an intron splits follows VEP's unspliced genomic
+  stop-overlap test, and can be `coding_sequence_variant` where the sequence keeps a stop.
+- A frameshift that leaves every residue through the stop unchanged is named at the stop.
+- A deletion that the 3-prime shift moves from an exon junction into the CDS is a protein
+  frameshift when its length is not a multiple of three.
+- `test/duckvep/conformance/stop_codon_sweep.sh` compares both engines on every 1 to 4 bp
+  deletion around the stop codons of a chromosome. Chromosome 21: 2,846,960 pairs, no
+  difference in consequences, HGVSc or HGVSp.
+
 ## Protein HGVS boundaries
 
 - First-residue frameshifts use VEP 116's `Ter?` notation in ordinary and replay paths.
