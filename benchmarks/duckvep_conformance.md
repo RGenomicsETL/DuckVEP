@@ -113,14 +113,14 @@ Exact counts, corpus revisions and descriptive pair statistics
 | revision | corpus                            | model                      | assembly       | species               | oracle_source | oracle    |  pairs | exact         | unresolved | resolved_disagreements | engine_extra | engine_missing | descriptive_independent_pair_upper_95 |
 |:---------|:----------------------------------|:---------------------------|:---------------|:----------------------|:--------------|:----------|-------:|:--------------|-----------:|-----------------------:|-------------:|---------------:|:--------------------------------------|
 | b204dd49 | GRCh38 dbSNP                      | final-dbsnp                | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  73620 | 73620/73620   |          0 |                      0 |            0 |              0 | 0.01%                                 |
-| b204dd49 | GRCh38 GIAB                       | final-giab                 | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  54905 | 54905/54905   |          0 |                      0 |            0 |              0 | 0.01%                                 |
-| 22803a40 | GRCh38 ClinVar coding             | final-coding               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 287836 | 287836/287836 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 39760c1b | GRCh38 GIAB                       | final-giab                 | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 109275 | 109275/109275 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| b8d1733f | GRCh38 ClinVar coding             | final-coding               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 316019 | 316019/316019 |          0 |                      0 |            0 |              0 | 0.00%                                 |
 | 22803a40 | GRCh38 ClinVar cross-chromosome   | final-clinvar              | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 316397 | 316397/316397 |          0 |                      0 |            0 |              0 | 0.00%                                 |
 | 7dd90ce8 | GRCh37                            | final-grch37               | GRCh37         | homo_sapiens          | cache         | VEP 116.0 | 486464 | 486464/486464 |          0 |                      0 |            0 |              0 | 0.00%                                 |
-| 7dd90ce8 | P. falciparum                     | plasmodium-falciparum-63   | GCA000002765v3 | plasmodium_falciparum | cache         | VEP 116.0 |  40732 | 40732/40732   |          0 |                      0 |            0 |              0 | 0.01%                                 |
-| 360619ed | GRCh38 paired BND                 | grch38_breakend_multichrom | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  91428 | 91428/91428   |          0 |                      0 |            0 |              0 | 0.00%                                 |
-| 96b4cd45 | GRCh38 GIAB + core regulation     | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  14955 | 14955/14955   |          0 |                      0 |            0 |              0 | 0.02%                                 |
-| 96b4cd45 | GRCh38 exact SV + core regulation | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 120224 | 120224/120224 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 41a8a423 | P. falciparum                     | plasmodium-falciparum-63   | GCA000002765v3 | plasmodium_falciparum | cache         | VEP 116.0 |  32131 | 32131/32131   |          0 |                      0 |            0 |              0 | 0.01%                                 |
+| 116854e9 | GRCh38 paired BND                 | grch38_breakend_multichrom | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  91428 | 91428/91428   |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 7ce94fce | GRCh38 GIAB + core regulation     | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  15409 | 15409/15409   |          0 |                      0 |            0 |              0 | 0.02%                                 |
+| 579b6f65 | GRCh38 exact SV + core regulation | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 120224 | 120224/120224 |          0 |                      0 |            0 |              0 | 0.00%                                 |
 
 </details>
 
@@ -145,8 +145,8 @@ Full conformance ledger, properties and species receipts
 
 | revision | corpus                          | model        | metric | exact           | match | both_absent | discordant |
 |:---------|:--------------------------------|:-------------|:-------|:----------------|------:|------------:|-----------:|
-| 6ce2ddd8 | clinvar_chr21_hgvs_seed113      | differential | HGVSC  | 56,998/56,998   | 44871 |       12127 |          0 |
-| 6ce2ddd8 | clinvar_chr21_hgvs_seed113      | differential | HGVSP  | 56,998/56,998   | 20782 |       36216 |          0 |
+| 35ebf46b | clinvar_chr21_hgvs_seed113      | differential | HGVSC  | 56,998/56,998   | 44871 |       12127 |          0 |
+| 35ebf46b | clinvar_chr21_hgvs_seed113      | differential | HGVSP  | 56,998/56,998   | 20782 |       36216 |          0 |
 | 6ce2ddd8 | hgvs_terminal_multiplication    | differential | HGVSC  | 4/4             |     1 |           3 |          0 |
 | 6ce2ddd8 | hgvs_terminal_multiplication    | differential | HGVSP  | 4/4             |     0 |           4 |          0 |
 | 6ce2ddd8 | state_exploration_seed_16180339 | differential | HGVSC  | 100,268/100,268 | 99169 |        1099 |          0 |
@@ -155,14 +155,17 @@ Full conformance ledger, properties and species receipts
 | 6ce2ddd8 | state_exploration_seed_27182818 | differential | HGVSP  | 100,268/100,268 | 31227 |       69041 |          0 |
 | 6ce2ddd8 | state_exploration_seed_31415927 | differential | HGVSC  | 100,268/100,268 | 99146 |        1122 |          0 |
 | 6ce2ddd8 | state_exploration_seed_31415927 | differential | HGVSP  | 100,268/100,268 | 31021 |       69247 |          0 |
+| adf68dfe | witnesses                       | differential | HGVSC  | 268/268         |   262 |           6 |          0 |
+| adf68dfe | witnesses                       | differential | HGVSP  | 268/268         |   134 |         134 |          0 |
 
 | revision | corpus                          | extension_build               | extension    | model_kind | model        | reference    | reference_index | source_vcf   | input_vcf    | pair_artifact |
 |:---------|:--------------------------------|:------------------------------|:-------------|:-----------|:-------------|:-------------|:----------------|:-------------|:-------------|:--------------|
-| 6ce2ddd8 | clinvar_chr21_hgvs_seed113      | htslib_distclean_make_release | 3213f0a209bf | duckdb     | 8a59b14eed5c | 1e74081a49ce | 0998f61682f4    | 7ecec9a75071 | 7ecec9a75071 | f4df0ad05234  |
+| 35ebf46b | clinvar_chr21_hgvs_seed113      | htslib_distclean_make_release | 3e92ad1ade9a | duckdb     | 0301905915b0 | 1e74081a49ce | 0998f61682f4    | 7ecec9a75071 | 7ecec9a75071 | 6cbedcb84af7  |
 | 6ce2ddd8 | hgvs_terminal_multiplication    | htslib_distclean_make_release | 3213f0a209bf | sql        | b21fbeac2c28 | 01d1f0252130 | 154cbe440869    | bfa15d2786f3 | c4182bf1b769 | eb37a23b382c  |
 | 6ce2ddd8 | state_exploration_seed_16180339 | htslib_distclean_make_release | 3213f0a209bf | sql        | b21fbeac2c28 | 01d1f0252130 | 154cbe440869    | 2d8315a4926a | 53150698e457 | ce7688057f5b  |
 | 6ce2ddd8 | state_exploration_seed_27182818 | htslib_distclean_make_release | 3213f0a209bf | sql        | b21fbeac2c28 | 01d1f0252130 | 154cbe440869    | ec5a793adc6b | 8486a6b4c05e | 2aba7e180609  |
 | 6ce2ddd8 | state_exploration_seed_31415927 | htslib_distclean_make_release | 3213f0a209bf | sql        | b21fbeac2c28 | 01d1f0252130 | 154cbe440869    | 1c5cbf73b5f6 | beab52a9d117 | 107ea9953774  |
+| adf68dfe | witnesses                       | htslib_distclean_make_release | 5a9b6c8baaf6 | sql        | b21fbeac2c28 | 01d1f0252130 | 154cbe440869    | ef38e47a8298 | 97a4022397cb | 7607c7f844f1  |
 
 This is exact string agreement for independent transcript events with
 VEP 116 invoked using `--hgvs`. A comparison is exact when both engines
@@ -203,7 +206,7 @@ gate.
 
 | revision | generated_events | transcript_pairs | exact         | unresolved | extra | missing | descriptive_independent_pair_upper_95 |
 |:---------|:-----------------|:-----------------|:--------------|-----------:|------:|--------:|:--------------------------------------|
-| 360619ed | 1,004            | 91,428           | 91,428/91,428 |          0 |     0 |       0 | 0.00%                                 |
+| 116854e9 | 1,004            | 91,428           | 91,428/91,428 |          0 |     0 |       0 | 0.00%                                 |
 
 The generated seed-31 corpus spans chromosomes 1, 2, 7, 21, and X;
 intra- and interchromosomal mates; all four VCF bracket orientations;
@@ -226,11 +229,11 @@ rule; the ledger records `breakend_buffer_size=1` and the artifact hash.
 |:--------------------|:--------------------------------|:------------|:------------|
 | generated exact SVs | TFBS_ablation                   | 766         | 766/ 766    |
 | generated exact SVs | TFBS_amplification              | 1,532       | 1,532/1,532 |
-| GIAB chromosome 21  | TF_binding_site_variant         | 2           | 2/ 2        |
+| GIAB chromosome 21  | TF_binding_site_variant         | 10          | 10/ 10      |
 | generated exact SVs | TF_binding_site_variant         | 4,354       | 4,354/4,354 |
 | generated exact SVs | regulatory_region_ablation      | 358         | 358/ 358    |
 | generated exact SVs | regulatory_region_amplification | 716         | 716/ 716    |
-| GIAB chromosome 21  | regulatory_region_variant       | 54          | 54/ 54      |
+| GIAB chromosome 21  | regulatory_region_variant       | 63          | 63/ 63      |
 | generated exact SVs | regulatory_region_variant       | 2,689       | 2,689/2,689 |
 
 The GIAB run checks ordinary alleles against transcript and core funcgen
@@ -345,14 +348,25 @@ recorded.
 | 2026-09-06 | b7c7237e        | clinvar_chr21_hgvs_seed113                               | differential               |   56998 |       56998 |          0 |      56998 |                   0 | 100.00%    | 0.01%                                 |
 | 2026-09-06 | b7c7237e        | nmd_clinvar_chr21                                        | ensembl116-grch38-final    | 1353288 |     1353288 |          0 |    1353288 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-09-07 | 15417633        | state_exploration_seed_31415927                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
-| 2026-09-07 | cc1993fd        | state_exploration_seed_31415927                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
-| 2026-09-07 | 7d40756a        | state_exploration_seed_16180339                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
-| 2026-09-07 | 7d40756a        | state_exploration_seed_27182818                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-09-07 | 6ce2ddd8        | clinvar_chr21_hgvs_seed113                               | differential               |   56998 |       56998 |          0 |      56998 |                   0 | 100.00%    | 0.01%                                 |
 | 2026-09-07 | 6ce2ddd8        | hgvs_terminal_multiplication                             | differential               |       4 |           4 |          0 |          4 |                   0 | 100.00%    | 60.24%                                |
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_16180339                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_27182818                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-09-07 | 6ce2ddd8        | state_exploration_seed_31415927                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-09-07 | 7d40756a        | state_exploration_seed_16180339                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-09-07 | 7d40756a        | state_exploration_seed_27182818                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-09-07 | cc1993fd        | state_exploration_seed_31415927                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-15 | 116854e9        | breakend_multichrom_seed31_isolated                      | grch38_breakend_multichrom |   91428 |       91428 |          0 |      91428 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-15 | 35ebf46b        | clinvar_chr21_hgvs_seed113                               | differential               |   56998 |       56998 |          0 |      56998 |                   0 | 100.00%    | 0.01%                                 |
+| 2026-11-15 | 39760c1b        | final_giab_grch38_seed71                                 | final-giab                 |  109275 |      109275 |          0 |     109275 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-15 | 41a8a423        | plasmodium-falciparum-vep63-seed11663                    | plasmodium-falciparum-63   |   32131 |       32131 |          0 |      32131 |                   0 | 100.00%    | 0.01%                                 |
+| 2026-11-15 | 579b6f65        | regulation_sv_chr21_seed17                               | differential               |  120224 |      120224 |          0 |     120224 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-15 | 5c1df7c4        | generated_sv_chr22_seed401                               | differential               |  547182 |      547182 |          0 |     547182 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-15 | 7ce94fce        | regulation_giab_chr21_seed1                              | differential               |   15409 |       15409 |          0 |      15409 |                   0 | 100.00%    | 0.02%                                 |
+| 2026-11-15 | 92ad6050        | state_exploration_seed_31415927                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-15 | adf68dfe        | witnesses                                                | differential               |     268 |         268 |          0 |        268 |                   0 | 100.00%    | 1.37%                                 |
+| 2026-11-15 | b8d1733f        | final_clinvar_coding_seed113                             | final-coding               |  316019 |      316019 |          0 |     316019 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-15 | e002f531        | nmd_clinvar_chr21                                        | ensembl116-grch38-final    | 1353288 |     1353288 |          0 |    1353288 |                   0 | 100.00%    | 0.00%                                 |
 
 ## Randomized executable-VEP state exploration
 
@@ -366,10 +380,8 @@ with differing alleles up to 49 bases.
 
 | revision | seed     | pairs   | exact   | unresolved | resolved_disagreements | descriptive_independent_pair_upper_95_ppm |
 |:---------|:---------|:--------|:--------|:-----------|:-----------------------|:------------------------------------------|
-| 6ce2ddd8 | 16180339 | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
-| 6ce2ddd8 | 27182818 | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
-| 6ce2ddd8 | 31415927 | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
-| 6ce2ddd8 | combined | 300,804 | 300,804 | 0          | 0                      | 12.3                                      |
+| 92ad6050 | 31415927 | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
+| 92ad6050 | combined | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
 
 The combined denominator counts pair comparisons across seed runs, not
 distinct alleles: the 268 fixed witnesses are deliberately shared and
@@ -406,31 +418,31 @@ memberships, not distinct transcript pairs, because one pair may carry
 several terms and seed runs deliberately retain the same fixed
 witnesses.
 
-| consequence_class                   | impact   | seeds_observed |      n | unresolved | term_mismatch | engine_extra | engine_missing |
-|:------------------------------------|:---------|---------------:|-------:|-----------:|--------------:|-------------:|---------------:|
-| intron_variant                      | MODIFIER |              3 | 116484 |          0 |             0 |            0 |              0 |
-| coding_sequence_variant             | MODIFIER |              3 |  76854 |          0 |             0 |            0 |              0 |
-| frameshift_variant                  | HIGH     |              3 |  49155 |          0 |             0 |            0 |              0 |
-| 5_prime_UTR_variant                 | MODIFIER |              3 |  44738 |          0 |             0 |            0 |              0 |
-| 3_prime_UTR_variant                 | MODIFIER |              3 |  41181 |          0 |             0 |            0 |              0 |
-| splice_donor_variant                | HIGH     |              3 |  38750 |          0 |             0 |            0 |              0 |
-| splice_acceptor_variant             | HIGH     |              3 |  34670 |          0 |             0 |            0 |              0 |
-| splice_donor_5th_base_variant       | LOW      |              3 |  33786 |          0 |             0 |            0 |              0 |
-| splice_polypyrimidine_tract_variant | LOW      |              3 |  31101 |          0 |             0 |            0 |              0 |
-| stop_gained                         | HIGH     |              3 |  25890 |          0 |             0 |            0 |              0 |
-| start_lost                          | HIGH     |              3 |  24495 |          0 |             0 |            0 |              0 |
-| splice_region_variant               | LOW      |              3 |  24208 |          0 |             0 |            0 |              0 |
-| splice_donor_region_variant         | LOW      |              3 |  14109 |          0 |             0 |            0 |              0 |
-| missense_variant                    | MODERATE |              3 |  13035 |          0 |             0 |            0 |              0 |
-| inframe_insertion                   | MODERATE |              3 |  12993 |          0 |             0 |            0 |              0 |
-| stop_lost                           | HIGH     |              3 |  10983 |          0 |             0 |            0 |              0 |
-| protein_altering_variant            | MODERATE |              3 |   8157 |          0 |             0 |            0 |              0 |
-| stop_retained_variant               | LOW      |              3 |   7289 |          0 |             0 |            0 |              0 |
-| inframe_deletion                    | MODERATE |              3 |   1237 |          0 |             0 |            0 |              0 |
-| downstream_gene_variant             | MODIFIER |              3 |   1227 |          0 |             0 |            0 |              0 |
-| start_retained_variant              | LOW      |              3 |   1051 |          0 |             0 |            0 |              0 |
-| synonymous_variant                  | LOW      |              3 |    325 |          0 |             0 |            0 |              0 |
-| intergenic_variant                  | MODIFIER |              3 |     52 |          0 |             0 |            0 |              0 |
+| consequence_class                   | impact   | seeds_observed |     n | unresolved | term_mismatch | engine_extra | engine_missing |
+|:------------------------------------|:---------|---------------:|------:|-----------:|--------------:|-------------:|---------------:|
+| intron_variant                      | MODIFIER |              1 | 27142 |          0 |             0 |            0 |              0 |
+| frameshift_variant                  | HIGH     |              1 | 19926 |          0 |             0 |            0 |              0 |
+| 5_prime_UTR_variant                 | MODIFIER |              1 | 13485 |          0 |             0 |            0 |              0 |
+| 3_prime_UTR_variant                 | MODIFIER |              1 | 12216 |          0 |             0 |            0 |              0 |
+| missense_variant                    | MODERATE |              1 | 10937 |          0 |             0 |            0 |              0 |
+| splice_polypyrimidine_tract_variant | LOW      |              1 | 10132 |          0 |             0 |            0 |              0 |
+| splice_region_variant               | LOW      |              1 | 10131 |          0 |             0 |            0 |              0 |
+| coding_sequence_variant             | MODIFIER |              1 |  7840 |          0 |             0 |            0 |              0 |
+| start_lost                          | HIGH     |              1 |  4819 |          0 |             0 |            0 |              0 |
+| stop_gained                         | HIGH     |              1 |  4581 |          0 |             0 |            0 |              0 |
+| splice_acceptor_variant             | HIGH     |              1 |  4564 |          0 |             0 |            0 |              0 |
+| splice_donor_variant                | HIGH     |              1 |  4355 |          0 |             0 |            0 |              0 |
+| inframe_insertion                   | MODERATE |              1 |  4225 |          0 |             0 |            0 |              0 |
+| protein_altering_variant            | MODERATE |              1 |  3501 |          0 |             0 |            0 |              0 |
+| splice_donor_region_variant         | LOW      |              1 |  3181 |          0 |             0 |            0 |              0 |
+| splice_donor_5th_base_variant       | LOW      |              1 |  3179 |          0 |             0 |            0 |              0 |
+| stop_lost                           | HIGH     |              1 |  2861 |          0 |             0 |            0 |              0 |
+| downstream_gene_variant             | MODIFIER |              1 |   663 |          0 |             0 |            0 |              0 |
+| start_retained_variant              | LOW      |              1 |   414 |          0 |             0 |            0 |              0 |
+| inframe_deletion                    | MODERATE |              1 |   399 |          0 |             0 |            0 |              0 |
+| stop_retained_variant               | LOW      |              1 |   391 |          0 |             0 |            0 |              0 |
+| synonymous_variant                  | LOW      |              1 |   284 |          0 |             0 |            0 |              0 |
+| intergenic_variant                  | MODIFIER |              1 |    25 |          0 |             0 |            0 |              0 |
 
 This distribution deliberately stresses local alleles and positions near
 exon, splice-site, and CDS endpoints on one engineered transcript. It
@@ -507,6 +519,7 @@ duplicate count. A failed suite does not append rows.
 | 2026-09-08 | ae131a9d        | 0x00000000000000ad |                 56 | 5,600,000  | 5,600,000  |      0 |          0 |         269 | 34,092,011       |                46.210 | cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0 |
 | 2026-09-08 | ae131a9d        | 0x000000000135282a |                 56 | 5,600,000  | 5,600,000  |      0 |          0 |         269 | 34,092,327       |                45.861 | cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0 |
 | 2026-09-09 | b38f6179        | 0x000000000135282a |                 63 | 6,300,000  | 6,300,000  |      0 |          0 |         291 | 56,325,135       |                52.343 | cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0 |
+| 2026-11-15 | 4ec8cfc2        | 0x000000000135282a |                 65 | 6,500,000  | 6,463,448  |      0 |          0 |         386 | 57,715,060       |                62.966 | cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0 |
 
 | target                                                                               | trials  | passed  | failed | skipped | duplicates |
 |:-------------------------------------------------------------------------------------|:--------|:--------|:-------|:--------|:-----------|
@@ -542,6 +555,7 @@ duplicate count. A failed suite does not append rows.
 | compound HGVSp terminal reference == displayed protein replay                        | 100,000 | 100,000 | 0      | 0       | 0          |
 | compound HGVSp terminal repeat == complete protein replay                            | 100,000 | 100,000 | 0      | 0       | 0          |
 | coordinate projection == brute-force transcript-order base walk                      | 100,000 | 100,000 | 0      | 0       | 0          |
+| ejc50 == edited-transcript oracle                                                    | 100,000 | 100,000 | 0      | 0       | 0          |
 | event differing-region normalization == independent trim oracle                      | 100,000 | 100,000 | 0      | 0       | 0          |
 | haplotype block spans reconstruct the independently replayed CDS                     | 100,000 | 100,000 | 0      | 0       | 0          |
 | haplotype blocks preserve every frame and same-codon interaction                     | 100,000 | 100,000 | 0      | 0       | 0          |
@@ -553,6 +567,7 @@ duplicate count. A failed suite does not append rows.
 | ordered source replacements == literal replay, net spans and applied provenance      | 100,000 | 100,000 | 0      | 0       | 0          |
 | owned haplotype replay == dense genomic edits in coexisting models                   | 100,000 | 100,000 | 0      | 0       | 0          |
 | phased SNV set == equivalent MNV coding facts                                        | 100,000 | 100,000 | 0      | 0       | 0          |
+| post-stop edits move J only                                                          | 100,000 | 63,448  | 0      | 36,552  | 0          |
 | region mask structural invariants                                                    | 100,000 | 100,000 | 0      | 0       | 0          |
 | regulation sweep/BND pairs == independent feature oracles                            | 100,000 | 100,000 | 0      | 0       | 0          |
 | sequence delta annotation wrapper MNV == direct shape                                | 100,000 | 100,000 | 0      | 0       | 0          |
@@ -615,15 +630,18 @@ suite-level pass count.
 | delta-scratch-indel coverage               | forward= 50,151; lengthen= 49,864; reverse= 49,849; shorten= 50,136                                                                                                                                                                                                                                |
 | delta-wrapper coverage                     | fwd= 50,015; mis= 20,049; rev= 49,985; stop_gained= 19,948; stop_lost= 20,007; stop_retained= 19,902; syn= 20,094                                                                                                                                                                                  |
 | event normalization coverage               | del= 25,028; indel= 24,718; ins= 24,954; interbase= 27,720; prefix= 81,125; prefix0_interbase= 7,019; sub= 25,300; suffix= 77,968                                                                                                                                                                  |
+| frame classifier coverage                  | decided= 4,342; post_stop_edits= 1,000                                                                                                                                                                                                                                                             |
 | frameshift coverage                        | -1= 7,294; -2= 7,155; +1= 7,530; +2= 7,131; del= 29,432; delins= 29,110; ins= 41,458; reverse= 47,774; stop_gained= 1,562; terminal_cil_protein_altering= 9; terminal_cil_retained= 47; terminal_endpoint= 16,522; terminal_missing_tail= 4,182; terminal_nonstop= 12,362; terminal_reverse= 8,203 |
-| frameshift length-oracle coverage          | frameshift= 62,587; inframe_len= 12,446; stop_gained= 1,893                                                                                                                                                                                                                                        |
+| frameshift length-oracle coverage          | frameshift= 62,587; inframe_len= 12,446; raw_missense= 30,639; stop_gained= 1,893                                                                                                                                                                                                                  |
 | haplotype-MNV equivalence coverage         | body= 33,177; fwd= 50,079; one_codon= 16,102; rev= 49,921; several_codons= 83,898; start= 33,617; stop= 33,206                                                                                                                                                                                     |
-| HGVS shift coverage                        | at_vep_limit= 0; composed= 96,683; del= 48,656; dup= 37,932; fwd= 49,955; ins= 51,189; nonlocal_ref_replay= 1,542; protein= 90,059; rev= 49,890; rotated= 20,818; terminal_duplication= 3,162                                                                                                      |
+| HGVS shift coverage                        | at_vep_limit= 0; composed= 96,683; del= 48,656; dup= 37,932; fwd= 49,955; ins= 51,189; nonlocal_ref_replay= 1,542; protein= 96,437; rev= 49,890; rotated= 20,818; terminal_duplication= 3,162                                                                                                      |
 | HGVSp frameshift coverage                  | del= 24,911; delins= 29,221; eligible= 91,789; equal_stop= 19; fs= 87,367; fwd= 45,781; immediate_stop= 4,403; ins= 37,657; non_fs= 8,211; rev= 46,008; shortened= 0; ter_known= 17,365; ter_unknown= 70,002                                                                                       |
-| HGVSp replay coverage                      | del= 3,941; delins= 3,844; dup= 388; equal= 8,346; fwd= 17,190; ins= 1,582; replayed= 34,988; rev= 17,798; special= 63,926; sub= 16,887; terminal_not_applicable= 1,086; vep_position_zero= 1,324; vep_stop_equal= 0                                                                               |
+| HGVSp replay coverage                      | del= 3,941; delins= 3,854; dup= 394; equal= 8,346; fwd= 17,336; ins= 1,711; replayed= 35,133; rev= 17,797; special= 63,781; sub= 16,887; terminal_not_applicable= 1,086; vep_position_zero= 1,388; vep_stop_equal= 0                                                                               |
 | inframe_deletion coverage                  | forward= 50,130; reverse= 49,870                                                                                                                                                                                                                                                                   |
 | inframe_insertion coverage                 | forward= 50,050; reverse= 49,950                                                                                                                                                                                                                                                                   |
 | mnv coverage                               | len2= 50,110; len3= 49,890                                                                                                                                                                                                                                                                         |
+| nmd oracle coverage                        | attributed_post_stop= 5,567; escape= 57,267; four_exon= 17,804; indel_before_junction= 15,757; intronless= 17,373; not_applicable= 21,446; post_stop_edits= 48,600; reverse= 49,992; trigger= 12,640; unknown= 8,647; utr= 40,385                                                                  |
+| nmd post-stop coverage                     | checked= 63,448; flips= 3,620; junction_shifts= 12,760; unchanged= 50,688                                                                                                                                                                                                                          |
 | non-boundary insertion coverage            | forward= 50,132; inframe_insertion= 49,985; protein_altering= 50,015; reverse= 49,868                                                                                                                                                                                                              |
 | ordered-replacement coverage               | clipped= 85,602; empty= 6,365; forward= 49,777; merged_sources= 135,000; noop= 102,730; ref_slot= 220,687; reverse= 50,223; tied= 519,063                                                                                                                                                          |
 | simple-indel equivalence coverage          | del= 11,394; delins= 5,652; fallback= 38,829; fast= 21,130; frameshift= 18,801; fwd= 10,366; inframe_del= 1,847; inframe_ins= 482; ins= 4,084; rev= 10,764                                                                                                                                         |
@@ -631,7 +649,7 @@ suite-level pass count.
 | terminal-partial-insertion coverage        | after_tail_rejected= 41,724; length_mod0= 33,507; length_mod1= 33,297; length_mod2= 33,196; mitochondrial= 50,038; nonstop= 76,796; reverse_orientation= 50,001; same_orientation= 49,999; site_first= 41,607; site_internal= 16,669; standard= 49,962; stop= 11,190; tail1= 49,970; tail2= 50,030 |
 | variant-coding-context coverage            | capfail= 400,000; del= 19,940; fwd= 49,955; indel= 19,988; ins= 20,031; mnv= 20,094; pep_diff= 86,666; pep_same= 13,334; rev= 50,045; snv= 19,947                                                                                                                                                  |
 
-The run observed all 314 required nonzero counters. The other 3 counters
+The run observed all 332 required nonzero counters. The other 3 counters
 have named fixed witnesses in the coverage manifest; their absence from
 a random draw is not counted as statistical coverage. These counters
 describe the declared generators, not an exhaustive enumeration of
@@ -639,9 +657,9 @@ biological configurations.
 
 | revision | seed               | targets |  trials | required_counters_observed | minimum_required_counter_hits | fixed_witness_counters_not_hit |
 |:---------|:-------------------|--------:|--------:|---------------------------:|------------------------------:|-------------------------------:|
-| b38f6179 | 0x000000000135282a |      63 | 6300000 |                        314 |                             9 |                              3 |
+| 4ec8cfc2 | 0x000000000135282a |      65 | 6500000 |                        332 |                             9 |                              3 |
 
-The recorded runs executed 6,300,000 property trials on the shown
+The recorded runs executed 6,500,000 property trials on the shown
 revision. Millions of passing trials do not make a counter with
 single-digit observations densely explored, and marginal counters do not
 establish coverage of their cross-products. The fresh-seed HGVS failure
@@ -1319,13 +1337,13 @@ carry several terms.
 | corpus                            | observed_terms | terms_with_mismatch | term_mismatches | engine_extra | engine_missing | terms_with_unresolved | unresolved_term_memberships |
 |:----------------------------------|---------------:|--------------------:|----------------:|-------------:|---------------:|----------------------:|----------------------------:|
 | GRCh38 dbSNP                      |             22 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
-| GRCh38 GIAB                       |             19 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
-| GRCh38 ClinVar coding             |             27 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
+| GRCh38 GIAB                       |             21 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
+| GRCh38 ClinVar coding             |             26 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 ClinVar cross-chromosome   |             28 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh37                            |             26 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
-| P. falciparum                     |             20 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
+| P. falciparum                     |             21 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 paired BND                 |             14 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
-| GRCh38 GIAB + core regulation     |             15 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
+| GRCh38 GIAB + core regulation     |             17 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 | GRCh38 exact SV + core regulation |             27 |                   0 |               0 |            0 |              0 |                     0 |                           0 |
 
 `term_mismatches` counts an SO term that is missing or extra on a
@@ -1348,38 +1366,38 @@ counted once within each corpus.
 | corpus                            | impact   |      n | exact_agree | unresolved | resolved_n | resolved_discordant | exact_rate | descriptive_independent_pair_upper_95 |
 |:----------------------------------|:---------|-------:|------------:|-----------:|-----------:|--------------------:|:-----------|:--------------------------------------|
 | GRCh38 paired BND                 | HIGH     |  69654 |       69654 |          0 |      69654 |                   0 | 100.00%    | 0.01%                                 |
-| GRCh38 ClinVar coding             | HIGH     |  99103 |       99103 |          0 |      99103 |                   0 | 100.00%    | 0.00%                                 |
+| GRCh38 ClinVar coding             | HIGH     |  79058 |       79058 |          0 |      79058 |                   0 | 100.00%    | 0.00%                                 |
 | GRCh38 ClinVar cross-chromosome   | HIGH     |  79663 |       79663 |          0 |      79663 |                   0 | 100.00%    | 0.00%                                 |
 | GRCh38 dbSNP                      | HIGH     |    118 |         118 |          0 |        118 |                   0 | 100.00%    | 3.08%                                 |
-| GRCh38 GIAB                       | HIGH     |      4 |           4 |          0 |          4 |                   0 | 100.00%    | 60.24%                                |
+| GRCh38 GIAB                       | HIGH     |     31 |          31 |          0 |         31 |                   0 | 100.00%    | 11.22%                                |
 | GRCh37                            | HIGH     |  46645 |       46645 |          0 |      46645 |                   0 | 100.00%    | 0.01%                                 |
-| P. falciparum                     | HIGH     |   4309 |        4309 |          0 |       4309 |                   0 | 100.00%    | 0.09%                                 |
-| GRCh38 GIAB + core regulation     | HIGH     |      3 |           3 |          0 |          3 |                   0 | 100.00%    | 70.76%                                |
+| P. falciparum                     | HIGH     |   1296 |        1296 |          0 |       1296 |                   0 | 100.00%    | 0.28%                                 |
+| GRCh38 GIAB + core regulation     | HIGH     |      5 |           5 |          0 |          5 |                   0 | 100.00%    | 52.18%                                |
 | GRCh38 exact SV + core regulation | HIGH     |  40135 |       40135 |          0 |      40135 |                   0 | 100.00%    | 0.01%                                 |
-| GRCh38 ClinVar coding             | LOW      |   5952 |        5952 |          0 |       5952 |                   0 | 100.00%    | 0.06%                                 |
+| GRCh38 ClinVar coding             | LOW      |  29956 |       29956 |          0 |      29956 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 ClinVar cross-chromosome   | LOW      |  28776 |       28776 |          0 |      28776 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 dbSNP                      | LOW      |    349 |         349 |          0 |        349 |                   0 | 100.00%    | 1.05%                                 |
-| GRCh38 GIAB                       | LOW      |    260 |         260 |          0 |        260 |                   0 | 100.00%    | 1.41%                                 |
+| GRCh38 GIAB                       | LOW      |    201 |         201 |          0 |        201 |                   0 | 100.00%    | 1.82%                                 |
 | GRCh37                            | LOW      |  23354 |       23354 |          0 |      23354 |                   0 | 100.00%    | 0.02%                                 |
-| P. falciparum                     | LOW      |    210 |         210 |          0 |        210 |                   0 | 100.00%    | 1.74%                                 |
-| GRCh38 GIAB + core regulation     | LOW      |     98 |          98 |          0 |         98 |                   0 | 100.00%    | 3.69%                                 |
+| P. falciparum                     | LOW      |    190 |         190 |          0 |        190 |                   0 | 100.00%    | 1.92%                                 |
+| GRCh38 GIAB + core regulation     | LOW      |     35 |          35 |          0 |         35 |                   0 | 100.00%    | 10.00%                                |
 | GRCh38 exact SV + core regulation | LOW      |    821 |         821 |          0 |        821 |                   0 | 100.00%    | 0.45%                                 |
-| GRCh38 ClinVar coding             | MODERATE |  59108 |       59108 |          0 |      59108 |                   0 | 100.00%    | 0.01%                                 |
+| GRCh38 ClinVar coding             | MODERATE |  41471 |       41471 |          0 |      41471 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 ClinVar cross-chromosome   | MODERATE |  43286 |       43286 |          0 |      43286 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 dbSNP                      | MODERATE |    125 |         125 |          0 |        125 |                   0 | 100.00%    | 2.91%                                 |
-| GRCh38 GIAB                       | MODERATE |     31 |          31 |          0 |         31 |                   0 | 100.00%    | 11.22%                                |
+| GRCh38 GIAB                       | MODERATE |    171 |         171 |          0 |        171 |                   0 | 100.00%    | 2.13%                                 |
 | GRCh37                            | MODERATE |  23319 |       23319 |          0 |      23319 |                   0 | 100.00%    | 0.02%                                 |
-| P. falciparum                     | MODERATE |   1937 |        1937 |          0 |       1937 |                   0 | 100.00%    | 0.19%                                 |
-| GRCh38 GIAB + core regulation     | MODERATE |     41 |          41 |          0 |         41 |                   0 | 100.00%    | 8.60%                                 |
+| P. falciparum                     | MODERATE |    957 |         957 |          0 |        957 |                   0 | 100.00%    | 0.38%                                 |
+| GRCh38 GIAB + core regulation     | MODERATE |     57 |          57 |          0 |         57 |                   0 | 100.00%    | 6.27%                                 |
 | GRCh38 exact SV + core regulation | MODERATE |    766 |         766 |          0 |        766 |                   0 | 100.00%    | 0.48%                                 |
 | GRCh38 paired BND                 | MODIFIER |  21774 |       21774 |          0 |      21774 |                   0 | 100.00%    | 0.02%                                 |
-| GRCh38 ClinVar coding             | MODIFIER | 123673 |      123673 |          0 |     123673 |                   0 | 100.00%    | 0.00%                                 |
+| GRCh38 ClinVar coding             | MODIFIER | 165534 |      165534 |          0 |     165534 |                   0 | 100.00%    | 0.00%                                 |
 | GRCh38 ClinVar cross-chromosome   | MODIFIER | 164672 |      164672 |          0 |     164672 |                   0 | 100.00%    | 0.00%                                 |
 | GRCh38 dbSNP                      | MODIFIER |  73028 |       73028 |          0 |      73028 |                   0 | 100.00%    | 0.01%                                 |
-| GRCh38 GIAB                       | MODIFIER |  54610 |       54610 |          0 |      54610 |                   0 | 100.00%    | 0.01%                                 |
+| GRCh38 GIAB                       | MODIFIER | 108872 |      108872 |          0 |     108872 |                   0 | 100.00%    | 0.00%                                 |
 | GRCh37                            | MODIFIER | 393146 |      393146 |          0 |     393146 |                   0 | 100.00%    | 0.00%                                 |
-| P. falciparum                     | MODIFIER |  34276 |       34276 |          0 |      34276 |                   0 | 100.00%    | 0.01%                                 |
-| GRCh38 GIAB + core regulation     | MODIFIER |  14813 |       14813 |          0 |      14813 |                   0 | 100.00%    | 0.02%                                 |
+| P. falciparum                     | MODIFIER |  29688 |       29688 |          0 |      29688 |                   0 | 100.00%    | 0.01%                                 |
+| GRCh38 GIAB + core regulation     | MODIFIER |  15312 |       15312 |          0 |      15312 |                   0 | 100.00%    | 0.02%                                 |
 | GRCh38 exact SV + core regulation | MODIFIER |  78502 |       78502 |          0 |      78502 |                   0 | 100.00%    | 0.00%                                 |
 
 The source artifact hash and exact Ensembl core/variation build remain
@@ -1407,16 +1425,16 @@ with that run is not an identical-workload comparison.
 
 | revision | corpus            | model                   | exact       | mismatches | not comparable | VEP unresolved | DuckVEP unresolved | descriptive independent-pair upper 95% |
 |:---------|:------------------|:------------------------|:------------|-----------:|---------------:|---------------:|-------------------:|:---------------------------------------|
-| b7c7237e | nmd_clinvar_chr21 | ensembl116-grch38-final | 70521/70521 |          0 |              0 |          29954 |              29954 | 0.01%                                  |
+| e002f531 | nmd_clinvar_chr21 | ensembl116-grch38-final | 70521/70521 |          0 |              0 |          29954 |              29954 | 0.01%                                  |
 
 The ledger keeps the prediction confusion matrix rather than only the
 total:
 
 | revision | corpus            | VEP_prediction | DuckVEP_prediction |     n |
 |:---------|:------------------|:---------------|:-------------------|------:|
-| b7c7237e | nmd_clinvar_chr21 | escaping       | escaping           |  7175 |
-| b7c7237e | nmd_clinvar_chr21 | triggering     | triggering         | 33392 |
-| b7c7237e | nmd_clinvar_chr21 | unresolved     | unresolved         | 29954 |
+| e002f531 | nmd_clinvar_chr21 | escaping       | escaping           |  7175 |
+| e002f531 | nmd_clinvar_chr21 | triggering     | triggering         | 33392 |
+| e002f531 | nmd_clinvar_chr21 | unresolved     | unresolved         | 29954 |
 
 VEP projects the complete uploaded `VariationFeature` for the plugin’s
 CDS and exon-position rules. DuckVEP therefore retains both geometries:

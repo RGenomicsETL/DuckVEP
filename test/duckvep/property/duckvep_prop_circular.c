@@ -188,6 +188,11 @@ static void cp_make_world(struct cp_world *w, uint64_t seed, int mode) {
             cursor += t->ex[j].length + (mode == 2 ? cp_range(&s, 6u, 10u) : cp_range(&s, 10u, 24u));
             cum += t->ex[j].length;
         }
+        if (t->ex[t->nex - 1u].u_start + t->ex[t->nex - 1u].length - t->ex[0].u_start > w->L) {
+            /* A transcript cannot span more than one lap of the circle. */
+            w->L = 0u;
+            return;
+        }
         cursor += cp_range(&s, 8u, 20u);
         t->cdna_length = cum;
         {
