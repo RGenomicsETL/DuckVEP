@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Exercise the real nested-to-flat mapping without an extension or VEP process.
 suppressMessages({ library(DBI); library(duckdb) })
-source("r/duckhtsbench/R/duckvep_relations.R")
+source("scripts/duckvep_model_relations.R")
 local({
   directory <- tempfile("duckvep-model-relations-")
   dir.create(directory)
@@ -15,7 +15,7 @@ local({
     dbGetQuery(con, paste("SELECT * FROM", name, "ORDER BY ALL"))
   }), flat_names)
   catalog <- dbGetQuery(con, "SELECT current_database() AS name")$name
-  flat <- duckhts_bench_duckvep_relations(con, catalog)
+  flat <- duckvep_model_relations(con, catalog)
   for (name in flat_names) {
     stopifnot(identical(dbGetQuery(con, paste("SELECT * FROM", flat[[name]], "ORDER BY ALL")),
       expected[[name]]))
@@ -23,7 +23,7 @@ local({
   dbExecute(con, "CREATE TABLE model_regions AS
     SELECT seq_region, name AS seq_region_name, 1000::UBIGINT AS sequence_length
     FROM duckvep_sequence_regions")
-  error <- tryCatch({ duckhts_bench_duckvep_relations(con, catalog); "" }, error = conditionMessage)
+  error <- tryCatch({ duckvep_model_relations(con, catalog); "" }, error = conditionMessage)
   stopifnot(grepl("both model_regions and model_transcripts", error, fixed = TRUE))
   dbExecute(con, "CREATE TABLE model_transcripts AS
     SELECT t.*, n.transcript_id AS transcript_stable_id,
@@ -46,7 +46,7 @@ local({
   attached <- 'quoted "model'
   dbExecute(first, paste("ATTACH", dbQuoteString(first, path), "AS",
     dbQuoteIdentifier(first, attached), "(READ_ONLY)"))
-  relations <- duckhts_bench_duckvep_relations(first, attached)
+  relations <- duckvep_model_relations(first, attached)
   second <- dbConnect(driver)
   on.exit(dbDisconnect(second), add = TRUE, after = FALSE)
   for (name in flat_names) {

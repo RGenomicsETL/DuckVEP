@@ -3903,7 +3903,7 @@ TEST haplotype_frame_classifier_matches_independent_translation_and_frame_walk(v
     if (seen != 1023u) fprintf(stderr, "[frame classifier coverage] seen=%lu\n", seen);
     ASSERT_EQ(1023u, (unsigned)seen);
     ASSERT(decided > 1000u && pending == 0u && post_stops > 100u);
-    fprintf(stderr, "[frame classifier coverage] decided=%lu pending=%lu post_stop_edits=%lu\n", decided, pending, post_stops);
+    fprintf(stderr, "[frame classifier coverage] decided=%lu post_stop_edits=%lu\n", decided, post_stops);
     PASS();
 }
 

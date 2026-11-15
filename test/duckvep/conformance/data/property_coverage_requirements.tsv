@@ -214,6 +214,7 @@ frameshift coverage	terminal_reverse	statistical_required	-
 frameshift length-oracle coverage	frameshift	statistical_required	-
 frameshift length-oracle coverage	inframe_len	statistical_required	-
 frameshift length-oracle coverage	stop_gained	statistical_required	-
+frameshift length-oracle coverage	raw_missense	statistical_required	-
 haplotype-MNV equivalence coverage	body	statistical_required	-
 haplotype-MNV equivalence coverage	fwd	statistical_required	-
 haplotype-MNV equivalence coverage	one_codon	statistical_required	-
@@ -316,3 +317,20 @@ ordered-replacement coverage	noop	statistical_required	-
 ordered-replacement coverage	tied	statistical_required	-
 ordered-replacement coverage	empty	statistical_required	-
 ordered-replacement coverage	merged_sources	statistical_required	-
+frame classifier coverage	decided	statistical_required	-
+frame classifier coverage	post_stop_edits	statistical_required	-
+nmd oracle coverage	attributed_post_stop	statistical_required	-
+nmd oracle coverage	trigger	statistical_required	-
+nmd oracle coverage	escape	statistical_required	-
+nmd oracle coverage	unknown	statistical_required	-
+nmd oracle coverage	not_applicable	statistical_required	-
+nmd oracle coverage	intronless	statistical_required	-
+nmd oracle coverage	reverse	statistical_required	-
+nmd oracle coverage	utr	statistical_required	-
+nmd oracle coverage	four_exon	statistical_required	-
+nmd oracle coverage	indel_before_junction	statistical_required	-
+nmd oracle coverage	post_stop_edits	statistical_required	-
+nmd post-stop coverage	checked	statistical_required	-
+nmd post-stop coverage	junction_shifts	statistical_required	-
+nmd post-stop coverage	flips	statistical_required	-
+nmd post-stop coverage	unchanged	statistical_required	-

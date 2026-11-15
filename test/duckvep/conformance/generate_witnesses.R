@@ -113,6 +113,15 @@ if (opt$max_random_length < 1L || opt$max_random_length > 65534L) {
 con <- dbConnect(duckdb(config = list(allow_unsigned_extensions = "true")))
 on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
 invisible(dbExecute(con, glue("LOAD '{opt$ext}'")))
+# read_gff and the FASTA readers are DuckHTS table functions: load the build named by
+# DUCKVEP_READER_EXT, or an installed duckhts.
+reader_extension <- Sys.getenv("DUCKVEP_READER_EXT", "")
+if (nzchar(reader_extension)) {
+  reader_extension <- normalizePath(reader_extension, mustWork = TRUE)
+  invisible(dbExecute(con, glue("LOAD '{reader_extension}'")))
+} else {
+  invisible(dbExecute(con, "LOAD duckhts"))
+}
 
 # 1. transcript features (exon/CDS) for the target tx. Transcript line carries ID=transcript:X;
 #    exon/CDS lines carry Parent=transcript:X.

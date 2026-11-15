@@ -886,8 +886,8 @@ if (external_model_database) {
       "AS duckvep_model_source (READ_ONLY)"
     )
   ))
-  source(file.path(root, "r/duckhtsbench/R/duckvep_relations.R"), local = TRUE)
-  model_source_relations <- duckhts_bench_duckvep_relations(con, "duckvep_model_source")
+  source(file.path(root, "scripts", "duckvep_model_relations.R"), local = TRUE)
+  model_source_relations <- duckvep_model_relations(con, "duckvep_model_source")
   for (relation in names(model_source_relations)) {
     relation_id <- as.character(dbQuoteIdentifier(con, relation))
     invisible(dbExecute(

@@ -136,6 +136,86 @@ test_compound_hgvs_fuzz: release
 test_phase_arrangements_oracle:
 	Rscript --vanilla test/duckvep/conformance/phase_arrangements_oracle.R $(PROJ_DIR)
 
+# Conformance campaigns against executable VEP. VEP_PREFIX is the VEP environment;
+# DUCKVEP_READER_EXT is a DuckHTS build that reads the VCF and GFF inputs. The runner
+# rebuilds the extension and binds it to the clean source revision.
+.PHONY: duckvep-generated-check duckvep-state-contract-check duckvep-state-current-check
+.PHONY: duckvep-corpus-differential test-duckvep-differential test-duckvep-gvcf-differential
+.PHONY: test-duckvep-state-exploration duckvep-record-conformance duckvep-render-reports
+DUCKVEP_DIFFERENTIAL = VEP_PREFIX=$(VEP_PREFIX) Rscript test/duckvep/conformance/corpus_differential.R \
+	--extension build/release/duckvep.duckdb_extension
+
+duckvep-generated-check:
+	perl test/duckvep/conformance/generate_effect_rules.pl --check src/kernel/src/duckvep_effect_rules.inc
+	perl test/duckvep/conformance/generate_so_metadata.pl --check src/kernel/src/duckvep_so_metadata.inc
+	perl test/duckvep/property/inventory_test.pl
+	perl test/duckvep/upstream/check_sources.pl
+
+# The kernel properties without sanitizers, which property_history.R runs and records.
+# test_properties is the sanitized run.
+.PHONY: test-duckvep-kernel test-duckvep-kernel-statistical
+test-duckvep-kernel: duckvep-generated-check
+	$(MAKE) test_properties PROPERTY_SANITIZE=
+test-duckvep-kernel-statistical:
+	DUCKVEP_PROP_TRIALS=$${DUCKVEP_PROP_TRIALS:-100000} $(MAKE) test-duckvep-kernel
+
+# The campaign ledger names the source revision of each campaign. The current check
+# also requires each revision to be an ancestor of HEAD with unchanged semantic inputs.
+duckvep-state-contract-check:
+	perl test/duckvep/conformance/check_state_machine_contract.pl
+duckvep-state-current-check:
+	perl test/duckvep/conformance/check_state_machine_contract.pl --require-current
+
+duckvep-corpus-differential: release
+	$(DUCKVEP_DIFFERENTIAL) $(DUCKVEP_DIFFERENTIAL_ARGS)
+
+test-duckvep-differential: release
+	$(DUCKVEP_DIFFERENTIAL) --sample-per-shape 0 --hgvs
+
+# VEP receives one single-ALT record for each expanded input allele.
+test-duckvep-gvcf-differential: release
+	$(DUCKVEP_DIFFERENTIAL) --corpus gvcf_semantics \
+		--vcf test/duckvep/conformance/data/gvcf_semantics.vcf \
+		--split-multiallelic --sample-per-shape 0 --distance 0 --max-allele-length 171
+
+# Reproducible rare-state exploration. The generated VCF and the pair-level Parquet
+# stay under the ignored results directory with their seed. The allele limit covers
+# the fixed witnesses, which are longer than the random cases.
+test-duckvep-state-exploration: release
+	@set -e; \
+	cases=$${DUCKVEP_STATE_CASES:-20000}; \
+	seed=$${DUCKVEP_STATE_SEED:-17}; \
+	max_len=$${DUCKVEP_STATE_MAX_LENGTH:-10}; \
+	trials=$${DUCKVEP_PROP_TRIALS:-100000}; \
+	allele_limit=$$((max_len + 1)); \
+	if [ $$allele_limit -lt 101 ]; then allele_limit=101; fi; \
+	Rscript test/duckvep/conformance/property_history.R \
+		--trials $$trials --seed $$seed \
+		--history test/duckvep/conformance/results/state_exploration_seed_$${seed}_properties.csv \
+		--coverage-history test/duckvep/conformance/results/state_exploration_seed_$${seed}_coverage.csv \
+		--failure-log-dir test/duckvep/conformance/results; \
+	vcf=test/duckvep/conformance/results/state_exploration_seed_$${seed}.vcf; \
+	Rscript test/duckvep/conformance/generate_witnesses.R \
+		--ext build/release/duckvep.duckdb_extension \
+		--random-cases $$cases --max-random-length $$max_len \
+		--seed $$seed --out $$vcf; \
+	$(DUCKVEP_DIFFERENTIAL) --corpus state_exploration_seed_$${seed} \
+		--vcf $$vcf --sample-per-shape 0 --seed $$seed \
+		--max-allele-length $$allele_limit --hgvs
+
+# Replace this revision's witness rows in the two conformance ledgers.
+duckvep-record-conformance: test-duckvep-differential
+	Rscript test/duckvep/conformance/hgvs_history.R \
+		--pairs test/duckvep/conformance/results/witnesses_hgvs_pairs.parquet \
+		--history test/duckvep/conformance/data/hgvs_history.csv
+	Rscript test/duckvep/conformance/statistical_conformance.R \
+		--annotations test/duckvep/conformance/results/witnesses_annotations.parquet \
+		--history test/duckvep/conformance/data/conformance_history.csv
+
+duckvep-render-reports:
+	DUCKVEP_REPO_ROOT=$(PROJ_DIR) Rscript -e "rmarkdown::render('benchmarks/duckvep_conformance.Rmd', quiet = TRUE)"
+	DUCKVEP_REPO_ROOT=$(PROJ_DIR) Rscript -e "rmarkdown::render('benchmarks/duckvep_throughput.Rmd', quiet = TRUE)"
+
 # Host-neutral C properties over the kernel views (theft + greatest, no DuckDB),
 # always under ASan and UBSan. DUCKVEP_PROP_TRIALS and DUCKVEP_PROP_SEED make a
 # run larger or reproducible; read_sources.pl checks every test is registered.

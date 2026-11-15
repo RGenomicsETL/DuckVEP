@@ -612,6 +612,7 @@ static duckvep_hgvs_status_t hgvs_dna_fact_build_clamped_feature(
     uint32_t genomic_first1;
     uint32_t genomic_last1;
     int duplication = 0;
+    int inversion = 0;
     int8_t strand;
 
     if (out == NULL) return DUCKVEP_HGVS_INVALID_ARG;
@@ -732,6 +733,32 @@ static duckvep_hgvs_status_t hgvs_dna_fact_build_clamped_feature(
         return DUCKVEP_HGVS_OK;
     }
 
+    /* hgvs_variant_notation() also names an inversion from the clamped
+     * slice before _clip_alleles() runs, and clipping keeps that type. */
+    if (reference_length > 1u && alternate_length == reference_length) {
+        size_t i;
+        inversion = 1;
+
+        for (i = 0u; i < reference_length; i++) {
+            uint8_t reference_base;
+            uint8_t alternate_base;
+
+            status = hgvs_oriented_allele_base(
+                reference_allele, reference_length, (int8_t)1, 0u,
+                reference_length - 1u - i, &reference_base);
+            if (status != DUCKVEP_HGVS_OK) return status;
+            status = hgvs_oriented_allele_base(
+                alternate_allele, alternate_length, (int8_t)1, 0u, i,
+                &alternate_base);
+            if (status != DUCKVEP_HGVS_OK) return status;
+            if (alternate_base !=
+                (uint8_t)duckvep_dna_complement((char)reference_base)) {
+                inversion = 0;
+                break;
+            }
+        }
+    }
+
     while (prefix < reference_length && prefix < alternate_length) {
         uint8_t ref_base;
         uint8_t alt_base;
@@ -817,6 +844,8 @@ static duckvep_hgvs_status_t hgvs_dna_fact_build_clamped_feature(
         result.shape = (uint8_t)DUCKVEP_HGVS_DNA_DELETION;
     } else if (reference_length == 0u) {
         result.shape = (uint8_t)DUCKVEP_HGVS_DNA_INSERTION;
+    } else if (inversion) {
+        result.shape = (uint8_t)DUCKVEP_HGVS_DNA_INVERSION;
     } else {
         result.shape = (uint8_t)DUCKVEP_HGVS_DNA_REPLACEMENT;
     }
