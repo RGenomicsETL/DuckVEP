@@ -67,10 +67,10 @@ build <- run(
     "-std=c99",
     "-Wall",
     "-Wextra",
-    glue("-I{repo}/src/duckvep/kernel/include"),
-    glue("-I{repo}/src/duckvep/kernel/src"),
+    glue("-I{repo}/src/kernel/include"),
+    glue("-I{repo}/src/kernel/src"),
     glue("{base}/so_dump.c"),
-    glue("{repo}/src/duckvep/kernel/src/duckvep_so.c"),
+    glue("{repo}/src/kernel/src/duckvep_so.c"),
     "-o",
     dump_bin
   )

@@ -355,18 +355,18 @@ main <- function() {
     writeLines(c(">bench", sequence), reference_fasta)
     stopifnot(system2("samtools", c("faidx", shQuote(reference_fasta))) == 0L)
   }
-  sources <- c("benchmarks/duckvep_haplotype_stream.c", paste0("src/duckvep/kernel/src/duckvep_",
+  sources <- c("benchmarks/duckvep_haplotype_stream.c", paste0("src/kernel/src/duckvep_",
     c("haplotype", "carriers", "phase", "haplotype_stream", "classify", "codon", "coding", "projection", "delta"), ".c"))
   shared <- file.path(out, paste0("stream", .Platform$dynlib.ext))
   compiler <- Sys.getenv("CC", "cc")
   flags <- c("-std=c99", "-O3", "-DNDEBUG", "-Wall", "-Wextra", "-fPIC", "-shared",
-    "-I", "src/duckvep/kernel/src", "-I", "src/duckvep/kernel/include")
+    "-I", "src/kernel/src", "-I", "src/kernel/include")
   stopifnot(system2(compiler, shQuote(c(flags, sources, "-o", shared)),
     stdout = file.path(out, "compiler.log"), stderr = file.path(out, "compiler.log")) == 0L)
   identities <- c(paths, if (!is.null(reference_fasta)) c(reference_fasta, paste0(reference_fasta, ".fai")),
     extension, shared, sources,
-    list.files("src/duckvep/kernel/src", "\\.(h|inc)$", full.names = TRUE),
-    "src/duckvep/kernel/include/duckvep_kernel.h", "benchmarks/duckvep_haplotypes.R",
+    list.files("src/kernel/src", "\\.(h|inc)$", full.names = TRUE),
+    "src/kernel/include/duckvep_kernel.h", "benchmarks/duckvep_haplotypes.R",
     "r/duckhtsbench/inst/benchmark_registry.tsv")
   hashes <- vapply(identities, duckvep_evidence_sha256, "")
   results <- list()

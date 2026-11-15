@@ -58,13 +58,13 @@ main <- function() {
   write.csv(csq, file.path(out, "bcftools-rows.csv"), row.names = FALSE)
 
   sources <- c("test/duckvep/conformance/compound_coding_probe.c",
-    paste0("src/duckvep/kernel/src/duckvep_", c("delta", "haplotype", "codon", "coding", "projection"), ".c"))
-  code <- c(sources, list.files("src/duckvep/kernel/src", "\\.h$", full.names = TRUE),
-    "src/duckvep/kernel/include/duckvep_kernel.h", "test/duckvep/conformance/compound_coding_audit.R")
+    paste0("src/kernel/src/duckvep_", c("delta", "haplotype", "codon", "coding", "projection"), ".c"))
+  code <- c(sources, list.files("src/kernel/src", "\\.h$", full.names = TRUE),
+    "src/kernel/include/duckvep_kernel.h", "test/duckvep/conformance/compound_coding_audit.R")
   code_hashes <- vapply(code, duckvep_evidence_sha256, "")
   shared <- file.path(out, paste0("compound_coding_probe", .Platform$dynlib.ext))
   stopifnot(system2(Sys.getenv("CC", "cc"), shQuote(c("-std=c99", "-O1", "-g", "-Wall", "-Wextra",
-    "-fPIC", "-shared", "-I", "src/duckvep/kernel/src", "-I", "src/duckvep/kernel/include",
+    "-fPIC", "-shared", "-I", "src/kernel/src", "-I", "src/kernel/include",
     sources, "-o", shared)), stdout = file.path(out, "compiler.log"),
     stderr = file.path(out, "compiler.log")) == 0L)
   dll <- dyn.load(shared)
