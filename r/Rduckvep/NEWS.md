@@ -1,4 +1,6 @@
-# Rduckvep
+# Rduckvep 1.5.2.9002.0.1.0
+
+Preview of 2.0.0.0.1.0, still in development. The section below describes what it will contain.
 
 - `rduckvep_haplotypes()` works on the C API v2 host: it stages the calls with `duckvep_haplotype_load_sql()` under a unique job name, runs the statements on the connection and reads `duckvep_haplotype_scan()`, dropping the job if staging fails. It called `duckvep_haplotypes()`, which the v2 host does not register.
 - `rduckvep_load()` falls back to the newest bundled artifact when none was built for the installed duckdb version. The artifact declares the stable C API v1.2.0, so upgrading duckdb no longer requires reinstalling Rduckvep before DuckVEP loads.

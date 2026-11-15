@@ -5,7 +5,7 @@ bibentry(
   title = "DuckVEP: relation-first variant consequence and haplotype annotation in DuckDB",
   author = person("Sounkou Mahamane", "Toure"),
   year = "2026",
-  note = "R package Rduckvep version 0.1.0",
+  note = paste("R package Rduckvep version", meta$Version),
   url = "https://github.com/RGenomicsETL/DuckVEP"
 )
 
