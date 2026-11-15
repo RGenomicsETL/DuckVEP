@@ -529,9 +529,11 @@ main <- function() {
   number_columns <- c("trials", "passed", "failed", "skipped", "duplicates")
   properties[number_columns] <- lapply(properties[number_columns], as.numeric)
   if (
-    any(properties$failed != 0) || any(properties$passed != properties$trials)
+    any(properties$failed != 0) ||
+      any(properties$passed == 0) ||
+      any(properties$passed + properties$skipped != properties$trials)
   ) {
-    die("a property target did not pass every requested trial")
+    die("a property target failed a trial or did not account for every trial")
   }
 
   coverage_lines <- grep("\\[[^]]+ coverage\\]", log, value = TRUE)
