@@ -1,6 +1,6 @@
 Package: Rduckvep
 Title: DuckDB Variant Consequence Annotation
-Version: 0.1.0
+Version: 1.5.2.9002.0.1.0
 Authors@R: person("Sounkou Mahamane", "Toure", role = c("aut", "cre"), email = "sounkoutoure@gmail.com")
 Description: Builds and loads the bundled DuckVEP C extension for relation-first variant consequence and phased-haplotype annotation.
 License: GPL (>= 2)

@@ -1,4 +1,4 @@
-# Rduckvep 0.1.0 — CRAN submission comments
+# Rduckvep 1.5.2.9002.0.1.0 — CRAN submission comments
 
 ## Test environments
 
