@@ -206,8 +206,11 @@ with_environment("DUCKVEP_CORPUS_STAGER", {
 })
 
 evidence <- readme_evidence(root)
-stopifnot(identical(evidence$newest_conformance_run, "2026-07-16"))
-stopifnot(identical(evidence$newest_hgvs_run, "2026-09-07"))
+# ISO dates order as strings: the newest runs are the 2026-11-15 campaigns or later ones.
+stopifnot(grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", evidence$newest_conformance_run),
+  evidence$newest_conformance_run >= "2026-11-15")
+stopifnot(grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", evidence$newest_hgvs_run),
+  evidence$newest_hgvs_run >= "2026-11-15")
 
 # A corpus with no reachable revision is omitted from the complete evidence table.
 probe <- readme_evidence
