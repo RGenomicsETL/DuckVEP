@@ -1,0 +1,24 @@
+{
+  "species": "homo_sapiens",
+  "assembly": "GRCh38",
+  "cache_version": 116,
+  "regulatory": false,
+  "variation_cols": [
+    "variation_name",
+    "failed",
+    "somatic",
+    "start",
+    "end",
+    "allele_string",
+    "strand",
+    "minor_allele",
+    "minor_allele_freq",
+    "clin_sig",
+    "phenotype_or_disease",
+    "pubmed"
+  ],
+  "source_versions": {
+    "assembly": "GRCh38.p14",
+    "genebuild": "2025-11"
+  }
+}
