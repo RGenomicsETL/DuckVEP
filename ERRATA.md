@@ -54,6 +54,15 @@ All 336,000 independent SO comparisons agree in that finite matrix. These are re
 diagnostics, not current-build certificates, population error rates, or proof for
 compound events, reverse strands or phase-padded indels.
 
+An insertion in a CDS whose inserted bases contain `N` is `unresolved` with reason
+`ambiguous_sequence` and reports `coding_sequence_variant`. VEP decides `frameshift_variant`
+from the lengths alone, so the two differ when the inserted length is not a multiple of three.
+In a ClinVar sample of 11,819 alleles of at most 101 bases, 19 such insertions of 58 to 100
+bases give 378 transcript pairs: the 134 pairs of the 7 in-frame insertions agree, and the 244
+pairs of the 12 frame-changing insertions differ
+([retained rows](test/duckvep/conformance/data/ambiguous_insertion_payload/clinvar_seed113.csv)).
+The recorded ClinVar consequence campaign bounds alleles at 50 bases and contains none.
+
 Circular sequence regions are modelled where VEP has no model. A region flagged `circular_seq` that holds a
 transcript, exon or feature with `start > end` runs on lifted intervals; VEP 116 reads such a transcript as
 an ordinary interval with reversed bounds. In three public genomes with a VEP cache
