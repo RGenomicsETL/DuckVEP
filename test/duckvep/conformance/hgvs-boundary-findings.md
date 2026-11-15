@@ -133,6 +133,6 @@ The first run of this sweep found ten differing rows ([#75](https://github.com/R
    The protein is then a frameshift (`p.Ter81AsnfsTer13`), not the stop equality VEP writes for the same change without a shift.
 
 Rules 2 and 3 were read from an instrumented VEP 116.0 run and its `VariationEffect.pm`.
-Rule 4 is inferred from the installed source and confirmed only by the two chromosome 21 rows; no synthetic fixture reproduces the shift on VEP's GFF path.
+Rule 4 is inferred from the installed source and confirmed by chromosome 21 rows on VEP's cache path; VEP's GFF path does not reproduce the shift.
 
-Fixtures: [`duckvep_stop_boundary.test`](../../sql/duckvep_stop_boundary.test) (six rows equal to VEP 116.0 on its GFF path, rules 2 and 3) and the `splice_region_requires_within_feature` property (rule 1).
+Fixtures: [`duckvep_stop_boundary.test`](../../sql/duckvep_stop_boundary.test) (six rows equal to VEP 116.0 on its GFF path, rules 2 and 3; four rows on the sequence of `ENST00001093239` equal to VEP 116.0 on its cache path, rule 4) and the `splice_region_requires_within_feature` property (rule 1).
