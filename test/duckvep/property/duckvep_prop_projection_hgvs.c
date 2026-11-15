@@ -2153,8 +2153,14 @@ static enum theft_trial_res prop_hgvs_shift_matches_genomic_oracle(
         duckvep_hgvs_status_t got_status =
             duckvep_hgvs_dna_fact_build_genomic_shifted(
                 &s->tx, &s->ex, &s->reference, &s->edit, &fact);
+        /* On a reverse transcript VEP names the base immediately below
+         * transcript start as a +1 offset from the terminal exon base, so a
+         * plain insertion shifted to that pair stays printable. */
+        int external_flank = s->insertion != 0u && s->strand < 0 &&
+            expected_shape == (uint8_t)DUCKVEP_HGVS_DNA_INSERTION &&
+            expected_last == s->transcript_length + 1u;
         duckvep_hgvs_status_t expected_status =
-            expected_last > s->transcript_length
+            expected_last > s->transcript_length && !external_flank
                 ? DUCKVEP_HGVS_NOT_APPLICABLE : DUCKVEP_HGVS_OK;
         if (got_status != expected_status) {
             fprintf(stderr,
@@ -2167,6 +2173,24 @@ static enum theft_trial_res prop_hgvs_shift_matches_genomic_oracle(
             KPROP_HGVS_SHIFT_FAIL();
         }
         if (expected_status == DUCKVEP_HGVS_NOT_APPLICABLE) {
+            return THEFT_TRIAL_PASS;
+        }
+        if (external_flank) {
+            /* The CDS ends at the transcript end in this scenario, so the
+             * external flank is the +1 offset from the last coding base.
+             * CDS composition is outside the contract here, as it is for a
+             * terminal duplication: production checks the shifted mapper
+             * endpoints before it composes. */
+            if (fact.shift_offset != (int32_t)shift ||
+                fact.shape != expected_shape ||
+                fact.first.kind != (uint8_t)DUCKVEP_HGVS_COORDINATE_C ||
+                fact.first.base != (int64_t)s->transcript_length ||
+                fact.first.intron_offset != 0 ||
+                fact.last.kind != (uint8_t)DUCKVEP_HGVS_COORDINATE_C_STAR ||
+                fact.last.base != 0 ||
+                fact.last.intron_offset != 1) {
+                KPROP_HGVS_SHIFT_FAIL();
+            }
             return THEFT_TRIAL_PASS;
         }
         if (got_status != DUCKVEP_HGVS_OK ||
