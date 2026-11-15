@@ -259,6 +259,10 @@ typedef struct duckvep_coding_context {
      * insertion. CDS distance cannot derive this: an intron may lie between
      * the insertion and terminal codon. */
     uint8_t insertion_length_reaches_terminal_stop;
+    /* A span feature that lies outside the three genomic bases ending at the
+     * coding-region end. _overlaps_stop_codon_cil tests that window without
+     * splicing, so a stop codon split across an intron is only partly in it. */
+    uint8_t span_misses_genomic_terminal_stop;
     /* Sparse Ensembl Translation SeqEdits. Positions are one-based and sorted.
      * They are an overlay on the reference peptide only: VEP deliberately
      * leaves the alternate peptide as the raw codon translation. */

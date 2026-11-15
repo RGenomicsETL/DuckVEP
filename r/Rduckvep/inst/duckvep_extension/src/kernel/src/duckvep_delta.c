@@ -2632,6 +2632,36 @@ static uint8_t delta_insertion_length_reaches_terminal_stop(
                      feature_start1 <= stop_end1);
 }
 
+static uint8_t delta_span_misses_genomic_terminal_stop(
+    const duckvep_transcript_model_t *transcripts,
+    size_t                            tx_idx,
+    const duckvep_event_t            *event) {
+
+    int64_t stop_start1;
+    int64_t stop_end1;
+    int8_t strand;
+
+    if (transcripts == NULL || event == NULL || transcripts->strand == NULL ||
+        transcripts->cds_start1 == NULL || transcripts->cds_end1 == NULL ||
+        tx_idx >= transcripts->transcript_count || event->interbase ||
+        event->feature_start1 == 0u ||
+        event->feature_end1 < event->feature_start1 ||
+        transcripts->cds_start1[tx_idx] == 0u) {
+        return 0u;
+    }
+    strand = transcripts->strand[tx_idx];
+    if (strand != (int8_t)1 && strand != (int8_t)-1) return 0u;
+    if (strand > 0) {
+        stop_end1 = (int64_t)transcripts->cds_end1[tx_idx];
+        stop_start1 = stop_end1 - 2;
+    } else {
+        stop_start1 = (int64_t)transcripts->cds_start1[tx_idx];
+        stop_end1 = stop_start1 + 2;
+    }
+    return (uint8_t)!((int64_t)event->feature_end1 >= stop_start1 &&
+                      (int64_t)event->feature_start1 <= stop_end1);
+}
+
 DUCKVEP_INTERNAL_API duckvep_variant_coding_context_status_t duckvep_coding_context_attach_model(
     const duckvep_transcript_model_t *transcripts,
     const duckvep_exon_model_t       *exons,
@@ -2667,6 +2697,8 @@ DUCKVEP_INTERNAL_API duckvep_variant_coding_context_status_t duckvep_coding_cont
     ctx->insertion_length_reaches_terminal_stop =
         delta_insertion_length_reaches_terminal_stop(
             transcripts, tx_idx, event);
+    ctx->span_misses_genomic_terminal_stop =
+        delta_span_misses_genomic_terminal_stop(transcripts, tx_idx, event);
     if (event != NULL &&
         event->feature_length_relation !=
             (uint8_t)DUCKVEP_FEATURE_LENGTH_UNKNOWN) {
@@ -3893,6 +3925,7 @@ typedef struct delta_coding_span {
     int8_t alt_orientation;
     uint8_t equal_length_strings;
     uint8_t insertion_length_reaches_terminal_stop;
+    uint8_t span_misses_genomic_terminal_stop;
 } delta_coding_span_t;
 
 /* Final start_lost predicate after the two UTR+CDS string tests. */
@@ -4276,7 +4309,10 @@ static duckvep_context_delta_status_t delta_context_length_change_window(
                 if (status != DUCKVEP_CONTEXT_DELTA_OK) return status;
                 delta->stop_retained = (uint8_t)!endpoint_altered;
             } else if (!feature_is_substitution && overlaps_terminal &&
-                       span->ref_len != 0u) {
+                       span->ref_len != 0u &&
+                       !span->span_misses_genomic_terminal_stop) {
+                /* stop_retained needs _overlaps_stop_codon_cil, which tests
+                 * the genomic feature against the unspliced window. */
                 status = delta_context_original_endpoint_stop_altered(
                     ctx, span, &endpoint_altered, &endpoint_aa);
                 if (status != DUCKVEP_CONTEXT_DELTA_OK) return status;
@@ -4500,7 +4536,8 @@ static duckvep_context_delta_status_t delta_context_length_change_predicates(
         .length_diff = ctx->length_diff,
         .alt_orientation = ctx->single_edit_variant_strand == ctx->transcript_strand ? 1 : -1,
         .equal_length_strings = ctx->feature_length_relation == DUCKVEP_FEATURE_LENGTH_EQUAL,
-        .insertion_length_reaches_terminal_stop = ctx->insertion_length_reaches_terminal_stop
+        .insertion_length_reaches_terminal_stop = ctx->insertion_length_reaches_terminal_stop,
+        .span_misses_genomic_terminal_stop = ctx->span_misses_genomic_terminal_stop
     };
     return delta_context_length_change_window(ctx, &view, &span, 0, tx_flags, delta);
 }

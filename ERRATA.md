@@ -266,6 +266,58 @@ not a published conformance pack or release-build certificate. The shipped
 provides the broader executable comparison. DuckVEP's compatibility target remains
 each original record's VEP result; this inference does not replace it.
 
+### Stop-codon deletions at an exon junction
+
+**Classification: reproduced sequence contradictions on synthetic and chromosome 21
+inputs; mechanism traced in the installed VEP 116.0 source; no upstream acknowledgement.**
+
+VEP's own [known-bugs list](https://github.com/Ensembl/ensembl-vep#known-bugs) says that
+variants overlapping exon/intron boundaries can get incorrect consequences and HGVS.
+The rows below belong to that family. DuckVEP reproduces each VEP result; the
+sequence-true reading is recorded here and does not replace it.
+
+The forward transcript `STOP2` of [`duckvep_stop_boundary.test`](test/sql/duckvep_stop_boundary.test)
+has CDS `ATGGCCGCCGCAAAATGA`, with the stop codon split `TG|A` by an intron, and
+3-prime UTR `AATTGTGAGG...`. The unsplit transcript `STOP1` has CDS `ATGGCCGCCATCGACTGA`.
+
+| Record | VEP and DuckVEP | Sequence |
+| --- | --- | --- |
+| `STOP2:1516 TG>T` (`c.17del`) | `splice_region_variant`, `coding_sequence_variant`; `p.Ter6=` | `TGA` becomes `TAA`: the stop is retained, as the protein name says, but no stop term is reported |
+| `STOP2:1515 AT>A` (`c.16del`) | `stop_lost`; `p.Ter6=` | `TGA` becomes `GAA` (Glu): the stop is lost, and the protein name asserts it is unchanged |
+| `STOP1:1516 TGA>T` (`c.17_18del`) | `stop_lost`; `p.Ter6=` | `TGA` becomes `TTT` (Phe): as above |
+
+Mechanisms:
+
+- `stop_retained` for a deletion with an `X` peptide allele calls `_overlaps_stop_codon_cil`,
+  which tests the three genomic bases ending at the coding-region end. For a split stop
+  codon those bases include intron, and the stop bases before the intron are outside
+  the window. No stop term is then evaluated and `coding_unknown` remains.
+- `frameshift` returns false when the reference peptide allele starts with the stop, so
+  the protein formatter does not take its frameshift branch and writes an equality at the stop.
+- When the original feature crosses the junction it has no peptide alleles. After the
+  3-prime shift places it inside the CDS, the same deletion is written as a frameshift:
+  `21:42362489 CAC>C` on `ENST00001093239` is `p.Ter81AsnfsTer13`, the sequence-true
+  name. The synthetic `STOP3:1618 GTG>G`, the same kind of edit given inside the exon,
+  is `stop_lost` with `p.Ter7=`.
+
+The [stop-codon sweep](test/duckvep/conformance/stop_codon_sweep.sh) reproduces the
+chromosome 21 rows; [the findings](test/duckvep/conformance/hgvs-boundary-findings.md)
+give the counts. This does not establish prevalence beyond that chromosome.
+
+### Upstream known bugs and DuckVEP
+
+VEP publishes a list of known bugs. Where one changes output inside DuckVEP's
+surface, DuckVEP follows the executable, as the compatibility target requires.
+
+| Upstream known bug | DuckVEP |
+| --- | --- |
+| Exon/intron boundary variants can get incorrect consequences or HGVS | Followed; witnesses above and in the boundary findings |
+| Incomplete terminal codons give unreliable consequences | Followed; partial-codon rules under "Record geometry and consequence terms" |
+| `--hgvs` with `--no_stats` on multiallelic input can give wrong positions | Not modelled: DuckVEP annotates each ALT as an independent event |
+| Multi-allelic alleles are not minimised by default | Followed by `duckvep_vcf_events_sql`, which reads records as VEP does |
+| `--shift_3prime` does not shift non-coding transcripts | Outside the surface: DuckVEP has no `--shift_3prime` mode |
+| Frequency filtering of indels; `--fork` with `--merged` HGNC ids | Outside the surface |
+
 <a id="haplosaurus-reference-and-alternate-proteins-use-different-stop-rules"></a>
 
 ## Haplotype sequences, reference curation and flags
