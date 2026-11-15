@@ -179,13 +179,16 @@ test-duckvep-gvcf-differential: release
 		--split-multiallelic --sample-per-shape 0 --distance 0 --max-allele-length 171
 
 # Reproducible rare-state exploration. The generated VCF and the pair-level Parquet
-# stay under the ignored results directory with their seed.
+# stay under the ignored results directory with their seed. The allele limit covers
+# the fixed witnesses, which are longer than the random cases.
 test-duckvep-state-exploration: release
 	@set -e; \
 	cases=$${DUCKVEP_STATE_CASES:-20000}; \
 	seed=$${DUCKVEP_STATE_SEED:-17}; \
 	max_len=$${DUCKVEP_STATE_MAX_LENGTH:-10}; \
 	trials=$${DUCKVEP_PROP_TRIALS:-100000}; \
+	allele_limit=$$((max_len + 1)); \
+	if [ $$allele_limit -lt 101 ]; then allele_limit=101; fi; \
 	Rscript test/duckvep/conformance/property_history.R \
 		--trials $$trials --seed $$seed \
 		--history test/duckvep/conformance/results/state_exploration_seed_$${seed}_properties.csv \
@@ -198,7 +201,7 @@ test-duckvep-state-exploration: release
 		--seed $$seed --out $$vcf; \
 	$(DUCKVEP_DIFFERENTIAL) --corpus state_exploration_seed_$${seed} \
 		--vcf $$vcf --sample-per-shape 0 --seed $$seed \
-		--max-allele-length $$((max_len + 1)) --hgvs
+		--max-allele-length $$allele_limit --hgvs
 
 # Replace this revision's witness rows in the two conformance ledgers.
 duckvep-record-conformance: test-duckvep-differential
