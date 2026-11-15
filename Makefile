@@ -151,6 +151,14 @@ duckvep-generated-check:
 	perl test/duckvep/property/inventory_test.pl
 	perl test/duckvep/upstream/check_sources.pl
 
+# The kernel properties without sanitizers, which property_history.R runs and records.
+# test_properties is the sanitized run.
+.PHONY: test-duckvep-kernel test-duckvep-kernel-statistical
+test-duckvep-kernel: duckvep-generated-check
+	$(MAKE) test_properties PROPERTY_SANITIZE=
+test-duckvep-kernel-statistical:
+	DUCKVEP_PROP_TRIALS=$${DUCKVEP_PROP_TRIALS:-100000} $(MAKE) test-duckvep-kernel
+
 # The campaign ledger names the source revision of each campaign. The current check
 # also requires each revision to be an ancestor of HEAD with unchanged semantic inputs.
 duckvep-state-contract-check:
