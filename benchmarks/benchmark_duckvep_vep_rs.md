@@ -11,8 +11,8 @@ differ.
 
 |                                                |    DuckVEP |     vep-rs |
 |------------------------------------------------|-----------:|-----------:|
-| Median wall time, one core                     |     35.0 s |     41.9 s |
-| Median CPU time                                |     35.0 s |     39.7 s |
+| Median wall time, one core                     |     34.3 s |     41.2 s |
+| Median CPU time                                |     34.3 s |     40.3 s |
 | Median peak memory                             |   2.66 GiB |   2.77 GiB |
 | Output rows                                    | 47,278,065 | 36,258,238 |
 | Transcripts in output                          |    598,993 |    421,878 |
@@ -27,8 +27,7 @@ neither on 1.
 
 The 3 cold-process pairs ran one after another on CPU 4, vep-rs first in
 each pair. Each timed process includes startup, extension load, model
-snapshot restore, VCF read and sort, annotation, and output. Lines join
-the two halves of a pair.
+snapshot restore, VCF read and sort, annotation, and output.
 
 <div class="figure" style="text-align: center">
 
@@ -103,22 +102,22 @@ Run design and reproduction
 Render from the repository root with
 `Rscript benchmarks/scripts/render_benchmarks.R vep_rs`. The report
 reads the newest `benchmarks/data/vep_rs/*_paired` directory, here
-2417ac9_paired, measured at DuckVEP revision 2417ac9.
+2c7a930_paired, measured at DuckVEP revision 2c7a930.
 
 vep-rs ran its release binary with `--fork 1`. DuckVEP ran with
 `SET threads = 1`, so both used one worker on the pinned core. The
 adjudicating VEP uses `--gtf` with the same GTF the vep-rs cache was
 built from.
-[`run_receipt.tsv`](data/vep_rs/2417ac9_paired/run_receipt.tsv) records
+[`run_receipt.tsv`](data/vep_rs/2c7a930_paired/run_receipt.tsv) records
 the executables and their hashes;
-[`preparation.receipt.tsv`](data/vep_rs/2417ac9_paired/preparation.receipt.tsv)
+[`preparation.receipt.tsv`](data/vep_rs/2c7a930_paired/preparation.receipt.tsv)
 and
-[`preparation_outputs.sha256`](data/vep_rs/2417ac9_paired/preparation_outputs.sha256)
+[`preparation_outputs.sha256`](data/vep_rs/2c7a930_paired/preparation_outputs.sha256)
 bind the inputs and the prepared snapshot. Paths in them locate the
 measurement host’s files.
-[`timings.tsv`](data/vep_rs/2417ac9_paired/timings.tsv),
-[`stage_timings.tsv`](data/vep_rs/2417ac9_paired/stage_timings.tsv) and
-[`adjudication.txt`](data/vep_rs/2417ac9_paired/adjudication.txt) are
+[`timings.tsv`](data/vep_rs/2c7a930_paired/timings.tsv),
+[`stage_timings.tsv`](data/vep_rs/2c7a930_paired/stage_timings.tsv) and
+[`adjudication.txt`](data/vep_rs/2c7a930_paired/adjudication.txt) are
 the raw outputs this page is drawn from.
 
 To reproduce, set `DUCKVEP_READER_EXT`, `DUCKVEP_MODEL`, `VEP_RS_CACHE`,
