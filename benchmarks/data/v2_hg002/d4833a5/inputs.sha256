@@ -1,0 +1,8 @@
+62d7731dd8722dd521e899fa470886626e254c1b118c17747473110a04152119  /root/.local/bin/duckdb
+c41f957db5645d545a9caef430994cf262d24fad9297fef70c691395aadb43fb  /root/duckvep/data/duckdb-2.0.0/duckdb
+2fac5054668a57b8d9a07ced489aecb0f29e167cd08ae98355856d9af3d2a109  /root/duckvep/DuckVEP/build/release/duckvep.duckdb_extension
+36152d1951bdf8a29323c71b98e13b8cd564e97fa19a42698d4fb078d147906c  /root/duckvep/DuckVEP/build/release_v2/duckvep.duckdb_extension
+0301905915b038b6b1f5db04d7dda1041ac5e30a7732ec700dd82b1616402c1b  /root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb
+54e5d09d3d6524a5daeaba8bfa911a8c760d1f50c81b51830404281c7b9ebf9e  /root/duckvep/data/hg002-csq/hg002.ens.vcf.gz
+f55564444a7df8ad7823d856f80331f505460654ef9b8d6bbcc32587a7ad3460  /root/duckvep/DuckVEP/scripts/check_v2_hg002.sh
+9b92d879e4f1a5b5f8e7b198c773299f80f060a4f9126ea132ee1c761049e8b7  /root/duckvep/DuckVEP/duckvep-package.json

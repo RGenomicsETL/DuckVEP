@@ -26,7 +26,7 @@ duckvep_append_extension_metadata <- function(
     },
     logical(1)
   )]
-  if (length(missing)) {
+  if (length(missing) > 0L) {
     stop(
       "Missing extension metadata value(s): ",
       paste(missing, collapse = ", "),

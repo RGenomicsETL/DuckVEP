@@ -1,6 +1,6 @@
 {
   "name": "duckvep",
-  "version-string": "1.5.2.9002",
+  "version-string": "2.0.0",
   "description": "Ensembl VEP consequence annotation in DuckDB",
   "dependencies": ["zlib"],
   "default-features": [],

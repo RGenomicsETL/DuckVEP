@@ -99,8 +99,8 @@ The v2 arrangement job is consumed once. The scan fully validates and charges th
 
 ## Whole-HG002 parity measurement
 
-The receipt at [`benchmarks/data/v2_hg002/1967499/`](../benchmarks/data/v2_hg002/1967499/README.md) records a run measured on 2026-11-15 with biological implementation `1967499`, v1 DuckDB source `7dbb2e646f`, and the released DuckDB v2.0.0 source `d54cbbe3df17e8e5ce68312f483b4155836112aa`. The run used one thread on CPU 4 and an 8 GB DuckDB memory limit.
+The receipt at [`benchmarks/data/v2_hg002/d4833a5/`](../benchmarks/data/v2_hg002/d4833a5/README.md) records a run measured on 2026-11-19 with the 2.0.0 release candidate at `d4833a5`, v1 DuckDB source `7dbb2e646f`, and the released DuckDB v2.0.0 source `d54cbbe3df17e8e5ce68312f483b4155836112aa`. The run used one thread on CPU 4 and an 8 GB DuckDB memory limit.
 
-Both hosts produced 158,137 rows, including 157,635 predicted paths. Schema and the complete nested row multiset matched by bidirectional `EXCEPT ALL`. The model fingerprint was `8650913055114199712` on each host. Native-memory high-water stayed below 4 GiB, with zero capacity refusals. Peak RSS was 4,039,124 KiB (3.85 GiB) on v1 and 4,692,000 KiB (4.47 GiB) on v2. The v2 capture collections are DuckDB-managed and outside the native budget. Wall times were 9.76 s on v1 and 9.57 s on v2; these values are descriptive rather than a throughput qualification.
+Both hosts produced 158,137 rows. Schema and the complete nested row multiset matched by bidirectional `EXCEPT ALL`. The model fingerprint was `8650913055114199712` on each host. Native-memory high-water stayed below 4 GiB, with zero capacity refusals. Peak RSS was 4,038,968 KiB (3.85 GiB) on v1 and 4,689,272 KiB (4.47 GiB) on v2. The v2 capture collections are DuckDB-managed and outside the native budget. Wall times were 10.07 s on v1 and 9.72 s on v2; these values are descriptive rather than a throughput qualification.
 
 The receipt includes hashes, schemas, budget snapshots, inputs and outputs' provenance. `scripts/check_v2_hg002.sh --help` describes the reproduction inputs and options. The full-data run is separate from `make test_v2`.

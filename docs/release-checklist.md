@@ -18,7 +18,8 @@ The scheme is the one DuckHTS uses.
 - The extension version is `version:` in `description.yml`. `CITATION.cff` and `vcpkg.json` carry the same value.
 - The R package version is `Version:` in `r/Rduckvep/DESCRIPTION`: the extension version, a dot, then the three-part R packaging revision (for example `2.0.0.0.1.0`, or `1.5.2.9002.0.1.0` in development).
 - The first release is extension `2.0.0` with R package `2.0.0.0.1.0`.
-- Until a release is tagged, development stays on the `X.Y.Z.9NNN` line, and NEWS labels its top section as a preview of the coming release. Set the release version only when the release is tagged.
+- Between releases, development stays on the `X.Y.Z.9NNN` line, and NEWS labels its top section as a preview of the coming release.
+- Set the release version in the release candidate commit, before the conformance campaigns run. `make duckvep-state-current-check` compares `description.yml` with each campaign's revision, so a later version change makes the recorded campaigns stale.
 - For a release, remove the development suffix and keep the packaging revision.
 - After a release of `X.Y.Z` to CRAN and the community repository, start the next cycle with `X.Y.Z.9000` and `X.Y.Z.9000.A`. Increment the suffix for each published development update.
 - Do not edit `configure/extension_version.txt`; `make configure` writes it.

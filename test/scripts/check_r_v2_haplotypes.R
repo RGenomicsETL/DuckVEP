@@ -35,8 +35,8 @@ check_host <- function(extension, v2) {
   stopifnot(is.character(failure), grepl("missing_calls", failure),
     identical(dbReadTable(con, 'output"table'), rows),
     identical(dbGetQuery(con, budget), before))
-  failure <- tryCatch(getFromNamespace(".duckvep_create_table", "Rduckvep")(
-    con, 'output"table', "SELECT error('output execution failed')", TRUE), error = conditionMessage)
+  failure <- tryCatch(getFromNamespace(".duckvep_query_result", "Rduckvep")(
+    con, "SELECT error('output execution failed')", 'output"table', TRUE), error = conditionMessage)
   stopifnot(is.character(failure), grepl("output execution failed", failure),
     identical(dbReadTable(con, 'output"table'), rows))
   failure <- tryCatch(rduckvep_haplotypes(con, query, "haplotypes", table_name = 'output"table'),

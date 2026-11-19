@@ -916,7 +916,7 @@ duckvep_haplotype_status_t duckvep_haplotype_apply_cds_edits(
 
     {
         /* Rebuild once from right to left. Every reference byte and ALT byte is
-         * written exactly once; edit count no longer multiplies CDS-tail moves. */
+         * written exactly once, so the cost does not grow with the edit count. */
         size_t src_cursor = ref_cds_len;
         size_t dst_cursor = final_len;
 

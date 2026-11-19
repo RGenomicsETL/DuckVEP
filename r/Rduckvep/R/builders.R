@@ -57,7 +57,7 @@ NULL
 
 .duckvep_builder_sql <- function(con, builder, required, options) {
   args <- vapply(required, function(value) .duckvep_builder_literal(con, value), "")
-  if (length(options)) {
+  if (length(options) > 0L) {
     keys <- names(options)
     if (is.null(keys) || anyNA(keys) || any(!nzchar(keys)) || anyDuplicated(keys)) {
       stop("Builder options must have unique nonempty names", call. = FALSE)

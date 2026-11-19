@@ -1,8 +1,13 @@
 Package: Rduckvep
-Title: DuckDB Variant Consequence Annotation
-Version: 1.5.2.9002.0.1.0
+Title: 'DuckDB' Variant Consequence and Haplotype Annotation
+Version: 2.0.0.0.1.0
 Authors@R: person("Sounkou Mahamane", "Toure", role = c("aut", "cre"), email = "sounkoutoure@gmail.com")
-Description: Builds and loads the bundled DuckVEP C extension for relation-first variant consequence and phased-haplotype annotation.
+Description: Builds and loads the bundled 'DuckVEP' extension for 'DuckDB', which predicts the
+    consequences of genomic variants on 'Ensembl' transcript models with SQL table functions.
+    Variants, transcript models and results are relations. The package provides wrappers that load
+    a model, annotate single variants in the manner of the 'Ensembl' Variant Effect Predictor
+    ('VEP') release 116, name them in Human Genome Variation Society ('HGVS') notation, and
+    predict the joint consequences of phased variants on a haplotype.
 License: GPL (>= 2)
 URL: https://rgenomicsetl.github.io/DuckVEP/Rduckvep/, https://github.com/RGenomicsETL/DuckVEP
 BugReports: https://github.com/RGenomicsETL/DuckVEP/issues
