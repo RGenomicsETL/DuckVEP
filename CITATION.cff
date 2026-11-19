@@ -9,7 +9,7 @@ authors:
 repository-code: "https://github.com/RGenomicsETL/DuckVEP"
 url: "https://rgenomicsetl.github.io/DuckVEP/"
 license: GPL-2.0-or-later
-version: 1.5.2.9002
+version: 2.0.0
 keywords:
   - variant annotation
   - consequence prediction

@@ -1,6 +1,6 @@
-# DuckVEP 1.5.2.9002
+# DuckVEP 2.0.0
 
-Preview of 2.0.0, the first release, still in development. The sections below describe what 2.0.0 will contain.
+The first release.
 
 ## Model and benchmark-input publication
 

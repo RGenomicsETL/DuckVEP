@@ -1,4 +1,4 @@
-# Rduckvep 1.5.2.9002.0.1.0 — CRAN submission comments
+# Rduckvep 2.0.0.0.1.0 — CRAN submission comments
 
 ## Test environments
 
@@ -18,11 +18,10 @@ Status: 1 NOTE
 ```
 * checking CRAN incoming feasibility ... NOTE
 New submission
-Version contains large components (1.5.2.9002.0.1.0)
 ```
 
-The version note belongs to the development version. The submitted version is
-`2.0.0.0.1.0`: the bundled extension version followed by the package revision.
+The version `2.0.0.0.1.0` is the bundled extension version followed by the
+package revision.
 
 ## Notes for the reviewer
 
