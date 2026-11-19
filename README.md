@@ -14,7 +14,7 @@
 
 DuckVEP is a C extension on DuckDB’s stable C API v1. CI builds and tests it against DuckDB 1.5.6, and the same build loads in DuckDB 2.0.0. Build it from source and load it unsigned:
 
-``` sh
+```sh
 git clone --recurse-submodules https://github.com/RGenomicsETL/DuckVEP
 cd DuckVEP
 make configure release test_release
@@ -29,26 +29,26 @@ An experimental host targets DuckDB 2.0.0’s version-locked C API v2 ([docs/v2-
 
 The [duckvep-models](https://huggingface.co/datasets/RgenomicsETL/duckvep-models) dataset holds one DuckDB file per assembly. The [dataset card](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/blob/main/README.md) gives the load queries, and [`SHA256SUMS`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/blob/main/SHA256SUMS) lists the checksums.
 
-| Model | File | Size |
-|---|---|---:|
-| Human GRCh38 | [`homo_sapiens_116_GRCh38.duckdb`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/resolve/main/ensembl-116/homo_sapiens_116_GRCh38.duckdb) | 1.8 GB |
-| Human GRCh37 | [`homo_sapiens_116_GRCh37.duckdb`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/resolve/main/ensembl-116/homo_sapiens_116_GRCh37.duckdb) | 0.3 GB |
-| MANE on GRCh37 | [`mane-grch37/`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/tree/main/ensembl-116/mane-grch37) (mapping, transcript authorities, receipt) | 8 MB |
+| Model          | File                                                                                                                                                       |   Size |
+|----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|-------:|
+| Human GRCh38   | [`homo_sapiens_116_GRCh38.duckdb`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/resolve/main/ensembl-116/homo_sapiens_116_GRCh38.duckdb)    | 1.8 GB |
+| Human GRCh37   | [`homo_sapiens_116_GRCh37.duckdb`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/resolve/main/ensembl-116/homo_sapiens_116_GRCh37.duckdb)    | 0.3 GB |
+| MANE on GRCh37 | [`mane-grch37/`](https://huggingface.co/datasets/RgenomicsETL/duckvep-models/tree/main/ensembl-116/mane-grch37) (mapping, transcript authorities, receipt) |   8 MB |
 
 Attach a file in place, or download it first:
 
-``` sql
+```sql
 INSTALL httpfs; LOAD httpfs;
 ATTACH 'hf://datasets/RgenomicsETL/duckvep-models/ensembl-116/homo_sapiens_116_GRCh38.duckdb' AS src (READ_ONLY);
 ```
 
-A download link without a revision follows the dataset's `main` branch. Record the dataset revision and the file checksum with any result you keep. [Publishing to Hugging Face](docs/publishing-hugging-face.md) describes how these files are staged, checked and uploaded.
+A download link without a revision follows the dataset’s `main` branch. Record the dataset revision and the file checksum with any result you keep. [Publishing to Hugging Face](docs/publishing-hugging-face.md) describes how these files are staged, checked and uploaded.
 
 ## Try it
 
 A model is loaded from three relations: regions, transcripts (with CDS and flanking sequence) and exons. In practice they come from an Ensembl core database through `query(duckvep_ensembl_regions_sql(...))` and `query(duckvep_ensembl_transcripts_sql(...))`; here a [one-transcript fixture](test/data/duckvep/readme.sql) stands in:
 
-``` sql
+```sql
 SELECT loaded FROM duckvep_model_load('demo',
   'SELECT * FROM readme_regions ORDER BY seq_region',
   'SELECT * FROM readme_transcripts ORDER BY seq_region, transcript_start',
@@ -63,7 +63,7 @@ SELECT loaded FROM duckvep_model_load('demo',
 
 The model stays resident in the session. Annotate seven variants, from the 5′ UTR to the intron, and join the results back to the input:
 
-``` sql
+```sql
 CREATE TABLE demo_events AS
 SELECT row_number() OVER (ORDER BY position, alternate)::UBIGINT AS event_index,
        1::UINTEGER AS seq_region, position::UBIGINT AS position, reference, alternate,
@@ -96,7 +96,7 @@ The frameshift and the stop gain escape nonsense-mediated decay because they fal
 
 The empty HGVS fields are deliberate: this model was loaded without a reference FASTA, and those notations need flanking sequence to shift and render. Every row says why:
 
-``` sql
+```sql
 SELECT e.position, a.transcript_hgvs_status, a.transcript_hgvs_reason
 FROM query(duckvep_annotate_sql('demo_events', 'demo', struct_pack(hgvs := true))) a
 JOIN demo_events e USING (event_index)
@@ -115,7 +115,7 @@ ORDER BY e.position;
 
 Phased genotypes give whole-haplotype consequences. The changes at 124 and 125 sit in the same codon (Val2): alone, one is missense and the other synonymous; on the same haplotype they make one codon, GTA to GCG, classified once:
 
-``` sql
+```sql
 CREATE TABLE demo_calls AS
 SELECT event_index, seq_region, position, reference, alternate,
        1::UINTEGER alt_index, 0::UINTEGER transcript_index, 0::UBIGINT sample_index,
@@ -137,7 +137,7 @@ For VCF or BCF input, [`duckvep_coding_calls(model, path)`](docs/functions.md#du
 
 ## How close to VEP
 
-Across 9 recorded corpora, executable Ensembl VEP and DuckVEP agree on **1,676,727 of 1,676,727 transcript and feature pairs**; 0 are unresolved and 0 differ. The corpora cover GRCh37 and GRCh38, *Plasmodium falciparum* genetic codes, small variants, exact structural events, paired breakends, and regulatory and motif features. HGVS against VEP `--hgvs`: 358,074 of 358,074 HGVSc and 358,074 of 358,074 HGVSp pairs agree, 56,998 of them from ClinVar chromosome 21. The displayed corpus rows are dated 2026-11-15; the displayed HGVS rows are dated 2026-11-15. These are historical recorded results, not measurements of this checkout; changes merged after their source revisions are not covered until the corpora are rerun.
+Across 9 recorded corpora, executable Ensembl VEP and DuckVEP agree on **1,676,727 of 1,676,727 transcript and feature pairs**; 0 are unresolved and 0 differ. The corpora cover GRCh37 and GRCh38, *Plasmodium falciparum* genetic codes, small variants, exact structural events, paired breakends, and regulatory and motif features. HGVS against VEP `--hgvs`: 358,074 of 358,074 HGVSc and 358,074 of 358,074 HGVSp pairs agree, 56,998 of them from ClinVar chromosome 21. The displayed corpus rows are dated 2026-11-19; the displayed HGVS rows are dated 2026-11-19. These are historical recorded results, not measurements of this checkout; changes merged after their source revisions are not covered until the corpora are rerun.
 
 The [conformance report](benchmarks/duckvep_conformance.md) has the methods and term-level results; the [consequence](test/duckvep/conformance/data/conformance_history.csv) and [HGVS](test/duckvep/conformance/data/hgvs_history.csv) ledgers hold every run with its source revision.
 
@@ -149,14 +149,14 @@ Per-corpus counts
 | Corpus                                 | Assembly        | Oracle  |   Pairs |   Exact | Unresolved | Different | Run date   |
 |:---------------------------------------|:----------------|:--------|--------:|--------:|-----------:|----------:|:-----------|
 | dbSNP 157 windows                      | GRCh38          | VEP 116 |  73,620 |  73,620 |          0 |         0 | 2026-07-14 |
-| GIAB HG002 small variants              | GRCh38          | VEP 116 | 109,275 | 109,275 |          0 |         0 | 2026-11-15 |
-| ClinVar coding                         | GRCh38          | VEP 116 | 316,019 | 316,019 |          0 |         0 | 2026-11-15 |
+| GIAB HG002 small variants              | GRCh38          | VEP 116 | 109,275 | 109,275 |          0 |         0 | 2026-11-19 |
+| ClinVar coding                         | GRCh38          | VEP 116 | 316,019 | 316,019 |          0 |         0 | 2026-11-19 |
 | ClinVar, all chromosomes               | GRCh38          | VEP 116 | 316,397 | 316,397 |          0 |         0 | 2026-07-16 |
-| GRCh37 cache corpus                    | GRCh37          | VEP 116 | 602,224 | 602,224 |          0 |         0 | 2026-11-15 |
-| *P. falciparum* (Ensembl Genomes 63)   | GCA_000002765v3 | VEP 116 |  32,131 |  32,131 |          0 |         0 | 2026-11-15 |
-| Paired breakends, multi-chromosome     | GRCh38          | VEP 116 |  91,428 |  91,428 |          0 |         0 | 2026-11-15 |
-| GIAB + regulatory and motif features   | GRCh38          | VEP 116 |  15,409 |  15,409 |          0 |         0 | 2026-11-15 |
-| Exact structural variants + regulation | GRCh38          | VEP 116 | 120,224 | 120,224 |          0 |         0 | 2026-11-15 |
+| GRCh37 cache corpus                    | GRCh37          | VEP 116 | 602,224 | 602,224 |          0 |         0 | 2026-11-19 |
+| *P. falciparum* (Ensembl Genomes 63)   | GCA_000002765v3 | VEP 116 |  32,131 |  32,131 |          0 |         0 | 2026-11-19 |
+| Paired breakends, multi-chromosome     | GRCh38          | VEP 116 |  91,428 |  91,428 |          0 |         0 | 2026-11-19 |
+| GIAB + regulatory and motif features   | GRCh38          | VEP 116 |  15,409 |  15,409 |          0 |         0 | 2026-11-19 |
+| Exact structural variants + regulation | GRCh38          | VEP 116 | 120,224 | 120,224 |          0 |         0 | 2026-11-19 |
 
 </details>
 
@@ -180,9 +180,9 @@ Measured on one host (Intel i5-13500, cores pinned) with the Ensembl 116 GRCh38 
 
 | Workload                                                        | DuckVEP                                       | Comparison                                                                  |
 |-----------------------------------------------------------------|-----------------------------------------------|-----------------------------------------------------------------------------|
-| Annotate GIAB HG002 (4,095,611 alleles), consequence codes only | 1,090,418 alleles/s on 1 core; 4,031,113 on 4 |                                                                             |
-| Same, with rich columns and HGVS                                | 174,772 alleles/s on 1 core; 626,528 on 4     |                                                                             |
-| HG002 end to end on 1 core: read VCF, annotate, write output    | 35.0 s, 2.7 GiB peak                          | [vep-rs](https://github.com/natera-open-source/vep-rs) 41.9 s, 2.8 GiB peak |
+| Annotate GIAB HG002 (4,095,611 alleles), consequence codes only | 1,216,759 alleles/s on 1 core; 4,380,333 on 4 |                                                                             |
+| Same, with rich columns and HGVS                                | 164,608 alleles/s on 1 core; 584,169 on 4     |                                                                             |
+| HG002 end to end on 1 core: read VCF, annotate, write output    | 34.3 s, 2.7 GiB peak                          | [vep-rs](https://github.com/natera-open-source/vep-rs) 41.2 s, 2.8 GiB peak |
 | HG002 whole haplotypes on 1 core, model load included           | 8.7 s from the CLI, 9.1 s from R              | `bcftools csq` 17.1 s                                                       |
 | Load the model                                                  | 0.55 s from a snapshot (1.3 GiB)              | 2.33 s from relations (1.48 s on 8 threads)                                 |
 
@@ -206,7 +206,7 @@ Untested species and releases, and genomic or structural HGVS beyond the [exact-
 
 `Rduckvep` runs the same builders on your DuckDB connection: builder functions return SQL, and `rduckvep_annotate()` runs it and returns a data frame. Queries can read anything on that connection, TEMP tables included.
 
-``` r
+```r
 con <- Rduckvep::rduckvep_connect()
 # After loading a model named "demo" and creating "demo_events":
 results <- Rduckvep::rduckvep_annotate(con, "demo_events", "demo", hgvs = TRUE)
@@ -217,7 +217,7 @@ DBI::dbDisconnect(con, shutdown = TRUE)
 
 DuckVEP needs no other extension, but it is meant to share a query with them: [DuckHTS](https://github.com/RGenomicsETL/duckhts) reads the VCF and [DuckClinVarbitration](https://github.com/RGenomicsETL/DuckClinVarbitration) supplies arbitrated ClinVar decisions. Not evaluated here, since it needs a full Ensembl model and both extensions:
 
-``` sql
+```sql
 -- The model's regions under the VCF's own contig names: DuckHTS reads the header, and
 -- duckhts_contig_key maps each name (chr1, chrM) to Ensembl's (1, MT). Breakend mates
 -- written in ALT (A[chr2:200[) resolve through the same rows.

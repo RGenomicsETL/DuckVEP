@@ -113,14 +113,14 @@ Exact counts, corpus revisions and descriptive pair statistics
 | revision | corpus                            | model                      | assembly       | species               | oracle_source | oracle    |  pairs | exact         | unresolved | resolved_disagreements | engine_extra | engine_missing | descriptive_independent_pair_upper_95 |
 |:---------|:----------------------------------|:---------------------------|:---------------|:----------------------|:--------------|:----------|-------:|:--------------|-----------:|-----------------------:|-------------:|---------------:|:--------------------------------------|
 | b204dd49 | GRCh38 dbSNP                      | final-dbsnp                | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  73620 | 73620/73620   |          0 |                      0 |            0 |              0 | 0.01%                                 |
-| 39760c1b | GRCh38 GIAB                       | final-giab                 | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 109275 | 109275/109275 |          0 |                      0 |            0 |              0 | 0.00%                                 |
-| b8d1733f | GRCh38 ClinVar coding             | final-coding               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 316019 | 316019/316019 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 345514d6 | GRCh38 GIAB                       | final-giab                 | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 109275 | 109275/109275 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 345514d6 | GRCh38 ClinVar coding             | final-coding               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 316019 | 316019/316019 |          0 |                      0 |            0 |              0 | 0.00%                                 |
 | 22803a40 | GRCh38 ClinVar cross-chromosome   | final-clinvar              | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 316397 | 316397/316397 |          0 |                      0 |            0 |              0 | 0.00%                                 |
-| 7dd90ce8 | GRCh37                            | final-grch37               | GRCh37         | homo_sapiens          | cache         | VEP 116.0 | 486464 | 486464/486464 |          0 |                      0 |            0 |              0 | 0.00%                                 |
-| 41a8a423 | P. falciparum                     | plasmodium-falciparum-63   | GCA000002765v3 | plasmodium_falciparum | cache         | VEP 116.0 |  32131 | 32131/32131   |          0 |                      0 |            0 |              0 | 0.01%                                 |
-| 116854e9 | GRCh38 paired BND                 | grch38_breakend_multichrom | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  91428 | 91428/91428   |          0 |                      0 |            0 |              0 | 0.00%                                 |
-| 7ce94fce | GRCh38 GIAB + core regulation     | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  15409 | 15409/15409   |          0 |                      0 |            0 |              0 | 0.02%                                 |
-| 579b6f65 | GRCh38 exact SV + core regulation | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 120224 | 120224/120224 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 6f461e7b | GRCh37                            | final-grch37               | GRCh37         | homo_sapiens          | cache         | VEP 116.0 | 602224 | 602224/602224 |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 6f461e7b | P. falciparum                     | plasmodium-falciparum-63   | GCA000002765v3 | plasmodium_falciparum | cache         | VEP 116.0 |  32131 | 32131/32131   |          0 |                      0 |            0 |              0 | 0.01%                                 |
+| 345514d6 | GRCh38 paired BND                 | grch38_breakend_multichrom | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  91428 | 91428/91428   |          0 |                      0 |            0 |              0 | 0.00%                                 |
+| 6f461e7b | GRCh38 GIAB + core regulation     | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 |  15409 | 15409/15409   |          0 |                      0 |            0 |              0 | 0.02%                                 |
+| 6f461e7b | GRCh38 exact SV + core regulation | differential               | GRCh38         | homo_sapiens          | cache         | VEP 116.0 | 120224 | 120224/120224 |          0 |                      0 |            0 |              0 | 0.00%                                 |
 
 </details>
 
@@ -145,8 +145,8 @@ Full conformance ledger, properties and species receipts
 
 | revision | corpus                          | model        | metric | exact           | match | both_absent | discordant |
 |:---------|:--------------------------------|:-------------|:-------|:----------------|------:|------------:|-----------:|
-| 35ebf46b | clinvar_chr21_hgvs_seed113      | differential | HGVSC  | 56,998/56,998   | 44871 |       12127 |          0 |
-| 35ebf46b | clinvar_chr21_hgvs_seed113      | differential | HGVSP  | 56,998/56,998   | 20782 |       36216 |          0 |
+| 6f461e7b | clinvar_chr21_hgvs_seed113      | differential | HGVSC  | 56,998/56,998   | 44871 |       12127 |          0 |
+| 6f461e7b | clinvar_chr21_hgvs_seed113      | differential | HGVSP  | 56,998/56,998   | 20782 |       36216 |          0 |
 | 6ce2ddd8 | hgvs_terminal_multiplication    | differential | HGVSC  | 4/4             |     1 |           3 |          0 |
 | 6ce2ddd8 | hgvs_terminal_multiplication    | differential | HGVSP  | 4/4             |     0 |           4 |          0 |
 | 6ce2ddd8 | state_exploration_seed_16180339 | differential | HGVSC  | 100,268/100,268 | 99169 |        1099 |          0 |
@@ -160,7 +160,7 @@ Full conformance ledger, properties and species receipts
 
 | revision | corpus                          | extension_build               | extension    | model_kind | model        | reference    | reference_index | source_vcf   | input_vcf    | pair_artifact |
 |:---------|:--------------------------------|:------------------------------|:-------------|:-----------|:-------------|:-------------|:----------------|:-------------|:-------------|:--------------|
-| 35ebf46b | clinvar_chr21_hgvs_seed113      | htslib_distclean_make_release | 3e92ad1ade9a | duckdb     | 0301905915b0 | 1e74081a49ce | 0998f61682f4    | 7ecec9a75071 | 7ecec9a75071 | 6cbedcb84af7  |
+| 6f461e7b | clinvar_chr21_hgvs_seed113      | htslib_distclean_make_release | fbdd4b783e2e | duckdb     | 0301905915b0 | 1e74081a49ce | 0998f61682f4    | 7ecec9a75071 | 7ecec9a75071 | a46d4f7fd2bb  |
 | 6ce2ddd8 | hgvs_terminal_multiplication    | htslib_distclean_make_release | 3213f0a209bf | sql        | b21fbeac2c28 | 01d1f0252130 | 154cbe440869    | bfa15d2786f3 | c4182bf1b769 | eb37a23b382c  |
 | 6ce2ddd8 | state_exploration_seed_16180339 | htslib_distclean_make_release | 3213f0a209bf | sql        | b21fbeac2c28 | 01d1f0252130 | 154cbe440869    | 2d8315a4926a | 53150698e457 | ce7688057f5b  |
 | 6ce2ddd8 | state_exploration_seed_27182818 | htslib_distclean_make_release | 3213f0a209bf | sql        | b21fbeac2c28 | 01d1f0252130 | 154cbe440869    | ec5a793adc6b | 8486a6b4c05e | 2aba7e180609  |
@@ -206,7 +206,7 @@ gate.
 
 | revision | generated_events | transcript_pairs | exact         | unresolved | extra | missing | descriptive_independent_pair_upper_95 |
 |:---------|:-----------------|:-----------------|:--------------|-----------:|------:|--------:|:--------------------------------------|
-| 116854e9 | 1,004            | 91,428           | 91,428/91,428 |          0 |     0 |       0 | 0.00%                                 |
+| 345514d6 | 1,004            | 91,428           | 91,428/91,428 |          0 |     0 |       0 | 0.00%                                 |
 
 The generated seed-31 corpus spans chromosomes 1, 2, 7, 21, and X;
 intra- and interchromosomal mates; all four VCF bracket orientations;
@@ -360,6 +360,7 @@ recorded.
 | 2026-11-15 | 35ebf46b        | clinvar_chr21_hgvs_seed113                               | differential               |   56998 |       56998 |          0 |      56998 |                   0 | 100.00%    | 0.01%                                 |
 | 2026-11-15 | 39760c1b        | final_giab_grch38_seed71                                 | final-giab                 |  109275 |      109275 |          0 |     109275 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-11-15 | 41a8a423        | plasmodium-falciparum-vep63-seed11663                    | plasmodium-falciparum-63   |   32131 |       32131 |          0 |      32131 |                   0 | 100.00%    | 0.01%                                 |
+| 2026-11-15 | 4a94c34e        | final_grch37_cache_seed37                                | final-grch37               |  602224 |      602224 |          0 |     602224 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-11-15 | 579b6f65        | regulation_sv_chr21_seed17                               | differential               |  120224 |      120224 |          0 |     120224 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-11-15 | 5c1df7c4        | generated_sv_chr22_seed401                               | differential               |  547182 |      547182 |          0 |     547182 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-11-15 | 7ce94fce        | regulation_giab_chr21_seed1                              | differential               |   15409 |       15409 |          0 |      15409 |                   0 | 100.00%    | 0.02%                                 |
@@ -367,6 +368,17 @@ recorded.
 | 2026-11-15 | adf68dfe        | witnesses                                                | differential               |     268 |         268 |          0 |        268 |                   0 | 100.00%    | 1.37%                                 |
 | 2026-11-15 | b8d1733f        | final_clinvar_coding_seed113                             | final-coding               |  316019 |      316019 |          0 |     316019 |                   0 | 100.00%    | 0.00%                                 |
 | 2026-11-15 | e002f531        | nmd_clinvar_chr21                                        | ensembl116-grch38-final    | 1353288 |     1353288 |          0 |    1353288 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-19 | 345514d6        | breakend_multichrom_seed31_isolated                      | grch38_breakend_multichrom |   91428 |       91428 |          0 |      91428 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-19 | 345514d6        | final_clinvar_coding_seed113                             | final-coding               |  316019 |      316019 |          0 |     316019 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-19 | 345514d6        | final_giab_grch38_seed71                                 | final-giab                 |  109275 |      109275 |          0 |     109275 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-19 | 345514d6        | generated_sv_chr22_seed401                               | differential               |  547182 |      547182 |          0 |     547182 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-19 | 6f461e7b        | clinvar_chr21_hgvs_seed113                               | differential               |   56998 |       56998 |          0 |      56998 |                   0 | 100.00%    | 0.01%                                 |
+| 2026-11-19 | 6f461e7b        | final_grch37_cache_seed37                                | final-grch37               |  602224 |      602224 |          0 |     602224 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-19 | 6f461e7b        | nmd_clinvar_chr21                                        | ensembl116-grch38-final    | 1353288 |     1353288 |          0 |    1353288 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-19 | 6f461e7b        | plasmodium-falciparum-vep63-seed11663                    | plasmodium-falciparum-63   |   32131 |       32131 |          0 |      32131 |                   0 | 100.00%    | 0.01%                                 |
+| 2026-11-19 | 6f461e7b        | regulation_giab_chr21_seed1                              | differential               |   15409 |       15409 |          0 |      15409 |                   0 | 100.00%    | 0.02%                                 |
+| 2026-11-19 | 6f461e7b        | regulation_sv_chr21_seed17                               | differential               |  120224 |      120224 |          0 |     120224 |                   0 | 100.00%    | 0.00%                                 |
+| 2026-11-19 | 6f461e7b        | state_exploration_seed_31415927                          | differential               |  100268 |      100268 |          0 |     100268 |                   0 | 100.00%    | 0.00%                                 |
 
 ## Randomized executable-VEP state exploration
 
@@ -380,8 +392,8 @@ with differing alleles up to 49 bases.
 
 | revision | seed     | pairs   | exact   | unresolved | resolved_disagreements | descriptive_independent_pair_upper_95_ppm |
 |:---------|:---------|:--------|:--------|:-----------|:-----------------------|:------------------------------------------|
-| 92ad6050 | 31415927 | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
-| 92ad6050 | combined | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
+| 6f461e7b | 31415927 | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
+| 6f461e7b | combined | 100,268 | 100,268 | 0          | 0                      | 36.8                                      |
 
 The combined denominator counts pair comparisons across seed runs, not
 distinct alleles: the 268 fixed witnesses are deliberately shared and
@@ -1370,7 +1382,7 @@ counted once within each corpus.
 | GRCh38 ClinVar cross-chromosome   | HIGH     |  79663 |       79663 |          0 |      79663 |                   0 | 100.00%    | 0.00%                                 |
 | GRCh38 dbSNP                      | HIGH     |    118 |         118 |          0 |        118 |                   0 | 100.00%    | 3.08%                                 |
 | GRCh38 GIAB                       | HIGH     |     31 |          31 |          0 |         31 |                   0 | 100.00%    | 11.22%                                |
-| GRCh37                            | HIGH     |  46645 |       46645 |          0 |      46645 |                   0 | 100.00%    | 0.01%                                 |
+| GRCh37                            | HIGH     |   6997 |        6997 |          0 |       6997 |                   0 | 100.00%    | 0.05%                                 |
 | P. falciparum                     | HIGH     |   1296 |        1296 |          0 |       1296 |                   0 | 100.00%    | 0.28%                                 |
 | GRCh38 GIAB + core regulation     | HIGH     |      5 |           5 |          0 |          5 |                   0 | 100.00%    | 52.18%                                |
 | GRCh38 exact SV + core regulation | HIGH     |  40135 |       40135 |          0 |      40135 |                   0 | 100.00%    | 0.01%                                 |
@@ -1378,7 +1390,7 @@ counted once within each corpus.
 | GRCh38 ClinVar cross-chromosome   | LOW      |  28776 |       28776 |          0 |      28776 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 dbSNP                      | LOW      |    349 |         349 |          0 |        349 |                   0 | 100.00%    | 1.05%                                 |
 | GRCh38 GIAB                       | LOW      |    201 |         201 |          0 |        201 |                   0 | 100.00%    | 1.82%                                 |
-| GRCh37                            | LOW      |  23354 |       23354 |          0 |      23354 |                   0 | 100.00%    | 0.02%                                 |
+| GRCh37                            | LOW      |   4588 |        4588 |          0 |       4588 |                   0 | 100.00%    | 0.08%                                 |
 | P. falciparum                     | LOW      |    190 |         190 |          0 |        190 |                   0 | 100.00%    | 1.92%                                 |
 | GRCh38 GIAB + core regulation     | LOW      |     35 |          35 |          0 |         35 |                   0 | 100.00%    | 10.00%                                |
 | GRCh38 exact SV + core regulation | LOW      |    821 |         821 |          0 |        821 |                   0 | 100.00%    | 0.45%                                 |
@@ -1386,7 +1398,7 @@ counted once within each corpus.
 | GRCh38 ClinVar cross-chromosome   | MODERATE |  43286 |       43286 |          0 |      43286 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 dbSNP                      | MODERATE |    125 |         125 |          0 |        125 |                   0 | 100.00%    | 2.91%                                 |
 | GRCh38 GIAB                       | MODERATE |    171 |         171 |          0 |        171 |                   0 | 100.00%    | 2.13%                                 |
-| GRCh37                            | MODERATE |  23319 |       23319 |          0 |      23319 |                   0 | 100.00%    | 0.02%                                 |
+| GRCh37                            | MODERATE |   4861 |        4861 |          0 |       4861 |                   0 | 100.00%    | 0.08%                                 |
 | P. falciparum                     | MODERATE |    957 |         957 |          0 |        957 |                   0 | 100.00%    | 0.38%                                 |
 | GRCh38 GIAB + core regulation     | MODERATE |     57 |          57 |          0 |         57 |                   0 | 100.00%    | 6.27%                                 |
 | GRCh38 exact SV + core regulation | MODERATE |    766 |         766 |          0 |        766 |                   0 | 100.00%    | 0.48%                                 |
@@ -1395,7 +1407,7 @@ counted once within each corpus.
 | GRCh38 ClinVar cross-chromosome   | MODIFIER | 164672 |      164672 |          0 |     164672 |                   0 | 100.00%    | 0.00%                                 |
 | GRCh38 dbSNP                      | MODIFIER |  73028 |       73028 |          0 |      73028 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 GIAB                       | MODIFIER | 108872 |      108872 |          0 |     108872 |                   0 | 100.00%    | 0.00%                                 |
-| GRCh37                            | MODIFIER | 393146 |      393146 |          0 |     393146 |                   0 | 100.00%    | 0.00%                                 |
+| GRCh37                            | MODIFIER | 585778 |      585778 |          0 |     585778 |                   0 | 100.00%    | 0.00%                                 |
 | P. falciparum                     | MODIFIER |  29688 |       29688 |          0 |      29688 |                   0 | 100.00%    | 0.01%                                 |
 | GRCh38 GIAB + core regulation     | MODIFIER |  15312 |       15312 |          0 |      15312 |                   0 | 100.00%    | 0.02%                                 |
 | GRCh38 exact SV + core regulation | MODIFIER |  78502 |       78502 |          0 |      78502 |                   0 | 100.00%    | 0.00%                                 |
@@ -1425,16 +1437,16 @@ with that run is not an identical-workload comparison.
 
 | revision | corpus            | model                   | exact       | mismatches | not comparable | VEP unresolved | DuckVEP unresolved | descriptive independent-pair upper 95% |
 |:---------|:------------------|:------------------------|:------------|-----------:|---------------:|---------------:|-------------------:|:---------------------------------------|
-| e002f531 | nmd_clinvar_chr21 | ensembl116-grch38-final | 70521/70521 |          0 |              0 |          29954 |              29954 | 0.01%                                  |
+| 6f461e7b | nmd_clinvar_chr21 | ensembl116-grch38-final | 70521/70521 |          0 |              0 |          29954 |              29954 | 0.01%                                  |
 
 The ledger keeps the prediction confusion matrix rather than only the
 total:
 
 | revision | corpus            | VEP_prediction | DuckVEP_prediction |     n |
 |:---------|:------------------|:---------------|:-------------------|------:|
-| e002f531 | nmd_clinvar_chr21 | escaping       | escaping           |  7175 |
-| e002f531 | nmd_clinvar_chr21 | triggering     | triggering         | 33392 |
-| e002f531 | nmd_clinvar_chr21 | unresolved     | unresolved         | 29954 |
+| 6f461e7b | nmd_clinvar_chr21 | escaping       | escaping           |  7175 |
+| 6f461e7b | nmd_clinvar_chr21 | triggering     | triggering         | 33392 |
+| 6f461e7b | nmd_clinvar_chr21 | unresolved     | unresolved         | 29954 |
 
 VEP projects the complete uploaded `VariationFeature` for the plugin’s
 CDS and exon-position rules. DuckVEP therefore retains both geometries:
