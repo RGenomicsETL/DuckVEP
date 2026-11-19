@@ -39,9 +39,13 @@ shard_of <- function(files) sub("^.*/((genomes|exomes)-chr[0-9XY]+)/part-.*$", "
 description <- function(dir) {
   s <- sources_of(dir)
   shards <- unique(shard_of(s$file))
+  chromosomes <- sub("^.*-chr", "", shards)
+  # Autosomes in numeric order, then the remaining names in text order.
+  autosome <- grepl("^[0-9]{1,3}$", chromosomes)
+  number <- rep(NA_integer_, length(chromosomes))
+  number[autosome] <- as.integer(chromosomes[autosome])
   list(sets = paste(sort(unique(sub("-chr.*$", "", shards))), collapse = ","),
-    chromosomes = paste(sub("^.*-chr", "", shards)[order(suppressWarnings(as.integer(sub("^.*-chr", "", shards))),
-      sub("^.*-chr", "", shards))], collapse = ","),
+    chromosomes = paste(chromosomes[order(number, chromosomes)], collapse = ","),
     parts = nrow(s), sources_sha256 = sha256(file.path(dir, "sources.tsv")))
 }
 git_revision <- tryCatch(system2("git", c("-C", repo, "rev-parse", "HEAD"), stdout = TRUE), error = function(e) "unknown")
