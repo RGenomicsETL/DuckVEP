@@ -121,7 +121,7 @@ typedef enum {
     DUCKVEP_REASON_NONCANONICAL_STOP,
     DUCKVEP_REASON_INTERNAL_STOP,
     DUCKVEP_REASON_NON_LITERAL_ALLELE,
-    /* No longer emitted since slice 5 (every eligible path is decided); kept so the numbering is stable. */
+    /* Reserved: never emitted, because every eligible path is decided. It keeps the numbering stable. */
     DUCKVEP_REASON_START_STOP_CLASSIFIER_PENDING,
     DUCKVEP_REASON_NMD_GEOMETRY_UNAVAILABLE,
     DUCKVEP_REASON_SEQUENCE_CAPACITY,

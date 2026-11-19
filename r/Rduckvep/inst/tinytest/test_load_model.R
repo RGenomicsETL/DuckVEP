@@ -21,13 +21,13 @@ expect_true(rduckvep_load_model(con, "lm", "SELECT * FROM lm_regions ORDER BY se
 expect_error(rduckvep_load_model(con, "lm", "SELECT * FROM lm_regions ORDER BY seq_region",
   "SELECT * FROM lm_transcripts ORDER BY seq_region, transcript_start",
   "SELECT * FROM lm_exons ORDER BY transcript_index, exon_start"), "already exists")
-expect_error(rduckvep_load_model(con, "", "a", "b", "c"), "non-empty")
+expect_error(rduckvep_load_model(con, "", "a", "b", "c"), "name must be one nonempty string")
 snapshot <- tempfile(fileext = ".dvsnap")
 expect_true(rduckvep_save_model(con, "lm", snapshot))
 expect_true(rduckvep_restore_model(con, "lm_restored", snapshot))
 expect_true(dbGetQuery(con, "SELECT _duckvep_model_fingerprint('lm') = _duckvep_model_fingerprint('lm_restored') AS same")$same)
 expect_error(rduckvep_restore_model(con, "lm_restored", snapshot), "already exists")
-expect_error(rduckvep_save_model(con, "", snapshot), "non-empty")
+expect_error(rduckvep_save_model(con, "", snapshot), "name must be one nonempty string")
 expect_error(rduckvep_restore_model(con, "lm_missing", tempfile()), "cannot open")
 expect_true(dbGetQuery(con, "SELECT duckvep_model_drop('lm_restored') AS dropped")$dropped)
 unlink(snapshot)

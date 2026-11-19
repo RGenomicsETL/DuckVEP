@@ -1,3 +1,19 @@
+# Named workspace capacities as SQL integer literals.
+.duckvep_capacity_literals <- function(limits) {
+  keys <- names(limits)
+  if (length(limits) > 0L &&
+      (is.null(keys) || anyDuplicated(keys) > 0L || !all(grepl("^[a-z][a-z_]*$", keys)))) {
+    stop("capacities must have unique SQL parameter names", call. = FALSE)
+  }
+  Map(function(name, value) {
+    whole <- is.numeric(value) && length(value) == 1L && is.finite(value) && value == floor(value)
+    if (!whole || value <= 0 || value > 2^53) {
+      stop(name, " must be one positive, exactly representable integer", call. = FALSE)
+    }
+    format(value, scientific = FALSE, trim = TRUE)
+  }, keys, limits)
+}
+
 #' Replay Phased Transcript Haplotypes
 #'
 #' Consume a SELECT query of flat event-by-transcript-by-sample calls through
@@ -143,39 +159,18 @@ rduckvep_haplotypes <- function(con, calls_query, model_name,
                                phase_policy = c("strict", "vep_compat"),
                                ..., input_mode = c("alt_events", "source_records"),
                                hgvs = FALSE, table_name = NULL, overwrite = FALSE) {
-  if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
-    stop("overwrite must be TRUE or FALSE", call. = FALSE)
-  }
   .duckvep_check_table_target(con, table_name, overwrite)
-  for (name in c("calls_query", "model_name")) {
-    value <- get(name)
-    if (!is.character(value) || length(value) != 1L || is.na(value) || !nzchar(value)) {
-      stop(name, " must be one nonempty string", call. = FALSE)
-    }
-  }
+  .duckvep_check_strings(calls_query = calls_query, model_name = model_name)
   phase_policy <- match.arg(phase_policy)
   input_mode <- match.arg(input_mode)
   if (input_mode == "source_records" && phase_policy != "vep_compat") {
     stop("source_records requires phase_policy='vep_compat'", call. = FALSE)
   }
-  if (!is.logical(hgvs) || length(hgvs) != 1L || is.na(hgvs)) {
-    stop("hgvs must be TRUE or FALSE", call. = FALSE)
-  }
-  limits <- list(...)
-  if (length(limits) && (is.null(names(limits)) || anyDuplicated(names(limits)) ||
-      any(!grepl("^[a-z][a-z_]*$", names(limits))))) {
-    stop("capacities must have unique SQL parameter names", call. = FALSE)
-  }
-  params <- list(phase_policy = sql_quote_string(con, phase_policy),
-                 input_mode = sql_quote_string(con, input_mode), hgvs = if (hgvs) "TRUE" else "FALSE")
-  for (name in names(limits)) {
-    value <- limits[[name]]
-    if (!is.numeric(value) || length(value) != 1L || !is.finite(value) ||
-        value <= 0 || value > 2^53 || value != floor(value)) {
-      stop(name, " must be one positive, exactly representable integer", call. = FALSE)
-    }
-    params[[name]] <- format(value, scientific = FALSE, trim = TRUE)
-  }
+  if (!isTRUE(hgvs) && !isFALSE(hgvs)) stop("hgvs must be TRUE or FALSE", call. = FALSE)
+  params <- c(list(phase_policy = sql_quote_string(con, phase_policy),
+                   input_mode = sql_quote_string(con, input_mode),
+                   hgvs = if (hgvs) "TRUE" else "FALSE"),
+              .duckvep_capacity_literals(list(...)))
   if (.duckvep_is_v2(con)) {
     job <- basename(tempfile("rduckvep_haplotypes_"))
     options <- paste0("struct_pack(", paste(paste0(names(params), " := ", unlist(params)),
@@ -192,9 +187,7 @@ rduckvep_haplotypes <- function(con, calls_query, model_name,
     query <- paste0("SELECT * FROM duckvep_haplotypes(", sql_quote_string(con, calls_query),
                     ",", sql_quote_string(con, model_name), build_param_str(params), ")")
   }
-  if (is.null(table_name)) return(DBI::dbGetQuery(con, query))
-  .duckvep_create_table(con, table_name, query, overwrite)
-  invisible(TRUE)
+  .duckvep_query_result(con, query, table_name, overwrite)
 }
 
 #' Find the Transcripts Whose Coding Sequence Events Overlap
@@ -228,23 +221,13 @@ rduckvep_haplotypes <- function(con, calls_query, model_name,
 #' @export
 rduckvep_coding_transcripts <- function(con, events_query, model_name,
                                         table_name = NULL, overwrite = FALSE) {
-  if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
-    stop("overwrite must be TRUE or FALSE", call. = FALSE)
-  }
   .duckvep_check_table_target(con, table_name, overwrite)
-  for (name in c("events_query", "model_name")) {
-    value <- get(name)
-    if (!is.character(value) || length(value) != 1L || is.na(value) || !nzchar(value)) {
-      stop(name, " must be one nonempty string", call. = FALSE)
-    }
-  }
+  .duckvep_check_strings(events_query = events_query, model_name = model_name)
   query <- paste0("SELECT event_index, unnest(duckvep_coding_transcripts(",
                   sql_quote_string(con, model_name),
                   ", seq_region, \"position\", reference, alternate)) AS transcript_index FROM (",
                   events_query, ") AS events")
-  if (is.null(table_name)) return(DBI::dbGetQuery(con, query))
-  .duckvep_create_table(con, table_name, query, overwrite)
-  invisible(TRUE)
+  .duckvep_query_result(con, query, table_name, overwrite)
 }
 
 #' Read the Coding Calls of a VCF or BCF File
@@ -279,19 +262,9 @@ rduckvep_coding_transcripts <- function(con, events_query, model_name,
 #'   `"SELECT * FROM <table_name>"`.
 #' @export
 rduckvep_coding_calls <- function(con, model_name, path, table_name = NULL, overwrite = FALSE) {
-  if (!is.logical(overwrite) || length(overwrite) != 1L || is.na(overwrite)) {
-    stop("overwrite must be TRUE or FALSE", call. = FALSE)
-  }
   .duckvep_check_table_target(con, table_name, overwrite)
-  for (name in c("model_name", "path")) {
-    value <- get(name)
-    if (!is.character(value) || length(value) != 1L || is.na(value) || !nzchar(value)) {
-      stop(name, " must be one nonempty string", call. = FALSE)
-    }
-  }
+  .duckvep_check_strings(model_name = model_name, path = path)
   query <- paste0("SELECT * FROM duckvep_coding_calls(", sql_quote_string(con, model_name), ", ",
                   sql_quote_string(con, path.expand(path)), ")")
-  if (is.null(table_name)) return(DBI::dbGetQuery(con, query))
-  .duckvep_create_table(con, table_name, query, overwrite)
-  invisible(TRUE)
+  .duckvep_query_result(con, query, table_name, overwrite)
 }

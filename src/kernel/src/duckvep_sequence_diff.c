@@ -197,8 +197,8 @@ duckvep_sequence_diff_status_t duckvep_sequence_differences(
          * 3*(2(w+1)-|m-n|) in gaps, so a banded optimum below that value has every optimal path inside the band,
          * every traceback direction on those paths is unchanged, and the traceback is identical to the full band.
          * Start at the length change and widen (never beyond the bound). Capacity is checked against the band of
-         * each attempt, (n+1) x stride cells, so a long sequence with a short indel no longer needs the trace of its
-         * feasible bound; when the band that is still to be tried does not fit, that band's cell count is reported. */
+         * each attempt, (n+1) x stride cells, so a long sequence with a short indel needs only the trace of a narrow
+         * band, not that of its feasible bound; when the band that is still to be tried does not fit, that band's cell count is reported. */
         size_t gap = n > m ? n - m : m - n, width = minimum(band, gap + 3u);
         size_t prefix = 0u, shared = minimum(n, m);
         while (prefix < shared && ref[prefix] == alt[prefix]) prefix++;
