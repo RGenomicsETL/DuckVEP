@@ -1,0 +1,24 @@
+status	PASS
+v1_duckdb_source	7dbb2e646f
+v2_duckdb_source	d54cbbe3df
+v2_pinned_revision	d54cbbe3df17e8e5ce68312f483b4155836112aa
+v1_duckdb	/root/.local/bin/duckdb
+v2_duckdb	/root/duckvep/data/duckdb-2.0.0/duckdb
+v1_extension	/root/duckvep/DuckVEP/build/release/duckvep.duckdb_extension
+v2_extension	/root/duckvep/DuckVEP/build/release_v2/duckvep.duckdb_extension
+vcf	/root/duckvep/data/hg002-csq/hg002.ens.vcf.gz
+model	/root/duckvep/data/models/homo_sapiens_116_GRCh38_final.duckdb
+cpu_list	4
+threads	1
+memory_limit	8GB
+v1_parquet	/root/duckvep/work/v2-hg002-d4833a5/v1.parquet
+v2_parquet	/root/duckvep/work/v2-hg002-d4833a5/v2.parquet
+v1_model_fingerprint	8650913055114199712
+v2_model_fingerprint	8650913055114199712
+v1_v2_exact_multiset	PASS
+v1_reference	not supplied
+v1_reference_exact_multiset	NOT_RUN
+v1_max_rss_kib	4038968
+v2_max_rss_kib	4689272
+v1_output_bytes	68159626
+v2_output_bytes	68107240
